@@ -50,6 +50,10 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - fichier `firestore.rules`
   - isolation stricte par `userId`
   - suppression autorisee uniquement pour les documents du proprietaire
+- Qualite logicielle renforcee:
+  - suite unitaire etendue a `55` tests metier (auth, compte, pipeline, parsing, stores)
+  - lint ESLint v9 operationnel
+  - typecheck TypeScript sans erreur (`tsc --noEmit`)
 
 ## Fonctionnalites en cours
 
@@ -79,6 +83,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - version revue avec rappel spam et CTA d'activation
 - Moteur KPI pur et sans dependance UI pour testabilite.
 - Tests unitaires privilegies sur logique metier, pas sur rendu UI.
+- Migration lint finalisee pour ESLint v9 via `eslint.config.mjs`.
 
 ## Notes techniques
 

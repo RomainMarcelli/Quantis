@@ -100,7 +100,7 @@ describe("loginWithEmailPassword", () => {
     const gateway: LoginGateway = { signIn };
 
     const result = await loginWithEmailPassword(gateway, {
-      email: "bad-email",
+      email: "bad-email@quantis.io",
       password: "wrong-pass"
     });
 

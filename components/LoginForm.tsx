@@ -36,7 +36,10 @@ export function LoginForm() {
   const [loginErrors, setLoginErrors] = useState<LoginValidationErrors>(EMPTY_LOGIN_ERRORS);
   const [registerErrors, setRegisterErrors] = useState<RegisterValidationErrors>(EMPTY_REGISTER_ERRORS);
 
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isCheckingSession] = useState(() => {
+    const currentUser = firebaseAuthGateway.getCurrentUser();
+    return Boolean(currentUser?.emailVerified);
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [authInfoMessage, setAuthInfoMessage] = useState<string | null>(null);
@@ -46,10 +49,7 @@ export function LoginForm() {
 
     if (currentUser?.emailVerified) {
       router.replace("/dashboard");
-      return;
     }
-
-    setIsCheckingSession(false);
   }, [router]);
 
   useEffect(() => {
@@ -302,7 +302,7 @@ export function LoginForm() {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Taille d'entreprise</span>
+              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Taille d&apos;entreprise</span>
               <div className="quantis-input px-3 py-2">
                 <select
                   value={companySize}
@@ -337,7 +337,7 @@ export function LoginForm() {
                   ))}
                 </select>
               </div>
-              <p className="mt-1 text-xs text-quantis-slate">Choisissez votre secteur principal d'activite.</p>
+              <p className="mt-1 text-xs text-quantis-slate">Choisissez votre secteur principal d&apos;activite.</p>
               {registerErrors.sector ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.sector}</span> : null}
             </label>
           </>
@@ -376,7 +376,7 @@ export function LoginForm() {
                 setPassword("");
               }}
             >
-              S'inscrire
+              S&apos;inscrire
             </button>
           </>
         ) : (

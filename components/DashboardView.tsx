@@ -145,7 +145,7 @@ export function DashboardView() {
 
       {errorMessage ? <div className="quantis-panel border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div> : null}
 
-      {loadingHistory ? <div className="quantis-panel px-4 py-3 text-sm text-quantis-slate">Chargement de l'historique...</div> : null}
+      {loadingHistory ? <div className="quantis-panel px-4 py-3 text-sm text-quantis-slate">Chargement de l&apos;historique...</div> : null}
 
       <KpiSummary kpis={selectedAnalysis?.kpis ?? null} />
 
