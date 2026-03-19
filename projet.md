@@ -16,6 +16,11 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - logo de marque centralise dans `public/images/logo.png` et integre aux ecrans principaux
 - Authentification Firebase complete:
   - login email/password
+  - recuperation de mot de passe complete:
+    - lien "Mot de passe oublie ?" depuis la page login
+    - page `/forgot-password` (envoi lien de reset via Firebase)
+    - page `/reset-password` (validation lien + nouveau mot de passe)
+    - messages generiques pour ne jamais exposer si un email existe
   - inscription complete:
     - nom
     - prenom
@@ -104,6 +109,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 - Logiques auth separees et testables:
   - `lib/auth/login.ts`
   - `lib/auth/register.ts`
+  - `lib/auth/passwordReset.ts`
 - Verification email envoyee automatiquement a l'inscription via Firebase Auth.
 - Template email design Quantis disponible pour futur envoi transactionnel:
   - `lib/email/templates/verificationEmailTemplate.ts`

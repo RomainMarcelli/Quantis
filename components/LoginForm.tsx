@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, Circle, Eye, EyeOff, Info } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getPasswordRuleChecks } from "@/lib/auth/passwordPolicy";
 import { COMPANY_SIZE_OPTIONS, SECTOR_OPTIONS } from "@/lib/onboarding/options";
@@ -238,6 +239,17 @@ export function LoginForm() {
             </button>
           </div>
           {currentErrors.password ? <span className="mt-1 block text-sm text-rose-700">{currentErrors.password}</span> : null}
+          {mode === "login" ? (
+            <div className="mt-2 text-right">
+              {/* Lien discret et accessible vers le flow de recuperation de mot de passe. */}
+              <Link
+                href="/forgot-password"
+                className="text-xs font-medium text-quantis-carbon underline underline-offset-2 hover:text-quantis-gold"
+              >
+                Mot de passe oublie ?
+              </Link>
+            </div>
+          ) : null}
         </label>
 
         {mode === "register" ? (
