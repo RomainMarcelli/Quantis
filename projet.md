@@ -47,9 +47,10 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - page d'inspection d'une analyse precise: `/analysis/[id]`
     - affichage `rawData`, `mappedData`, `kpis` et `parsedData`
   - page de test KPI avant/apres: `/test-kpi`
-    - saisie JSON `mappedData`
-    - visualisation des formules
-    - visualisation des resultats `kpis`
+    - charge les analyses reelles stockees en Firestore apres upload
+    - visualisation des formules appliquees a `mappedData`
+    - comparaison KPI stockes vs KPI recalcules
+    - affichage debug complet: `rawData`, `mappedData`, `parsedData`, `kpis`
 - Historisation:
   - timestamp de creation
   - exercice fiscal (`fiscalYear`) exploitable pour filtrage
