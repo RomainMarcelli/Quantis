@@ -1,37 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  compareStoredAndRecalculatedKpis,
   getNonNullKpiEntries,
-  getNonNullMappedEntries,
-  getPlaygroundDefaultInput,
-  parseMappedDataJson
+  getNonNullMappedEntries
 } from "@/lib/debug/kpiPlayground";
+import { createEmptyMappedFinancialData } from "@/services/mapping/financialDataMapper";
 
 describe("kpiPlayground utils", () => {
-  it("parses valid mapped data json and keeps known numeric keys", () => {
-    const result = parseMappedDataJson(
-      JSON.stringify({
-        total_prod_expl: 1200,
-        inconnue: 99,
-        salaires: "100"
-      })
-    );
-
-    expect(result.success).toBe(true);
-    expect(result.data.total_prod_expl).toBe(1200);
-    expect(result.data.salaires).toBeNull();
-  });
-
-  it("returns a readable error on invalid json", () => {
-    const result = parseMappedDataJson("{");
-
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toContain("JSON invalide");
-    }
-  });
-
   it("returns sorted non-null entries for mapped data and kpis", () => {
-    const mapped = parseMappedDataJson(JSON.stringify({ salaires: 100, achats_mp: 20 })).data;
+    const mapped = {
+      ...createEmptyMappedFinancialData(),
+      salaires: 100,
+      achats_mp: 20
+    };
     const mappedEntries = getNonNullMappedEntries(mapped);
 
     expect(mappedEntries).toEqual([
@@ -81,9 +62,53 @@ describe("kpiPlayground utils", () => {
     ]);
   });
 
-  it("provides a non-empty default playground json", () => {
-    const text = getPlaygroundDefaultInput();
-    expect(text).toContain("total_prod_expl");
-    expect(text.length).toBeGreaterThan(100);
+  it("compares stored and recalculated kpis", () => {
+    const stored = {
+      tcam: null,
+      va: 30,
+      ebitda: null,
+      marge_ebitda: null,
+      charges_var: null,
+      mscv: null,
+      tmscv: null,
+      charges_fixes: null,
+      point_mort: null,
+      ratio_immo: null,
+      bfr: null,
+      rot_bfr: null,
+      dso: null,
+      dpo: null,
+      rot_stocks: null,
+      caf: null,
+      fte: null,
+      tn: null,
+      solvabilite: null,
+      gearing: null,
+      liq_gen: null,
+      liq_red: null,
+      liq_imm: null,
+      roce: null,
+      roe: null,
+      effet_levier: null,
+      grossMarginRate: 40,
+      netProfit: null,
+      workingCapital: null,
+      monthlyBurnRate: 0,
+      cashRunwayMonths: null,
+      healthScore: null
+    };
+
+    const recalculated = {
+      ...stored,
+      va: 30.005,
+      grossMarginRate: 39.8
+    };
+
+    const result = compareStoredAndRecalculatedKpis(stored, recalculated);
+    const va = result.find((item) => item.key === "va");
+    const margin = result.find((item) => item.key === "grossMarginRate");
+
+    expect(va?.matches).toBe(true);
+    expect(margin?.matches).toBe(false);
   });
 });
