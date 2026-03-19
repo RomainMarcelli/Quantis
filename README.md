@@ -39,6 +39,7 @@ Puis ouvrir `http://localhost:3000`.
   - `secteur` (select)
 - Affichage/masquage du mot de passe (icone oeil)
 - Checklist de securite mot de passe dynamique (rouge -> vert critere par critere)
+  - layout horizontal en badges/chips responsive
 - Feedback UX:
   - toasts succes/erreur
   - messages inline de validation
@@ -60,10 +61,10 @@ Puis ouvrir `http://localhost:3000`.
   - 1 chiffre
   - 1 caractere special
 - Regles Firestore dans `firestore.rules`:
-  - `users/{uid}` lisible/modifiable uniquement par l'utilisateur authentifie
-  - lecture uniquement de ses propres documents
+  - `users/{uid}` lisible/modifiable/supprimable uniquement par l'utilisateur authentifie
+  - `analyses` lisibles/supprimables uniquement par leur proprietaire
   - creation uniquement avec `userId == request.auth.uid`
-  - pas de modification/suppression en MVP
+  - update `analyses` desactive
 
 ## Email de confirmation
 
@@ -82,6 +83,18 @@ Flux implemente:
 - Moteur KPI pur: `services/kpiEngine.ts`
 - Stockage Firestore: `services/analysisStore.ts`
 - Orchestration API parsing/kpi: `app/api/analyses/route.ts`
+
+## Gestion de compte
+
+- Page compte: `/account`
+- Consultation des infos:
+  - email
+  - nom/prenom
+  - SIREN
+  - entreprise, taille, secteur
+- Mise a jour du profil (Firestore)
+- Suppression des donnees (profil + analyses)
+- Suppression complete du compte (donnees + Firebase Auth) avec double confirmation
 
 ## Tests unitaires
 

@@ -27,9 +27,16 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - messages d'erreur metier explicites
   - affichage/masquage du mot de passe (icone oeil)
   - checklist securite mot de passe dynamique (etat par critere)
+  - version UI horizontale (chips) responsive
   - feedback UX via toasts + messages inline + tooltips
   - verification email obligatoire avant acces dashboard
   - profil entreprise stocke dans `users/{uid}`
+- Gestion de compte utilisateur:
+  - page `/account` creee
+  - affichage des informations utilisateur/entreprise
+  - mise a jour du profil Firestore
+  - suppression des donnees (users + analyses)
+  - suppression complete du compte Firebase Auth + Firestore avec double confirmation
 - Pipeline metier MVP:
   - upload de fichiers (Excel/PDF)
   - parsing serveur (`services/parsers/*`)
@@ -42,6 +49,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 - Regles de securite Firestore:
   - fichier `firestore.rules`
   - isolation stricte par `userId`
+  - suppression autorisee uniquement pour les documents du proprietaire
 
 ## Fonctionnalites en cours
 

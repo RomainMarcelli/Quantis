@@ -1,5 +1,6 @@
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   onAuthStateChanged,
   sendEmailVerification,
   signInWithEmailAndPassword,
@@ -18,6 +19,7 @@ export interface AuthGateway {
   signIn(credentials: LoginCredentials): Promise<AuthenticatedUser>;
   register(credentials: RegisterCredentials): Promise<AuthenticatedUser>;
   signOut(): Promise<void>;
+  deleteCurrentUser(): Promise<void>;
   getCurrentUser(): AuthenticatedUser | null;
   subscribe(listener: AuthStateListener): () => void;
 }
@@ -62,6 +64,13 @@ export const firebaseAuthGateway: AuthGateway = {
 
   async signOut() {
     await signOut(auth);
+  },
+
+  async deleteCurrentUser() {
+    if (!auth.currentUser) {
+      return;
+    }
+    await deleteUser(auth.currentUser);
   },
 
   getCurrentUser() {

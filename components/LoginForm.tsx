@@ -246,16 +246,23 @@ export function LoginForm() {
                 <Info className="h-3.5 w-3.5" />
                 Securite mot de passe
               </p>
-              <ul className="space-y-1">
+              <ul className="grid grid-cols-3 gap-1.5">
                 {passwordRules.map((rule) => (
                   <li
                     key={rule.key}
-                    className={`flex items-center gap-2 text-xs ${
-                      rule.isValid ? "text-emerald-700" : "text-rose-700"
+                    className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] ${
+                      rule.isValid
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-rose-200 bg-rose-50 text-rose-700"
                     }`}
+                    title={rule.label}
                   >
-                    {rule.isValid ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
-                    {rule.label}
+                    {rule.isValid ? (
+                      <CheckCircle2 className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <Circle className="h-3 w-3 shrink-0" />
+                    )}
+                    <span className="truncate">{rule.label}</span>
                   </li>
                 ))}
               </ul>

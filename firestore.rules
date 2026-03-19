@@ -8,7 +8,8 @@ service cloud.firestore {
       allow create, update: if request.auth != null
         && request.auth.uid == userId;
 
-      allow delete: if false;
+      allow delete: if request.auth != null
+        && request.auth.uid == userId;
     }
 
     match /analyses/{analysisId} {
@@ -20,7 +21,10 @@ service cloud.firestore {
         && request.resource.data.kpis is map
         && request.resource.data.financialFacts is map;
 
-      allow update, delete: if false;
+      allow update: if false;
+
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
     }
   }
 }

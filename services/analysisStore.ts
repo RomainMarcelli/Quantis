@@ -2,6 +2,7 @@ import {
   type QueryConstraint,
   Timestamp,
   addDoc,
+  deleteDoc,
   collection,
   getDocs,
   query,
@@ -71,9 +72,17 @@ export async function listUserAnalyses(userId: string, fiscalYear?: number): Pro
               monthlyBurnRate: null,
               cashRunwayMonths: null,
               healthScore: null
-      }
+            }
     };
   });
 
   return analyses.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function deleteUserAnalyses(userId: string): Promise<number> {
+  const collectionRef = collection(firestoreDb, COLLECTION);
+  const snapshot = await getDocs(query(collectionRef, where("userId", "==", userId)));
+
+  await Promise.all(snapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref)));
+  return snapshot.docs.length;
 }

@@ -127,9 +127,18 @@ export function DashboardView() {
             Connecte en tant que {user?.displayName ?? user?.email}
           </p>
         </div>
-        <button type="button" onClick={handleLogout} className="quantis-primary px-4 py-2 text-sm font-medium">
-          Se deconnecter
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/account")}
+            className="rounded-xl border border-quantis-mist bg-white px-4 py-2 text-sm font-medium text-quantis-carbon hover:bg-quantis-paper"
+          >
+            Mon compte
+          </button>
+          <button type="button" onClick={handleLogout} className="quantis-primary px-4 py-2 text-sm font-medium">
+            Se deconnecter
+          </button>
+        </div>
       </header>
 
       <UploadLanding loading={uploading} onUpload={handleUpload} />

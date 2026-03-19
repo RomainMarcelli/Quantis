@@ -15,27 +15,27 @@ export function getPasswordRuleChecks(password: string): PasswordRuleCheck[] {
   return [
     {
       key: "minLength",
-      label: "8 caracteres minimum",
+      label: "8 caracteres min",
       isValid: password.length >= 8
     },
     {
       key: "hasUppercase",
-      label: "Au moins 1 majuscule",
+      label: "1 majuscule",
       isValid: /[A-Z]/.test(password)
     },
     {
       key: "hasLowercase",
-      label: "Au moins 1 minuscule",
+      label: "1 minuscule",
       isValid: /[a-z]/.test(password)
     },
     {
       key: "hasDigit",
-      label: "Au moins 1 chiffre",
+      label: "1 chiffre",
       isValid: /\d/.test(password)
     },
     {
       key: "hasSpecialChar",
-      label: "Au moins 1 caractere special",
+      label: "1 caractere special",
       isValid: /[^A-Za-z0-9]/.test(password)
     }
   ];
@@ -70,4 +70,3 @@ export function getPasswordValidationError(password: string): string | undefined
 export function isPasswordCompliant(password: string): boolean {
   return getPasswordRuleChecks(password).every((rule) => rule.isValid);
 }
-
