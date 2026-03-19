@@ -1,3 +1,5 @@
+// File: app/layout.tsx
+// Role: layout racine Next.js qui applique font, metadata et initialisation du theme global.
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import { ThemeInitializer } from "@/components/ui/ThemeInitializer";
@@ -25,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body className={manrope.variable}>
+      <body className={`${manrope.variable} premium-app-shell`}>
         <ThemeInitializer />
         {children}
       </body>

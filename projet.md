@@ -70,6 +70,20 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
     - debug repliable (`rawData`, `mappedData`, `kpis`)
     - sidebar (`Dashboard`, `Analyses`, `Documents`, `Compte`)
     - profil sidebar avec avatar initial + niveau Free
+  - refonte premium de la zone dashboard `/analysis`:
+    - integration du design cockpit en composants React/Tailwind
+    - composants dedies `DashboardLayout`, `HealthScore`, `KPIBlock`, `KPIWide`, `AIInsight`
+    - mapping frontend pur des KPI vers contrat UI premium
+    - animations React-friendly (cadran sante, compteurs, barre EBE)
+    - eclairage au survol par bloc (cards) au lieu d'un glow global suiveur
+    - panneau de simulation IA compact repositionne en haut a droite
+    - espacements du bloc "Indice de sante" reajustes pour une lecture plus nette
+    - mode dark force uniquement sur la vue analyse
+    - conservation des blocs fonctionnels existants (dossiers, upload, debug)
+    - creation multi-dossiers stabilisee via stockage local de dossiers connus
+  - DA premium etendue globalement a l'application:
+    - theme sombre par defaut (sauf preference light sauvegardee)
+    - tokens/containers globaux aligns avec la signature visuelle `/analysis`
   - page de test KPI avant/apres: `/test-kpi`
     - charge les analyses reelles stockees en Firestore apres upload
     - visualisation des formules appliquees a `mappedData`
@@ -86,6 +100,12 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - suite unitaire etendue (auth, compte, pipeline, parsing, stores, view-model dashboard)
   - lint ESLint v9 operationnel
   - typecheck TypeScript sans erreur (`tsc --noEmit`)
+  - nouveaux tests unitaires dashboard premium:
+    - mapping KPI premium
+    - logique score/couleur
+    - calcul strokeDashoffset
+    - bornage des animations
+    - rendu composants KPI premium
 
 ## Fonctionnalites en cours
 

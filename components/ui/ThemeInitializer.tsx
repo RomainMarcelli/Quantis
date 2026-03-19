@@ -1,3 +1,5 @@
+// File: components/ui/ThemeInitializer.tsx
+// Role: initialise le theme global au chargement et persiste le choix utilisateur dans localStorage.
 "use client";
 
 import { useEffect } from "react";
@@ -7,9 +9,9 @@ const THEME_STORAGE_KEY = "quantis.theme";
 export function ThemeInitializer() {
   useEffect(() => {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    // Regle produit: le mode jour doit etre l'affichage par defaut.
+    // Regle produit de cette iteration: DA premium sombre par defaut sur toute l'application.
     // On respecte uniquement un choix utilisateur deja persiste en localStorage.
-    const theme = stored === "dark" || stored === "light" ? stored : "light";
+    const theme = stored === "dark" || stored === "light" ? stored : "dark";
     applyTheme(theme);
   }, []);
 
@@ -27,8 +29,8 @@ export function applyTheme(theme: "light" | "dark"): void {
 
 export function getStoredTheme(): "light" | "dark" {
   if (typeof window === "undefined") {
-    return "light";
+    return "dark";
   }
   const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return stored === "dark" ? "dark" : "light";
+  return stored === "light" ? "light" : "dark";
 }

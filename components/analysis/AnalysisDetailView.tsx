@@ -1,4 +1,6 @@
-﻿"use client";
+// File: components/analysis/AnalysisDetailView.tsx
+// Role: assemble la page /analysis (et /analysis/[id]) avec dashboard premium, dossiers, upload et debug.
+"use client";
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -7,7 +9,6 @@ import {
   CheckCircle2,
   FileText,
   Folder,
-  Gauge,
   LayoutDashboard,
   Lock,
   LogOut,
@@ -17,10 +18,19 @@ import {
   Upload,
   UserCircle2
 } from "lucide-react";
-import { buildAnalysisDashboardViewModel, type DashboardSeverity } from "@/lib/dashboard/analysisDashboardViewModel";
+import { buildAnalysisDashboardViewModel } from "@/lib/dashboard/analysisDashboardViewModel";
+import { toPremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
 import { clearLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
-import { DEFAULT_FOLDER_NAME, ensureFolderName, getActiveFolderName, setActiveFolderName } from "@/lib/folders/activeFolder";
+import {
+  DEFAULT_FOLDER_NAME,
+  ensureFolderName,
+  getActiveFolderName,
+  getKnownFolderNames,
+  registerKnownFolderName,
+  setActiveFolderName
+} from "@/lib/folders/activeFolder";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { getUserAnalysisById, listUserAnalyses, saveAnalysisDraft } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
 import { getUserProfile } from "@/services/userProfileStore";
@@ -46,6 +56,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
   const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
+  const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Quantis");
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -85,8 +96,35 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   useEffect(() => {
     if (currentFolder.trim()) {
       setActiveFolderName(currentFolder);
+      setKnownFolders(registerKnownFolderName(currentFolder));
     }
   }, [currentFolder]);
+
+  useEffect(() => {
+    // Les dossiers deja utilises dans l'historique sont memorises localement
+    // pour permettre de jongler entre plusieurs dossiers, meme avant nouvel upload.
+    if (!allAnalyses.length) {
+      return;
+    }
+
+    allAnalyses.forEach((item) => registerKnownFolderName(item.folderName));
+    setKnownFolders(getKnownFolderNames());
+  }, [allAnalyses]);
+
+  useEffect(() => {
+    // Contrainte produit: /analysis doit rester en mode dark par defaut.
+    const root = document.documentElement;
+    const previousTheme = root.getAttribute("data-theme");
+    root.setAttribute("data-theme", "dark");
+
+    return () => {
+      if (previousTheme) {
+        root.setAttribute("data-theme", previousTheme);
+        return;
+      }
+      root.removeAttribute("data-theme");
+    };
+  }, []);
 
   const analysesInCurrentFolder = useMemo(
     () => allAnalyses.filter((item) => normalizeFolderName(item.folderName) === normalizeFolderName(currentFolder)),
@@ -113,9 +151,10 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   const folderNames = useMemo(() => {
     const set = new Set<string>();
     allAnalyses.forEach((item) => set.add(normalizeFolderName(item.folderName)));
+    knownFolders.forEach((folderName) => set.add(normalizeFolderName(folderName)));
     set.add(normalizeFolderName(currentFolder));
     return Array.from(set).sort((left, right) => left.localeCompare(right, "fr"));
-  }, [allAnalyses, currentFolder]);
+  }, [allAnalyses, currentFolder, knownFolders]);
 
   const sourceFiles = useMemo<FolderFileItem[]>(() => {
     const deduped = new Map<string, FolderFileItem>();
@@ -138,6 +177,12 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
 
   const dashboardView = useMemo(
     () => (analysis ? buildAnalysisDashboardViewModel(analysis.kpis) : null),
+    [analysis]
+  );
+
+  // Adaptateur UI premium: isole les cles de presentation sans toucher la logique metier.
+  const premiumKpis = useMemo(
+    () => (analysis ? toPremiumKpis(analysis.kpis) : null),
     [analysis]
   );
 
@@ -232,6 +277,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
       setAllAnalyses((current) => [saved, ...current]);
       setLocalAnalysisHint(true);
       setCurrentFolder(normalizeFolderName(saved.folderName));
+      setKnownFolders(registerKnownFolderName(saved.folderName));
       setAnalysis(saved);
       setInfoMessage("Fichier traite avec succes. Dashboard mis a jour.");
       router.replace("/analysis");
@@ -243,12 +289,11 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   }
 
   function handleNewFolder() {
-    const next = ensureFolderName(null);
-    if (!next) {
-      return;
-    }
+    // Creation non bloquante: un clic sur "+" cree toujours un dossier unique.
+    const next = buildNextFolderName(folderNames);
     setCurrentFolder(normalizeFolderName(next));
-    setInfoMessage(`Dossier actif: ${normalizeFolderName(next)}`);
+    setKnownFolders(registerKnownFolderName(next));
+    setInfoMessage(`Dossier cree et actif: ${normalizeFolderName(next)}`);
   }
 
   function onInputFilesSelected(fileList: FileList | null) {
@@ -276,30 +321,31 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
 
   if (loadingAuth) {
     return (
-      <section className="quantis-panel p-8 text-center">
-        <p className="text-sm text-quantis-slate">Chargement de la session...</p>
+      <section className="precision-card rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/70">Chargement de la session...</p>
       </section>
     );
   }
 
   return (
     <section className="space-y-4">
-      <header className="quantis-panel flex items-center justify-between gap-3 px-5 py-3">
+      {/* Bandeau d'actions globales conserve (settings/offres/compte/logout) avec skin premium dark. */}
+      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
         <div className="flex items-center gap-3">
           <QuantisLogo withText={false} size={28} />
           <div>
-            <p className="text-sm font-semibold text-quantis-carbon">{companyName}</p>
-            <p className="text-xs text-quantis-slate">Plateforme financiere</p>
+            <p className="text-sm font-semibold text-white">{companyName}</p>
+            <p className="text-xs text-white/55">Plateforme financiere</p>
           </div>
         </div>
 
-        <div className="hidden text-sm font-medium text-quantis-carbon md:block">Dashboard</div>
+        <div className="hidden text-sm font-medium text-white md:block">Dashboard</div>
 
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => router.push("/settings")}
-            className="rounded-xl border border-quantis-mist bg-white p-2 text-quantis-carbon hover:bg-quantis-paper"
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
             aria-label="Parametres"
             title="Parametres"
           >
@@ -308,7 +354,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
           <button
             type="button"
             onClick={() => router.push("/pricing")}
-            className="rounded-xl border border-quantis-mist bg-white p-2 text-quantis-carbon hover:bg-quantis-paper"
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
             aria-label="Offres"
             title="Offre Free (verrouille)"
           >
@@ -317,7 +363,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
           <button
             type="button"
             onClick={() => router.push("/account?from=analysis")}
-            className="rounded-xl border border-quantis-mist bg-white p-2 text-quantis-carbon hover:bg-quantis-paper"
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
             aria-label="Compte"
             title="Compte"
           >
@@ -326,7 +372,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
           <button
             type="button"
             onClick={handleLogout}
-            className="rounded-xl border border-quantis-mist bg-white p-2 text-quantis-carbon hover:bg-quantis-paper"
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
             aria-label="Se deconnecter"
             title="Se deconnecter"
           >
@@ -336,23 +382,24 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
       </header>
 
       {loadingAnalysis ? (
-        <div className="quantis-panel px-4 py-3 text-sm text-quantis-slate">Chargement de l&apos;analyse...</div>
+        <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de l&apos;analyse...</div>
       ) : null}
 
       {errorMessage ? (
-        <div className="quantis-panel border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="precision-card rounded-2xl border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
           {errorMessage}
         </div>
       ) : null}
 
       {infoMessage ? (
-        <div className="quantis-panel border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="precision-card rounded-2xl border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
           {infoMessage}
         </div>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <aside className="quantis-panel h-fit p-4 lg:sticky lg:top-4">
+        {/* Sidebar metier: dossiers + fichiers + upload, conservee mais re-skinee premium. */}
+        <aside className="precision-card h-fit rounded-2xl p-4 lg:sticky lg:top-4">
           <nav className="space-y-1 text-sm">
             <NavRow icon={<LayoutDashboard className="h-4 w-4" />} active>
               Dashboard
@@ -368,26 +415,26 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
             </NavRow>
           </nav>
 
-          <div className="mt-4 rounded-xl border border-quantis-mist bg-quantis-paper p-3">
-            <p className="text-[11px] uppercase tracking-wide text-quantis-slate">Compte</p>
+          <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+            <p className="text-[11px] uppercase tracking-wide text-white/50">Compte</p>
             <div className="mt-2 flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-quantis-carbon text-sm font-semibold text-white">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
                 {greetingName.charAt(0).toUpperCase()}
               </span>
               <div>
-                <p className="text-sm font-medium text-quantis-carbon">{greetingName}</p>
-                <p className="text-xs text-quantis-slate">Free</p>
+                <p className="text-sm font-medium text-white">{greetingName}</p>
+                <p className="text-xs text-white/55">Free</p>
               </div>
             </div>
           </div>
 
           <div className="mt-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wide text-quantis-slate">Projects</p>
+              <p className="text-xs uppercase tracking-wide text-white/50">Projects</p>
               <button
                 type="button"
                 onClick={handleNewFolder}
-                className="rounded p-1 text-quantis-slate hover:bg-quantis-paper hover:text-quantis-carbon"
+                className="rounded p-1 text-white/60 hover:bg-white/10 hover:text-white"
                 aria-label="Nouveau dossier"
                 title="Nouveau dossier"
               >
@@ -405,7 +452,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
                     type="button"
                     onClick={() => setCurrentFolder(normalizeFolderName(folderName))}
                     className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left ${
-                      isActive ? "bg-quantis-paper text-quantis-carbon" : "text-quantis-slate hover:bg-quantis-paper"
+                      isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
                     }`}
                   >
                     <Folder className="h-4 w-4" />
@@ -417,19 +464,19 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
             </div>
           </div>
 
-          <div className="mt-5 border-t border-quantis-mist pt-4">
-            <p className="text-xs uppercase tracking-wide text-quantis-slate">Source files</p>
+          <div className="mt-5 border-t border-white/10 pt-4">
+            <p className="text-xs uppercase tracking-wide text-white/50">Source files</p>
             <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
               {sourceFiles.length === 0 ? (
-                <p className="px-1 text-xs text-quantis-slate">Aucun fichier dans ce dossier.</p>
+                <p className="px-1 text-xs text-white/55">Aucun fichier dans ce dossier.</p>
               ) : (
                 sourceFiles.map((file) => (
-                  <div key={`${file.name}-${file.createdAt}`} className="rounded-lg border border-quantis-mist bg-white px-2 py-1.5">
+                  <div key={`${file.name}-${file.createdAt}`} className="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5">
                     <div className="flex items-start gap-2">
-                      <FileText className="mt-0.5 h-3.5 w-3.5 text-quantis-slate" />
+                      <FileText className="mt-0.5 h-3.5 w-3.5 text-white/55" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-quantis-carbon">{file.name}</p>
-                        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-quantis-slate">
+                        <p className="truncate text-xs font-medium text-white">{file.name}</p>
+                        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-white/55">
                           <span>{new Date(file.createdAt).toLocaleDateString("fr-FR")}</span>
                           <CheckCircle2 className="h-3 w-3 text-emerald-500" />
                         </div>
@@ -441,7 +488,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
             </div>
           </div>
 
-          <div className="mt-4 rounded-xl border border-dashed border-quantis-mist bg-white p-3 text-center">
+          <div className="mt-4 rounded-xl border border-dashed border-white/20 bg-black/15 p-3 text-center">
             <input
               ref={fileInputRef}
               type="file"
@@ -457,90 +504,41 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="w-full rounded-lg px-2 py-3 text-xs text-quantis-carbon hover:bg-quantis-paper disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-lg px-2 py-3 text-xs text-white/85 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
               onDrop={(event) => {
                 event.preventDefault();
                 onInputFilesSelected(event.dataTransfer.files);
               }}
               onDragOver={(event) => event.preventDefault()}
             >
-              <Upload className="mx-auto h-4 w-4 text-quantis-slate" />
+              <Upload className="mx-auto h-4 w-4 text-white/60" />
               <p className="mt-2 font-medium">Drag and drop</p>
-              <p className="text-[11px] text-quantis-slate">or click to browse</p>
+              <p className="text-[11px] text-white/55">or click to browse</p>
             </button>
           </div>
         </aside>
 
         <div className="space-y-6">
-          <header className="quantis-panel p-5">
-            <p className="text-xs uppercase tracking-wide text-quantis-slate">Analyse financiere</p>
-            <h1 className="mt-1 text-3xl font-semibold text-quantis-carbon">Hello {greetingName}</h1>
-            <p className="mt-1 text-sm text-quantis-slate">Voici un apercu de votre situation financiere</p>
-            <p className="mt-2 text-xs text-quantis-slate">
-              Dossier {currentFolder} - Mise a jour {analysis ? new Date(analysis.createdAt).toLocaleString("fr-FR") : "N/D"}
-            </p>
-          </header>
-
-          {analysis && dashboardView ? (
-            <>
-              <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {dashboardView.topCards.map((card) => (
-                  <article key={card.id} className="quantis-panel p-4">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-quantis-slate">
-                      {cardIcon(card.id)}
-                      <span>{card.label}</span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <p className="text-2xl font-semibold text-quantis-carbon">{formatMetric(card.value, card.format)}</p>
-                      <StatusDot severity={card.severity} />
-                    </div>
-                  </article>
-                ))}
-              </section>
-
-              <section className="quantis-panel p-5">
-                <p className="text-xs uppercase tracking-wide text-quantis-slate">Suggestions</p>
-                <div className="quantis-input mt-3 flex items-center gap-2 px-3 py-3 text-sm text-quantis-carbon">
-                  <Sparkles className="h-4 w-4 text-quantis-slate" />
-                  <span>Puis-je investir 80kEUR ?</span>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {dashboardView.suggestions.slice(1).map((suggestion) => (
-                    <span
-                      key={suggestion}
-                      className="rounded-full border border-quantis-mist bg-white px-3 py-1.5 text-xs text-quantis-carbon"
-                    >
-                      {suggestion}
-                    </span>
-                  ))}
-                </div>
-                <p className="mt-3 text-xs text-quantis-slate">
-                  Cette zone sera assistee par IA dans une prochaine version.
-                </p>
-              </section>
-
+          {analysis && dashboardView && premiumKpis ? (
+            <DashboardLayout
+              // Le key force un remount propre quand on change d'analyse (reset slider IA local).
+              key={analysis.id}
+              companyName={companyName}
+              greetingName={greetingName}
+              kpis={premiumKpis}
+            >
+              {/* Les blocs existants restent presents en sections secondaires sous le bento premium. */}
               <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                <article className="quantis-panel p-5">
-                  <p className="text-xs uppercase tracking-wide text-quantis-slate">Sante globale</p>
-                  <div className="mt-4 flex flex-col items-center gap-3 sm:flex-row sm:items-center">
-                    <ScoreRing value={dashboardView.score.value} severity={dashboardView.score.severity} />
-                    <div>
-                      <p className="text-lg font-semibold text-quantis-carbon">Sante globale</p>
-                      <p className="text-sm text-quantis-slate">{dashboardView.score.label}</p>
-                    </div>
-                  </div>
-                </article>
-
-                <article className="quantis-panel p-5">
+                <article className="precision-card rounded-2xl p-5">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs uppercase tracking-wide text-quantis-slate">Alertes</p>
-                    <span className="rounded-full bg-quantis-paper px-2 py-1 text-xs font-medium text-quantis-carbon">
+                    <p className="text-xs uppercase tracking-wide text-white/60">Alertes</p>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white">
                       {dashboardView.alerts.count}
                     </span>
                   </div>
 
                   {dashboardView.alerts.items.length === 0 ? (
-                    <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    <p className="mt-3 rounded-xl border border-emerald-200/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
                       Aucune anomalie detectee.
                     </p>
                   ) : (
@@ -553,8 +551,8 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
                           <div className="flex items-start gap-2">
                             <AlertTriangle className={`mt-0.5 h-4 w-4 ${alertColorClass(alert.severity)}`} />
                             <div>
-                              <p className="text-sm font-medium text-quantis-carbon">{alert.title}</p>
-                              <p className="text-xs text-quantis-slate">{alert.description}</p>
+                              <p className="text-sm font-medium text-white">{alert.title}</p>
+                              <p className="text-xs text-white/65">{alert.description}</p>
                             </div>
                           </div>
                         </li>
@@ -562,28 +560,31 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
                     </ul>
                   )}
                 </article>
-              </section>
 
-              <section className="grid gap-4 xl:grid-cols-2">
-                {dashboardView.sections.map((section) => (
-                  <article key={section.id} className="quantis-panel p-5">
-                    <h2 className="text-sm font-semibold text-quantis-carbon">{section.title}</h2>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      {section.metrics.map((metric) => (
-                        <div key={String(metric.key)} className="rounded-xl border border-quantis-mist bg-white px-3 py-2">
-                          <p className="text-xs text-quantis-slate">{metric.label}</p>
-                          <p className="mt-1 text-sm font-semibold text-quantis-carbon">
-                            {formatMetric(metric.value, metric.format)}
-                          </p>
+                <article className="precision-card rounded-2xl p-5">
+                  <h2 className="text-sm font-semibold text-white">KPI par blocs metier</h2>
+                  <div className="mt-3 grid gap-2">
+                    {dashboardView.sections.map((section) => (
+                      <div key={section.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-white/60">{section.title}</p>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                          {section.metrics.map((metric) => (
+                            <div key={String(metric.key)} className="rounded-lg border border-white/10 px-2 py-1.5">
+                              <p className="text-[11px] text-white/55">{metric.label}</p>
+                              <p className="text-xs font-semibold text-white">
+                                {formatMetric(metric.value, metric.format)}
+                              </p>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </article>
-                ))}
+                      </div>
+                    ))}
+                  </div>
+                </article>
               </section>
-
-              <details className="quantis-panel p-5">
-                <summary className="cursor-pointer text-sm font-semibold text-quantis-carbon">
+{/* 
+              <details className="precision-card rounded-2xl p-5">
+                <summary className="cursor-pointer text-sm font-semibold text-white">
                   Donnees source (debug)
                 </summary>
                 <div className="mt-4 grid gap-4 xl:grid-cols-3">
@@ -591,11 +592,11 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
                   <JsonPanel title="mappedData" value={analysis.mappedData} />
                   <JsonPanel title="kpis" value={analysis.kpis} />
                 </div>
-              </details>
-            </>
+              </details> */}
+            </DashboardLayout>
           ) : (
-            <section className="quantis-panel p-5">
-              <p className="text-sm text-quantis-slate">
+            <section className="precision-card rounded-2xl p-5">
+              <p className="text-sm text-white/70">
                 Ce dossier ne contient pas encore d&apos;analyse. Ajoutez un fichier pour demarrer.
               </p>
             </section>
@@ -625,6 +626,17 @@ function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): s
 function normalizeFolderName(folderName?: string | null): string {
   const cleaned = folderName?.trim();
   return cleaned || DEFAULT_FOLDER_NAME;
+}
+
+function buildNextFolderName(existingFolderNames: string[]): string {
+  const takenNames = new Set(existingFolderNames.map((folderName) => folderName.toLowerCase()));
+  let index = 1;
+
+  while (takenNames.has(`nouveau dossier ${index}`.toLowerCase())) {
+    index += 1;
+  }
+
+  return `Nouveau dossier ${index}`;
 }
 
 function formatMetric(
@@ -689,10 +701,10 @@ function NavRow({
       onClick={onClick}
       className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors ${
         active
-          ? "bg-quantis-paper text-quantis-carbon"
+          ? "bg-white/10 text-white"
           : disabled
-            ? "cursor-not-allowed text-quantis-slate/70"
-            : "text-quantis-carbon hover:bg-quantis-paper"
+            ? "cursor-not-allowed text-white/40"
+            : "text-white/75 hover:bg-white/10 hover:text-white"
       }`}
     >
       {icon}
@@ -701,107 +713,11 @@ function NavRow({
   );
 }
 
-function StatusDot({ severity }: { severity: DashboardSeverity }) {
-  const className =
-    severity === "green"
-      ? "bg-emerald-500"
-      : severity === "orange"
-        ? "bg-amber-500"
-        : severity === "red"
-          ? "bg-rose-600"
-          : "bg-slate-400";
-
-  return <span className={`h-2.5 w-2.5 rounded-full ${className}`} />;
-}
-
-function ScoreRing({ value, severity }: { value: number | null; severity: DashboardSeverity }) {
-  const [animatedValue, setAnimatedValue] = useState(0);
-  const previousValueRef = useRef(0);
-  const radius = 48;
-  const circumference = 2 * Math.PI * radius;
-  const clampedTarget = value === null ? 0 : Math.max(0, Math.min(100, value));
-
-  useEffect(() => {
-    const start = performance.now();
-    const duration = 900;
-    const from = previousValueRef.current;
-    const to = clampedTarget;
-    let frame = 0;
-
-    const tick = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setAnimatedValue(from + (to - from) * eased);
-      if (progress < 1) {
-        frame = requestAnimationFrame(tick);
-      } else {
-        previousValueRef.current = to;
-      }
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [clampedTarget]);
-
-  const progress = (animatedValue / 100) * circumference;
-  const dashOffset = circumference - progress;
-
-  const ringColor =
-    severity === "green"
-      ? "stroke-emerald-500"
-      : severity === "orange"
-        ? "stroke-amber-500"
-        : severity === "red"
-          ? "stroke-rose-600"
-          : "stroke-slate-400";
-
-  const glowColor =
-    severity === "green"
-      ? "rgba(16,185,129,0.18)"
-      : severity === "orange"
-        ? "rgba(245,158,11,0.2)"
-        : severity === "red"
-          ? "rgba(225,29,72,0.18)"
-          : "rgba(148,163,184,0.18)";
-
-  return (
-    <div className="relative h-36 w-36 quantis-score-ring">
-      <div
-        className="absolute inset-3 rounded-full quantis-score-ring__glow"
-        style={{ background: glowColor }}
-        aria-hidden="true"
-      />
-      <svg className="relative h-36 w-36 -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
-        <circle cx="60" cy="60" r={radius} className="fill-none stroke-quantis-mist/70" strokeWidth="9" />
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          className={`fill-none ${ringColor}`}
-          strokeWidth="9"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="rounded-full border border-quantis-mist bg-white/85 px-4 py-3 text-center shadow-sm">
-          <Gauge className="mx-auto h-4 w-4 text-quantis-slate" />
-          <p className="mt-1 text-lg font-semibold text-quantis-carbon">
-            {value === null ? "N/D" : `${Math.round(animatedValue)}%`}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function JsonPanel({ title, value }: { title: string; value: unknown }) {
   return (
     <section>
-      <p className="text-xs uppercase tracking-wide text-quantis-slate">{title}</p>
-      <pre className="mt-2 max-h-80 overflow-auto rounded-xl bg-quantis-paper p-3 text-xs text-quantis-carbon">
+      <p className="text-xs uppercase tracking-wide text-white/60">{title}</p>
+      <pre className="mt-2 max-h-80 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-white/80">
         {JSON.stringify(value, null, 2)}
       </pre>
     </section>
@@ -810,33 +726,22 @@ function JsonPanel({ title, value }: { title: string; value: unknown }) {
 
 function alertColorClass(severity: "green" | "orange" | "red"): string {
   if (severity === "red") {
-    return "text-rose-600";
+    return "text-rose-300";
   }
   if (severity === "orange") {
-    return "text-amber-500";
+    return "text-amber-300";
   }
-  return "text-emerald-500";
+  return "text-emerald-300";
 }
 
 function alertContainerClass(severity: "green" | "orange" | "red"): string {
   if (severity === "red") {
-    return "border-rose-400 bg-rose-50";
+    return "border-rose-500/70 bg-rose-500/10";
   }
   if (severity === "orange") {
-    return "border-amber-400 bg-amber-50";
+    return "border-amber-500/60 bg-amber-500/10";
   }
-  return "border-emerald-400 bg-emerald-50";
+  return "border-emerald-500/60 bg-emerald-500/10";
 }
 
-function cardIcon(cardId: "cash" | "health" | "alerts" | "runway"): ReactNode {
-  if (cardId === "cash") {
-    return <Upload className="h-3.5 w-3.5" />;
-  }
-  if (cardId === "health") {
-    return <Gauge className="h-3.5 w-3.5" />;
-  }
-  if (cardId === "alerts") {
-    return <AlertTriangle className="h-3.5 w-3.5" />;
-  }
-  return <Sparkles className="h-3.5 w-3.5" />;
-}
+
