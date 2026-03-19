@@ -24,7 +24,12 @@ describe("parseUploadedFile", () => {
       extractedAt: "2026-03-19T10:00:00.000Z",
       fiscalYear: 2024,
       metrics: [],
-      previewRows: []
+      previewRows: [],
+      rawData: {
+        byVariableCode: {},
+        byLineCode: {},
+        byLabel: {}
+      }
     });
 
     const result = await parseUploadedFile({
@@ -46,7 +51,12 @@ describe("parseUploadedFile", () => {
       extractedAt: "2026-03-19T10:00:00.000Z",
       fiscalYear: 2024,
       metrics: [],
-      previewRows: []
+      previewRows: [],
+      rawData: {
+        byVariableCode: {},
+        byLineCode: {},
+        byLabel: {}
+      }
     });
 
     const result = await parseUploadedFile({
@@ -70,7 +80,7 @@ describe("parseUploadedFile", () => {
         type: "txt" as never,
         buffer: Buffer.from("txt")
       })
-    ).rejects.toThrow("Unsupported file type for unknown.txt");
+    ).rejects.toThrow("Type de fichier non supporte pour unknown.txt");
   });
 });
 

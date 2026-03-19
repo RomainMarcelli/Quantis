@@ -1,4 +1,10 @@
 import { computeKpis } from "@/services/kpiEngine";
+import {
+  applyLegacyFinancialFactsToMappedData,
+  mapMappedDataToFinancialFacts,
+  mapRawDataToMappedFinancialData,
+  mergeRawAnalysisData
+} from "@/services/mapping/financialDataMapper";
 import { parseUploadedFile, type UploadedBinaryFile } from "@/services/parsers/fileParser";
 import { mergeFinancialFacts } from "@/services/parsers/financialFactsExtractor";
 import type { AnalysisDraft, FinancialFacts, ParsedFileData } from "@/types/analysis";
@@ -8,8 +14,14 @@ export async function runAnalysisPipeline(params: {
   files: UploadedBinaryFile[];
 }): Promise<AnalysisDraft> {
   const parsedData = await Promise.all(params.files.map((file) => parseUploadedFile(file)));
-  const facts = mergeFinancialFacts(parsedData.map((item) => mapParsedDataToFacts(item)));
-  const kpis = computeKpis(facts);
+  const rawData = mergeRawAnalysisData(parsedData.map((item) => item.rawData));
+  const legacyFacts = mergeFinancialFacts(parsedData.map((item) => mapParsedDataToFacts(item)));
+  const mappedData = applyLegacyFinancialFactsToMappedData(
+    mapRawDataToMappedFinancialData(rawData),
+    legacyFacts
+  );
+  const kpis = computeKpis(mappedData);
+  const facts = mapMappedDataToFinancialFacts(mappedData);
 
   const candidateYears = parsedData.map((item) => item.fiscalYear).filter((year): year is number => year !== null);
   const fiscalYear = candidateYears.length > 0 ? candidateYears[0] : null;
@@ -25,6 +37,8 @@ export async function runAnalysisPipeline(params: {
       type: file.type
     })),
     parsedData,
+    rawData,
+    mappedData,
     financialFacts: facts,
     kpis
   };

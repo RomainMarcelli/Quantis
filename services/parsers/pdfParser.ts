@@ -1,5 +1,6 @@
 import { PDFParse } from "pdf-parse";
 import { extractFinancialFactsFromText } from "@/services/parsers/financialFactsExtractor";
+import { buildRawDataFromMetrics } from "@/services/parsers/rawDataExtractor";
 import type { ParsedFileData } from "@/types/analysis";
 
 export async function parsePdfBuffer(buffer: Buffer, fileName: string): Promise<ParsedFileData> {
@@ -26,7 +27,8 @@ export async function parsePdfBuffer(buffer: Buffer, fileName: string): Promise<
           expenses: facts.expenses,
           treasury: facts.treasury
         }
-      ]
+      ],
+      rawData: buildRawDataFromMetrics(metrics)
     };
   } finally {
     await parser.destroy();

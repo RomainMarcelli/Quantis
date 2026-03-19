@@ -61,6 +61,7 @@ describe("parsePdfBuffer", () => {
       revenue: 1000,
       treasury: 200
     });
+    expect(result.rawData.byVariableCode.total_prod_expl).toBe(1000);
     expect(mockDestroy).toHaveBeenCalledTimes(1);
   });
 

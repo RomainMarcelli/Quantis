@@ -79,16 +79,16 @@ export function UploadLanding({ loading, onUpload }: UploadLandingProps) {
       <div className="relative grid gap-8 md:grid-cols-[1.3fr_1fr] md:items-center">
         <div>
           <h1 className="text-4xl font-semibold leading-tight text-quantis-carbon md:text-5xl md:leading-[1.12]">
-            Financial insights,
-            <span className="ml-2 text-quantis-gold">in one flow</span>
+            Analyse financiere,
+            <span className="ml-2 text-quantis-gold">en un seul flux</span>
           </h1>
           <div className="quantis-accent-line mt-4" />
           <p className="mt-4 text-sm text-quantis-slate md:text-base">
-            Upload your Excel or PDF documents. Quantis parses, computes KPIs, stores in Firestore, then renders
-            your dashboard.
+            Deposez vos documents Excel ou PDF. Quantis parse, calcule les KPI, stocke dans Firestore, puis alimente
+            votre tableau de bord.
           </p>
           <p className="mt-2 text-xs text-quantis-slate">
-            Pipeline: Upload → Parsing → KPI → Storage → Dashboard
+            Pipeline: Depot -&gt; Parsing -&gt; KPI -&gt; Stockage -&gt; Tableau de bord
           </p>
         </div>
 
@@ -124,8 +124,8 @@ export function UploadLanding({ loading, onUpload }: UploadLandingProps) {
                 <Upload className="h-4 w-4 text-quantis-slate" strokeWidth={1.5} />
               </div>
               <div className="min-w-0">
-                <p className="truncate text-sm text-quantis-carbon">Drop files or click to select</p>
-                <p className="text-xs text-quantis-slate">Excel (.xlsx .xls .csv) and PDF</p>
+                <p className="truncate text-sm text-quantis-carbon">Deposez vos fichiers ou cliquez pour choisir</p>
+                <p className="text-xs text-quantis-slate">Excel (.xlsx .xls .csv) et PDF</p>
               </div>
             </div>
           </div>
@@ -147,7 +147,7 @@ export function UploadLanding({ loading, onUpload }: UploadLandingProps) {
                         removeFile(index);
                       }}
                       className="rounded p-1 text-quantis-slate opacity-0 transition-opacity group-hover:opacity-100 hover:text-quantis-carbon"
-                      aria-label={`Remove ${file.name}`}
+                      aria-label={`Supprimer ${file.name}`}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -161,7 +161,7 @@ export function UploadLanding({ loading, onUpload }: UploadLandingProps) {
                   disabled={loading}
                   className="quantis-primary w-full py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? "Processing..." : "Generate dashboard"}
+                  {loading ? "Traitement..." : "Generer le tableau de bord"}
                 </button>
               </div>
             </div>
@@ -171,4 +171,3 @@ export function UploadLanding({ loading, onUpload }: UploadLandingProps) {
     </section>
   );
 }
-

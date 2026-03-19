@@ -40,9 +40,16 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 - Pipeline metier MVP:
   - upload de fichiers (Excel/PDF)
   - parsing serveur (`services/parsers/*`)
-  - calcul KPI (`services/kpiEngine.ts`)
+  - mapping financier 2033 (`services/mapping/financialDataMapper.ts`)
+  - calcul KPI complet selon `Quantis_Mapping_2033SD.xlsx` (`services/kpiEngine.ts`)
   - stockage Firestore via SDK client authentifie (`services/analysisStore.ts`)
   - affichage dashboard + historique
+  - page d'inspection d'une analyse precise: `/analysis/[id]`
+    - affichage `rawData`, `mappedData`, `kpis` et `parsedData`
+  - page de test KPI avant/apres: `/test-kpi`
+    - saisie JSON `mappedData`
+    - visualisation des formules
+    - visualisation des resultats `kpis`
 - Historisation:
   - timestamp de creation
   - exercice fiscal (`fiscalYear`) exploitable pour filtrage
@@ -82,6 +89,11 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - `lib/email/templates/verificationEmailTemplate.ts`
   - version revue avec rappel spam et CTA d'activation
 - Moteur KPI pur et sans dependance UI pour testabilite.
+- Nouveau modele de donnees d'analyse stocke:
+  - `rawData`
+  - `mappedData`
+  - `kpis`
+  - `financialFacts` (compatibilite dashboard MVP)
 - Tests unitaires privilegies sur logique metier, pas sur rendu UI.
 - Migration lint finalisee pour ESLint v9 via `eslint.config.mjs`.
 

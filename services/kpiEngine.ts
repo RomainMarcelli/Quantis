@@ -1,32 +1,71 @@
-import type { CalculatedKpis, FinancialFacts } from "@/types/analysis";
+import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
-export function computeKpis(facts: FinancialFacts): CalculatedKpis {
-  const revenue = valueOrZero(facts.revenue);
-  const expenses = valueOrZero(facts.expenses);
-  const payroll = valueOrZero(facts.payroll);
-  const treasury = valueOrZero(facts.treasury);
-  const receivables = valueOrZero(facts.receivables);
-  const payables = valueOrZero(facts.payables);
-  const inventory = valueOrZero(facts.inventory);
+export function computeKpis(data: MappedFinancialData): CalculatedKpis {
+  const tcam = percent(powMinusOne(div(data.total_prod_expl, data.ca_n_minus_1), inv(data.n)));
+  const va = sub(data.total_prod_expl, sum(data.achats_march, data.achats_mp, data.ace));
+  const ebitda = sub(va, sum(data.impots_taxes, data.salaires, data.charges_soc));
+  const marge_ebitda = percent(div(ebitda, data.total_prod_expl));
+  const charges_var = sum(data.achats_march, data.achats_mp, data.var_stock_march, data.var_stock_mp);
+  const mscv = sub(data.total_prod_expl, charges_var);
+  const tmscv = div(mscv, data.total_prod_expl);
+  const charges_fixes = sum(data.ace, data.salaires, data.charges_soc, data.dap);
+  const point_mort = div(charges_fixes, tmscv);
+  const ratio_immo = div(data.total_actif_immo, data.total_actif);
+  const bfr = sub(sum(data.total_stocks, data.creances), sum(data.fournisseurs, data.dettes_fisc_soc));
+  const rot_bfr = mul(div(bfr, mul(data.total_prod_expl, 1.2)), 365);
+  const dso = div(mul(data.clients, 365), mul(data.total_prod_expl, 1.2));
+  const dpo = div(mul(data.fournisseurs, 365), mul(sum(data.achats_march, data.ace), 1.2));
+  const rot_stocks = div(mul(data.total_stocks, 365), data.total_prod_expl);
+  const caf = sum(data.res_net, data.dap);
+  const fte = sub(caf, data.delta_bfr);
+  const tn = sub(data.dispo, data.emprunts);
+  const solvabilite = div(data.total_cp, data.total_passif);
+  const gearing = div(sub(data.emprunts, data.dispo), ebitda);
+  const liq_gen = div(data.total_actif_circ, sum(data.fournisseurs, data.dettes_fisc_soc));
+  const liq_red = div(sum(data.creances, data.dispo), sum(data.fournisseurs, data.dettes_fisc_soc));
+  const liq_imm = div(data.dispo, sum(data.fournisseurs, data.dettes_fisc_soc));
+  const roce = div(mul(data.ebit, 0.75), sum(data.total_actif_immo, bfr));
+  const roe = div(data.res_net, data.total_cp);
+  const effet_levier = sub(roe, roce);
 
-  const grossMarginRate = revenue > 0 ? round(((revenue - expenses) / revenue) * 100) : null;
-  const netProfit = revenue > 0 ? round(revenue - expenses - payroll) : null;
-  const workingCapital = facts.receivables !== null || facts.inventory !== null || facts.payables !== null
-    ? round(receivables + inventory - payables)
-    : null;
-
+  const grossMarginRate = percent(tmscv);
+  const netProfit = data.res_net ?? data.resultat_exercice;
+  const workingCapital = bfr;
   const monthlyBurnRate = netProfit !== null && netProfit < 0 ? round(Math.abs(netProfit) / 12) : 0;
-  const cashRunwayMonths =
-    monthlyBurnRate && monthlyBurnRate > 0 && facts.treasury !== null
-      ? round(treasury / monthlyBurnRate)
-      : null;
+  const cashRunwayMonths = monthlyBurnRate > 0 ? div(data.dispo, monthlyBurnRate) : null;
 
   return {
-    grossMarginRate,
-    netProfit,
-    workingCapital,
-    monthlyBurnRate,
-    cashRunwayMonths,
+    tcam: roundOrNull(tcam),
+    va: roundOrNull(va),
+    ebitda: roundOrNull(ebitda),
+    marge_ebitda: roundOrNull(marge_ebitda),
+    charges_var: roundOrNull(charges_var),
+    mscv: roundOrNull(mscv),
+    tmscv: roundOrNull(tmscv),
+    charges_fixes: roundOrNull(charges_fixes),
+    point_mort: roundOrNull(point_mort),
+    ratio_immo: roundOrNull(ratio_immo),
+    bfr: roundOrNull(bfr),
+    rot_bfr: roundOrNull(rot_bfr),
+    dso: roundOrNull(dso),
+    dpo: roundOrNull(dpo),
+    rot_stocks: roundOrNull(rot_stocks),
+    caf: roundOrNull(caf),
+    fte: roundOrNull(fte),
+    tn: roundOrNull(tn),
+    solvabilite: roundOrNull(solvabilite),
+    gearing: roundOrNull(gearing),
+    liq_gen: roundOrNull(liq_gen),
+    liq_red: roundOrNull(liq_red),
+    liq_imm: roundOrNull(liq_imm),
+    roce: roundOrNull(roce),
+    roe: roundOrNull(roe),
+    effet_levier: roundOrNull(effet_levier),
+    grossMarginRate: roundOrNull(grossMarginRate),
+    netProfit: roundOrNull(netProfit),
+    workingCapital: roundOrNull(workingCapital),
+    monthlyBurnRate: roundOrNull(monthlyBurnRate),
+    cashRunwayMonths: roundOrNull(cashRunwayMonths),
     healthScore: scoreHealth({
       grossMarginRate,
       netProfit,
@@ -84,11 +123,63 @@ function normalize(value: number, low: number, high: number): number {
   return (value - low) / (high - low);
 }
 
-function valueOrZero(value: number | null): number {
-  return value ?? 0;
+function sum(...values: Array<number | null>): number | null {
+  if (values.some((value) => value === null)) {
+    return null;
+  }
+  const strictValues = values as number[];
+  return strictValues.reduce((acc, value) => acc + value, 0);
+}
+
+function sub(left: number | null, right: number | null): number | null {
+  if (left === null || right === null) {
+    return null;
+  }
+  return left - right;
+}
+
+function mul(left: number | null, right: number | null): number | null {
+  if (left === null || right === null) {
+    return null;
+  }
+  return left * right;
+}
+
+function div(left: number | null, right: number | null): number | null {
+  if (left === null || right === null || right === 0) {
+    return null;
+  }
+  return left / right;
+}
+
+function inv(value: number | null): number | null {
+  if (value === null || value === 0) {
+    return null;
+  }
+  return 1 / value;
+}
+
+function powMinusOne(base: number | null, exponent: number | null): number | null {
+  if (base === null || exponent === null || base <= 0) {
+    return null;
+  }
+  return Math.pow(base, exponent) - 1;
+}
+
+function percent(value: number | null): number | null {
+  if (value === null) {
+    return null;
+  }
+  return value * 100;
+}
+
+function roundOrNull(value: number | null): number | null {
+  if (value === null) {
+    return null;
+  }
+  return round(value);
 }
 
 function round(value: number): number {
   return Number(value.toFixed(2));
 }
-

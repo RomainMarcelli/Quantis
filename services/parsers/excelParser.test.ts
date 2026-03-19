@@ -27,6 +27,7 @@ describe("parseExcelBuffer", () => {
       true
     );
     expect(result.previewRows.length).toBeGreaterThan(0);
+    expect(Object.keys(result.rawData.byLabel).length).toBeGreaterThan(0);
   });
 
   it("returns a fallback preview row when sheet has no data rows", () => {
@@ -46,6 +47,11 @@ describe("parseExcelBuffer", () => {
       receivables: 0,
       payables: 0,
       inventory: 0
+    });
+    expect(result.rawData).toEqual({
+      byVariableCode: {},
+      byLineCode: {},
+      byLabel: {}
     });
   });
 });

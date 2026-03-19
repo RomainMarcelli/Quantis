@@ -147,8 +147,8 @@ export function LoginForm() {
       {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
       <p className="text-xs uppercase tracking-wide text-quantis-slate">Quantis</p>
       <h1 className="mt-2 text-3xl font-semibold leading-tight text-quantis-carbon">
-        Secure financial
-        <span className="ml-2 text-quantis-gold">workspace</span>
+        Espace financier
+        <span className="ml-2 text-quantis-gold">securise</span>
       </h1>
       <div className="quantis-accent-line mt-4" />
       <p className="mt-4 text-sm text-quantis-slate">
