@@ -64,7 +64,7 @@ export function DashboardView() {
         setSelectedAnalysisId(nextAnalyses[0].id);
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unexpected error while loading history.");
+      setErrorMessage(error instanceof Error ? error.message : "Erreur inattendue pendant le chargement de l'historique.");
     } finally {
       setLoadingHistory(false);
     }
@@ -91,14 +91,14 @@ export function DashboardView() {
       const payload = (await response.json()) as { analysisDraft?: AnalysisDraft; error?: string; detail?: string };
 
       if (!response.ok || !payload.analysisDraft) {
-        throw new Error(payload.detail ?? payload.error ?? "Upload pipeline failed.");
+        throw new Error(payload.detail ?? payload.error ?? "Le traitement du fichier a echoue.");
       }
 
       const savedAnalysis = await saveAnalysisDraft(payload.analysisDraft);
       setAnalyses((current) => [savedAnalysis, ...current]);
       setSelectedAnalysisId(savedAnalysis.id);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Unexpected error while processing upload.");
+      setErrorMessage(error instanceof Error ? error.message : "Erreur inattendue pendant le traitement du fichier.");
     } finally {
       setUploading(false);
     }
@@ -122,12 +122,19 @@ export function DashboardView() {
       <header className="quantis-panel flex flex-wrap items-center justify-between gap-3 p-5">
         <div>
           <p className="text-xs uppercase tracking-wide text-quantis-slate">Quantis</p>
-          <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Dashboard financier</h1>
+          <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Tableau de bord financier</h1>
           <p className="mt-1 text-sm text-quantis-slate">
             Connecte en tant que {user?.displayName ?? user?.email}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/test-kpi")}
+            className="rounded-xl border border-quantis-mist bg-white px-4 py-2 text-sm font-medium text-quantis-carbon hover:bg-quantis-paper"
+          >
+            Page de test KPI
+          </button>
           <button
             type="button"
             onClick={() => router.push("/account")}
@@ -145,7 +152,7 @@ export function DashboardView() {
 
       {errorMessage ? <div className="quantis-panel border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div> : null}
 
-      {loadingHistory ? <div className="quantis-panel px-4 py-3 text-sm text-quantis-slate">Chargement de l'historique...</div> : null}
+      {loadingHistory ? <div className="quantis-panel px-4 py-3 text-sm text-quantis-slate">Chargement de l&apos;historique...</div> : null}
 
       <KpiSummary kpis={selectedAnalysis?.kpis ?? null} />
 
@@ -164,11 +171,11 @@ export function DashboardView() {
                 Creee le {new Date(selectedAnalysis.createdAt).toLocaleString("fr-FR")}
               </p>
               <div className="mt-4 space-y-2 text-sm text-quantis-carbon">
-                <p>Revenue: {formatCurrency(selectedAnalysis.financialFacts.revenue)}</p>
-                <p>Expenses: {formatCurrency(selectedAnalysis.financialFacts.expenses)}</p>
-                <p>Payroll: {formatCurrency(selectedAnalysis.financialFacts.payroll)}</p>
+                <p>Chiffre d&apos;affaires: {formatCurrency(selectedAnalysis.financialFacts.revenue)}</p>
+                <p>Charges: {formatCurrency(selectedAnalysis.financialFacts.expenses)}</p>
+                <p>Masse salariale: {formatCurrency(selectedAnalysis.financialFacts.payroll)}</p>
                 <p>Tresorerie: {formatCurrency(selectedAnalysis.financialFacts.treasury)}</p>
-                <p>BFR (receivables + inventory - payables): {formatCurrency(selectedAnalysis.kpis.workingCapital)}</p>
+                <p>BFR (creances + stocks - dettes): {formatCurrency(selectedAnalysis.kpis.workingCapital)}</p>
               </div>
             </>
           ) : (
@@ -182,7 +189,7 @@ export function DashboardView() {
 
 function formatCurrency(value: number | null): string {
   if (value === null) {
-    return "N/A";
+    return "N/D";
   }
 
   return new Intl.NumberFormat("fr-FR", {

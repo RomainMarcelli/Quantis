@@ -100,7 +100,7 @@ describe("loginWithEmailPassword", () => {
     const gateway: LoginGateway = { signIn };
 
     const result = await loginWithEmailPassword(gateway, {
-      email: "bad-email",
+      email: "bad-email@quantis.io",
       password: "wrong-pass"
     });
 
@@ -126,7 +126,8 @@ describe("loginWithEmailPassword", () => {
     expect(result).toEqual({
       success: false,
       errors: {
-        general: "Email non verifie. Cliquez sur le lien recu par email avant de vous connecter."
+        general:
+          "Email non verifie. Cliquez sur le lien reçu par email (Vérifier les spams) avant de vous connecter."
       }
     });
   });

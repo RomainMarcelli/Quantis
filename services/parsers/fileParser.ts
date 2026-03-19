@@ -15,7 +15,7 @@ export async function parseUploadedFile(file: UploadedBinaryFile): Promise<Parse
     return parsePdfBuffer(file.buffer, file.name);
   }
 
-  throw new Error(`Unsupported file type for ${file.name}`);
+  throw new Error(`Type de fichier non supporte pour ${file.name}`);
 }
 
 export function detectSupportedUploadType(fileName: string, mimeType: string): SupportedUploadType | null {
@@ -39,4 +39,3 @@ export function detectSupportedUploadType(fileName: string, mimeType: string): S
 
   return null;
 }
-

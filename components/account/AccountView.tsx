@@ -201,7 +201,7 @@ export function AccountView() {
             onClick={() => router.push("/dashboard")}
             className="rounded-xl border border-quantis-mist bg-white px-3 py-1.5 text-xs font-medium text-quantis-carbon hover:bg-quantis-paper"
           >
-            Retour dashboard
+            Retour au tableau de bord
           </button>
         </div>
         <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Profil utilisateur</h1>

@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function GET() {
   return NextResponse.json(
     {
-      error: "Use Firestore client SDK for listing analyses in the authenticated frontend."
+      error: "Utilisez le SDK client Firestore pour lister les analyses depuis le frontend authentifie."
     },
     { status: 405 }
   );
@@ -18,24 +18,24 @@ export async function POST(request: NextRequest) {
   const userId = String(formData.get("userId") ?? "");
 
   if (!userId) {
-    return NextResponse.json({ error: "userId is required." }, { status: 400 });
+    return NextResponse.json({ error: "Le champ userId est obligatoire." }, { status: 400 });
   }
 
   const files = formData.getAll("files");
   if (!files.length) {
-    return NextResponse.json({ error: "At least one file is required." }, { status: 400 });
+    return NextResponse.json({ error: "Au moins un fichier est obligatoire." }, { status: 400 });
   }
 
   try {
     const binaryFiles = await Promise.all(
       files.map(async (candidate) => {
         if (!(candidate instanceof File)) {
-          throw new Error("Invalid file payload.");
+          throw new Error("Payload fichier invalide.");
         }
 
         const type = detectSupportedUploadType(candidate.name, candidate.type);
         if (!type) {
-          throw new Error(`Unsupported file format for ${candidate.name}.`);
+          throw new Error(`Format de fichier non supporte pour ${candidate.name}.`);
         }
 
         const arrayBuffer = await candidate.arrayBuffer();
@@ -58,12 +58,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ analysisDraft }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
-      { error: "Upload pipeline failed.", detail: toErrorMessage(error) },
+      { error: "Le pipeline d'upload a echoue.", detail: toErrorMessage(error) },
       { status: 500 }
     );
   }
 }
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Unknown error";
+  return error instanceof Error ? error.message : "Erreur inconnue";
 }

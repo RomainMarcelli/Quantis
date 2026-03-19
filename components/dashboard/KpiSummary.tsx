@@ -11,27 +11,27 @@ export function KpiSummary({ kpis }: KpiSummaryProps) {
 
   const items = [
     {
-      label: "Gross Margin",
+      label: "Marge brute",
       value: formatPercent(kpis.grossMarginRate)
     },
     {
-      label: "Net Profit",
+      label: "Resultat net",
       value: formatCurrency(kpis.netProfit)
     },
     {
-      label: "Working Capital",
+      label: "BFR",
       value: formatCurrency(kpis.workingCapital)
     },
     {
-      label: "Runway (months)",
+      label: "Autonomie (mois)",
       value: formatNumber(kpis.cashRunwayMonths)
     },
     {
-      label: "Monthly Burn",
+      label: "Consommation mensuelle",
       value: formatCurrency(kpis.monthlyBurnRate)
     },
     {
-      label: "Health Score",
+      label: "Score de sante",
       value: formatPercent(kpis.healthScore)
     }
   ];
@@ -50,7 +50,7 @@ export function KpiSummary({ kpis }: KpiSummaryProps) {
 
 function formatCurrency(value: number | null): string {
   if (value === null) {
-    return "N/A";
+    return "N/D";
   }
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
@@ -61,15 +61,14 @@ function formatCurrency(value: number | null): string {
 
 function formatPercent(value: number | null): string {
   if (value === null) {
-    return "N/A";
+    return "N/D";
   }
   return `${value.toFixed(1)}%`;
 }
 
 function formatNumber(value: number | null): string {
   if (value === null) {
-    return "N/A";
+    return "N/D";
   }
   return value.toFixed(1);
 }
-

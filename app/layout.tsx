@@ -9,7 +9,7 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "Quantis",
-  description: "Quantis - Financial Intelligence Platform"
+  description: "Quantis - Plateforme d'intelligence financiere"
 };
 
 export default function RootLayout({

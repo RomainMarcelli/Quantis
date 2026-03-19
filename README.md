@@ -77,12 +77,34 @@ Puis ouvrir `http://localhost:3000`.
 
 Flux implemente:
 
-`Upload -> Parsing -> Calcul KPI -> Stockage Firestore -> Affichage dashboard`
+`Upload -> Parsing -> Mapping -> Calcul KPI -> Stockage Firestore -> Affichage dashboard`
 
 - Parsing Excel/PDF: `services/parsers/`
-- Moteur KPI pur: `services/kpiEngine.ts`
+- Mapping 2033: `services/mapping/financialDataMapper.ts`
+- Moteur KPI complet (formules Quantis Mapping): `services/kpiEngine.ts`
 - Stockage Firestore: `services/analysisStore.ts`
 - Orchestration API parsing/kpi: `app/api/analyses/route.ts`
+- Chaque analyse stocke:
+  - `rawData`
+  - `mappedData`
+  - `kpis`
+  - (et champs legacy dashboard: `financialFacts`, `parsedData`)
+
+## Inspection d'une analyse
+
+- Page detail: `/analysis/[id]`
+- Objectif MVP: verifier une analyse precise en affichant:
+  - `rawData` (affiche via `parsedData`)
+  - `mappedData` (affiche via `financialFacts`)
+  - `kpis`
+
+## Page de test KPI (avant / apres)
+
+- Route: `/test-kpi`
+- Permet de:
+  - coller/modifier un JSON `mappedData` (donnees inserees)
+  - voir les formules appliquees et les resultats intermediaires
+  - visualiser le resultat final `kpis` en tableau + JSON
 
 ## Gestion de compte
 
