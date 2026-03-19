@@ -1,76 +1,55 @@
-# Quantis V2
+# Quantis MVP
 
-Plateforme d'intelligence financière pour PME qui transforme les données comptables en analyses stratégiques via langage naturel.
+Reconstruction from scratch de Quantis a partir des fichiers Markdown du projet historique.
 
-## 🚀 Stack Technique
+## Stack
 
-- **Frontend**: Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS
-- **Backend**: Next.js API Routes (mapping + KPIs en mode démo, sans API externe)
-- **Déploiement**: Vercel (un seul déploiement, pas de Render ni autre service)
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- Firebase SDK (Auth email/password)
 
-## 📦 Installation
+## Installation
 
 ```bash
-# Installer les dépendances
 npm install
-
-# Copier le fichier d'environnement
-cp .env.example .env
-
-# Configurer OPENAI_API_KEY dans .env
 ```
 
-## 🛠️ Développement
+## Variables d'environnement
+
+Le projet fonctionne sans variable obligatoire pour l'auth MVP (config Firebase dans `lib/firebase.ts`).
+
+## Lancer le projet
 
 ```bash
-# Démarrer le serveur de développement
 npm run dev
-
-# Build pour production
-npm run build
-
-# Démarrer en mode production
-npm start
-
-# Linter
-npm run lint
 ```
 
-Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur.
+Puis ouvrir `http://localhost:3000`.
 
-## 🔧 Variables d'Environnement
+## Authentification MVP
 
-| Variable | Description | Requis |
-|----------|-------------|--------|
-| `OPENAI_API_KEY` | Clé API OpenAI (optionnel, pour analyses avancées) | ❌ Non |
+- Connexion Firebase par `email` + `password`
+- Login d'un utilisateur deja cree dans Firebase Authentication
+- Redirection vers `/dashboard` apres authentification
+- Deconnexion depuis le dashboard
 
-## 📁 Structure du Projet
+## Tests unitaires
 
-```
-├── app/                    # Pages et routes Next.js
-│   ├── api/               # API Routes
-│   └── page.tsx           # Page d'accueil
-├── components/            # Composants React
-│   ├── decision/         # Composants de décision
-│   ├── dashboard/        # Dashboard KPI
-│   └── ui/               # Composants UI réutilisables
-├── lib/                   # Bibliothèques métier
-│   ├── data-mapper/      # Mapping Excel/CSV → KPI (remplace l'API Python)
-│   ├── analyzers/        # Analyseurs de décisions
-│   ├── calculators/      # Calculateurs financiers
-│   └── generators/       # Générateurs d'UI
-├── types/                 # Types TypeScript
-└── config/                # Configuration
+```bash
+npm run test:unit
 ```
 
-## 🚢 Déploiement
+Les tests couvrent la logique metier de login (validation credentials + gestion des erreurs d'auth).
 
-Le projet est configuré pour Vercel. Voir `vercel.json` pour la configuration.
+## Structure
 
-1. Connectez votre repository à Vercel
-2. Configurez les variables d'environnement dans le dashboard Vercel
-3. Le déploiement se fait automatiquement à chaque push
+- `app/`
+- `components/`
+- `services/`
+- `lib/`
+- `types/`
 
-## 📝 Licence
+## Suivi projet
 
-Private - Tous droits réservés
+Le fichier `projet.md` est la source de verite de pilotage (vision, etat d'avancement, decisions techniques, prochaines etapes).

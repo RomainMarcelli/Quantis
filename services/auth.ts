@@ -1,43 +1,53 @@
-import type { UserSession } from "@/types/auth";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  type User
+} from "firebase/auth";
+import { firebaseApp } from "@/lib/firebase";
+import type { AuthenticatedUser, LoginCredentials } from "@/types/auth";
 
-const STORAGE_KEY = "quantis_session";
+const auth = getAuth(firebaseApp);
 
-export const bypassLoginEnabled = process.env.NEXT_PUBLIC_BYPASS_LOGIN === "1";
+export type AuthStateListener = (user: AuthenticatedUser | null) => void;
 
-export function canLoginWithSiren(siren: string): boolean {
-  return siren.trim() === "1";
+export interface AuthGateway {
+  signIn(credentials: LoginCredentials): Promise<AuthenticatedUser>;
+  signOut(): Promise<void>;
+  getCurrentUser(): AuthenticatedUser | null;
+  subscribe(listener: AuthStateListener): () => void;
 }
 
-export function saveSession(session: UserSession): void {
-  if (typeof window === "undefined") {
-    return;
-  }
+export const firebaseAuthGateway: AuthGateway = {
+  async signIn(credentials) {
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      credentials.email,
+      credentials.password
+    );
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    return toAuthenticatedUser(userCredential.user);
+  },
+
+  async signOut() {
+    await signOut(auth);
+  },
+
+  getCurrentUser() {
+    return auth.currentUser ? toAuthenticatedUser(auth.currentUser) : null;
+  },
+
+  subscribe(listener) {
+    return onAuthStateChanged(auth, (user) => {
+      listener(user ? toAuthenticatedUser(user) : null);
+    });
+  }
+};
+
+function toAuthenticatedUser(user: User): AuthenticatedUser {
+  return {
+    uid: user.uid,
+    email: user.email
+  };
 }
-
-export function getSession(): UserSession | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(raw) as UserSession;
-  } catch {
-    return null;
-  }
-}
-
-export function clearSession(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.removeItem(STORAGE_KEY);
-}
-

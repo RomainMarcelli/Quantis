@@ -3,14 +3,62 @@
 @tailwind utilities;
 
 :root {
+  --quantis-smoke: #f4f5f7;
+  --quantis-paper: #fafafa;
+  --quantis-white: #ffffff;
+  --quantis-carbon: #1a1a1a;
+  --quantis-slate: #6b7280;
+  --quantis-mist: #e5e7eb;
+  --quantis-gold: #d4af37;
+  --quantis-emerald: #0f766e;
+  --quantis-crimson: #9f1239;
   color-scheme: light;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f7f8fa;
-  color: #111827;
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--quantis-smoke);
+  color: var(--quantis-carbon);
+  font-family: var(--font-quantis), "Segoe UI", sans-serif;
 }
 
+.mesh-gradient {
+  background-image: radial-gradient(circle at 15% 10%, rgb(212 175 55 / 16%), transparent 42%),
+    radial-gradient(circle at 80% 0%, rgb(26 26 26 / 7%), transparent 35%),
+    linear-gradient(140deg, #fff, #f7f8fb 45%, #f2f4f8);
+}
+
+.quantis-panel {
+  border: 1px solid var(--quantis-mist);
+  background: var(--quantis-white);
+  border-radius: 16px;
+}
+
+.quantis-input {
+  border: 1px solid #d7dce4;
+  border-radius: 12px;
+  background: var(--quantis-white);
+}
+
+.quantis-input:focus-within {
+  border-color: rgb(212 175 55 / 55%);
+  box-shadow: 0 0 0 2px rgb(212 175 55 / 12%);
+}
+
+.quantis-primary {
+  background: var(--quantis-carbon);
+  color: var(--quantis-white);
+  border-radius: 12px;
+  transition: background-color 160ms ease-out;
+}
+
+.quantis-primary:hover {
+  background: #292929;
+}
+
+.quantis-accent-line {
+  height: 1px;
+  width: 56px;
+  background: var(--quantis-gold);
+}

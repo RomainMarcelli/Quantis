@@ -1,0 +1,75 @@
+import type { CalculatedKpis } from "@/types/analysis";
+
+type KpiSummaryProps = {
+  kpis: CalculatedKpis | null;
+};
+
+export function KpiSummary({ kpis }: KpiSummaryProps) {
+  if (!kpis) {
+    return null;
+  }
+
+  const items = [
+    {
+      label: "Gross Margin",
+      value: formatPercent(kpis.grossMarginRate)
+    },
+    {
+      label: "Net Profit",
+      value: formatCurrency(kpis.netProfit)
+    },
+    {
+      label: "Working Capital",
+      value: formatCurrency(kpis.workingCapital)
+    },
+    {
+      label: "Runway (months)",
+      value: formatNumber(kpis.cashRunwayMonths)
+    },
+    {
+      label: "Monthly Burn",
+      value: formatCurrency(kpis.monthlyBurnRate)
+    },
+    {
+      label: "Health Score",
+      value: formatPercent(kpis.healthScore)
+    }
+  ];
+
+  return (
+    <section className="grid gap-3 md:grid-cols-3">
+      {items.map((item) => (
+        <article key={item.label} className="quantis-panel p-4">
+          <p className="text-xs uppercase tracking-wide text-quantis-slate">{item.label}</p>
+          <p className="mt-2 text-2xl font-semibold text-quantis-carbon">{item.value}</p>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function formatCurrency(value: number | null): string {
+  if (value === null) {
+    return "N/A";
+  }
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
+function formatPercent(value: number | null): string {
+  if (value === null) {
+    return "N/A";
+  }
+  return `${value.toFixed(1)}%`;
+}
+
+function formatNumber(value: number | null): string {
+  if (value === null) {
+    return "N/A";
+  }
+  return value.toFixed(1);
+}
+

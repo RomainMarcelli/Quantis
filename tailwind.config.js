@@ -9,8 +9,17 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        surface: "#f7f8fa",
-        ink: "#111827"
+        quantis: {
+          smoke: "#f4f5f7",
+          paper: "#fafafa",
+          white: "#ffffff",
+          carbon: "#1a1a1a",
+          slate: "#6b7280",
+          mist: "#e5e7eb",
+          gold: "#d4af37",
+          emerald: "#0f766e",
+          crimson: "#9f1239"
+        }
       }
     }
   },

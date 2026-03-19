@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
+import { Manrope } from "next/font/google";
 import "./globals.css";
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-quantis"
+});
 
 export const metadata: Metadata = {
   title: "Quantis",
-  description: "Quantis MVP"
+  description: "Quantis - Financial Intelligence Platform"
 };
 
 export default function RootLayout({
@@ -13,8 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body>{children}</body>
+      <body className={manrope.variable}>{children}</body>
     </html>
   );
 }
-
