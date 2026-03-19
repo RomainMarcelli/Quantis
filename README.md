@@ -114,4 +114,4 @@ Couvrent la logique metier (auth, parsing, KPI).
 
 ## Suivi projet
 
-Le fichier `projet.md` est la source de verite de pilotage (vision, etat d'avancement, decisions techniques, roadmap).
+Le fichier `projet.md` est la source de verite de pilotage (vision, etat d'avancement, decisions techniques, roadmap)
