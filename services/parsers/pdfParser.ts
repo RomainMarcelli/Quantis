@@ -1,28 +1,36 @@
-import pdf from "pdf-parse";
+import { PDFParse } from "pdf-parse";
 import { extractFinancialFactsFromText } from "@/services/parsers/financialFactsExtractor";
 import type { ParsedFileData } from "@/types/analysis";
 
 export async function parsePdfBuffer(buffer: Buffer, fileName: string): Promise<ParsedFileData> {
-  const parsedPdf = await pdf(buffer);
-  const extractedText = parsedPdf.text ?? "";
-  const { facts, metrics } = extractFinancialFactsFromText(extractedText);
+  const parser = new PDFParse({
+    data: new Uint8Array(buffer)
+  });
 
-  return {
-    fileName,
-    fileType: "pdf",
-    extractedAt: new Date().toISOString(),
-    fiscalYear: inferFiscalYear(extractedText),
-    metrics,
-    previewRows: [
-      {
-        pages: parsedPdf.numpages ?? null,
-        textSample: extractedText.slice(0, 220),
-        revenue: facts.revenue,
-        expenses: facts.expenses,
-        treasury: facts.treasury
-      }
-    ]
-  };
+  try {
+    const textResult = await parser.getText();
+    const extractedText = textResult.text ?? "";
+    const { facts, metrics } = extractFinancialFactsFromText(extractedText);
+
+    return {
+      fileName,
+      fileType: "pdf",
+      extractedAt: new Date().toISOString(),
+      fiscalYear: inferFiscalYear(extractedText),
+      metrics,
+      previewRows: [
+        {
+          pages: textResult.pages?.length ?? null,
+          textSample: extractedText.slice(0, 220),
+          revenue: facts.revenue,
+          expenses: facts.expenses,
+          treasury: facts.treasury
+        }
+      ]
+    };
+  } finally {
+    await parser.destroy();
+  }
 }
 
 function inferFiscalYear(text: string): number | null {
@@ -32,4 +40,3 @@ function inferFiscalYear(text: string): number | null {
   }
   return Number(yearMatch[1]);
 }
-

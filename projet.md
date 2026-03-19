@@ -3,54 +3,80 @@
 ## Vision du projet
 
 Quantis est un copilote financier B2B pour PME.
-Le produit convertit des donnees comptables (PDF/Excel) en decisions exploitables via langage naturel:
-classification de la demande, extraction de parametres, analyse financiere, restitution claire (KPIs, projections, recommandations).
+Le produit convertit des donnees comptables (Excel/PDF) en decisions exploitables via un pipeline clair:
+Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 
 ## Fonctionnalites implementees
 
-- Socle Next.js App Router + TypeScript + Tailwind.
-- Initialisation Firebase (`lib/firebase.ts`).
-- Authentification Firebase email/password:
-  - formulaire login `email` + `password`
-  - connexion via `signInWithEmailAndPassword`
-  - guard du dashboard base sur l'etat auth Firebase
-  - deconnexion via `signOut`
-- Separation des responsabilites:
-  - UI: `components/`
-  - logique metier auth: `lib/auth/login.ts`
-  - service Firebase auth: `services/auth.ts`
-- Tests unitaires metier (Vitest):
-  - validation des credentials
-  - flow login success/erreur
-  - mapping des erreurs Firebase en messages utilisateur
+- Base technique Next.js App Router + TypeScript + Tailwind.
+- DA "premium fintech" appliquee sur login et dashboard:
+  - fond clair, anthracite, accent or
+  - cartes sobrement bordees
+  - hierarchie visuelle type landing Quantis
+- Authentification Firebase complete:
+  - login email/password
+  - inscription complete:
+    - nom
+    - prenom
+    - email
+    - password
+    - nom entreprise
+    - SIREN
+    - taille entreprise
+    - secteur
+  - messages d'erreur metier explicites
+  - affichage/masquage du mot de passe (icone oeil)
+  - checklist securite mot de passe dynamique (etat par critere)
+  - feedback UX via toasts + messages inline + tooltips
+  - verification email obligatoire avant acces dashboard
+  - profil entreprise stocke dans `users/{uid}`
+- Pipeline metier MVP:
+  - upload de fichiers (Excel/PDF)
+  - parsing serveur (`services/parsers/*`)
+  - calcul KPI (`services/kpiEngine.ts`)
+  - stockage Firestore via SDK client authentifie (`services/analysisStore.ts`)
+  - affichage dashboard + historique
+- Historisation:
+  - timestamp de creation
+  - exercice fiscal (`fiscalYear`) exploitable pour filtrage
+- Regles de securite Firestore:
+  - fichier `firestore.rules`
+  - isolation stricte par `userId`
 
 ## Fonctionnalites en cours
 
-- Mise en place du premier pipeline metier de question/reponse Quantis:
-  - classification
-  - extraction de parametres
-  - gap analysis
-  - generation de sortie structuree
+- Robustification du parsing PDF (cas reels multi-pages / tableaux complexes).
+- Enrichissement du schema des donnees extraites (granularite comptable plus fine).
 
 ## Prochaines etapes
 
-1. Ajouter l'API Route `POST /api/question` avec orchestration metier MVP.
-2. Implementer un premier analyseur (recrutement) avec KPIs et projection simple.
-3. Poser un schema de types commun pour la sortie analytique (PageConfig/sections KPI).
-4. Ajouter les tests unitaires associes aux modules de classification/extraction/calcul.
-5. Connecter le dashboard a des donnees metier reelles (widgets sante/alertes/argent dormant).
+1. Ajouter un filtre dashboard par annee d'exercice.
+2. Brancher un parser PDF plus semantique (ratios + sections bilan/CR).
+3. Ajouter snapshots mensuels pour KPI temporels.
+4. Introduire un module d'alertes proactives (cash stress, argent dormant).
+5. Isoler parsing et KPI engine en microservices (phase suivante).
 
 ## Decisions techniques importantes
 
-- Auth custom SIREN retiree au profit de Firebase Auth email/password pour un MVP evolutif.
-- Logique de login extraite en use case testable (`lib/auth/login.ts`) pour eviter de coupler la regle metier au composant React.
-- Gateway d'auth centralisee (`services/auth.ts`) pour preparer une evolution future (RBAC, claims, multi-tenant).
-- Vitest choisi pour des tests unitaires rapides et isoles sur la logique metier.
+- Suppression de la dependance runtime a Firebase Admin pour le MVP local:
+  - parsing + KPI restent en backend Next.js
+  - persistance Firestore est realisee depuis le client authentifie
+  - evite le blocage "FIREBASE_PROJECT_ID / CLIENT_EMAIL / PRIVATE_KEY" en local
+- Logiques auth separees et testables:
+  - `lib/auth/login.ts`
+  - `lib/auth/register.ts`
+- Verification email envoyee automatiquement a l'inscription via Firebase Auth.
+- Template email design Quantis disponible pour futur envoi transactionnel:
+  - `lib/email/templates/verificationEmailTemplate.ts`
+  - version revue avec rappel spam et CTA d'activation
+- Moteur KPI pur et sans dependance UI pour testabilite.
+- Tests unitaires privilegies sur logique metier, pas sur rendu UI.
 
 ## Notes techniques
 
 - Dossiers cibles: `app/`, `components/`, `services/`, `lib/`, `types/`.
-- Documentation fonctionnelle source:
+- Regles Firestore a deployer: `firestore.rules`.
+- Documentation source:
   - `DOCUMENTATION_COMPLETE_PROJET.md`
   - `PRESENTATION_DEMO.md`
   - `PRESENTATION_EXECUTIVE_SUMMARY.md`

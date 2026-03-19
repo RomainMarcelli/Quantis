@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId;
+
+      allow delete: if false;
+    }
+
+    match /analyses/{analysisId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.kpis is map
+        && request.resource.data.financialFacts is map;
+
+      allow update, delete: if false;
+    }
+  }
+}

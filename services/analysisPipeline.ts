@@ -1,13 +1,12 @@
 import { computeKpis } from "@/services/kpiEngine";
 import { parseUploadedFile, type UploadedBinaryFile } from "@/services/parsers/fileParser";
 import { mergeFinancialFacts } from "@/services/parsers/financialFactsExtractor";
-import { saveAnalysis } from "@/services/repositories/analysisRepository";
-import type { AnalysisRecord, FinancialFacts, NewAnalysisRecord, ParsedFileData } from "@/types/analysis";
+import type { AnalysisDraft, FinancialFacts, ParsedFileData } from "@/types/analysis";
 
 export async function runAnalysisPipeline(params: {
   userId: string;
   files: UploadedBinaryFile[];
-}): Promise<AnalysisRecord> {
+}): Promise<AnalysisDraft> {
   const parsedData = await Promise.all(params.files.map((file) => parseUploadedFile(file)));
   const facts = mergeFinancialFacts(parsedData.map((item) => mapParsedDataToFacts(item)));
   const kpis = computeKpis(facts);
@@ -15,7 +14,7 @@ export async function runAnalysisPipeline(params: {
   const candidateYears = parsedData.map((item) => item.fiscalYear).filter((year): year is number => year !== null);
   const fiscalYear = candidateYears.length > 0 ? candidateYears[0] : null;
 
-  const analysisToSave: NewAnalysisRecord = {
+  const analysisDraft: AnalysisDraft = {
     userId: params.userId,
     createdAt: new Date().toISOString(),
     fiscalYear,
@@ -30,7 +29,7 @@ export async function runAnalysisPipeline(params: {
     kpis
   };
 
-  return saveAnalysis(analysisToSave);
+  return analysisDraft;
 }
 
 function mapParsedDataToFacts(item: ParsedFileData): FinancialFacts {

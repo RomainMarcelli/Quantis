@@ -1,25 +1,50 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { CheckCircle2, Circle, Eye, EyeOff, Info } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { getPasswordRuleChecks } from "@/lib/auth/passwordPolicy";
+import { COMPANY_SIZE_OPTIONS, SECTOR_OPTIONS } from "@/lib/onboarding/options";
+import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
 import { loginWithEmailPassword } from "@/lib/auth/login";
+import { registerWithEmailPassword } from "@/lib/auth/register";
+import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { firebaseAuthGateway } from "@/services/auth";
-import type { LoginValidationErrors } from "@/types/auth";
+import { markUserEmailAsVerified, saveUserProfile } from "@/services/userProfileStore";
+import type { LoginValidationErrors, RegisterValidationErrors } from "@/types/auth";
 
-const EMPTY_ERRORS: LoginValidationErrors = {};
+type AuthMode = "login" | "register";
+
+const EMPTY_LOGIN_ERRORS: LoginValidationErrors = {};
+const EMPTY_REGISTER_ERRORS: RegisterValidationErrors = {};
+type ToastState = { type: "success" | "error" | "info"; message: string } | null;
 
 export function LoginForm() {
   const router = useRouter();
+
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [lastName, setLastName] = useState("");
+  const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<LoginValidationErrors>(EMPTY_ERRORS);
+  const [companyName, setCompanyName] = useState("");
+  const [siren, setSiren] = useState("");
+  const [companySize, setCompanySize] = useState<CompanySizeValue | "">("");
+  const [sector, setSector] = useState<SectorValue | "">("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [loginErrors, setLoginErrors] = useState<LoginValidationErrors>(EMPTY_LOGIN_ERRORS);
+  const [registerErrors, setRegisterErrors] = useState<RegisterValidationErrors>(EMPTY_REGISTER_ERRORS);
+
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState<ToastState>(null);
+  const [authInfoMessage, setAuthInfoMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const currentUser = firebaseAuthGateway.getCurrentUser();
 
-    if (currentUser) {
+    if (currentUser?.emailVerified) {
       router.replace("/dashboard");
       return;
     }
@@ -27,44 +52,153 @@ export function LoginForm() {
     setIsCheckingSession(false);
   }, [router]);
 
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timeout = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timeout);
+  }, [toast]);
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setErrors(EMPTY_ERRORS);
+    setLoginErrors(EMPTY_LOGIN_ERRORS);
+    setRegisterErrors(EMPTY_REGISTER_ERRORS);
     setIsSubmitting(true);
 
-    const result = await loginWithEmailPassword(firebaseAuthGateway, {
-      email,
-      password
-    });
+    if (mode === "login") {
+      setAuthInfoMessage(null);
+      const result = await loginWithEmailPassword(firebaseAuthGateway, {
+        email,
+        password
+      });
+
+      if (!result.success) {
+        setLoginErrors(result.errors);
+        setToast({
+          type: "error",
+          message: result.errors.general ?? "Connexion impossible. Verifiez vos informations."
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      try {
+        await markUserEmailAsVerified(result.user.uid);
+      } catch {
+        // User profile document may not exist for legacy accounts.
+      }
+      router.push("/dashboard");
+      return;
+    }
+
+    const result = await registerWithEmailPassword(
+      {
+        register: firebaseAuthGateway.register,
+        saveProfile: saveUserProfile
+      },
+      {
+        lastName,
+        firstName,
+        email,
+        password,
+        companyName,
+        siren,
+        companySize,
+        sector
+      }
+    );
 
     if (!result.success) {
-      setErrors(result.errors);
+      setRegisterErrors(result.errors);
+      setToast({
+        type: "error",
+        message: result.errors.general ?? "Inscription invalide. Verifiez le formulaire."
+      });
       setIsSubmitting(false);
       return;
     }
 
-    router.push("/dashboard");
+    await firebaseAuthGateway.signOut();
+    setIsSubmitting(false);
+    setMode("login");
+    setLoginErrors(EMPTY_LOGIN_ERRORS);
+    setAuthInfoMessage("Compte cree. Verifiez votre email et votre dossier spam avant de vous connecter.");
+    setToast({
+      type: "success",
+      message: "Compte cree avec succes. Verifiez votre boite email et vos spams."
+    });
   }
 
   if (isCheckingSession) {
     return (
-      <section className="quantis-panel w-full max-w-md p-8 text-center">
+      <section className="quantis-panel w-full max-w-xl p-8 text-center">
         <p className="text-sm text-quantis-slate">Verification de session...</p>
       </section>
     );
   }
 
+  const currentErrors = mode === "login" ? loginErrors : registerErrors;
+  const passwordRules = getPasswordRuleChecks(password);
+
   return (
-    <section className="quantis-panel mesh-gradient w-full max-w-md p-8">
+    <section className="quantis-panel mesh-gradient relative w-full max-w-xl p-8">
+      {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
       <p className="text-xs uppercase tracking-wide text-quantis-slate">Quantis</p>
       <h1 className="mt-2 text-3xl font-semibold leading-tight text-quantis-carbon">
         Secure financial
         <span className="ml-2 text-quantis-gold">workspace</span>
       </h1>
       <div className="quantis-accent-line mt-4" />
-      <p className="mt-4 text-sm text-quantis-slate">Connectez-vous avec votre compte Firebase.</p>
+      <p className="mt-4 text-sm text-quantis-slate">
+        {mode === "login"
+          ? "Connectez-vous avec votre compte Firebase."
+          : "Inscrivez-vous pour activer votre espace entreprise."}
+      </p>
+      {mode === "login" && authInfoMessage ? (
+        <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {authInfoMessage}
+        </p>
+      ) : null}
 
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+        {mode === "register" ? (
+          <>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Nom</span>
+              <div className="quantis-input px-3 py-2">
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  placeholder="Votre nom"
+                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+                  autoComplete="family-name"
+                  title="Nom de famille de la personne responsable"
+                />
+              </div>
+              {registerErrors.lastName ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.lastName}</span> : null}
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Prenom</span>
+              <div className="quantis-input px-3 py-2">
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  placeholder="Votre prenom"
+                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+                  autoComplete="given-name"
+                  title="Prenom de la personne responsable"
+                />
+              </div>
+              {registerErrors.firstName ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.firstName}</span> : null}
+            </label>
+          </>
+        ) : null}
+
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Email</span>
           <div className="quantis-input px-3 py-2">
@@ -75,36 +209,187 @@ export function LoginForm() {
               placeholder="email@entreprise.com"
               className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
               autoComplete="email"
+              title="Adresse email professionnelle"
             />
           </div>
-          {errors.email ? <span className="mt-1 block text-sm text-rose-700">{errors.email}</span> : null}
+          {currentErrors.email ? <span className="mt-1 block text-sm text-rose-700">{currentErrors.email}</span> : null}
         </label>
 
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Mot de passe</span>
-          <div className="quantis-input px-3 py-2">
+          <div className="quantis-input flex items-center gap-2 px-3 py-2">
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Votre mot de passe"
               className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
-              autoComplete="current-password"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((value) => !value)}
+              className="rounded p-1 text-quantis-slate transition-colors hover:text-quantis-carbon"
+              aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+              title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
-          {errors.password ? <span className="mt-1 block text-sm text-rose-700">{errors.password}</span> : null}
+          {currentErrors.password ? <span className="mt-1 block text-sm text-rose-700">{currentErrors.password}</span> : null}
         </label>
 
-        {errors.general ? <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{errors.general}</p> : null}
+        {mode === "register" ? (
+          <>
+            <div className="rounded-xl border border-quantis-mist bg-white px-3 py-2">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-quantis-slate">
+                <Info className="h-3.5 w-3.5" />
+                Securite mot de passe
+              </p>
+              <ul className="space-y-1">
+                {passwordRules.map((rule) => (
+                  <li
+                    key={rule.key}
+                    className={`flex items-center gap-2 text-xs ${
+                      rule.isValid ? "text-emerald-700" : "text-rose-700"
+                    }`}
+                  >
+                    {rule.isValid ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+                    {rule.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Nom entreprise</span>
+              <div className="quantis-input px-3 py-2">
+                <input
+                  type="text"
+                  value={companyName}
+                  onChange={(event) => setCompanyName(event.target.value)}
+                  placeholder="Nom legal de l'entreprise"
+                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+                  autoComplete="organization"
+                  title="Raison sociale / nom legal de l'entreprise"
+                />
+              </div>
+              {registerErrors.companyName ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.companyName}</span> : null}
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Numero SIREN</span>
+              <div className="quantis-input px-3 py-2">
+                <input
+                  type="text"
+                  value={siren}
+                  onChange={(event) => setSiren(event.target.value.replace(/\D/g, "").slice(0, 9))}
+                  placeholder="9 chiffres"
+                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  title="SIREN (9 chiffres)"
+                />
+              </div>
+              {registerErrors.siren ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.siren}</span> : null}
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Taille d'entreprise</span>
+              <div className="quantis-input px-3 py-2">
+                <select
+                  value={companySize}
+                  onChange={(event) => setCompanySize(event.target.value as CompanySizeValue | "")}
+                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+                >
+                  <option value="">Choisir une taille</option>
+                  {COMPANY_SIZE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} - {option.range}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-1 text-xs text-quantis-slate">Selectionnez la categorie de taille correspondant a votre entreprise.</p>
+              {registerErrors.companySize ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.companySize}</span> : null}
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Secteur</span>
+              <div className="quantis-input px-3 py-2">
+                <select
+                  value={sector}
+                  onChange={(event) => setSector(event.target.value as SectorValue | "")}
+                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+                >
+                  <option value="">Choisir un secteur</option>
+                  {SECTOR_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-1 text-xs text-quantis-slate">Choisissez votre secteur principal d'activite.</p>
+              {registerErrors.sector ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.sector}</span> : null}
+            </label>
+          </>
+        ) : null}
+
+        {currentErrors.general ? (
+          <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{currentErrors.general}</p>
+        ) : null}
 
         <button
           type="submit"
           disabled={isSubmitting}
           className="quantis-primary w-full py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? "Connexion..." : "Se connecter"}
+          {isSubmitting
+            ? mode === "login"
+              ? "Connexion..."
+              : "Inscription..."
+            : mode === "login"
+              ? "Se connecter"
+              : "Creer mon compte"}
         </button>
       </form>
+
+      <div className="mt-5 text-sm text-quantis-slate">
+        {mode === "login" ? (
+          <>
+            Pas encore de compte ?{" "}
+            <button
+              type="button"
+              className="font-medium text-quantis-carbon underline underline-offset-2"
+              onClick={() => {
+                setMode("register");
+                setLoginErrors(EMPTY_LOGIN_ERRORS);
+                setAuthInfoMessage(null);
+                setPassword("");
+              }}
+            >
+              S'inscrire
+            </button>
+          </>
+        ) : (
+          <>
+            Vous avez deja un compte ?{" "}
+            <button
+              type="button"
+              className="font-medium text-quantis-carbon underline underline-offset-2"
+              onClick={() => {
+                setMode("login");
+                setRegisterErrors(EMPTY_REGISTER_ERRORS);
+                setAuthInfoMessage(null);
+                setPassword("");
+              }}
+            >
+              Se connecter
+            </button>
+          </>
+        )}
+      </div>
     </section>
   );
 }
