@@ -79,14 +79,17 @@ function extractErrorCode(error: unknown): string | undefined {
 
 function mapFirebaseAuthErrorToMessage(code: string | undefined): string {
   switch (code) {
+    case "auth/invalid-email":
+      return "Format d'email invalide.";
     case "auth/invalid-credential":
     case "auth/user-not-found":
     case "auth/wrong-password":
       return "Email ou mot de passe invalide.";
     case "auth/too-many-requests":
       return "Trop de tentatives. Reessayez dans quelques minutes.";
+    case "auth/email-not-verified":
+      return "Email non verifie. Cliquez sur le lien recu par email avant de vous connecter.";
     default:
       return "Connexion impossible pour le moment. Veuillez reessayer.";
   }
 }
-

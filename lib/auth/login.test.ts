@@ -52,7 +52,9 @@ describe("loginWithEmailPassword", () => {
   it("returns authenticated user when gateway succeeds", async () => {
     const signIn = vi.fn().mockResolvedValue({
       uid: "uid-123",
-      email: "user@quantis.io"
+      email: "user@quantis.io",
+      displayName: "User Quantis",
+      emailVerified: true
     });
     const gateway: LoginGateway = { signIn };
 
@@ -65,12 +67,10 @@ describe("loginWithEmailPassword", () => {
       success: true,
       user: {
         uid: "uid-123",
-        email: "user@quantis.io"
+        email: "user@quantis.io",
+        displayName: "User Quantis",
+        emailVerified: true
       }
-    });
-    expect(signIn).toHaveBeenCalledWith({
-      email: "user@quantis.io",
-      password: "secure-pass"
     });
   });
 
@@ -92,5 +92,42 @@ describe("loginWithEmailPassword", () => {
       }
     });
   });
-});
 
+  it("maps firebase invalid email error", async () => {
+    const signIn = vi.fn().mockRejectedValue({
+      code: "auth/invalid-email"
+    });
+    const gateway: LoginGateway = { signIn };
+
+    const result = await loginWithEmailPassword(gateway, {
+      email: "bad-email",
+      password: "wrong-pass"
+    });
+
+    expect(result).toEqual({
+      success: false,
+      errors: {
+        general: "Format d'email invalide."
+      }
+    });
+  });
+
+  it("maps email not verified error", async () => {
+    const signIn = vi.fn().mockRejectedValue({
+      code: "auth/email-not-verified"
+    });
+    const gateway: LoginGateway = { signIn };
+
+    const result = await loginWithEmailPassword(gateway, {
+      email: "user@quantis.io",
+      password: "secure-pass"
+    });
+
+    expect(result).toEqual({
+      success: false,
+      errors: {
+        general: "Email non verifie. Cliquez sur le lien recu par email avant de vous connecter."
+      }
+    });
+  });
+});

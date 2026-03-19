@@ -54,4 +54,4 @@ export type AnalysisRecord = {
 };
 
 export type NewAnalysisRecord = Omit<AnalysisRecord, "id">;
-
+export type AnalysisDraft = Omit<AnalysisRecord, "id">;

@@ -1,28 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAnalysisPipeline } from "@/services/analysisPipeline";
 import { detectSupportedUploadType } from "@/services/parsers/fileParser";
-import { listAnalysesByUser } from "@/services/repositories/analysisRepository";
 
 export const runtime = "nodejs";
 
-export async function GET(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get("userId");
-  const yearParam = request.nextUrl.searchParams.get("year");
-  const year = yearParam ? Number(yearParam) : undefined;
-
-  if (!userId) {
-    return NextResponse.json({ error: "userId is required." }, { status: 400 });
-  }
-
-  try {
-    const analyses = await listAnalysesByUser(userId, Number.isFinite(year) ? year : undefined);
-    return NextResponse.json({ analyses });
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Unable to load analyses from Firestore.", detail: toErrorMessage(error) },
-      { status: 500 }
-    );
-  }
+export async function GET() {
+  return NextResponse.json(
+    {
+      error: "Use Firestore client SDK for listing analyses in the authenticated frontend."
+    },
+    { status: 405 }
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -62,12 +50,12 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    const analysis = await runAnalysisPipeline({
+    const analysisDraft = await runAnalysisPipeline({
       userId,
       files: binaryFiles
     });
 
-    return NextResponse.json({ analysis }, { status: 201 });
+    return NextResponse.json({ analysisDraft }, { status: 200 });
   } catch (error) {
     return NextResponse.json(
       { error: "Upload pipeline failed.", detail: toErrorMessage(error) },

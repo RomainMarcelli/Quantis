@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { AnalysisHistory } from "@/components/dashboard/AnalysisHistory";
 import { KpiSummary } from "@/components/dashboard/KpiSummary";
 import { UploadLanding } from "@/components/dashboard/UploadLanding";
+import { listUserAnalyses, saveAnalysisDraft } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
-import type { AnalysisRecord } from "@/types/analysis";
+import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 
 export function DashboardView() {
@@ -22,6 +23,12 @@ export function DashboardView() {
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
       if (!nextUser) {
+        router.replace("/");
+        return;
+      }
+
+      if (!nextUser.emailVerified) {
+        void firebaseAuthGateway.signOut();
         router.replace("/");
         return;
       }
@@ -51,16 +58,10 @@ export function DashboardView() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch(`/api/analyses?userId=${encodeURIComponent(userId)}`);
-      const payload = (await response.json()) as { analyses?: AnalysisRecord[]; error?: string; detail?: string };
-
-      if (!response.ok || !payload.analyses) {
-        throw new Error(payload.detail ?? payload.error ?? "Unable to load analysis history.");
-      }
-
-      setAnalyses(payload.analyses);
-      if (payload.analyses.length > 0) {
-        setSelectedAnalysisId(payload.analyses[0].id);
+      const nextAnalyses = await listUserAnalyses(userId);
+      setAnalyses(nextAnalyses);
+      if (nextAnalyses.length > 0) {
+        setSelectedAnalysisId(nextAnalyses[0].id);
       }
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unexpected error while loading history.");
@@ -87,14 +88,15 @@ export function DashboardView() {
         body: formData
       });
 
-      const payload = (await response.json()) as { analysis?: AnalysisRecord; error?: string; detail?: string };
+      const payload = (await response.json()) as { analysisDraft?: AnalysisDraft; error?: string; detail?: string };
 
-      if (!response.ok || !payload.analysis) {
+      if (!response.ok || !payload.analysisDraft) {
         throw new Error(payload.detail ?? payload.error ?? "Upload pipeline failed.");
       }
 
-      setAnalyses((current) => [payload.analysis as AnalysisRecord, ...current]);
-      setSelectedAnalysisId(payload.analysis.id);
+      const savedAnalysis = await saveAnalysisDraft(payload.analysisDraft);
+      setAnalyses((current) => [savedAnalysis, ...current]);
+      setSelectedAnalysisId(savedAnalysis.id);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Unexpected error while processing upload.");
     } finally {
@@ -121,11 +123,22 @@ export function DashboardView() {
         <div>
           <p className="text-xs uppercase tracking-wide text-quantis-slate">Quantis</p>
           <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Dashboard financier</h1>
-          <p className="mt-1 text-sm text-quantis-slate">Connecte en tant que {user?.email}</p>
+          <p className="mt-1 text-sm text-quantis-slate">
+            Connecte en tant que {user?.displayName ?? user?.email}
+          </p>
         </div>
-        <button type="button" onClick={handleLogout} className="quantis-primary px-4 py-2 text-sm font-medium">
-          Se deconnecter
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/account")}
+            className="rounded-xl border border-quantis-mist bg-white px-4 py-2 text-sm font-medium text-quantis-carbon hover:bg-quantis-paper"
+          >
+            Mon compte
+          </button>
+          <button type="button" onClick={handleLogout} className="quantis-primary px-4 py-2 text-sm font-medium">
+            Se deconnecter
+          </button>
+        </div>
       </header>
 
       <UploadLanding loading={uploading} onUpload={handleUpload} />
