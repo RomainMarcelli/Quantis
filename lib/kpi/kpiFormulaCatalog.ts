@@ -8,8 +8,10 @@ export type KpiFormulaDefinition = {
 
 export const KPI_FORMULA_CATALOG: KpiFormulaDefinition[] = [
   { key: "tcam", label: "TCAM", formula: "((total_prod_expl / ca_n_minus_1)^(1/n) - 1) * 100" },
+  { key: "ca", label: "Chiffre d'affaires", formula: "total_prod_expl" },
   { key: "va", label: "Valeur ajoutee", formula: "total_prod_expl - achats_march - achats_mp - ace" },
   { key: "ebitda", label: "EBITDA", formula: "va - impots_taxes - salaires - charges_soc" },
+  { key: "ebe", label: "EBE", formula: "ebitda" },
   { key: "marge_ebitda", label: "Marge EBITDA (%)", formula: "(ebitda / total_prod_expl) * 100" },
   { key: "charges_var", label: "Charges variables", formula: "achats_march + achats_mp + var_stock_march + var_stock_mp" },
   { key: "mscv", label: "MSCV", formula: "total_prod_expl - charges_var" },
@@ -30,8 +32,12 @@ export const KPI_FORMULA_CATALOG: KpiFormulaDefinition[] = [
   { key: "liq_gen", label: "Liquidite generale", formula: "total_actif_circ / (fournisseurs + dettes_fisc_soc)" },
   { key: "liq_red", label: "Liquidite reduite", formula: "(creances + dispo) / (fournisseurs + dettes_fisc_soc)" },
   { key: "liq_imm", label: "Liquidite immediate", formula: "dispo / (fournisseurs + dettes_fisc_soc)" },
+  { key: "disponibilites", label: "Cash disponible", formula: "dispo" },
   { key: "roce", label: "ROCE", formula: "(ebit * 0.75) / (total_actif_immo + bfr)" },
   { key: "roe", label: "ROE", formula: "res_net / total_cp" },
   { key: "effet_levier", label: "Effet de levier", formula: "roe - roce" },
+  { key: "resultat_net", label: "Resultat net", formula: "res_net || resultat_exercice" },
+  { key: "capacite_remboursement_annees", label: "Capacite de remboursement", formula: "emprunts / caf" },
+  { key: "etat_materiel_indice", label: "Etat du materiel (indice)", formula: "(total_actif_immo / total_actif) * 100" },
   { key: "healthScore", label: "Score de sante", formula: "Score composite (marge, resultat, BFR, runway)" }
 ];

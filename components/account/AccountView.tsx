@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
+import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { deleteAccountCompletely, deleteAccountData, updateAccountProfile } from "@/lib/account/account";
+import { clearLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
+import { clearActiveFolderName } from "@/lib/folders/activeFolder";
 import { COMPANY_SIZE_OPTIONS, SECTOR_OPTIONS } from "@/lib/onboarding/options";
 import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
 import {
@@ -19,7 +22,11 @@ import type { UserProfileUpdateInput } from "@/types/profile";
 type ToastState = { type: "success" | "error" | "info"; message: string } | null;
 type DeleteMode = "data" | "account" | null;
 
-export function AccountView() {
+type AccountViewProps = {
+  fromAnalysis?: boolean;
+};
+
+export function AccountView({ fromAnalysis = false }: AccountViewProps) {
   const router = useRouter();
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -151,10 +158,20 @@ export function AccountView() {
     setSiren("");
     setCompanySize("");
     setSector("");
+    // Les dossiers visibles dans l'UI derivent des analyses + du dossier actif local.
+    // On purge aussi le dossier actif local pour repartir sur une session propre.
+    clearActiveFolderName();
+    // Les analyses etant supprimees, on retire aussi l'indicateur local
+    // utilise pour afficher le bouton d'acces dashboard sur /dashboard.
+    clearLocalAnalysisHint();
     setToast({
       type: "success",
-      message: `Donnees supprimees (${result.deletedAnalysesCount ?? 0} analyses).`
+      message: `Donnees supprimees: profil + dossiers + ${result.deletedAnalysesCount ?? 0} analyses.`
     });
+
+    // Apres purge des donnees, on renvoie l'utilisateur vers l'espace de depot
+    // pour repartir directement sur un nouveau flux d'import.
+    router.replace("/dashboard");
   }
 
   async function onDeleteAccount() {
@@ -175,6 +192,14 @@ export function AccountView() {
       return;
     }
 
+    // Le compte est detruit: on nettoie aussi le dossier actif local.
+    clearActiveFolderName();
+    clearLocalAnalysisHint();
+    router.replace("/");
+  }
+
+  async function handleLogout() {
+    await firebaseAuthGateway.signOut();
     router.replace("/");
   }
 
@@ -195,14 +220,23 @@ export function AccountView() {
 
       <header className="quantis-panel p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs uppercase tracking-wide text-quantis-slate">Compte</p>
-          <button
-            type="button"
-            onClick={() => router.push("/dashboard")}
-            className="rounded-xl border border-quantis-mist bg-white px-3 py-1.5 text-xs font-medium text-quantis-carbon hover:bg-quantis-paper"
-          >
-            Retour au tableau de bord
-          </button>
+          <QuantisLogo withText={false} size={24} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push(fromAnalysis ? "/analysis" : "/dashboard")}
+              className="rounded-xl border border-quantis-mist bg-white px-3 py-1.5 text-xs font-medium text-quantis-carbon hover:bg-quantis-paper"
+            >
+              {fromAnalysis ? "Retour au dashboard" : "Retour a l&apos;espace de depot"}
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="quantis-primary px-3 py-1.5 text-xs font-medium"
+            >
+              Se deconnecter
+            </button>
+          </div>
         </div>
         <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Profil utilisateur</h1>
         <p className="mt-2 text-sm text-quantis-slate">
@@ -299,11 +333,26 @@ export function AccountView() {
                 <h3 className="text-lg font-semibold text-quantis-carbon">
                   {deleteMode === "data" ? "Supprimer les donnees" : "Supprimer le compte"}
                 </h3>
-                <p className="mt-1 text-sm text-quantis-slate">
-                  {deleteMode === "data"
-                    ? "Cette action supprime vos donnees Firestore (profil + analyses)."
-                    : "Cette action supprime vos donnees Firestore puis votre compte Firebase Auth."}
-                </p>
+                {deleteMode === "data" ? (
+                  <div className="mt-1 text-sm text-quantis-slate">
+                    <p>Cette action supprime definitivement:</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      <li>Votre profil entreprise (nom, SIREN, taille, secteur)</li>
+                      <li>Vos dossiers d&apos;analyse</li>
+                      <li>Toutes vos analyses (rawData, mappedData, kpis, historique)</li>
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-sm text-quantis-slate">
+                    <p>Cette action supprime definitivement:</p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      <li>Votre profil entreprise (nom, SIREN, taille, secteur)</li>
+                      <li>Vos dossiers d&apos;analyse</li>
+                      <li>Toutes vos analyses (rawData, mappedData, kpis, historique)</li>
+                      <li>Votre compte Firebase Auth (connexion impossible ensuite)</li>
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
 

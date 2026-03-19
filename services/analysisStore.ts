@@ -100,10 +100,12 @@ const EMPTY_KPIS: AnalysisRecord["kpis"] = {
   tcam: null,
   va: null,
   ebitda: null,
+  ebe: null,
   marge_ebitda: null,
   charges_var: null,
   mscv: null,
   tmscv: null,
+  ca: null,
   charges_fixes: null,
   point_mort: null,
   ratio_immo: null,
@@ -120,14 +122,18 @@ const EMPTY_KPIS: AnalysisRecord["kpis"] = {
   liq_gen: null,
   liq_red: null,
   liq_imm: null,
+  disponibilites: null,
   roce: null,
   roe: null,
   effet_levier: null,
+  resultat_net: null,
   grossMarginRate: null,
   netProfit: null,
   workingCapital: null,
   monthlyBurnRate: null,
   cashRunwayMonths: null,
+  capacite_remboursement_annees: null,
+  etat_materiel_indice: null,
   healthScore: null
 };
 
@@ -196,6 +202,7 @@ function toAnalysisRecord(id: string, data: Record<string, unknown>): AnalysisRe
   return {
     id,
     userId: String(data.userId ?? ""),
+    folderName: String(data.folderName ?? "Dossier principal"),
     createdAt,
     fiscalYear: typeof data.fiscalYear === "number" ? data.fiscalYear : null,
     sourceFiles: Array.isArray(data.sourceFiles)
@@ -218,8 +225,11 @@ function toAnalysisRecord(id: string, data: Record<string, unknown>): AnalysisRe
         : { ...EMPTY_MAPPED_DATA },
     financialFacts:
       data.financialFacts && typeof data.financialFacts === "object"
-        ? (data.financialFacts as AnalysisRecord["financialFacts"])
-        : EMPTY_FINANCIAL_FACTS,
-    kpis: data.kpis && typeof data.kpis === "object" ? (data.kpis as AnalysisRecord["kpis"]) : EMPTY_KPIS
+        ? { ...EMPTY_FINANCIAL_FACTS, ...(data.financialFacts as Partial<AnalysisRecord["financialFacts"]>) }
+        : { ...EMPTY_FINANCIAL_FACTS },
+    kpis:
+      data.kpis && typeof data.kpis === "object"
+        ? { ...EMPTY_KPIS, ...(data.kpis as Partial<AnalysisRecord["kpis"]>) }
+        : { ...EMPTY_KPIS }
   };
 }

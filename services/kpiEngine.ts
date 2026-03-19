@@ -2,8 +2,10 @@ import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
 export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const tcam = percent(powMinusOne(div(data.total_prod_expl, data.ca_n_minus_1), inv(data.n)));
+  const ca = data.total_prod_expl;
   const va = sub(data.total_prod_expl, sum(data.achats_march, data.achats_mp, data.ace));
   const ebitda = sub(va, sum(data.impots_taxes, data.salaires, data.charges_soc));
+  const ebe = ebitda;
   const marge_ebitda = percent(div(ebitda, data.total_prod_expl));
   const charges_var = sum(data.achats_march, data.achats_mp, data.var_stock_march, data.var_stock_mp);
   const mscv = sub(data.total_prod_expl, charges_var);
@@ -24,20 +26,26 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const liq_gen = div(data.total_actif_circ, sum(data.fournisseurs, data.dettes_fisc_soc));
   const liq_red = div(sum(data.creances, data.dispo), sum(data.fournisseurs, data.dettes_fisc_soc));
   const liq_imm = div(data.dispo, sum(data.fournisseurs, data.dettes_fisc_soc));
+  const disponibilites = data.dispo;
   const roce = div(mul(data.ebit, 0.75), sum(data.total_actif_immo, bfr));
   const roe = div(data.res_net, data.total_cp);
   const effet_levier = sub(roe, roce);
+  const resultat_net = data.res_net ?? data.resultat_exercice;
+  const capacite_remboursement_annees = computeDebtRepaymentCapacity(data.emprunts, caf);
+  const etat_materiel_indice = percent(ratio_immo);
 
   const grossMarginRate = percent(tmscv);
-  const netProfit = data.res_net ?? data.resultat_exercice;
+  const netProfit = resultat_net;
   const workingCapital = bfr;
   const monthlyBurnRate = netProfit !== null && netProfit < 0 ? round(Math.abs(netProfit) / 12) : 0;
   const cashRunwayMonths = monthlyBurnRate > 0 ? div(data.dispo, monthlyBurnRate) : null;
 
   return {
     tcam: roundOrNull(tcam),
+    ca: roundOrNull(ca),
     va: roundOrNull(va),
     ebitda: roundOrNull(ebitda),
+    ebe: roundOrNull(ebe),
     marge_ebitda: roundOrNull(marge_ebitda),
     charges_var: roundOrNull(charges_var),
     mscv: roundOrNull(mscv),
@@ -58,14 +66,18 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
     liq_gen: roundOrNull(liq_gen),
     liq_red: roundOrNull(liq_red),
     liq_imm: roundOrNull(liq_imm),
+    disponibilites: roundOrNull(disponibilites),
     roce: roundOrNull(roce),
     roe: roundOrNull(roe),
     effet_levier: roundOrNull(effet_levier),
+    resultat_net: roundOrNull(resultat_net),
     grossMarginRate: roundOrNull(grossMarginRate),
     netProfit: roundOrNull(netProfit),
     workingCapital: roundOrNull(workingCapital),
     monthlyBurnRate: roundOrNull(monthlyBurnRate),
     cashRunwayMonths: roundOrNull(cashRunwayMonths),
+    capacite_remboursement_annees: roundOrNull(capacite_remboursement_annees),
+    etat_materiel_indice: roundOrNull(etat_materiel_indice),
     healthScore: scoreHealth({
       grossMarginRate,
       netProfit,
@@ -182,4 +194,14 @@ function roundOrNull(value: number | null): number | null {
 
 function round(value: number): number {
   return Number(value.toFixed(2));
+}
+
+function computeDebtRepaymentCapacity(
+  debt: number | null,
+  cashFlowCapacity: number | null
+): number | null {
+  if (debt === null || cashFlowCapacity === null || cashFlowCapacity <= 0) {
+    return null;
+  }
+  return debt / cashFlowCapacity;
 }

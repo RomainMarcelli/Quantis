@@ -13,6 +13,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - fond clair, anthracite, accent or
   - cartes sobrement bordees
   - hierarchie visuelle type landing Quantis
+  - logo de marque centralise dans `public/images/logo.png` et integre aux ecrans principaux
 - Authentification Firebase complete:
   - login email/password
   - inscription complete:
@@ -42,10 +43,28 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - parsing serveur (`services/parsers/*`)
   - mapping financier 2033 (`services/mapping/financialDataMapper.ts`)
   - calcul KPI complet selon `Quantis_Mapping_2033SD.xlsx` (`services/kpiEngine.ts`)
+    - extension KPI metier stockee: `disponibilites`, `ca`, `ebe`, `resultat_net`, `capacite_remboursement_annees`, `etat_materiel_indice`
   - stockage Firestore via SDK client authentifie (`services/analysisStore.ts`)
-  - affichage dashboard + historique
-  - page d'inspection d'une analyse precise: `/analysis/[id]`
-    - affichage `rawData`, `mappedData`, `kpis` et `parsedData`
+  - redirection post-upload vers `/analysis`
+  - page `/dashboard` simplifiee en espace de depot (upload only)
+  - URL simplifiee pour le dashboard: `/analysis` (sans identifiant visible)
+  - support des dossiers d'analyses:
+    - creation d'un dossier au premier depot
+    - association des analyses a `folderName`
+    - affichage des fichiers sources par dossier dans la sidebar
+    - ajout de nouveaux fichiers directement depuis la page dashboard
+  - nouveau dashboard decisionnel sur `/analysis/[id]`:
+    - header personnalise `Hello {firstname}`
+    - top cards KPI (cash, sante, alertes, runway)
+    - bloc suggestions (UI future-ready)
+    - score global visuel (progress ring)
+    - top header app (logo, nom entreprise, acces parametres/offres/compte)
+    - sections metier A/B/C/D (creation de valeur, BFR, financement, rentabilite)
+    - alertes basees sur seuils fixes (vert/orange/rouge)
+    - design alertes renforce (codes visuels par severite)
+    - debug repliable (`rawData`, `mappedData`, `kpis`)
+    - sidebar (`Dashboard`, `Analyses`, `Documents`, `Compte`)
+    - profil sidebar avec avatar initial + niveau Free
   - page de test KPI avant/apres: `/test-kpi`
     - charge les analyses reelles stockees en Firestore apres upload
     - visualisation des formules appliquees a `mappedData`
@@ -59,7 +78,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - isolation stricte par `userId`
   - suppression autorisee uniquement pour les documents du proprietaire
 - Qualite logicielle renforcee:
-  - suite unitaire etendue a `55` tests metier (auth, compte, pipeline, parsing, stores)
+  - suite unitaire etendue (auth, compte, pipeline, parsing, stores, view-model dashboard)
   - lint ESLint v9 operationnel
   - typecheck TypeScript sans erreur (`tsc --noEmit`)
 
@@ -90,6 +109,10 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - `lib/email/templates/verificationEmailTemplate.ts`
   - version revue avec rappel spam et CTA d'activation
 - Moteur KPI pur et sans dependance UI pour testabilite.
+- Couche `view-model` pure pour transformer `kpis` en UI dashboard sans recalcul frontend.
+- Parametres utilisateur ajoutes:
+  - page `settings` avec mode jour/nuit persistant (localStorage)
+  - page `pricing` visuelle (3 offres) pour preparer l'evolution payante
 - Nouveau modele de donnees d'analyse stocke:
   - `rawData`
   - `mappedData`

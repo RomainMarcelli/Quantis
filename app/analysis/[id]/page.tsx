@@ -8,7 +8,7 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
   const { id } = await params;
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-8">
+    <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-8">
       <AnalysisDetailView analysisId={id} />
     </main>
   );

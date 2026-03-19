@@ -114,10 +114,12 @@ export type CalculatedKpis = {
   tcam: number | null;
   va: number | null;
   ebitda: number | null;
+  ebe: number | null;
   marge_ebitda: number | null;
   charges_var: number | null;
   mscv: number | null;
   tmscv: number | null;
+  ca: number | null;
   charges_fixes: number | null;
   point_mort: number | null;
   ratio_immo: number | null;
@@ -134,20 +136,25 @@ export type CalculatedKpis = {
   liq_gen: number | null;
   liq_red: number | null;
   liq_imm: number | null;
+  disponibilites: number | null;
   roce: number | null;
   roe: number | null;
   effet_levier: number | null;
+  resultat_net: number | null;
   grossMarginRate: number | null;
   netProfit: number | null;
   workingCapital: number | null;
   monthlyBurnRate: number | null;
   cashRunwayMonths: number | null;
+  capacite_remboursement_annees: number | null;
+  etat_materiel_indice: number | null;
   healthScore: number | null;
 };
 
 export type AnalysisRecord = {
   id: string;
   userId: string;
+  folderName: string;
   createdAt: string;
   fiscalYear: number | null;
   sourceFiles: FileDescriptor[];

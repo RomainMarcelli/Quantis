@@ -9,6 +9,7 @@ import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
 import { loginWithEmailPassword } from "@/lib/auth/login";
 import { registerWithEmailPassword } from "@/lib/auth/register";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
+import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { firebaseAuthGateway } from "@/services/auth";
 import { markUserEmailAsVerified, saveUserProfile } from "@/services/userProfileStore";
 import type { LoginValidationErrors, RegisterValidationErrors } from "@/types/auth";
@@ -145,7 +146,7 @@ export function LoginForm() {
   return (
     <section className="quantis-panel mesh-gradient relative w-full max-w-xl p-8">
       {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
-      <p className="text-xs uppercase tracking-wide text-quantis-slate">Quantis</p>
+      <QuantisLogo className="mb-1" />
       <h1 className="mt-2 text-3xl font-semibold leading-tight text-quantis-carbon">
         Espace financier
         <span className="ml-2 text-quantis-gold">securise</span>

@@ -16,6 +16,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const userId = String(formData.get("userId") ?? "");
+  const folderName = String(formData.get("folderName") ?? "").trim() || "Dossier principal";
 
   if (!userId) {
     return NextResponse.json({ error: "Le champ userId est obligatoire." }, { status: 400 });
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
 
     const analysisDraft = await runAnalysisPipeline({
       userId,
+      folderName,
       files: binaryFiles
     });
 

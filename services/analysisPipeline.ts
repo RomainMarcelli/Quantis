@@ -11,6 +11,7 @@ import type { AnalysisDraft, FinancialFacts, ParsedFileData } from "@/types/anal
 
 export async function runAnalysisPipeline(params: {
   userId: string;
+  folderName: string;
   files: UploadedBinaryFile[];
 }): Promise<AnalysisDraft> {
   const parsedData = await Promise.all(params.files.map((file) => parseUploadedFile(file)));
@@ -28,6 +29,7 @@ export async function runAnalysisPipeline(params: {
 
   const analysisDraft: AnalysisDraft = {
     userId: params.userId,
+    folderName: params.folderName,
     createdAt: new Date().toISOString(),
     fiscalYear,
     sourceFiles: params.files.map((file) => ({

@@ -43,6 +43,7 @@ import {
 function buildDraft(): AnalysisDraft {
   return {
     userId: "uid-1",
+    folderName: "Dossier test",
     createdAt: "2026-03-19T10:00:00.000Z",
     fiscalYear: 2024,
     sourceFiles: [
@@ -73,10 +74,12 @@ function buildDraft(): AnalysisDraft {
       tcam: null,
       va: null,
       ebitda: null,
+      ebe: null,
       marge_ebitda: null,
       charges_var: null,
       mscv: null,
       tmscv: null,
+      ca: 1000,
       charges_fixes: null,
       point_mort: null,
       ratio_immo: null,
@@ -93,14 +96,18 @@ function buildDraft(): AnalysisDraft {
       liq_gen: null,
       liq_red: null,
       liq_imm: null,
+      disponibilites: 100,
       roce: null,
       roe: null,
       effet_levier: null,
+      resultat_net: 400,
       grossMarginRate: 60,
       netProfit: 400,
       workingCapital: null,
       monthlyBurnRate: 0,
       cashRunwayMonths: null,
+      capacite_remboursement_annees: null,
+      etat_materiel_indice: null,
       healthScore: 75
     }
   };
@@ -219,6 +226,12 @@ describe("analysisStore", () => {
           inventory: null
         },
         kpis: {
+          ebe: null,
+          ca: null,
+          disponibilites: null,
+          resultat_net: null,
+          capacite_remboursement_annees: null,
+          etat_materiel_indice: null,
           grossMarginRate: 60,
           netProfit: 60,
           workingCapital: null,

@@ -15,6 +15,19 @@
   color-scheme: light;
 }
 
+:root[data-theme="dark"] {
+  --quantis-smoke: #0f1115;
+  --quantis-paper: #171b22;
+  --quantis-white: #141923;
+  --quantis-carbon: #f4f7fb;
+  --quantis-slate: #a4adbd;
+  --quantis-mist: #2b3442;
+  --quantis-gold: #e0be4a;
+  --quantis-emerald: #2dd4bf;
+  --quantis-crimson: #fb7185;
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -57,8 +70,47 @@ body {
   background: #292929;
 }
 
+:root[data-theme="dark"] .quantis-primary:hover {
+  background: #2b3442;
+}
+
 .quantis-accent-line {
   height: 1px;
   width: 56px;
   background: var(--quantis-gold);
+}
+
+@keyframes quantis-ring-pop {
+  from {
+    opacity: 0.7;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes quantis-ring-glow {
+  0% {
+    opacity: 0.45;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.45;
+    transform: scale(0.94);
+  }
+}
+
+.quantis-score-ring {
+  animation: quantis-ring-pop 420ms ease-out;
+}
+
+.quantis-score-ring__glow {
+  filter: blur(12px);
+  animation: quantis-ring-glow 2.4s ease-in-out infinite;
 }

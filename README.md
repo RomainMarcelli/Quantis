@@ -17,6 +17,26 @@ Reconstruction from scratch de Quantis a partir des fichiers Markdown du projet 
 npm install
 ```
 
+## Variables d'environnement
+
+Copier `.env.example` vers `.env.local`, puis renseigner les valeurs Firebase:
+
+```bash
+cp .env.example .env.local
+```
+
+Variables requises:
+
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` (optionnelle)
+
+Note: aucune variable `FIREBASE_ADMIN_*` n'est necessaire avec l'implementation actuelle.
+
 ## Lancer le projet
 
 ```bash
@@ -93,18 +113,20 @@ Flux implemente:
 ## Inspection d'une analyse
 
 - Page detail: `/analysis/[id]`
-- Objectif MVP: verifier une analyse precise en affichant:
-  - `rawData` (affiche via `parsedData`)
-  - `mappedData` (affiche via `financialFacts`)
-  - `kpis`
+- Dashboard decisionnel (SaaS):
+  - header personnalise
+  - top KPI cards
+  - score global + alertes
+  - sections metier (creation de valeur, BFR, financement, rentabilite)
+  - debug repliable (`rawData`, `mappedData`, `kpis`)
 
 ## Page de test KPI (avant / apres)
 
 - Route: `/test-kpi`
 - Permet de:
-  - coller/modifier un JSON `mappedData` (donnees inserees)
-  - voir les formules appliquees et les resultats intermediaires
-  - visualiser le resultat final `kpis` en tableau + JSON
+  - charger les analyses reelles stockees en Firestore
+  - comparer KPI stockes vs KPI recalcules
+  - verifier les donnees brutes/mappees/resultats en JSON
 
 ## Gestion de compte
 

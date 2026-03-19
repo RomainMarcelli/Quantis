@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AnalysisHistory } from "@/components/dashboard/AnalysisHistory";
-import { KpiSummary } from "@/components/dashboard/KpiSummary";
 import { UploadLanding } from "@/components/dashboard/UploadLanding";
+import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { hasLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
+import { ensureFolderName } from "@/lib/folders/activeFolder";
 import { listUserAnalyses, saveAnalysisDraft } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
-import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
+import type { AnalysisDraft } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 
 export function DashboardView() {
@@ -15,10 +16,9 @@ export function DashboardView() {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
-  const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [hasExistingAnalyses, setHasExistingAnalyses] = useState(hasLocalAnalysisHint);
+  const [loadingAnalyses, setLoadingAnalyses] = useState(false);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
@@ -42,36 +42,56 @@ export function DashboardView() {
 
   useEffect(() => {
     if (!user) {
+      setHasExistingAnalyses(false);
       return;
     }
 
-    void loadHistory(user.uid);
-  }, [user]);
+    // On capture l'uid une fois pour eviter un acces a `user` potentiellement null
+    // dans la closure asynchrone (exigence TypeScript en mode strict).
+    const currentUserId = user.uid;
+    let isMounted = true;
 
-  const selectedAnalysis = useMemo(
-    () => analyses.find((analysis) => analysis.id === selectedAnalysisId) ?? analyses[0] ?? null,
-    [analyses, selectedAnalysisId]
-  );
-
-  async function loadHistory(userId: string) {
-    setLoadingHistory(true);
-    setErrorMessage(null);
-
-    try {
-      const nextAnalyses = await listUserAnalyses(userId);
-      setAnalyses(nextAnalyses);
-      if (nextAnalyses.length > 0) {
-        setSelectedAnalysisId(nextAnalyses[0].id);
+    async function loadAnalysesAvailability() {
+      setLoadingAnalyses(true);
+      try {
+        // On charge la presence d'analyses une seule fois pour piloter l'affichage
+        // du bouton "Acceder aux dashboards" sur la page post-connexion.
+        const analyses = await listUserAnalyses(currentUserId);
+        const hasAnalyses = analyses.length > 0;
+        if (isMounted) {
+          setHasExistingAnalyses(hasAnalyses);
+        }
+        // Synchronise un hint local pour gerer les retours utilisateur meme
+        // si la lecture Firestore echoue ponctuellement.
+        setLocalAnalysisHint(hasAnalyses);
+      } catch {
+        // En cas d'erreur reseau/permission, on conserve le dernier etat connu
+        // (localStorage) plutot que de masquer brutalement le bouton.
+        if (isMounted) {
+          setHasExistingAnalyses(hasLocalAnalysisHint());
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingAnalyses(false);
+        }
       }
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Erreur inattendue pendant le chargement de l'historique.");
-    } finally {
-      setLoadingHistory(false);
     }
-  }
+
+    void loadAnalysesAvailability();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   async function handleUpload(files: File[]) {
     if (!user) {
+      return;
+    }
+
+    const folderName = ensureFolderName();
+    if (!folderName) {
+      setErrorMessage("Un nom de dossier est requis pour continuer.");
       return;
     }
 
@@ -81,6 +101,7 @@ export function DashboardView() {
     try {
       const formData = new FormData();
       formData.append("userId", user.uid);
+      formData.append("folderName", folderName);
       files.forEach((file) => formData.append("files", file));
 
       const response = await fetch("/api/analyses", {
@@ -94,9 +115,12 @@ export function DashboardView() {
         throw new Error(payload.detail ?? payload.error ?? "Le traitement du fichier a echoue.");
       }
 
-      const savedAnalysis = await saveAnalysisDraft(payload.analysisDraft);
-      setAnalyses((current) => [savedAnalysis, ...current]);
-      setSelectedAnalysisId(savedAnalysis.id);
+      await saveAnalysisDraft(payload.analysisDraft);
+      // Une analyse vient d'etre creee: on debloque explicitement le bouton
+      // de navigation dashboard meme si l'utilisateur revient ensuite sur /dashboard.
+      setHasExistingAnalyses(true);
+      setLocalAnalysisHint(true);
+      router.push("/analysis");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Erreur inattendue pendant le traitement du fichier.");
     } finally {
@@ -121,13 +145,25 @@ export function DashboardView() {
     <section className="space-y-6">
       <header className="quantis-panel flex flex-wrap items-center justify-between gap-3 p-5">
         <div>
-          <p className="text-xs uppercase tracking-wide text-quantis-slate">Quantis</p>
-          <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Tableau de bord financier</h1>
+          <QuantisLogo />
+          <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Espace de depot</h1>
           <p className="mt-1 text-sm text-quantis-slate">
             Connecte en tant que {user?.displayName ?? user?.email}
           </p>
+          <p className="mt-1 text-xs text-quantis-slate">
+            Le dashboard financier s&apos;affiche apres traitement dans la page d&apos;analyse.
+          </p>
         </div>
         <div className="flex items-center gap-2">
+          {!loadingAnalyses && hasExistingAnalyses ? (
+            <button
+              type="button"
+              onClick={() => router.push("/analysis")}
+              className="rounded-xl border border-quantis-mist bg-white px-4 py-2 text-sm font-medium text-quantis-carbon hover:bg-quantis-paper"
+            >
+              Acceder aux dashboards
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => router.push("/test-kpi")}
@@ -151,50 +187,6 @@ export function DashboardView() {
       <UploadLanding loading={uploading} onUpload={handleUpload} />
 
       {errorMessage ? <div className="quantis-panel border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div> : null}
-
-      {loadingHistory ? <div className="quantis-panel px-4 py-3 text-sm text-quantis-slate">Chargement de l&apos;historique...</div> : null}
-
-      <KpiSummary kpis={selectedAnalysis?.kpis ?? null} />
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <AnalysisHistory
-          analyses={analyses}
-          selectedAnalysisId={selectedAnalysis?.id ?? null}
-          onSelect={(id) => setSelectedAnalysisId(id)}
-        />
-
-        <section className="quantis-panel p-5">
-          <h2 className="text-sm font-semibold text-quantis-carbon">Derniere extraction</h2>
-          {selectedAnalysis ? (
-            <>
-              <p className="mt-1 text-xs text-quantis-slate">
-                Creee le {new Date(selectedAnalysis.createdAt).toLocaleString("fr-FR")}
-              </p>
-              <div className="mt-4 space-y-2 text-sm text-quantis-carbon">
-                <p>Chiffre d&apos;affaires: {formatCurrency(selectedAnalysis.financialFacts.revenue)}</p>
-                <p>Charges: {formatCurrency(selectedAnalysis.financialFacts.expenses)}</p>
-                <p>Masse salariale: {formatCurrency(selectedAnalysis.financialFacts.payroll)}</p>
-                <p>Tresorerie: {formatCurrency(selectedAnalysis.financialFacts.treasury)}</p>
-                <p>BFR (creances + stocks - dettes): {formatCurrency(selectedAnalysis.kpis.workingCapital)}</p>
-              </div>
-            </>
-          ) : (
-            <p className="mt-3 text-sm text-quantis-slate">Charge tes premiers fichiers pour afficher les resultats.</p>
-          )}
-        </section>
-      </div>
     </section>
   );
-}
-
-function formatCurrency(value: number | null): string {
-  if (value === null) {
-    return "N/D";
-  }
-
-  return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0
-  }).format(value);
 }

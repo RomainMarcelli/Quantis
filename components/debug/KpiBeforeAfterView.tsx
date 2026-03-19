@@ -176,7 +176,7 @@ export function KpiBeforeAfterView() {
             type="button"
             onClick={() => {
               if (selectedAnalysis) {
-                router.push(`/analysis/${selectedAnalysis.id}`);
+                router.push("/analysis");
               }
             }}
             className="quantis-primary px-4 py-2 text-sm font-medium"
