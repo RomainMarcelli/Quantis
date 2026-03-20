@@ -1,11 +1,10 @@
-// File: components/analysis/AnalysisDetailView.tsx
+﻿// File: components/analysis/AnalysisDetailView.tsx
 // Role: assemble la page /analysis (et /analysis/[id]) avec dashboard premium, dossiers, upload et debug.
 "use client";
 
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  AlertTriangle,
   CheckCircle2,
   FileText,
   Folder,
@@ -22,6 +21,11 @@ import {
 } from "lucide-react";
 import { buildAnalysisDashboardViewModel } from "@/lib/dashboard/analysisDashboardViewModel";
 import { toPremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
+import {
+  DashboardFinancialTabContent,
+  DashboardFinancialTabsMenu,
+  type DashboardTabId
+} from "@/components/dashboard/tabs/DashboardFinancialTabs";
 import { clearLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import {
   DEFAULT_FOLDER_NAME,
@@ -35,6 +39,11 @@ import {
 } from "@/lib/folders/activeFolder";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import {
+  buildSyntheseYearOptions,
+  filterAnalysesByYear,
+  SYNTHESIS_CURRENT_YEAR_KEY
+} from "@/lib/synthese/synthesePeriod";
 import { loadAppPreferences } from "@/lib/settings/appPreferences";
 import {
   deleteUserAnalysisById,
@@ -73,10 +82,15 @@ const ACCEPTED_EXTENSIONS = [".xlsx", ".xls", ".csv", ".pdf"];
 export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const currentCalendarYear = new Date().getFullYear();
 
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
+  // null => affichage du dashboard initial; tab renseigne => affichage de la section choisie.
+  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTabId | null>(null);
+  // Le select du menu pilote l'année d'analyse affichée dans le dashboard.
+  const [selectedDashboardYear, setSelectedDashboardYear] = useState<string>(SYNTHESIS_CURRENT_YEAR_KEY);
   const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [showDebugSection, setShowDebugSection] = useState<boolean>(() => loadAppPreferences().showDebugSection);
@@ -182,27 +196,71 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
     };
   }, []);
 
-  const analysesInCurrentFolder = useMemo(
-    () => allAnalyses.filter((item) => normalizeFolderName(item.folderName) === normalizeFolderName(currentFolder)),
-    [allAnalyses, currentFolder]
+  const dashboardYearOptions = useMemo(
+    () => buildSyntheseYearOptions(allAnalyses, currentCalendarYear),
+    [allAnalyses, currentCalendarYear]
   );
+
+  const analysesFilteredByYear = useMemo(
+    () => filterAnalysesByYear(allAnalyses, selectedDashboardYear, currentCalendarYear),
+    [allAnalyses, selectedDashboardYear, currentCalendarYear]
+  );
+
+  const analysesInCurrentFolder = useMemo(
+    () =>
+      analysesFilteredByYear.filter(
+        (item) => normalizeFolderName(item.folderName) === normalizeFolderName(currentFolder)
+      ),
+    [analysesFilteredByYear, currentFolder]
+  );
+
+  const hasNoAnalysisForSelectedYear = allAnalyses.length > 0 && analysesFilteredByYear.length === 0;
+
+  useEffect(() => {
+    // Le filtre d'année revient sur une valeur valide quand la liste d'options change.
+    if (!dashboardYearOptions.length) {
+      return;
+    }
+
+    if (!dashboardYearOptions.some((option) => option.value === selectedDashboardYear)) {
+      setSelectedDashboardYear(dashboardYearOptions[0].value);
+    }
+  }, [dashboardYearOptions, selectedDashboardYear]);
 
   useEffect(() => {
     if (!allAnalyses.length) {
       return;
     }
 
+    if (!analysesFilteredByYear.length) {
+      setAnalysis(null);
+      return;
+    }
+
     if (!analysis) {
       if (analysesInCurrentFolder.length) {
         setAnalysis(analysesInCurrentFolder[0]);
+        return;
       }
+      setAnalysis(analysesFilteredByYear[0]);
+      return;
+    }
+
+    const analysisStillInSelectedYear = analysesFilteredByYear.some((item) => item.id === analysis.id);
+    if (!analysisStillInSelectedYear) {
+      setAnalysis(analysesInCurrentFolder[0] ?? analysesFilteredByYear[0] ?? null);
       return;
     }
 
     if (normalizeFolderName(analysis.folderName) !== normalizeFolderName(currentFolder)) {
       setAnalysis(analysesInCurrentFolder[0] ?? null);
     }
-  }, [analysis, analysesInCurrentFolder, allAnalyses, currentFolder]);
+  }, [analysis, analysesFilteredByYear, analysesInCurrentFolder, allAnalyses, currentFolder]);
+
+  useEffect(() => {
+    // Lors d'un changement d'analyse, on revient sur le contenu initial du tableau de bord.
+    setActiveDashboardTab(null);
+  }, [analysis?.id]);
 
   const folderNames = useMemo(() => {
     const set = new Set<string>();
@@ -624,6 +682,11 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
     void handleSubmitFolderDialog();
   }
 
+  function handleFinancialTabChange(nextTab: DashboardTabId) {
+    // Recliquer sur l'onglet actif re-affiche le contenu initial du tableau de bord.
+    setActiveDashboardTab((currentTab) => (currentTab === nextTab ? null : nextTab));
+  }
+
   function onInputFilesSelected(fileList: FileList | null) {
     if (!fileList) {
       return;
@@ -739,8 +802,9 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
             <NavRow icon={<LayoutDashboard className="h-4 w-4" />} active>
               Tableau de bord
             </NavRow>
-            <NavRow icon={<Sparkles className="h-4 w-4" />} disabled>
-              Analyses (bientôt)
+            {/* L'item "Analyses" est remplace par "Synthese" et devient navigable. */}
+            <NavRow icon={<Sparkles className="h-4 w-4" />} onClick={() => router.push("/synthese")}>
+              Synthèse
             </NavRow>
             <NavRow icon={<Sparkles className="h-4 w-4" />} disabled>
               Documents (bientôt)
@@ -930,85 +994,57 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
 
         <div className="space-y-6">
           {analysis && dashboardView && premiumKpis ? (
-            <DashboardLayout
-              // Le key force un remount propre quand on change d'analyse (reset slider IA local).
-              key={analysis.id}
-              companyName={companyName}
-              greetingName={greetingName}
-              kpis={premiumKpis}
-            >
-              {/* Les blocs existants restent presents en sections secondaires sous le bento premium. */}
-              <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                <article className="precision-card rounded-2xl p-5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs uppercase tracking-wide text-white/60">Alertes</p>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white">
-                      {dashboardView.alerts.count}
-                    </span>
-                  </div>
-
-                  {dashboardView.alerts.items.length === 0 ? (
-                    <p className="mt-3 rounded-xl border border-emerald-200/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
-                      Aucune anomalie detectee.
-                    </p>
-                  ) : (
-                    <ul className="mt-3 space-y-2">
-                      {dashboardView.alerts.items.map((alert) => (
-                        <li
-                          key={alert.id}
-                          className={`rounded-xl border-l-4 px-3 py-2 ${alertContainerClass(alert.severity)}`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className={`mt-0.5 h-4 w-4 ${alertColorClass(alert.severity)}`} />
-                            <div>
-                              <p className="text-sm font-medium text-white">{alert.title}</p>
-                              <p className="text-xs text-white/65">{alert.description}</p>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </article>
-
-                <article className="precision-card rounded-2xl p-5">
-                  <h2 className="text-sm font-semibold text-white">KPI par blocs metier</h2>
-                  <div className="mt-3 grid gap-2">
-                    {dashboardView.sections.map((section) => (
-                      <div key={section.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-white/60">{section.title}</p>
-                        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                          {section.metrics.map((metric) => (
-                            <div key={String(metric.key)} className="rounded-lg border border-white/10 px-2 py-1.5">
-                              <p className="text-[11px] text-white/55">{metric.label}</p>
-                              <p className="text-xs font-semibold text-white">
-                                {formatMetric(metric.value, metric.format)}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              </section>
-              {showDebugSection ? (
-                <details className="precision-card rounded-2xl p-5">
-                  <summary className="cursor-pointer text-sm font-semibold text-white">
-                    Donnees source (debug)
-                  </summary>
-                  <div className="mt-4 grid gap-4 xl:grid-cols-3">
-                    <JsonPanel title="rawData" value={analysis.rawData} />
-                    <JsonPanel title="mappedData" value={analysis.mappedData} />
-                    <JsonPanel title="kpis" value={analysis.kpis} />
-                  </div>
-                </details>
-              ) : null}
-            </DashboardLayout>
+            <>
+              {/* Menu horizontal placé AU-DESSUS du bloc Cockpit financier, comme demandé. */}
+              <DashboardFinancialTabsMenu
+                activeTab={activeDashboardTab}
+                onChange={handleFinancialTabChange}
+                yearOptions={dashboardYearOptions}
+                selectedYear={selectedDashboardYear}
+                onYearChange={setSelectedDashboardYear}
+              />
+              {activeDashboardTab !== null ? (
+                // UX demandee: quand un onglet métier est actif, on masque le cockpit
+                // pour afficher uniquement la section financière sélectionnée.
+                <DashboardFinancialTabContent
+                  activeTab={activeDashboardTab}
+                  kpis={analysis.kpis}
+                  viewModel={dashboardView}
+                />
+              ) : (
+                <DashboardLayout
+                  // Le key force un remount propre quand on change d'analyse (reset slider IA local).
+                  key={analysis.id}
+                  companyName={companyName}
+                  greetingName={greetingName}
+                  kpis={premiumKpis}
+                >
+                  <DashboardFinancialTabContent
+                    activeTab={activeDashboardTab}
+                    kpis={analysis.kpis}
+                    viewModel={dashboardView}
+                  />
+                  {showDebugSection && activeDashboardTab === null ? (
+                  <details className="precision-card rounded-2xl p-5">
+                    <summary className="cursor-pointer text-sm font-semibold text-white">
+                      Donnees source (debug)
+                    </summary>
+                    <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                      <JsonPanel title="rawData" value={analysis.rawData} />
+                      <JsonPanel title="mappedData" value={analysis.mappedData} />
+                      <JsonPanel title="kpis" value={analysis.kpis} />
+                    </div>
+                  </details>
+                  ) : null}
+                </DashboardLayout>
+              )}
+            </>
           ) : (
             <section className="precision-card rounded-2xl p-5">
               <p className="text-sm text-white/70">
-                Ce dossier ne contient pas encore d&apos;analyse. Ajoutez un fichier pour demarrer.
+                {hasNoAnalysisForSelectedYear
+                  ? "Aucune analyse disponible pour l'année sélectionnée."
+                  : "Ce dossier ne contient pas encore d&apos;analyse. Ajoutez un fichier pour demarrer."}
               </p>
             </section>
           )}
@@ -1189,48 +1225,6 @@ function buildSourceFileKey(file: FolderFileItem): string {
   return `${file.analysisId}:${file.name}:${file.createdAt}`;
 }
 
-function formatMetric(
-  value: number | null,
-  format: "currency" | "percent" | "days" | "ratio" | "years" | "months" | "number"
-): string {
-  if (value === null) {
-    return "N/D";
-  }
-
-  if (format === "currency") {
-    return new Intl.NumberFormat("fr-FR", {
-      style: "currency",
-      currency: "EUR",
-      maximumFractionDigits: 0
-    }).format(value);
-  }
-
-  if (format === "percent") {
-    const normalized = Math.abs(value) <= 1 ? value * 100 : value;
-    return `${normalized.toFixed(1)}%`;
-  }
-
-  if (format === "days") {
-    return `${value.toFixed(0)} j`;
-  }
-
-  if (format === "years") {
-    return `${value.toFixed(1)} ans`;
-  }
-
-  if (format === "months") {
-    return `${value.toFixed(1)} mois`;
-  }
-
-  if (format === "ratio") {
-    return value.toFixed(2);
-  }
-
-  return new Intl.NumberFormat("fr-FR", {
-    maximumFractionDigits: 0
-  }).format(value);
-}
-
 function NavRow({
   children,
   icon,
@@ -1274,24 +1268,5 @@ function JsonPanel({ title, value }: { title: string; value: unknown }) {
   );
 }
 
-function alertColorClass(severity: "green" | "orange" | "red"): string {
-  if (severity === "red") {
-    return "text-rose-300";
-  }
-  if (severity === "orange") {
-    return "text-amber-300";
-  }
-  return "text-emerald-300";
-}
-
-function alertContainerClass(severity: "green" | "orange" | "red"): string {
-  if (severity === "red") {
-    return "border-rose-500/70 bg-rose-500/10";
-  }
-  if (severity === "orange") {
-    return "border-amber-500/60 bg-amber-500/10";
-  }
-  return "border-emerald-500/60 bg-emerald-500/10";
-}
 
 

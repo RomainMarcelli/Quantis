@@ -85,9 +85,19 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
       - persistance Firestore des dossiers dans la collection `folders`
   - gestion des fichiers sources dans la sidebar `/analysis`:
     - libelle traduit en `Fichiers sources`
-    - affichage global de tous les fichiers importes dans l'app (tous dossiers)
+    - affichage filtre par dossier actif (uniquement les fichiers du dossier selectionne)
     - suppression d'un fichier source depuis la sidebar
+    - confirmation avant suppression pour eviter les erreurs utilisateur
+    - selection multiple de fichiers avec suppression groupee
     - suppression synchronisee de l'analyse associee avec rafraichissement immediat des donnees
+  - nouvelle page `/synthese` (DA premium coherente avec `/analysis`):
+    - item sidebar `Synthese` cliquable (remplace `Analyses`)
+    - bloc principal `Quantis Score` (score /100 + statut de sante globale)
+    - selecteur d'annee en haut a droite (option `Annee en cours` + annees historiques disponibles)
+    - ligne KPI principale: chiffre d'affaires, EBE, cash disponible
+    - indicateurs de tendance vs periode precedente (hausse/baisse/stable + couleurs)
+    - bloc `Actions recommandees` + bloc `Alertes` base sur les KPI
+    - donnees alimentees exclusivement depuis `kpis` (aucun recalcul metier en UI)
   - nouveau dashboard decisionnel sur `/analysis/[id]`:
     - header personnalise `Hello {firstname}`
     - top cards KPI (cash, sante, alertes, runway)
@@ -100,6 +110,59 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
     - debug repliable (`rawData`, `mappedData`, `kpis`)
     - sidebar (`Dashboard`, `Analyses`, `Documents`, `Compte`)
     - profil sidebar avec avatar initial + niveau Free
+  - sous-menu horizontal dashboard (`/analysis`) ajoute sous le header:
+    - onglets: `Creation de valeur`, `Investissement`, `Financement`, `Rentabilite`
+    - interaction locale sans reload (state client)
+    - switch dynamique du contenu principal selon l'onglet actif
+    - selecteur de periode (annee) integre au menu pour filtrer la vue dashboard
+    - comportement ajuste UX:
+      - menu affiche au-dessus du bloc `Cockpit financier`
+      - affichage initial conserve au chargement
+      - affichage des graphes uniquement apres clic sur `Creation de valeur`
+  - section `Investissement` implementee (UI + logique + tests):
+    - bloc `Argent bloque (BFR)` + explication metier
+    - graphique `Variation du BFR` (Recharts)
+    - bloc `Jours a avancer (Rotation du BFR)` avec detail Stocks / DSO / DPO
+    - bloc `Clients vs Fournisseurs` avec interpretation risque (DSO > DPO)
+    - bloc `Etat du materiel` avec radial chart
+    - composants dedies dans `components/dashboard/investment/*`
+    - logique metier pure centralisee dans `lib/dashboard/investment/investmentViewModel.ts`
+    - ajustements UX:
+      - bloc `Jours a avancer` compacte (moins vertical, meilleur alignement des lignes)
+      - bloc `Clients / Fournisseurs` reduit en hauteur
+      - bloc `Etat du materiel` passe en pleine largeur
+      - contraste renforce de `Usure estimee` pour une meilleure lisibilite
+  - section `Financement` implementee (UI + logique + tests):
+    - bloc `Capacite de remboursement` (annees) + interpretation risque
+    - bloc `Securite` avec liquidite generale/reduite/immediate + badges visuels
+    - bloc `Capacite d'autofinancement (CAF)`
+    - bloc `Dependance bancaire (levier financier)` + interpretation
+    - bloc pleine largeur `Cash genere (net)` + mini evolution Recharts
+    - composants dedies dans `components/dashboard/financement/*`
+    - logique metier pure centralisee dans `lib/dashboard/financement/financingViewModel.ts`
+    - ajustements UX:
+      - titres des cards reduits pour tenir proprement sur une seule ligne
+  - section `Rentabilite` implementee (UI + logique + tests):
+    - bloc `Gain sur mon capital (ROE)` + indicateur de tendance
+    - graphique `ROE` (Recharts)
+    - bloc `Performance de l'activite (ROCE)` + indicateur de tendance
+    - graphique `ROCE` (Recharts)
+    - bloc pleine largeur `Dependance bancaire (Levier financier)` + interpretation
+    - composants dedies dans `components/dashboard/rentabilite/*`
+    - logique metier pure centralisee dans `lib/dashboard/rentabilite/rentabilityViewModel.ts`
+  - comportement dashboard ajuste:
+    - quand un onglet metier est actif (`Creation de valeur`, `Investissement`, `Financement`, `Rentabilite`),
+      le cockpit est masque pour afficher uniquement la section selectionnee
+  - section `Creation de valeur` enrichie en data viz (Recharts):
+    - CA + line chart mensuel
+    - bloc TCAM explicatif
+    - EBE + chart evolution
+    - Resultat net + chart evolution
+    - TMSCV + pie chart
+    - graphique point mort XY (CA/couts/marge) + marker `Point mort`
+    - zones pertes/bénéfices affichées sur le graphique point mort + légende complète
+    - popups d'aide `i` ajoutés sur chaque bloc KPI (utilité, données, formule)
+    - donut TMSCV enrichi (plusieurs segments) avec gestion visuelle des cas négatifs
   - refonte premium de la zone dashboard `/analysis`:
     - integration du design cockpit en composants React/Tailwind
     - composants dedies `DashboardLayout`, `HealthScore`, `KPIBlock`, `KPIWide`, `AIInsight`
@@ -114,6 +177,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - DA premium etendue globalement a l'application:
     - theme sombre par defaut (sauf preference light sauvegardee)
     - tokens/containers globaux aligns avec la signature visuelle `/analysis`
+    - animation globale de reveal au scroll (fondu + translation legere) sur les surfaces premium
   - page de test KPI avant/apres: `/test-kpi`
     - charge les analyses reelles stockees en Firestore apres upload
     - visualisation des formules appliquees a `mappedData`
@@ -137,6 +201,23 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
     - calcul strokeDashoffset
     - bornage des animations
     - rendu composants KPI premium
+  - nouveaux tests unitaires Synthese:
+    - logique de tendance (up/down/na)
+    - construction view-model (score, KPI, alertes, actions)
+    - rendu composant (Quantis Score + KPI principaux)
+  - nouveaux tests unitaires dashboard tabs:
+    - logique de preparation des donnees graphiques (mensuel, TMSCV, point mort)
+    - rendu des composants chart
+    - rendu du sous-menu financier
+  - nouveaux tests unitaires Financement:
+    - interpretation metier (capacite, liquidite, levier)
+    - rendu section Financement
+    - affichage tab `Financement`
+  - nouveaux tests unitaires Rentabilite:
+    - normalisation/mapping des valeurs ROE/ROCE
+    - logique de tendance (hausse/baisse)
+    - rendu section Rentabilite
+    - affichage tab `Rentabilite`
 
 ## Fonctionnalites en cours
 

@@ -366,3 +366,31 @@ body {
 .precision-card:hover .edu-text {
   color: rgb(255 255 255 / 60%);
 }
+
+/* Animation globale au scroll: révèle progressivement les cartes sans casser la DA premium. */
+[data-scroll-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0) scale(0.995);
+  filter: blur(1.5px);
+  transition:
+    opacity 460ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 460ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 460ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--scroll-reveal-delay, 0ms);
+  will-change: opacity, transform, filter;
+}
+
+[data-scroll-reveal].is-scroll-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  filter: blur(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-scroll-reveal] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+}
