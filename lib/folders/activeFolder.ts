@@ -45,19 +45,8 @@ export function ensureFolderName(explicitFolderName?: string | null): string | n
     return stored;
   }
 
-  if (typeof window === "undefined") {
-    return DEFAULT_FOLDER_NAME;
-  }
-
-  const input = window.prompt(
-    "Choisissez un nom de dossier pour organiser vos fichiers",
-    "Mon dossier"
-  );
-  if (!input || !input.trim()) {
-    return null;
-  }
-
-  const next = input.trim();
+  // Aucun popup navigateur: on bascule automatiquement sur un dossier par defaut.
+  const next = DEFAULT_FOLDER_NAME;
   setActiveFolderName(next);
   return next;
 }
@@ -103,6 +92,36 @@ export function registerKnownFolderName(folderName: string): string[] {
   );
   window.localStorage.setItem(KNOWN_FOLDERS_STORAGE_KEY, JSON.stringify(knownFolders));
   return knownFolders;
+}
+
+export function removeKnownFolderName(folderName: string): string[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const normalizedFolderName = normalizeFolderName(folderName).toLowerCase();
+  const nextFolders = getKnownFolderNames().filter(
+    (knownFolderName) => knownFolderName.toLowerCase() !== normalizedFolderName
+  );
+  window.localStorage.setItem(KNOWN_FOLDERS_STORAGE_KEY, JSON.stringify(nextFolders));
+  return nextFolders;
+}
+
+export function renameKnownFolderName(previousFolderName: string, nextFolderName: string): string[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const previousNormalized = normalizeFolderName(previousFolderName).toLowerCase();
+  const nextNormalized = normalizeFolderName(nextFolderName);
+  const mergedFolders = getKnownFolderNames()
+    .map((knownFolderName) =>
+      knownFolderName.toLowerCase() === previousNormalized ? nextNormalized : knownFolderName
+    )
+    .concat(nextNormalized);
+  const deduplicatedFolders = Array.from(new Set(mergedFolders));
+  window.localStorage.setItem(KNOWN_FOLDERS_STORAGE_KEY, JSON.stringify(deduplicatedFolders));
+  return deduplicatedFolders;
 }
 
 function normalizeFolderName(folderName?: string | null): string {

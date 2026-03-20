@@ -2,7 +2,7 @@
 // Role: assemble la page /analysis (et /analysis/[id]) avec dashboard premium, dossiers, upload et debug.
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -12,9 +12,11 @@ import {
   LayoutDashboard,
   Lock,
   LogOut,
+  Pencil,
   Plus,
   Settings,
   Sparkles,
+  Trash2,
   Upload,
   UserCircle2
 } from "lucide-react";
@@ -26,12 +28,28 @@ import {
   ensureFolderName,
   getActiveFolderName,
   getKnownFolderNames,
+  removeKnownFolderName,
+  renameKnownFolderName,
   registerKnownFolderName,
   setActiveFolderName
 } from "@/lib/folders/activeFolder";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { getUserAnalysisById, listUserAnalyses, saveAnalysisDraft } from "@/services/analysisStore";
+import { loadAppPreferences } from "@/lib/settings/appPreferences";
+import {
+  deleteUserAnalysisById,
+  deleteUserFolderAnalyses,
+  getUserAnalysisById,
+  listUserAnalyses,
+  renameUserFolder,
+  saveAnalysisDraft
+} from "@/services/analysisStore";
+import {
+  createUserFolder,
+  deleteUserFoldersByName,
+  listUserFolders,
+  renameUserFoldersByName
+} from "@/services/folderStore";
 import { firebaseAuthGateway } from "@/services/auth";
 import { getUserProfile } from "@/services/userProfileStore";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
@@ -42,9 +60,13 @@ type AnalysisDetailViewProps = {
 };
 
 type FolderFileItem = {
+  analysisId: string;
+  folderName: string;
   name: string;
   createdAt: string;
 };
+
+type FolderDialogMode = "create" | "rename" | "delete" | null;
 
 const ACCEPTED_EXTENSIONS = [".xlsx", ".xls", ".csv", ".pdf"];
 
@@ -57,13 +79,34 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
   const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
+  const [showDebugSection, setShowDebugSection] = useState<boolean>(() => loadAppPreferences().showDebugSection);
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Quantis");
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [folderActionName, setFolderActionName] = useState<string | null>(null);
+  const [folderDialogMode, setFolderDialogMode] = useState<FolderDialogMode>(null);
+  const [folderDialogName, setFolderDialogName] = useState("");
+  const [folderDialogTargetName, setFolderDialogTargetName] = useState<string | null>(null);
+  const [folderDialogSubmitting, setFolderDialogSubmitting] = useState(false);
+  // Etat de selection multiple pour la suppression groupee de fichiers sources.
+  const [selectedSourceFileKeys, setSelectedSourceFileKeys] = useState<string[]>([]);
+  // Etat de confirmation pour la suppression de fichiers (simple ou multiple).
+  const [pendingSourceFilesDeletion, setPendingSourceFilesDeletion] = useState<FolderFileItem[]>([]);
+  const [sourceFilesDeletionSubmitting, setSourceFilesDeletionSubmitting] = useState(false);
+  const [fileActionKey, setFileActionKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Les messages de succes sont temporaires pour eviter d'encombrer l'ecran.
+    if (!infoMessage) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setInfoMessage(null), 2600);
+    return () => window.clearTimeout(timeout);
+  }, [infoMessage]);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
@@ -112,6 +155,19 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   }, [allAnalyses]);
 
   useEffect(() => {
+    // Synchronise la preference debug quand elle est modifiee depuis /settings.
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key && event.key !== "quantis.appPreferences") {
+        return;
+      }
+      setShowDebugSection(loadAppPreferences().showDebugSection);
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  useEffect(() => {
     // Contrainte produit: /analysis doit rester en mode dark par defaut.
     const root = document.documentElement;
     const previousTheme = root.getAttribute("data-theme");
@@ -157,23 +213,47 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   }, [allAnalyses, currentFolder, knownFolders]);
 
   const sourceFiles = useMemo<FolderFileItem[]>(() => {
-    const deduped = new Map<string, FolderFileItem>();
+    const allFiles: FolderFileItem[] = [];
     analysesInCurrentFolder
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .forEach((item) => {
         item.sourceFiles.forEach((file) => {
-          const key = file.name.toLowerCase();
-          if (!deduped.has(key)) {
-            deduped.set(key, {
-              name: file.name,
-              createdAt: item.createdAt
-            });
-          }
+          allFiles.push({
+            analysisId: item.id,
+            folderName: normalizeFolderName(item.folderName),
+            name: file.name,
+            createdAt: item.createdAt
+          });
         });
       });
 
-    return Array.from(deduped.values());
+    return allFiles;
   }, [analysesInCurrentFolder]);
+
+  const selectedSourceFiles = useMemo(
+    () => sourceFiles.filter((file) => selectedSourceFileKeys.includes(buildSourceFileKey(file))),
+    [sourceFiles, selectedSourceFileKeys]
+  );
+
+  useEffect(() => {
+    // Nettoie la selection quand on change de dossier/source pour eviter des suppressions hors contexte.
+    const availableKeys = new Set(sourceFiles.map((file) => buildSourceFileKey(file)));
+    setSelectedSourceFileKeys((current) => current.filter((key) => availableKeys.has(key)));
+  }, [sourceFiles]);
+
+  const folderDialogAnalysesCount = useMemo(() => {
+    if (!folderDialogTargetName) {
+      return 0;
+    }
+    return allAnalyses.filter((analysisItem) =>
+      isSameFolderName(analysisItem.folderName, folderDialogTargetName)
+    ).length;
+  }, [allAnalyses, folderDialogTargetName]);
+
+  const pendingSourceFilesDeletionAnalysesCount = useMemo(
+    () => new Set(pendingSourceFilesDeletion.map((file) => file.analysisId)).size,
+    [pendingSourceFilesDeletion]
+  );
 
   const dashboardView = useMemo(
     () => (analysis ? buildAnalysisDashboardViewModel(analysis.kpis) : null),
@@ -191,20 +271,24 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
     setErrorMessage(null);
 
     try {
-      const [history, profile] = await Promise.all([
+      const [history, profile, persistedFolders] = await Promise.all([
         listUserAnalyses(currentUser.uid),
-        getUserProfile(currentUser.uid)
+        getUserProfile(currentUser.uid),
+        listUserFolders(currentUser.uid)
       ]);
 
       setAllAnalyses(history);
       setGreetingName(resolveFirstName(currentUser, profile?.firstName));
       setCompanyName(profile?.companyName?.trim() || "Quantis");
+      const persistedFolderNames = persistedFolders.map((folder) => normalizeFolderName(folder.name));
+      persistedFolderNames.forEach((folderName) => registerKnownFolderName(folderName));
+      setKnownFolders(getKnownFolderNames());
 
       if (!history.length) {
         // Aucun historique: on retire l'indicateur local d'existence d'analyses.
         clearLocalAnalysisHint();
         setAnalysis(null);
-        setCurrentFolder(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
+        setCurrentFolder(getActiveFolderName() ?? persistedFolderNames[0] ?? DEFAULT_FOLDER_NAME);
         setErrorMessage("Aucune analyse disponible. Deposez un fichier pour afficher le dashboard.");
         return;
       }
@@ -258,6 +342,9 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
     setInfoMessage(null);
 
     try {
+      // Garantit la persistance du dossier en base avant la creation d'analyse.
+      await createUserFolder(user.uid, folderName);
+
       const formData = new FormData();
       formData.append("userId", user.uid);
       formData.append("folderName", folderName);
@@ -289,11 +376,252 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   }
 
   function handleNewFolder() {
-    // Creation non bloquante: un clic sur "+" cree toujours un dossier unique.
-    const next = buildNextFolderName(folderNames);
-    setCurrentFolder(normalizeFolderName(next));
-    setKnownFolders(registerKnownFolderName(next));
-    setInfoMessage(`Dossier cree et actif: ${normalizeFolderName(next)}`);
+    // Ouvre une modale applicative au lieu d'un prompt navigateur.
+    setFolderDialogMode("create");
+    setFolderDialogTargetName(null);
+    setFolderDialogName(buildNextFolderName(folderNames));
+  }
+
+  function openRenameFolderDialog(folderName: string) {
+    setFolderDialogMode("rename");
+    setFolderDialogTargetName(folderName);
+    setFolderDialogName(folderName);
+  }
+
+  function openDeleteFolderDialog(folderName: string) {
+    setFolderDialogMode("delete");
+    setFolderDialogTargetName(folderName);
+    setFolderDialogName(folderName);
+  }
+
+  async function handleSubmitFolderDialog() {
+    if (!user || !folderDialogMode) {
+      return;
+    }
+
+    const normalizedInputName = normalizeFolderName(folderDialogName);
+    const targetFolderName = folderDialogTargetName ? normalizeFolderName(folderDialogTargetName) : null;
+
+    if (!normalizedInputName) {
+      setErrorMessage("Le nom du dossier est requis.");
+      return;
+    }
+
+    if (folderDialogMode !== "delete" && !targetFolderName) {
+      const alreadyExists = folderNames.some((knownFolderName) =>
+        isSameFolderName(knownFolderName, normalizedInputName)
+      );
+      if (alreadyExists) {
+        setErrorMessage("Un dossier avec ce nom existe deja.");
+        return;
+      }
+    }
+
+    if (folderDialogMode === "rename" && targetFolderName) {
+      const alreadyExists = folderNames.some(
+        (knownFolderName) =>
+          !isSameFolderName(knownFolderName, targetFolderName) &&
+          isSameFolderName(knownFolderName, normalizedInputName)
+      );
+      if (alreadyExists) {
+        setErrorMessage("Un dossier avec ce nom existe deja.");
+        return;
+      }
+    }
+
+    setFolderActionName(targetFolderName ?? normalizedInputName);
+    setFolderDialogSubmitting(true);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      if (folderDialogMode === "create") {
+        await createUserFolder(user.uid, normalizedInputName);
+        setCurrentFolder(normalizedInputName);
+        setKnownFolders(registerKnownFolderName(normalizedInputName));
+        setInfoMessage(`Dossier cree et actif: ${normalizedInputName}`);
+      }
+
+      if (folderDialogMode === "rename" && targetFolderName) {
+        const movedAnalyses = await renameUserFolder(user.uid, targetFolderName, normalizedInputName);
+        await renameUserFoldersByName(user.uid, targetFolderName, normalizedInputName);
+
+        const remainingAnalyses = allAnalyses.filter(
+          (analysisItem) => !isSameFolderName(analysisItem.folderName, targetFolderName)
+        );
+        const nextAnalyses = [...movedAnalyses, ...remainingAnalyses].sort((left, right) =>
+          right.createdAt.localeCompare(left.createdAt)
+        );
+        setAllAnalyses(nextAnalyses);
+        setKnownFolders(renameKnownFolderName(targetFolderName, normalizedInputName));
+
+        if (isSameFolderName(currentFolder, targetFolderName)) {
+          setCurrentFolder(normalizedInputName);
+        }
+
+        if (analysis && isSameFolderName(analysis.folderName, targetFolderName)) {
+          setAnalysis(movedAnalyses[0] ?? null);
+        }
+
+        setInfoMessage(`Dossier renomme: ${targetFolderName} -> ${normalizedInputName}`);
+      }
+
+      if (folderDialogMode === "delete" && targetFolderName) {
+        const deletedCount = await deleteUserFolderAnalyses(user.uid, targetFolderName);
+        await deleteUserFoldersByName(user.uid, targetFolderName);
+
+        const remainingAnalyses = allAnalyses.filter(
+          (analysisItem) => !isSameFolderName(analysisItem.folderName, targetFolderName)
+        );
+        const remainingKnownFolders = removeKnownFolderName(targetFolderName);
+
+        setAllAnalyses(remainingAnalyses);
+        setKnownFolders(remainingKnownFolders);
+
+        const fallbackFolderName = resolveNextFolderName(
+          remainingAnalyses,
+          remainingKnownFolders,
+          currentFolder,
+          targetFolderName
+        );
+        if (fallbackFolderName) {
+          setCurrentFolder(fallbackFolderName);
+        }
+
+        if (analysis && isSameFolderName(analysis.folderName, targetFolderName)) {
+          setAnalysis(null);
+        }
+
+        if (deletedCount > 0) {
+          setInfoMessage(`Dossier supprime: ${targetFolderName} (${deletedCount} analyses).`);
+        } else {
+          setInfoMessage(`Dossier vide supprime: ${targetFolderName}.`);
+        }
+      }
+
+      closeFolderDialog();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Operation dossier impossible."
+      );
+    } finally {
+      setFolderDialogSubmitting(false);
+      setFolderActionName(null);
+    }
+  }
+
+  function closeFolderDialog() {
+    setFolderDialogMode(null);
+    setFolderDialogTargetName(null);
+    setFolderDialogName("");
+    setFolderDialogSubmitting(false);
+  }
+
+  function toggleSourceFileSelection(file: FolderFileItem) {
+    const key = buildSourceFileKey(file);
+    setSelectedSourceFileKeys((current) =>
+      current.includes(key) ? current.filter((entry) => entry !== key) : [...current, key]
+    );
+  }
+
+  function toggleSelectAllSourceFiles() {
+    if (selectedSourceFileKeys.length === sourceFiles.length) {
+      setSelectedSourceFileKeys([]);
+      return;
+    }
+    setSelectedSourceFileKeys(sourceFiles.map((file) => buildSourceFileKey(file)));
+  }
+
+  function requestSourceFilesDeletion(files: FolderFileItem[]) {
+    if (!files.length) {
+      return;
+    }
+    // Affiche une confirmation explicite avant toute suppression de donnees.
+    setPendingSourceFilesDeletion(files);
+    setErrorMessage(null);
+    setInfoMessage(null);
+  }
+
+  function closeSourceFilesDeletionDialog() {
+    setPendingSourceFilesDeletion([]);
+    setSourceFilesDeletionSubmitting(false);
+  }
+
+  async function confirmSourceFilesDeletion() {
+    if (!user || !pendingSourceFilesDeletion.length) {
+      return;
+    }
+
+    // Deduplication par analyse: plusieurs fichiers peuvent appartenir au meme lot d'analyse.
+    const analysisIdsToDelete = Array.from(
+      new Set(pendingSourceFilesDeletion.map((file) => file.analysisId))
+    );
+
+    setSourceFilesDeletionSubmitting(true);
+    setFileActionKey(analysisIdsToDelete.length === 1 ? analysisIdsToDelete[0] : null);
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    try {
+      const deletedAnalysisIds: string[] = [];
+      for (const analysisIdToDelete of analysisIdsToDelete) {
+        const deleted = await deleteUserAnalysisById(user.uid, analysisIdToDelete);
+        if (deleted) {
+          deletedAnalysisIds.push(analysisIdToDelete);
+        }
+      }
+
+      if (!deletedAnalysisIds.length) {
+        setErrorMessage("Impossible de supprimer les fichiers selectionnes.");
+        return;
+      }
+
+      const deletedIdsSet = new Set(deletedAnalysisIds);
+      const remainingAnalyses = allAnalyses.filter((analysisItem) => !deletedIdsSet.has(analysisItem.id));
+      setAllAnalyses(remainingAnalyses);
+      setSelectedSourceFileKeys([]);
+
+      if (!remainingAnalyses.length) {
+        clearLocalAnalysisHint();
+        setAnalysis(null);
+        setErrorMessage("Aucune analyse disponible. Déposez un fichier pour afficher le dashboard.");
+      } else {
+        setLocalAnalysisHint(true);
+      }
+
+      if (analysis && deletedIdsSet.has(analysis.id)) {
+        const nextInFolder = remainingAnalyses.find((item) =>
+          isSameFolderName(item.folderName, currentFolder)
+        );
+        setAnalysis(nextInFolder ?? remainingAnalyses[0] ?? null);
+      }
+
+      const deletedFilesCount = pendingSourceFilesDeletion.length;
+      const deletedAnalysesCount = deletedAnalysisIds.length;
+      setInfoMessage(
+        deletedFilesCount === 1
+          ? "Fichier source supprime. Les donnees associees ont ete mises a jour."
+          : `${deletedFilesCount} fichiers supprimes (${deletedAnalysesCount} analyses). Les donnees associees ont ete mises a jour.`
+      );
+      closeSourceFilesDeletionDialog();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Suppression des fichiers sources impossible."
+      );
+    } finally {
+      setFileActionKey(null);
+      setSourceFilesDeletionSubmitting(false);
+    }
+  }
+
+  function onSourceFilesDeletionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void confirmSourceFilesDeletion();
+  }
+
+  function onFolderDialogSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void handleSubmitFolderDialog();
   }
 
   function onInputFilesSelected(fileList: FileList | null) {
@@ -339,7 +667,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
           </div>
         </div>
 
-        <div className="hidden text-sm font-medium text-white md:block">Dashboard</div>
+        <div className="hidden text-sm font-medium text-white md:block">Tableau de bord</div>
 
         <div className="flex items-center gap-2">
           <button
@@ -392,8 +720,15 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
       ) : null}
 
       {infoMessage ? (
-        <div className="precision-card rounded-2xl border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-          {infoMessage}
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-4 top-4 z-50 w-full max-w-sm rounded-xl border border-emerald-400/35 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-100 shadow-[0_16px_40px_rgba(0,0,0,0.45)] backdrop-blur-sm"
+        >
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-300" />
+            <p>{infoMessage}</p>
+          </div>
         </div>
       ) : null}
 
@@ -402,20 +737,23 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
         <aside className="precision-card h-fit rounded-2xl p-4 lg:sticky lg:top-4">
           <nav className="space-y-1 text-sm">
             <NavRow icon={<LayoutDashboard className="h-4 w-4" />} active>
-              Dashboard
+              Tableau de bord
             </NavRow>
             <NavRow icon={<Sparkles className="h-4 w-4" />} disabled>
-              Analyses (Bientot)
+              Analyses (bientôt)
             </NavRow>
             <NavRow icon={<Sparkles className="h-4 w-4" />} disabled>
-              Documents (Bientot)
-            </NavRow>
-            <NavRow icon={<UserCircle2 className="h-4 w-4" />} onClick={() => router.push("/account?from=analysis")}>
-              Compte
+              Documents (bientôt)
             </NavRow>
           </nav>
 
-          <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+          {/* Le bloc compte remplace le lien de navigation "Compte" pour eviter le doublon. */}
+          <button
+            type="button"
+            onClick={() => router.push("/account?from=analysis")}
+            className="mt-4 w-full rounded-xl border border-white/10 bg-black/20 p-3 text-left transition-colors hover:bg-white/10"
+            aria-label="Ouvrir le compte"
+          >
             <p className="text-[11px] uppercase tracking-wide text-white/50">Compte</p>
             <div className="mt-2 flex items-center gap-3">
               <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
@@ -426,11 +764,11 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
                 <p className="text-xs text-white/55">Free</p>
               </div>
             </div>
-          </div>
+          </button>
 
           <div className="mt-5">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wide text-white/50">Projects</p>
+              <p className="text-xs uppercase tracking-wide text-white/50">Dossiers</p>
               <button
                 type="button"
                 onClick={handleNewFolder}
@@ -446,41 +784,113 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
               {folderNames.map((folderName) => {
                 const isActive = normalizeFolderName(folderName) === normalizeFolderName(currentFolder);
                 const count = allAnalyses.filter((item) => normalizeFolderName(item.folderName) === normalizeFolderName(folderName)).length;
+                const isBusy = folderActionName ? isSameFolderName(folderActionName, folderName) : false;
                 return (
-                  <button
+                  <div
                     key={folderName}
-                    type="button"
-                    onClick={() => setCurrentFolder(normalizeFolderName(folderName))}
-                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left ${
+                    className={`flex items-center gap-1 rounded-lg px-1 py-1 ${
                       isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
                     }`}
                   >
-                    <Folder className="h-4 w-4" />
-                    <span className="min-w-0 flex-1 truncate text-sm">{folderName}</span>
-                    <span className="text-[11px]">{count}</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentFolder(normalizeFolderName(folderName))}
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left"
+                      disabled={isBusy}
+                    >
+                      <Folder className="h-4 w-4" />
+                      <span className="min-w-0 flex-1 truncate text-sm">{folderName}</span>
+                      <span className="text-[11px]">{count}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openRenameFolderDialog(folderName)}
+                      className="rounded p-1 text-white/60 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label={`Renommer le dossier ${folderName}`}
+                      title="Renommer"
+                      disabled={isBusy}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openDeleteFolderDialog(folderName)}
+                      className="rounded p-1 text-white/60 hover:bg-rose-500/20 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
+                      aria-label={`Supprimer le dossier ${folderName}`}
+                      title="Supprimer"
+                      disabled={isBusy}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 );
               })}
             </div>
           </div>
 
           <div className="mt-5 border-t border-white/10 pt-4">
-            <p className="text-xs uppercase tracking-wide text-white/50">Source files</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs uppercase tracking-wide text-white/50">Fichiers sources</p>
+              {sourceFiles.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={toggleSelectAllSourceFiles}
+                  className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-white/75 hover:bg-white/10"
+                >
+                  {selectedSourceFileKeys.length === sourceFiles.length
+                    ? "Tout deselectionner"
+                    : "Tout selectionner"}
+                </button>
+              ) : null}
+            </div>
+            {selectedSourceFiles.length > 0 ? (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  onClick={() => requestSourceFilesDeletion(selectedSourceFiles)}
+                  className="w-full rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-xs font-medium text-rose-200 hover:bg-rose-500/20"
+                >
+                  Supprimer la selection ({selectedSourceFiles.length})
+                </button>
+              </div>
+            ) : null}
             <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
               {sourceFiles.length === 0 ? (
-                <p className="px-1 text-xs text-white/55">Aucun fichier dans ce dossier.</p>
+                <p className="px-1 text-xs text-white/55">Aucun fichier importé pour le moment.</p>
               ) : (
                 sourceFiles.map((file) => (
-                  <div key={`${file.name}-${file.createdAt}`} className="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5">
+                  <div
+                    key={`${file.analysisId}-${file.name}-${file.createdAt}`}
+                    className="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5"
+                  >
                     <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedSourceFileKeys.includes(buildSourceFileKey(file))}
+                        onChange={() => toggleSourceFileSelection(file)}
+                        className="mt-1 h-3.5 w-3.5 rounded border-white/20 bg-black/40 text-quantis-gold accent-quantis-gold"
+                        aria-label={`Selectionner ${file.name}`}
+                      />
                       <FileText className="mt-0.5 h-3.5 w-3.5 text-white/55" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-medium text-white">{file.name}</p>
                         <div className="mt-0.5 flex items-center gap-1 text-[11px] text-white/55">
                           <span>{new Date(file.createdAt).toLocaleDateString("fr-FR")}</span>
+                          <span>•</span>
+                          <span className="truncate">{file.folderName}</span>
                           <CheckCircle2 className="h-3 w-3 text-emerald-500" />
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => requestSourceFilesDeletion([file])}
+                        className="rounded p-1 text-white/55 transition-colors hover:bg-rose-500/20 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
+                        aria-label={`Supprimer ${file.name}`}
+                        title="Supprimer ce fichier source"
+                        disabled={fileActionKey === file.analysisId || sourceFilesDeletionSubmitting}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))
@@ -512,8 +922,8 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
               onDragOver={(event) => event.preventDefault()}
             >
               <Upload className="mx-auto h-4 w-4 text-white/60" />
-              <p className="mt-2 font-medium">Drag and drop</p>
-              <p className="text-[11px] text-white/55">or click to browse</p>
+              <p className="mt-2 font-medium">Glisser-déposer</p>
+              <p className="text-[11px] text-white/55">ou cliquer pour parcourir</p>
             </button>
           </div>
         </aside>
@@ -582,17 +992,18 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
                   </div>
                 </article>
               </section>
-{/* 
-              <details className="precision-card rounded-2xl p-5">
-                <summary className="cursor-pointer text-sm font-semibold text-white">
-                  Donnees source (debug)
-                </summary>
-                <div className="mt-4 grid gap-4 xl:grid-cols-3">
-                  <JsonPanel title="rawData" value={analysis.rawData} />
-                  <JsonPanel title="mappedData" value={analysis.mappedData} />
-                  <JsonPanel title="kpis" value={analysis.kpis} />
-                </div>
-              </details> */}
+              {showDebugSection ? (
+                <details className="precision-card rounded-2xl p-5">
+                  <summary className="cursor-pointer text-sm font-semibold text-white">
+                    Donnees source (debug)
+                  </summary>
+                  <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                    <JsonPanel title="rawData" value={analysis.rawData} />
+                    <JsonPanel title="mappedData" value={analysis.mappedData} />
+                    <JsonPanel title="kpis" value={analysis.kpis} />
+                  </div>
+                </details>
+              ) : null}
             </DashboardLayout>
           ) : (
             <section className="precision-card rounded-2xl p-5">
@@ -603,6 +1014,112 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
           )}
         </div>
       </div>
+
+      {pendingSourceFilesDeletion.length > 0 ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-4">
+          <form
+            className="precision-card w-full max-w-lg rounded-2xl p-5"
+            onSubmit={onSourceFilesDeletionSubmit}
+          >
+            <h3 className="text-base font-semibold text-white">Confirmer la suppression</h3>
+            <p className="mt-3 text-sm leading-relaxed text-white/75">
+              {pendingSourceFilesDeletion.length === 1
+                ? `Vous allez supprimer le fichier "${pendingSourceFilesDeletion[0]?.name ?? "source"}".`
+                : `Vous allez supprimer ${pendingSourceFilesDeletion.length} fichiers sources.`}
+              {" "}
+              Cette action supprime aussi les donnees d&apos;analyse associees ({pendingSourceFilesDeletionAnalysesCount} analyses)
+              et elle est irreversible.
+            </p>
+            <div className="mt-4 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-black/25 p-3">
+              {pendingSourceFilesDeletion.map((file) => (
+                <div
+                  key={buildSourceFileKey(file)}
+                  className="flex items-center justify-between gap-2 text-xs text-white/70"
+                >
+                  <span className="truncate">{file.name}</span>
+                  <span className="shrink-0 text-white/45">{file.folderName}</span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeSourceFilesDeletionDialog}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                disabled={sourceFilesDeletionSubmitting}
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg border border-rose-300/30 bg-rose-500/80 px-3 py-2 text-sm font-medium text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={sourceFilesDeletionSubmitting}
+                autoFocus
+              >
+                {sourceFilesDeletionSubmitting ? "Suppression..." : "Confirmer la suppression"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {folderDialogMode ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <form
+            className="precision-card w-full max-w-md rounded-2xl p-5"
+            onSubmit={onFolderDialogSubmit}
+          >
+            <h3 className="text-base font-semibold text-white">
+              {folderDialogMode === "create"
+                ? "Creer un dossier"
+                : folderDialogMode === "rename"
+                  ? "Renommer le dossier"
+                  : "Supprimer le dossier"}
+            </h3>
+
+            {folderDialogMode === "delete" ? (
+              <p className="mt-3 text-sm text-white/70">
+                {folderDialogAnalysesCount > 0
+                  ? `Le dossier "${folderDialogTargetName}" contient ${folderDialogAnalysesCount} analyses. Elles seront supprimees.`
+                  : `Le dossier "${folderDialogTargetName}" est vide et sera supprime.`}
+              </p>
+            ) : (
+              <div className="mt-4">
+                <label className="text-xs uppercase tracking-wide text-white/60" htmlFor="folder-name-input">
+                  Nom du dossier
+                </label>
+                <input
+                  id="folder-name-input"
+                  value={folderDialogName}
+                  onChange={(event) => setFolderDialogName(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-quantis-gold/60"
+                  placeholder="Nom du dossier"
+                  autoFocus
+                />
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeFolderDialog}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+                disabled={folderDialogSubmitting}
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg border border-white/15 bg-quantis-gold/85 px-3 py-2 text-sm font-medium text-black hover:bg-quantis-gold disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={folderDialogSubmitting}
+                autoFocus={folderDialogMode === "delete"}
+              >
+                {folderDialogSubmitting ? "Traitement..." : folderDialogMode === "delete" ? "Supprimer" : "Valider"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -637,6 +1154,39 @@ function buildNextFolderName(existingFolderNames: string[]): string {
   }
 
   return `Nouveau dossier ${index}`;
+}
+
+function resolveNextFolderName(
+  remainingAnalyses: AnalysisRecord[],
+  remainingKnownFolders: string[],
+  currentFolderName: string,
+  deletedFolderName: string
+): string | null {
+  if (!isSameFolderName(currentFolderName, deletedFolderName)) {
+    return normalizeFolderName(currentFolderName);
+  }
+
+  const candidateFolders = new Set<string>();
+  remainingAnalyses.forEach((analysisItem) => {
+    candidateFolders.add(normalizeFolderName(analysisItem.folderName));
+  });
+  remainingKnownFolders.forEach((folderName) => {
+    candidateFolders.add(normalizeFolderName(folderName));
+  });
+
+  if (!candidateFolders.size) {
+    return DEFAULT_FOLDER_NAME;
+  }
+
+  return Array.from(candidateFolders)[0];
+}
+
+function isSameFolderName(leftFolderName?: string | null, rightFolderName?: string | null): boolean {
+  return normalizeFolderName(leftFolderName).toLowerCase() === normalizeFolderName(rightFolderName).toLowerCase();
+}
+
+function buildSourceFileKey(file: FolderFileItem): string {
+  return `${file.analysisId}:${file.name}:${file.createdAt}`;
 }
 
 function formatMetric(

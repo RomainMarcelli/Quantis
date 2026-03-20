@@ -12,8 +12,18 @@ vi.mock("@/services/analysisStore", () => ({
   deleteUserAnalyses: vi.fn()
 }));
 
-import { loadAccountProfile, purgeAccountData, saveAccountProfile } from "@/services/accountService";
+vi.mock("@/services/folderStore", () => ({
+  deleteUserFolders: vi.fn()
+}));
+
+import {
+  loadAccountProfile,
+  purgeAccountData,
+  purgeAnalysisData,
+  saveAccountProfile
+} from "@/services/accountService";
 import { deleteUserAnalyses } from "@/services/analysisStore";
+import { deleteUserFolders } from "@/services/folderStore";
 import { deleteUserProfile, getUserProfile, updateUserProfile } from "@/services/userProfileStore";
 
 describe("accountService", () => {
@@ -91,17 +101,33 @@ describe("accountService", () => {
   });
 
   it("purges analyses then user profile and returns the deleted analyses count", async () => {
+    vi.mocked(deleteUserFolders).mockResolvedValue(2);
     vi.mocked(deleteUserAnalyses).mockResolvedValue(4);
     vi.mocked(deleteUserProfile).mockResolvedValue(undefined);
 
     const result = await purgeAccountData("uid-1");
 
     expect(result).toEqual({ deletedAnalysesCount: 4 });
+    expect(deleteUserFolders).toHaveBeenCalledWith("uid-1");
     expect(deleteUserAnalyses).toHaveBeenCalledWith("uid-1");
     expect(deleteUserProfile).toHaveBeenCalledWith("uid-1");
 
+    const foldersCall = vi.mocked(deleteUserFolders).mock.invocationCallOrder[0];
     const analysesCall = vi.mocked(deleteUserAnalyses).mock.invocationCallOrder[0];
     const profileCall = vi.mocked(deleteUserProfile).mock.invocationCallOrder[0];
+    expect(foldersCall).toBeLessThan(analysesCall);
     expect(analysesCall).toBeLessThan(profileCall);
+  });
+
+  it("purges only analysis/folder data and keeps profile", async () => {
+    vi.mocked(deleteUserFolders).mockResolvedValue(1);
+    vi.mocked(deleteUserAnalyses).mockResolvedValue(3);
+
+    const result = await purgeAnalysisData("uid-1");
+
+    expect(result).toEqual({ deletedAnalysesCount: 3 });
+    expect(deleteUserFolders).toHaveBeenCalledWith("uid-1");
+    expect(deleteUserAnalyses).toHaveBeenCalledWith("uid-1");
+    expect(deleteUserProfile).not.toHaveBeenCalled();
   });
 });

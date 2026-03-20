@@ -1,11 +1,15 @@
+// components/DashboardView.tsx
+// Vue client de l'espace de d�p�t avec DA premium coh�rente avec /analysis.
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { FlaskConical, FolderOpen, LayoutDashboard, LogOut, User } from "lucide-react";
 import { UploadLanding } from "@/components/dashboard/UploadLanding";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { hasLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import { ensureFolderName } from "@/lib/folders/activeFolder";
+import { loadAppPreferences } from "@/lib/settings/appPreferences";
 import { listUserAnalyses, saveAnalysisDraft } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
 import type { AnalysisDraft } from "@/types/analysis";
@@ -109,7 +113,11 @@ export function DashboardView() {
         body: formData
       });
 
-      const payload = (await response.json()) as { analysisDraft?: AnalysisDraft; error?: string; detail?: string };
+      const payload = (await response.json()) as {
+        analysisDraft?: AnalysisDraft;
+        error?: string;
+        detail?: string;
+      };
 
       if (!response.ok || !payload.analysisDraft) {
         throw new Error(payload.detail ?? payload.error ?? "Le traitement du fichier a echoue.");
@@ -120,9 +128,16 @@ export function DashboardView() {
       // de navigation dashboard meme si l'utilisateur revient ensuite sur /dashboard.
       setHasExistingAnalyses(true);
       setLocalAnalysisHint(true);
-      router.push("/analysis");
+      const preferences = loadAppPreferences();
+      if (preferences.autoOpenAnalysisAfterUpload) {
+        router.push("/analysis");
+        return;
+      }
+      setErrorMessage(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Erreur inattendue pendant le traitement du fichier.");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Erreur inattendue pendant le traitement du fichier."
+      );
     } finally {
       setUploading(false);
     }
@@ -135,58 +150,103 @@ export function DashboardView() {
 
   if (loadingAuth) {
     return (
-      <section className="quantis-panel p-8 text-center">
-        <p className="text-sm text-quantis-slate">Chargement de la session...</p>
+      <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/70">Chargement de la session...</p>
       </section>
     );
   }
 
   return (
-    <section className="space-y-6">
-      <header className="quantis-panel flex flex-wrap items-center justify-between gap-3 p-5">
-        <div>
-          <QuantisLogo />
-          <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Espace de depot</h1>
-          <p className="mt-1 text-sm text-quantis-slate">
-            Connecte en tant que {user?.displayName ?? user?.email}
-          </p>
-          <p className="mt-1 text-xs text-quantis-slate">
-            Le dashboard financier s&apos;affiche apres traitement dans la page d&apos;analyse.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {!loadingAnalyses && hasExistingAnalyses ? (
+    <section className="relative z-10 mx-auto w-full max-w-6xl space-y-6">
+      <header className="precision-card rounded-2xl p-5 md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <QuantisLogo withText={false} size={30} />
+            <h1 className="mt-2 text-2xl font-semibold text-white md:text-3xl">
+              {"Espace de d\u00E9p\u00F4t "}
+              <span className="text-quantis-gold">Quantis</span>
+            </h1>
+            <p className="mt-1 text-sm text-white/65">
+              {"Connect\u00E9 en tant que "}
+              {user?.displayName ?? user?.email}
+            </p>
+            <p className="mt-1 text-xs text-white/45">
+              {"D\u00E9posez vos fichiers puis ouvrez votre analyse financi\u00E8re automatiquement."}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/70">
+                Upload
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/70">
+                Parsing
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/70">
+                KPI
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/70">
+                Firestore
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {!loadingAnalyses && hasExistingAnalyses ? (
+              <button
+                type="button"
+                onClick={() => router.push("/analysis")}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-quantis-gold/35 bg-quantis-gold/15 px-4 py-2 text-sm font-medium text-quantis-gold transition-colors hover:bg-quantis-gold/25"
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                {"Acc\u00E9der aux dashboards"}
+              </button>
+            ) : null}
             <button
               type="button"
-              onClick={() => router.push("/analysis")}
-              className="rounded-xl border border-quantis-mist bg-white px-4 py-2 text-sm font-medium text-quantis-carbon hover:bg-quantis-paper"
+              onClick={() => router.push("/test-kpi")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/85 transition-colors hover:bg-white/10"
             >
-              Acceder aux dashboards
+              <FlaskConical className="h-4 w-4" />
+              Page de test KPI
             </button>
+            <button
+              type="button"
+              onClick={() => router.push("/account")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/85 transition-colors hover:bg-white/10"
+            >
+              <User className="h-4 w-4" />
+              Mon compte
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-200 transition-colors hover:bg-rose-500/20"
+            >
+              <LogOut className="h-4 w-4" />
+              {"Se d\u00E9connecter"}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/60">
+          <div className="flex items-center gap-1.5">
+            <FolderOpen className="h-3.5 w-3.5 text-quantis-gold" />
+            <span>
+              {"Le dashboard financier s\u2019affiche apr\u00E8s traitement dans la page d\u2019analyse."}
+            </span>
+          </div>
+          {loadingAnalyses ? (
+            <p className="mt-1 text-white/45">{"V\u00E9rification des analyses existantes..."}</p>
           ) : null}
-          <button
-            type="button"
-            onClick={() => router.push("/test-kpi")}
-            className="rounded-xl border border-quantis-mist bg-white px-4 py-2 text-sm font-medium text-quantis-carbon hover:bg-quantis-paper"
-          >
-            Page de test KPI
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/account")}
-            className="rounded-xl border border-quantis-mist bg-white px-4 py-2 text-sm font-medium text-quantis-carbon hover:bg-quantis-paper"
-          >
-            Mon compte
-          </button>
-          <button type="button" onClick={handleLogout} className="quantis-primary px-4 py-2 text-sm font-medium">
-            Se deconnecter
-          </button>
         </div>
       </header>
 
       <UploadLanding loading={uploading} onUpload={handleUpload} />
 
-      {errorMessage ? <div className="quantis-panel border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div> : null}
+      {errorMessage ? (
+        <div className="precision-card rounded-xl border-rose-400/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          {errorMessage}
+        </div>
+      ) : null}
     </section>
   );
 }

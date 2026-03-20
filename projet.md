@@ -18,9 +18,13 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - login email/password
   - recuperation de mot de passe complete:
     - lien "Mot de passe oublie ?" depuis la page login
-    - page `/forgot-password` (envoi lien de reset via Firebase)
+    - page `/forgot-password` (envoi lien de reset via Resend + lien Firebase Admin)
     - page `/reset-password` (validation lien + nouveau mot de passe)
     - messages generiques pour ne jamais exposer si un email existe
+  - emails transactionnels custom en DA Quantis:
+    - confirmation de compte
+    - reinitialisation mot de passe
+    - envoi via Resend avec endpoints serveur dedies
   - inscription complete:
     - nom
     - prenom
@@ -39,10 +43,20 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - profil entreprise stocke dans `users/{uid}`
 - Gestion de compte utilisateur:
   - page `/account` creee
+  - DA premium alignee sur `/analysis` (theme sombre, cartes precision, overlays)
   - affichage des informations utilisateur/entreprise
   - mise a jour du profil Firestore
-  - suppression des donnees (users + analyses)
+  - suppression des donnees statistiques uniquement (analyses + dossiers), profil conserve
   - suppression complete du compte Firebase Auth + Firestore avec double confirmation
+- Parametres `/settings` refondus:
+   - suppression du toggle mode jour/nuit
+   - DA premium identique a `/analysis`
+   - preferences essentielles ajoutees:
+     - exercice fiscal par defaut
+     - format d'export prefere
+     - affichage section debug
+     - ouverture auto de l'analyse apres upload
+     - confirmation des actions destructives
 - Pipeline metier MVP:
   - upload de fichiers (Excel/PDF)
   - parsing serveur (`services/parsers/*`)
@@ -52,12 +66,28 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - stockage Firestore via SDK client authentifie (`services/analysisStore.ts`)
   - redirection post-upload vers `/analysis`
   - page `/dashboard` simplifiee en espace de depot (upload only)
+  - refonte UI de `/dashboard` pour alignement complet avec la DA premium (`/analysis`):
+    - fond premium dark + overlays (noise/spotlight)
+    - cartes `precision-card` et contrastes renforces
+    - zone d'upload modernisee (drag-and-drop, liste fichiers, CTA gold)
+    - actions principales harmonisees (dashboard, test KPI, compte, deconnexion)
   - URL simplifiee pour le dashboard: `/analysis` (sans identifiant visible)
   - support des dossiers d'analyses:
     - creation d'un dossier au premier depot
     - association des analyses a `folderName`
     - affichage des fichiers sources par dossier dans la sidebar
     - ajout de nouveaux fichiers directement depuis la page dashboard
+    - gestion dossier complete dans la sidebar `/analysis`:
+      - creation rapide via bouton `+`
+      - renommage de dossier (deplacement des analyses associees)
+      - suppression de dossier (suppression des analyses associees)
+      - actions dossier via modale integree (plus de popup navigateur `prompt/confirm`)
+      - persistance Firestore des dossiers dans la collection `folders`
+  - gestion des fichiers sources dans la sidebar `/analysis`:
+    - libelle traduit en `Fichiers sources`
+    - affichage global de tous les fichiers importes dans l'app (tous dossiers)
+    - suppression d'un fichier source depuis la sidebar
+    - suppression synchronisee de l'analyse associee avec rafraichissement immediat des donnees
   - nouveau dashboard decisionnel sur `/analysis/[id]`:
     - header personnalise `Hello {firstname}`
     - top cards KPI (cash, sante, alertes, runway)
@@ -89,6 +119,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
     - visualisation des formules appliquees a `mappedData`
     - comparaison KPI stockes vs KPI recalcules
     - affichage debug complet: `rawData`, `mappedData`, `parsedData`, `kpis`
+    - refonte DA premium alignee sur `/analysis` (cartes dark, tables et panels JSON harmonises)
 - Historisation:
   - timestamp de creation
   - exercice fiscal (`fiscalYear`) exploitable pour filtrage
@@ -122,23 +153,29 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 
 ## Decisions techniques importantes
 
-- Suppression de la dependance runtime a Firebase Admin pour le MVP local:
+- Adoption de Firebase Admin cote serveur uniquement pour les emails transactionnels:
+  - generation securisee des liens de verification/reset
+  - envoi via Resend avec templates HTML custom
   - parsing + KPI restent en backend Next.js
-  - persistance Firestore est realisee depuis le client authentifie
-  - evite le blocage "FIREBASE_PROJECT_ID / CLIENT_EMAIL / PRIVATE_KEY" en local
+  - persistance Firestore reste realisee depuis le client authentifie
 - Logiques auth separees et testables:
   - `lib/auth/login.ts`
   - `lib/auth/register.ts`
   - `lib/auth/passwordReset.ts`
-- Verification email envoyee automatiquement a l'inscription via Firebase Auth.
-- Template email design Quantis disponible pour futur envoi transactionnel:
+- Verification email envoyee automatiquement a l'inscription via endpoint Resend (fallback Firebase natif actif).
+- Templates emails transactionnels actifs:
   - `lib/email/templates/verificationEmailTemplate.ts`
-  - version revue avec rappel spam et CTA d'activation
+  - `lib/email/templates/passwordResetEmailTemplate.ts`
+  - routes: `app/api/auth/send-verification-email/route.ts` et `app/api/auth/send-password-reset-email/route.ts`
 - Moteur KPI pur et sans dependance UI pour testabilite.
 - Couche `view-model` pure pour transformer `kpis` en UI dashboard sans recalcul frontend.
 - Parametres utilisateur ajoutes:
   - page `settings` avec mode jour/nuit persistant (localStorage)
   - page `pricing` visuelle (3 offres) pour preparer l'evolution payante
+  - refonte UI de `/pricing` alignee sur la DA premium (`/analysis`):
+    - shell dark avec overlays premium
+    - cartes d'offres `precision-card` avec contraste renforce
+    - mise en avant du plan recommande (accent gold)
 - Nouveau modele de donnees d'analyse stocke:
   - `rawData`
   - `mappedData`
@@ -158,3 +195,4 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - `Context et inspirations/context.md`
   - `Context et inspirations/design.md`
 - Dataset de reference: `datasets/acme_corporation/`.
+

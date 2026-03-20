@@ -1,6 +1,8 @@
+// File: components/account/AccountView.tsx
+// Role: page de gestion compte (profil, suppression data stats, suppression compte) avec DA premium coherente.
 "use client";
 
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { AlertTriangle, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
@@ -12,6 +14,7 @@ import { COMPANY_SIZE_OPTIONS, SECTOR_OPTIONS } from "@/lib/onboarding/options";
 import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
 import {
   loadAccountProfile,
+  purgeAnalysisData,
   purgeAccountData,
   saveAccountProfile
 } from "@/services/accountService";
@@ -91,6 +94,21 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
     })();
   }, [user]);
 
+  useEffect(() => {
+    // La page compte adopte la meme DA premium que /analysis (theme dark force localement).
+    const root = document.documentElement;
+    const previousTheme = root.getAttribute("data-theme");
+    root.setAttribute("data-theme", "dark");
+
+    return () => {
+      if (previousTheme) {
+        root.setAttribute("data-theme", previousTheme);
+        return;
+      }
+      root.removeAttribute("data-theme");
+    };
+  }, []);
+
   async function onSaveProfile() {
     if (!user) {
       return;
@@ -140,7 +158,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
     const result = await deleteAccountData(
       {
-        deleteUserData: purgeAccountData
+        deleteUserData: purgeAnalysisData
       },
       user.uid
     );
@@ -152,12 +170,6 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
     setDeleteMode(null);
     setDeleteConfirmation("");
-    setFirstName("");
-    setLastName("");
-    setCompanyName("");
-    setSiren("");
-    setCompanySize("");
-    setSector("");
     // Les dossiers visibles dans l'UI derivent des analyses + du dossier actif local.
     // On purge aussi le dossier actif local pour repartir sur une session propre.
     clearActiveFolderName();
@@ -166,7 +178,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
     clearLocalAnalysisHint();
     setToast({
       type: "success",
-      message: `Donnees supprimees: profil + dossiers + ${result.deletedAnalysesCount ?? 0} analyses.`
+      message: `Donnees statistiques supprimees: ${result.deletedAnalysesCount ?? 0} analyses. Votre profil est conserve.`
     });
 
     // Apres purge des donnees, on renvoie l'utilisateur vers l'espace de depot
@@ -198,6 +210,17 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
     router.replace("/");
   }
 
+  function onDeleteDialogSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (deleteMode === "data") {
+      void onDeleteData();
+      return;
+    }
+    if (deleteMode === "account") {
+      void onDeleteAccount();
+    }
+  }
+
   async function handleLogout() {
     await firebaseAuthGateway.signOut();
     router.replace("/");
@@ -208,43 +231,45 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
   if (loading) {
     return (
-      <section className="quantis-panel p-8 text-center">
-        <p className="text-sm text-quantis-slate">Chargement du compte...</p>
+      <section className="precision-card rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/70">Chargement du compte...</p>
       </section>
     );
   }
 
   return (
-    <section className="space-y-6">
+    <section className="premium-analysis-root relative space-y-6 overflow-hidden rounded-2xl p-4 md:p-8">
+      <div className="noise-overlay" aria-hidden="true" />
+      <div className="spotlight" aria-hidden="true" />
       {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
 
-      <header className="quantis-panel p-5">
+      <header className="precision-card relative z-10 rounded-2xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <QuantisLogo withText={false} size={24} />
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => router.push(fromAnalysis ? "/analysis" : "/dashboard")}
-              className="rounded-xl border border-quantis-mist bg-white px-3 py-1.5 text-xs font-medium text-quantis-carbon hover:bg-quantis-paper"
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-white/10"
             >
-              {fromAnalysis ? "Retour au dashboard" : "Retour a l&apos;espace de depot"}
+              {fromAnalysis ? "Retour au dashboard" : "Retour à l’espace de dépôt"}
             </button>
             <button
               type="button"
               onClick={handleLogout}
-              className="quantis-primary px-3 py-1.5 text-xs font-medium"
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-white/10"
             >
               Se deconnecter
             </button>
           </div>
         </div>
-        <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Profil utilisateur</h1>
-        <p className="mt-2 text-sm text-quantis-slate">
+        <h1 className="mt-1 text-2xl font-semibold text-white">Profil utilisateur</h1>
+        <p className="mt-2 text-sm text-white/60">
           Mettre a jour vos informations entreprise et personnelles.
         </p>
       </header>
 
-      <section className="quantis-panel p-5">
+      <section className="precision-card relative z-10 rounded-2xl p-5">
         <div className="grid gap-4 md:grid-cols-2">
           <Field
             label="Email"
@@ -293,30 +318,30 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
             type="button"
             disabled={submitting}
             onClick={onSaveProfile}
-            className="quantis-primary px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl border border-white/10 bg-quantis-gold/90 px-4 py-2 text-sm font-medium text-black hover:bg-quantis-gold disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? "Enregistrement..." : "Mettre a jour le profil"}
           </button>
         </div>
       </section>
 
-      <section className="quantis-panel p-5">
-        <h2 className="text-lg font-semibold text-quantis-carbon">Zone sensible</h2>
-        <p className="mt-1 text-sm text-quantis-slate">
-          Vous pouvez supprimer uniquement vos donnees ou supprimer totalement le compte.
+      <section className="precision-card relative z-10 rounded-2xl p-5">
+        <h2 className="text-lg font-semibold text-white">Zone sensible</h2>
+        <p className="mt-1 text-sm text-white/60">
+          Vous pouvez supprimer uniquement vos statistiques d&apos;analyse ou supprimer totalement le compte.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-3">
           <button
             type="button"
-            className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100"
+            className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-500/20"
             onClick={() => setDeleteMode("data")}
           >
-            Supprimer mes donnees
+            Supprimer mes statistiques
           </button>
           <button
             type="button"
-            className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
+            className="rounded-xl border border-rose-500/40 bg-black/20 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-500/20"
             onClick={() => setDeleteMode("account")}
           >
             Supprimer mon compte
@@ -325,25 +350,34 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
       </section>
 
       {deleteMode ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4">
-          <div className="quantis-panel w-full max-w-lg p-5">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
+          <form
+            className="precision-card w-full max-w-lg rounded-2xl p-5"
+            onSubmit={onDeleteDialogSubmit}
+          >
             <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 text-rose-600" />
+              <AlertTriangle className="mt-0.5 h-5 w-5 text-rose-300" />
               <div>
-                <h3 className="text-lg font-semibold text-quantis-carbon">
-                  {deleteMode === "data" ? "Supprimer les donnees" : "Supprimer le compte"}
+                <h3 className="text-lg font-semibold text-white">
+                  {deleteMode === "data" ? "Supprimer les statistiques" : "Supprimer le compte"}
                 </h3>
                 {deleteMode === "data" ? (
-                  <div className="mt-1 text-sm text-quantis-slate">
+                  <div className="mt-1 text-sm text-white/70">
                     <p>Cette action supprime definitivement:</p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
-                      <li>Votre profil entreprise (nom, SIREN, taille, secteur)</li>
                       <li>Vos dossiers d&apos;analyse</li>
                       <li>Toutes vos analyses (rawData, mappedData, kpis, historique)</li>
+                      <li>Les resultats et tableaux issus de vos fichiers Excel/PDF</li>
                     </ul>
+                    <p className="mt-2 font-medium text-white/85">
+                      Votre profil (nom, prenom, entreprise, SIREN, taille, secteur) sera conserve.
+                    </p>
+                    <p className="mt-1 text-white/65">
+                      Risque: cette suppression est irreversible, vos KPI et historiques ne pourront pas etre recuperes.
+                    </p>
                   </div>
                 ) : (
-                  <div className="mt-1 text-sm text-quantis-slate">
+                  <div className="mt-1 text-sm text-white/70">
                     <p>Cette action supprime definitivement:</p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                       <li>Votre profil entreprise (nom, SIREN, taille, secteur)</li>
@@ -358,13 +392,13 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
             {deleteMode === "account" ? (
               <div className="mt-4">
-                <p className="text-sm text-quantis-slate">
+                <p className="text-sm text-white/70">
                   Tapez <strong>{accountDeletionPhrase}</strong> pour confirmer.
                 </p>
                 <input
                   value={deleteConfirmation}
                   onChange={(event) => setDeleteConfirmation(event.target.value)}
-                  className="quantis-input mt-2 w-full px-3 py-2 text-sm outline-none"
+                  className="mt-2 w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none"
                 />
               </div>
             ) : null}
@@ -376,24 +410,23 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
                   setDeleteMode(null);
                   setDeleteConfirmation("");
                 }}
-                className="rounded-xl border border-quantis-mist bg-white px-3 py-2 text-sm text-quantis-carbon"
+                className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10"
               >
                 Annuler
               </button>
 
               {deleteMode === "data" ? (
                 <button
-                  type="button"
-                  onClick={onDeleteData}
+                  type="submit"
                   className="inline-flex items-center gap-1 rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700"
+                  autoFocus
                 >
                   <Trash2 className="h-4 w-4" />
-                  Confirmer suppression donnees
+                  Confirmer suppression statistiques
                 </button>
               ) : (
                 <button
-                  type="button"
-                  onClick={onDeleteAccount}
+                  type="submit"
                   disabled={!accountDeletionReady}
                   className="inline-flex items-center gap-1 rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -402,7 +435,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
                 </button>
               )}
             </div>
-          </div>
+          </form>
         </div>
       ) : null}
     </section>
@@ -426,17 +459,17 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium text-white/85">{label}</span>
       <div className="quantis-input px-3 py-2">
         <input
           value={value}
           onChange={(event) => onChange(event.target.value)}
           disabled={disabled}
-          className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none disabled:text-quantis-slate"
+          className="w-full border-0 bg-transparent text-sm text-white outline-none disabled:text-white/45"
         />
       </div>
-      {hint ? <p className="mt-1 text-xs text-quantis-slate">{hint}</p> : null}
-      {error ? <span className="mt-1 block text-sm text-rose-700">{error}</span> : null}
+      {hint ? <p className="mt-1 text-xs text-white/50">{hint}</p> : null}
+      {error ? <span className="mt-1 block text-sm text-rose-300">{error}</span> : null}
     </label>
   );
 }
@@ -456,12 +489,12 @@ function SelectField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium text-white/85">{label}</span>
       <div className="quantis-input px-3 py-2">
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+          className="w-full border-0 bg-transparent text-sm text-white outline-none"
         >
           <option value="">Choisir</option>
           {options.map((option) => (
@@ -471,7 +504,7 @@ function SelectField({
           ))}
         </select>
       </div>
-      {error ? <span className="mt-1 block text-sm text-rose-700">{error}</span> : null}
+      {error ? <span className="mt-1 block text-sm text-rose-300">{error}</span> : null}
     </label>
   );
 }

@@ -1,3 +1,5 @@
+// File: app/account/page.tsx
+// Role: route serveur App Router qui charge la vue compte avec contexte de provenance (analysis/dashboard).
 import { AccountView } from "@/components/account/AccountView";
 
 type AccountPageProps = {
@@ -9,7 +11,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   const fromAnalysis = params.from === "analysis";
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-8">
+    <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-8">
       <AccountView fromAnalysis={fromAnalysis} />
     </main>
   );

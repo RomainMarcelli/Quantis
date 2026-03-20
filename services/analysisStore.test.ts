@@ -34,6 +34,7 @@ vi.mock("firebase/firestore", () => ({
 
 import * as firestore from "firebase/firestore";
 import {
+  deleteUserAnalysisById,
   deleteUserAnalyses,
   getUserAnalysisById,
   listUserAnalyses,
@@ -201,6 +202,24 @@ describe("analysisStore", () => {
     expect(result).toBe(3);
     expect(firestore.deleteDoc).toHaveBeenCalledTimes(3);
     expect(firestore.where).toHaveBeenCalledWith("userId", "==", "uid-1");
+  });
+
+  it("deletes one analysis by id when it belongs to the user", async () => {
+    const TimestampCtor = firestore.Timestamp as unknown as new (value: Date) => { toDate: () => Date };
+    vi.mocked(firestore.getDoc).mockResolvedValue({
+      exists: () => true,
+      id: "analysis-1",
+      data: () => ({
+        userId: "uid-1",
+        createdAt: new TimestampCtor(new Date("2026-03-12T10:00:00.000Z"))
+      })
+    } as never);
+
+    const result = await deleteUserAnalysisById("uid-1", "analysis-1");
+
+    expect(result).toBe(true);
+    expect(firestore.deleteDoc).toHaveBeenCalledTimes(1);
+    expect(firestore.doc).toHaveBeenCalledWith(expect.anything(), "analyses", "analysis-1");
   });
 
   it("returns an analysis by id when it belongs to the user", async () => {

@@ -35,7 +35,16 @@ Variables requises:
 - `NEXT_PUBLIC_FIREBASE_APP_ID`
 - `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` (optionnelle)
 
-Note: aucune variable `FIREBASE_ADMIN_*` n'est necessaire avec l'implementation actuelle.
+Variables serveur requises pour les emails transactionnels:
+
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL` (recommande: domaine verifie)
+- `APP_BASE_URL` (optionnelle, sinon origin de la requete)
+
+Pour l'envoi d'emails transactionnels custom, des variables serveur Firebase Admin + Resend sont necessaires (voir `.env.example`).
 
 ## Lancer le projet
 
@@ -64,7 +73,7 @@ Puis ouvrir `http://localhost:3000`.
   - toasts succes/erreur
   - messages inline de validation
   - tooltips sur champs sensibles
-- Verification email obligatoire apres inscription (envoi automatique Firebase)
+- Verification email obligatoire apres inscription (email transactionnel Resend + lien Firebase Admin)
 - Messages d'erreurs explicites:
   - format email invalide
   - mot de passe trop faible / non conforme
@@ -88,10 +97,14 @@ Puis ouvrir `http://localhost:3000`.
 
 ## Email de confirmation
 
-- L'envoi est gere par Firebase Auth (`sendEmailVerification`).
-- Un template HTML DA Quantis est fourni pour integration future avec un provider mail transactionnel:
+- Envoi gere via Resend (design DA Quantis) avec liens securises Firebase Admin.
+- Templates utilises:
   - `lib/email/templates/verificationEmailTemplate.ts`
-  - design premium + rappel explicite de verifier le dossier spam
+  - `lib/email/templates/passwordResetEmailTemplate.ts`
+- Endpoints serveur:
+  - `app/api/auth/send-verification-email/route.ts`
+  - `app/api/auth/send-password-reset-email/route.ts`
+- Fallback automatique Firebase natif conserve si le service transactionnel est indisponible.
 
 ## Pipeline data
 
@@ -159,3 +172,5 @@ Couvrent la logique metier (auth, parsing, KPI).
 ## Suivi projet
 
 Le fichier `projet.md` est la source de verite de pilotage (vision, etat d'avancement, decisions techniques, roadmap)
+
+

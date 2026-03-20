@@ -1,15 +1,15 @@
-// lib/email/templates/verificationEmailTemplate.ts
-// Genere le template transactionnel de verification de compte dans la DA Quantis.
-type VerificationEmailTemplateInput = {
+// lib/email/templates/passwordResetEmailTemplate.ts
+// Genere le template transactionnel de reinitialisation mot de passe dans la DA Quantis.
+type PasswordResetEmailTemplateInput = {
   firstName?: string;
-  verificationUrl: string;
+  resetUrl: string;
 };
 
-export function buildVerificationEmailTemplate({
+export function buildPasswordResetEmailTemplate({
   firstName,
-  verificationUrl
-}: VerificationEmailTemplateInput): { subject: string; html: string; text: string } {
-  const subject = "Confirmez votre compte Quantis";
+  resetUrl
+}: PasswordResetEmailTemplateInput): { subject: string; html: string; text: string } {
+  const subject = "Reinitialisez votre mot de passe Quantis";
   const safeFirstName = firstName?.trim() || "Bonjour";
 
   const html = `
@@ -30,18 +30,23 @@ export function buildVerificationEmailTemplate({
               </tr>
               <tr>
                 <td style="padding:0 32px 0 32px;font-size:30px;line-height:1.2;font-weight:700;color:#ffffff;">
-                  Activez votre <span style="color:#C5A059;">compte securise</span>
+                  Reinitialisez votre <span style="color:#C5A059;">mot de passe</span>
                 </td>
               </tr>
               <tr>
                 <td style="padding:14px 32px 0 32px;font-size:15px;line-height:1.65;color:#d4d4d8;">
-                  ${safeFirstName}, votre espace Quantis est presque pret. Confirmez votre adresse email pour finaliser l'activation.
+                  ${safeFirstName}, une demande de reinitialisation a ete effectuee pour votre compte Quantis.
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:18px 32px 0 32px;font-size:14px;line-height:1.6;color:#a1a1aa;">
+                  Si c'etait bien vous, cliquez sur le bouton ci-dessous pour definir un nouveau mot de passe.
                 </td>
               </tr>
               <tr>
                 <td style="padding:24px 32px 0 32px;">
-                  <a href="${verificationUrl}" style="display:inline-block;background:#C5A059;color:#09090b;text-decoration:none;border-radius:12px;padding:13px 20px;font-weight:700;font-size:14px;">
-                    Confirmer mon email
+                  <a href="${resetUrl}" style="display:inline-block;background:#C5A059;color:#09090b;text-decoration:none;border-radius:12px;padding:13px 20px;font-weight:700;font-size:14px;">
+                    Reinitialiser mon mot de passe
                   </a>
                 </td>
               </tr>
@@ -50,7 +55,7 @@ export function buildVerificationEmailTemplate({
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #27272a;border-radius:12px;background:#0b0c10;">
                     <tr>
                       <td style="padding:12px 14px;font-size:13px;line-height:1.6;color:#a1a1aa;">
-                        Si vous ne voyez pas l'email dans votre boite principale, verifiez aussi votre dossier spam/courrier indesirable.
+                        Si vous n'etes pas a l'origine de cette demande, ignorez simplement cet email. Votre mot de passe restera inchange.
                       </td>
                     </tr>
                   </table>
@@ -59,7 +64,7 @@ export function buildVerificationEmailTemplate({
               <tr>
                 <td style="padding:16px 32px 24px 32px;font-size:13px;line-height:1.65;color:#a1a1aa;">
                   Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur:<br />
-                  <a href="${verificationUrl}" style="color:#f4f4f5;word-break:break-all;">${verificationUrl}</a>
+                  <a href="${resetUrl}" style="color:#f4f4f5;word-break:break-all;">${resetUrl}</a>
                 </td>
               </tr>
               <tr>
@@ -75,7 +80,7 @@ export function buildVerificationEmailTemplate({
   </html>
   `;
 
-  const text = `${safeFirstName}, confirmez votre compte Quantis via ce lien: ${verificationUrl}\n\nSi vous ne trouvez pas l'email, verifiez aussi votre dossier spam.`;
+  const text = `${safeFirstName}, reinitialisez votre mot de passe Quantis via ce lien: ${resetUrl}\n\nSi vous n'etes pas a l'origine de cette demande, ignorez cet email.`;
 
   return {
     subject,

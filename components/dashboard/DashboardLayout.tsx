@@ -38,10 +38,10 @@ export function DashboardLayout({ companyName, greetingName, kpis, children }: D
   const aiMessage = useMemo(() => {
     const runwayLabel = formatMonths(kpis.runway);
     if (kpis.tresorerie !== null && kpis.tresorerie > 0) {
-      return `Cashflow exploitable (${runwayLabel}). Une projection RH reste soutenable.`;
+      return `Flux de trésorerie exploitable (${runwayLabel}). Une projection RH reste soutenable.`;
     }
 
-    return "Priorite liquidite detectee. Revue des decaissements recommandee avant engagement.";
+    return "Priorité liquidité détectée. Revue des décaissements recommandée avant engagement.";
   }, [kpis.runway, kpis.tresorerie]);
 
   return (
@@ -80,7 +80,7 @@ export function DashboardLayout({ companyName, greetingName, kpis, children }: D
             <div className="flex flex-col">
               <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white">Quantis</span>
               <span className="text-[10px] font-mono text-quantis-muted">
-                {companyName || "Financial Operating System"}
+                {companyName || "Système d’exploitation financier"}
               </span>
             </div>
           </div>
@@ -88,7 +88,7 @@ export function DashboardLayout({ companyName, greetingName, kpis, children }: D
             Cockpit financier
           </h1>
           <p className="text-sm text-quantis-muted">
-            Hello {greetingName}, voici la vue d&apos;ensemble de votre sante financiere.
+            Bonjour {greetingName}, voici la vue d&apos;ensemble de votre santé financière.
           </p>
         </div>
 
@@ -96,12 +96,12 @@ export function DashboardLayout({ companyName, greetingName, kpis, children }: D
           <div className="flex items-center gap-2">
             <Activity className="h-3 w-3 text-white/30" />
             <span className="text-[11px] font-mono uppercase text-white/40">
-              Vue d&apos;ensemble - Temps reel
+              Vue d&apos;ensemble - Temps réel
             </span>
           </div>
           <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">Live Sync</span>
+            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">Synchronisation active</span>
           </div>
         </div>
       </header>
@@ -126,7 +126,7 @@ export function DashboardLayout({ companyName, greetingName, kpis, children }: D
             value={kpis.tresorerie}
             format="currency"
             sideLabel={`Runway: ${formatMonths(kpis.runway)}`}
-            trendLabel="LIQUIDITY"
+            trendLabel="LIQUIDITÉ"
             icon={<Wallet className="h-4 w-4 text-white/40 group-hover:text-quantis-gold" />}
           />
 
@@ -139,7 +139,7 @@ export function DashboardLayout({ companyName, greetingName, kpis, children }: D
 
           <AIInsight
             message={aiMessage}
-            ctaLabel="Ouvrir le simulateur strategic"
+            ctaLabel="Ouvrir le simulateur stratégique"
           />
         </div>
       </div>

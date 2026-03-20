@@ -1,3 +1,5 @@
+// File: services/analysisStore.ts
+// Role: gere la persistance Firestore des analyses (creation, lecture, suppression, gestion de dossiers).
 import {
   type QueryConstraint,
   Timestamp,
@@ -191,6 +193,92 @@ export async function deleteUserAnalyses(userId: string): Promise<number> {
 
   await Promise.all(snapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref)));
   return snapshot.docs.length;
+}
+
+// Supprime une analyse precise si elle appartient bien a l'utilisateur courant.
+export async function deleteUserAnalysisById(
+  userId: string,
+  analysisId: string
+): Promise<boolean> {
+  const analysis = await getUserAnalysisById(userId, analysisId);
+  if (!analysis) {
+    return false;
+  }
+
+  await deleteDoc(doc(firestoreDb, COLLECTION, analysisId));
+  return true;
+}
+
+// Deplace toutes les analyses d'un dossier vers un autre en recreant les documents.
+// Cette approche reste compatible avec les regles Firestore actuelles (update interdit).
+export async function renameUserFolder(
+  userId: string,
+  previousFolderName: string,
+  nextFolderName: string
+): Promise<AnalysisRecord[]> {
+  const trimmedNextFolderName = nextFolderName.trim();
+  if (!trimmedNextFolderName) {
+    return [];
+  }
+
+  const analyses = await listUserAnalyses(userId);
+  const analysesToMove = analyses.filter((analysis) =>
+    isSameFolderName(analysis.folderName, previousFolderName)
+  );
+
+  if (!analysesToMove.length) {
+    return [];
+  }
+
+  const collectionRef = collection(firestoreDb, COLLECTION);
+  const movedAnalyses: AnalysisRecord[] = [];
+
+  for (const analysis of analysesToMove) {
+    const createdAtDate = new Date(analysis.createdAt);
+    const payload = {
+      userId: analysis.userId,
+      folderName: trimmedNextFolderName,
+      createdAt: Number.isNaN(createdAtDate.getTime())
+        ? serverTimestamp()
+        : Timestamp.fromDate(createdAtDate),
+      fiscalYear: analysis.fiscalYear,
+      sourceFiles: analysis.sourceFiles,
+      parsedData: analysis.parsedData,
+      rawData: analysis.rawData,
+      mappedData: analysis.mappedData,
+      financialFacts: analysis.financialFacts,
+      kpis: analysis.kpis
+    };
+
+    const newDocRef = await addDoc(collectionRef, payload);
+    await deleteDoc(doc(firestoreDb, COLLECTION, analysis.id));
+
+    movedAnalyses.push({
+      ...analysis,
+      id: newDocRef.id,
+      folderName: trimmedNextFolderName
+    });
+  }
+
+  return movedAnalyses;
+}
+
+// Supprime toutes les analyses d'un dossier utilisateur.
+export async function deleteUserFolderAnalyses(userId: string, folderName: string): Promise<number> {
+  const analyses = await listUserAnalyses(userId);
+  const analysesToDelete = analyses.filter((analysis) =>
+    isSameFolderName(analysis.folderName, folderName)
+  );
+
+  await Promise.all(
+    analysesToDelete.map((analysis) => deleteDoc(doc(firestoreDb, COLLECTION, analysis.id)))
+  );
+
+  return analysesToDelete.length;
+}
+
+function isSameFolderName(leftFolderName: string, rightFolderName: string): boolean {
+  return leftFolderName.trim().toLowerCase() === rightFolderName.trim().toLowerCase();
 }
 
 function toAnalysisRecord(id: string, data: Record<string, unknown>): AnalysisRecord {

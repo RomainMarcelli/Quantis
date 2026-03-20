@@ -1,3 +1,5 @@
+// services/auth.ts
+// Implante la passerelle d'authentification Firebase cote frontend.
 import {
   confirmPasswordReset as firebaseConfirmPasswordReset,
   createUserWithEmailAndPassword,
@@ -63,6 +65,7 @@ export const firebaseAuthGateway: AuthGateway = {
       });
     }
 
+    // Envoi natif Firebase de l'email de verification.
     await sendEmailVerification(userCredential.user);
 
     return toAuthenticatedUser(userCredential.user);
@@ -80,19 +83,21 @@ export const firebaseAuthGateway: AuthGateway = {
   },
 
   async sendPasswordReset(email) {
+    const trimmedEmail = email.trim();
+
     // On demande a Firebase de rediriger vers notre ecran applicatif apres
     // validation du lien, pour garder un parcours UX coherent.
     const continueUrl =
       typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined;
 
     if (continueUrl) {
-      await firebaseSendPasswordResetEmail(auth, email, {
+      await firebaseSendPasswordResetEmail(auth, trimmedEmail, {
         url: continueUrl
       });
       return;
     }
 
-    await firebaseSendPasswordResetEmail(auth, email);
+    await firebaseSendPasswordResetEmail(auth, trimmedEmail);
   },
 
   async verifyPasswordResetCode(oobCode) {
