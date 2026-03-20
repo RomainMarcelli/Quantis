@@ -277,3 +277,39 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - `Context et inspirations/design.md`
 - Dataset de reference: `datasets/acme_corporation/`.
 
+
+## Sécurité - Journal d'audit (mise à jour 2026-03-20)
+
+<!--
+Résumé sécurité ajouté pour tracer les évolutions techniques côté production.
+-->
+
+- Hardening v1.1 implémenté:
+  - journal d'audit sécurité Firestore (`security_audit_logs`)
+  - endpoint d'audit frontend -> backend (`/api/security/audit`)
+  - logs structurés avec IP + userId + horodatage serveur
+- Événements audités:
+  - connexion (succès/échec)
+  - réinitialisation mot de passe (demande/finalisation)
+  - suppression de données statistiques
+  - suppression complète de compte
+  - uploads (validation/succès/échec)
+  - erreurs de sécurité 401/403/429
+- Pages d'erreur applicatives ajoutées:
+  - `404` (`app/not-found.tsx`)
+  - `403` (`app/403/page.tsx`)
+  - `501` (`app/501/page.tsx`)
+
+## Sécurité - Purge mensuelle des logs (mise à jour 2026-03-21)
+
+<!--
+Purge automatique mensuelle des logs sécurité pour maîtriser la volumétrie Firestore.
+-->
+
+- Endpoint cron sécurisé ajouté: `GET /api/cron/security-audit-cleanup`
+- Authentification par `Authorization: Bearer <CRON_SECRET>`
+- Suppression mensuelle de tous les logs `security_audit_logs`
+- Planification Vercel ajoutée (`vercel.json`):
+  - `0 3 1 * *` (1er de chaque mois à 03:00 UTC)
+- Variable d’environnement documentée:
+  - `CRON_SECRET` dans `.env.example`

@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth/passwordReset";
 import { getPasswordRuleChecks } from "@/lib/auth/passwordPolicy";
 import { firebaseAuthGateway } from "@/services/auth";
+import { logClientSecurityEvent } from "@/services/securityAuditClient";
 
 type ToastState = { type: "success" | "error" | "info"; message: string } | null;
 
@@ -96,6 +97,14 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
         result.errors.confirmPassword ??
         result.errors.general ??
         "Operation impossible pour le moment.";
+      // Journalisation sécurité: échec de finalisation du reset mot de passe.
+      void logClientSecurityEvent({
+        eventType: "password_reset_completion_failed",
+        statusCode: 400,
+        userId: null,
+        message,
+        includeAuthToken: false
+      });
       setFormError(message);
       setToast({
         type: "error",
@@ -106,6 +115,14 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
     }
 
     setSuccessMessage(result.message);
+    // Journalisation sécurité: reset mot de passe finalisé.
+    void logClientSecurityEvent({
+      eventType: "password_reset_completed",
+      statusCode: 200,
+      userId: null,
+      message: "Réinitialisation mot de passe terminée.",
+      includeAuthToken: false
+    });
     setToast({
       type: "success",
       message: result.message

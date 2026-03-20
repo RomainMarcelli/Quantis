@@ -1,7 +1,8 @@
 // lib/server/firebaseAdmin.ts
-// Centralise l'initialisation Firebase Admin pour generer des liens d'action securises cote serveur.
+// Centralise l'initialisation Firebase Admin pour générer des liens d'action sécurisés côté serveur.
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
 type RequiredServerEnvName = "FIREBASE_PROJECT_ID" | "FIREBASE_CLIENT_EMAIL" | "FIREBASE_PRIVATE_KEY";
 
@@ -9,6 +10,11 @@ let cachedAdminApp: App | null = null;
 
 export function getFirebaseAdminAuth(): Auth {
   return getAuth(getFirebaseAdminApp());
+}
+
+export function getFirebaseAdminFirestore(): Firestore {
+  // Expose Firestore Admin pour les besoins serveur (audit, jobs, etc.).
+  return getFirestore(getFirebaseAdminApp());
 }
 
 function getFirebaseAdminApp(): App {

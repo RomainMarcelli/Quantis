@@ -14,6 +14,7 @@ import { registerWithEmailPassword } from "@/lib/auth/register";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { firebaseAuthGateway } from "@/services/auth";
+import { logClientSecurityEvent } from "@/services/securityAuditClient";
 import { markUserEmailAsVerified, saveUserProfile } from "@/services/userProfileStore";
 import type { LoginValidationErrors, RegisterValidationErrors } from "@/types/auth";
 
@@ -89,9 +90,18 @@ export function LoginForm() {
 
       if (!result.success) {
         setLoginErrors(result.errors);
-        setToast({
-          type: "error",
-          message: result.errors.general ?? "Connexion impossible. Verifiez vos informations."
+        // On évite le doublon visuel: l'erreur de connexion est déjà affichée inline dans le formulaire.
+        setToast(null);
+        // Journalisation sécurité: tentative de connexion échouée.
+        void logClientSecurityEvent({
+          eventType: "login_failed",
+          statusCode: 401,
+          userId: null,
+          message: result.errors.general ?? "Échec de connexion.",
+          metadata: {
+            hasEmailValue: Boolean(email.trim())
+          },
+          includeAuthToken: false
         });
         setIsSubmitting(false);
         return;
@@ -102,6 +112,13 @@ export function LoginForm() {
       } catch {
         // Le profil peut manquer pour les comptes historiques; on ne bloque pas la navigation.
       }
+      // Journalisation sécurité: connexion validée.
+      void logClientSecurityEvent({
+        eventType: "login_success",
+        statusCode: 200,
+        userId: result.user.uid,
+        message: "Connexion utilisateur réussie."
+      });
       router.push("/dashboard");
       return;
     }

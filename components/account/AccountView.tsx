@@ -1,5 +1,5 @@
-// File: components/account/AccountView.tsx
-// Role: page de gestion compte (profil, suppression data stats, suppression compte) avec DA premium coherente.
+﻿// File: components/account/AccountView.tsx
+// Role: page de gestion compte (profil, suppression data stats, suppression compte) avec DA premium cohérente.
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
@@ -19,6 +19,7 @@ import {
   saveAccountProfile
 } from "@/services/accountService";
 import { firebaseAuthGateway } from "@/services/auth";
+import { logClientSecurityEvent } from "@/services/securityAuditClient";
 import type { AuthenticatedUser } from "@/types/auth";
 import type { UserProfileUpdateInput } from "@/types/profile";
 
@@ -38,6 +39,9 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [toast, setToast] = useState<ToastState>(null);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+
+  // État UX: confirmation inline de sauvegarde pour rassurer l'utilisateur sans dépendre uniquement du toast.
+  const [profileSavedAt, setProfileSavedAt] = useState<string | null>(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -95,7 +99,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
   }, [user]);
 
   useEffect(() => {
-    // La page compte adopte la meme DA premium que /analysis (theme dark force localement).
+    // La page compte adopte la même DA premium que /analysis (thème dark forcé localement).
     const root = document.documentElement;
     const previousTheme = root.getAttribute("data-theme");
     root.setAttribute("data-theme", "dark");
@@ -116,6 +120,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
     setSubmitting(true);
     setErrors({});
+    setProfileSavedAt(null);
 
     const input: UserProfileUpdateInput = {
       firstName,
@@ -146,8 +151,9 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
     setToast({
       type: "success",
-      message: "Profil mis a jour avec succes."
+      message: "Profil mis à jour avec succès."
     });
+    setProfileSavedAt(new Date().toISOString());
     setSubmitting(false);
   }
 
@@ -164,25 +170,44 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
     );
 
     if (!result.success) {
+      // Journalisation sécurité: échec de purge des données statistiques.
+      void logClientSecurityEvent({
+        eventType: "analysis_data_delete_failed",
+        statusCode: 500,
+        userId: user.uid,
+        message: result.message
+      });
       setToast({ type: "error", message: result.message });
       return;
     }
 
     setDeleteMode(null);
     setDeleteConfirmation("");
-    // Les dossiers visibles dans l'UI derivent des analyses + du dossier actif local.
+
+    // Les dossiers visibles dans l'UI dérivent des analyses + du dossier actif local.
     // On purge aussi le dossier actif local pour repartir sur une session propre.
     clearActiveFolderName();
-    // Les analyses etant supprimees, on retire aussi l'indicateur local
-    // utilise pour afficher le bouton d'acces dashboard sur /dashboard.
+
+    // Les analyses étant supprimées, on retire aussi l'indicateur local utilisé sur /dashboard.
     clearLocalAnalysisHint();
+
     setToast({
       type: "success",
-      message: `Donnees statistiques supprimees: ${result.deletedAnalysesCount ?? 0} analyses. Votre profil est conserve.`
+      message: `Données statistiques supprimées: ${result.deletedAnalysesCount ?? 0} analyses. Votre profil est conservé.`
     });
 
-    // Apres purge des donnees, on renvoie l'utilisateur vers l'espace de depot
-    // pour repartir directement sur un nouveau flux d'import.
+    // Journalisation sécurité: purge des données statistiques réalisée.
+    void logClientSecurityEvent({
+      eventType: "analysis_data_deleted",
+      statusCode: 200,
+      userId: user.uid,
+      message: "Suppression des données statistiques confirmée.",
+      metadata: {
+        deletedAnalysesCount: result.deletedAnalysesCount ?? 0
+      }
+    });
+
+    // Après purge des données, on renvoie l'utilisateur vers l'espace de dépôt.
     router.replace("/dashboard");
   }
 
@@ -200,11 +225,29 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
     );
 
     if (!result.success) {
+      // Journalisation sécurité: échec de suppression complète de compte.
+      void logClientSecurityEvent({
+        eventType: "account_delete_failed",
+        statusCode: 500,
+        userId: user.uid,
+        message: result.message
+      });
       setToast({ type: "error", message: result.message });
       return;
     }
 
-    // Le compte est detruit: on nettoie aussi le dossier actif local.
+    // Journalisation sécurité: suppression complète de compte validée.
+    void logClientSecurityEvent({
+      eventType: "account_deleted",
+      statusCode: 200,
+      userId: user.uid,
+      message: "Suppression complète du compte validée.",
+      metadata: {
+        deletedAnalysesCount: result.deletedAnalysesCount ?? 0
+      }
+    });
+
+    // Le compte est détruit: on nettoie aussi les traces locales.
     clearActiveFolderName();
     clearLocalAnalysisHint();
     router.replace("/");
@@ -244,29 +287,39 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
       {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
 
       <header className="precision-card relative z-10 rounded-2xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <QuantisLogo withText={false} size={24} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Branding: logo agrandi et mieux encadré pour un rendu net dans le header compte. */}
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/20 bg-black/30 shadow-[0_8px_20px_rgba(0,0,0,0.35)]">
+              <QuantisLogo withText={false} size={40} imageClassName="h-9 w-9 object-contain" />
+            </div>
+            <div>
+              <p className="text-base font-semibold text-white">Quantis</p>
+              <p className="text-xs text-white/70">Espace compte</p>
+            </div>
+          </div>
+
+          {/* Hiérarchie d'actions: retour (primaire) puis déconnexion (secondaire risque). */}
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => router.push(fromAnalysis ? "/analysis" : "/dashboard")}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-white/10"
+              className="rounded-xl border border-quantis-gold/55 bg-quantis-gold/95 px-3.5 py-1.5 text-xs font-semibold text-black transition hover:bg-quantis-gold"
             >
               {fromAnalysis ? "Retour au dashboard" : "Retour à l’espace de dépôt"}
             </button>
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-white/10"
+              className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3.5 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-500/20"
             >
-              Se deconnecter
+              Se déconnecter
             </button>
           </div>
         </div>
+
         <h1 className="mt-1 text-2xl font-semibold text-white">Profil utilisateur</h1>
-        <p className="mt-2 text-sm text-white/60">
-          Mettre a jour vos informations entreprise et personnelles.
-        </p>
+        <p className="mt-2 text-sm text-white/75">Mettez à jour vos informations entreprise et personnelles.</p>
       </header>
 
       <section className="precision-card relative z-10 rounded-2xl p-5">
@@ -276,7 +329,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
             value={email}
             onChange={setEmail}
             disabled
-            hint="L'email est gere par Firebase Auth."
+            hint="L’email est géré par Firebase Auth."
           />
           <Field
             label="SIREN"
@@ -285,16 +338,16 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
             error={errors.siren}
           />
           <Field label="Nom" value={lastName} onChange={setLastName} error={errors.lastName} />
-          <Field label="Prenom" value={firstName} onChange={setFirstName} error={errors.firstName} />
+          <Field label="Prénom" value={firstName} onChange={setFirstName} error={errors.firstName} />
           <Field
-            label="Nom entreprise"
+            label="Nom de l’entreprise"
             value={companyName}
             onChange={setCompanyName}
             error={errors.companyName}
           />
 
           <SelectField
-            label="Taille entreprise"
+            label="Taille de l’entreprise"
             value={companySize}
             onChange={(value) => setCompanySize(value as CompanySizeValue | "")}
             options={COMPANY_SIZE_OPTIONS.map((item) => ({
@@ -320,14 +373,21 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
             onClick={onSaveProfile}
             className="rounded-xl border border-white/10 bg-quantis-gold/90 px-4 py-2 text-sm font-medium text-black hover:bg-quantis-gold disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? "Enregistrement..." : "Mettre a jour le profil"}
+            {submitting ? "Enregistrement..." : "Mettre à jour le profil"}
           </button>
+
+          {/* Confirmation inline persistante quelques secondes pour augmenter la confiance utilisateur. */}
+          {profileSavedAt ? (
+            <p className="mt-2 inline-flex items-center rounded-lg border border-emerald-400/35 bg-emerald-500/12 px-3 py-1.5 text-xs font-medium text-emerald-200">
+              Profil enregistré avec succès.
+            </p>
+          ) : null}
         </div>
       </section>
 
       <section className="precision-card relative z-10 rounded-2xl p-5">
         <h2 className="text-lg font-semibold text-white">Zone sensible</h2>
-        <p className="mt-1 text-sm text-white/60">
+        <p className="mt-1 text-sm text-white/70">
           Vous pouvez supprimer uniquement vos statistiques d&apos;analyse ou supprimer totalement le compte.
         </p>
 
@@ -351,10 +411,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
       {deleteMode ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4">
-          <form
-            className="precision-card w-full max-w-lg rounded-2xl p-5"
-            onSubmit={onDeleteDialogSubmit}
-          >
+          <form className="precision-card w-full max-w-lg rounded-2xl p-5" onSubmit={onDeleteDialogSubmit}>
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-5 w-5 text-rose-300" />
               <div>
@@ -363,22 +420,22 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
                 </h3>
                 {deleteMode === "data" ? (
                   <div className="mt-1 text-sm text-white/70">
-                    <p>Cette action supprime definitivement:</p>
+                    <p>Cette action supprime définitivement:</p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                       <li>Vos dossiers d&apos;analyse</li>
                       <li>Toutes vos analyses (rawData, mappedData, kpis, historique)</li>
-                      <li>Les resultats et tableaux issus de vos fichiers Excel/PDF</li>
+                      <li>Les résultats et tableaux issus de vos fichiers Excel/PDF</li>
                     </ul>
                     <p className="mt-2 font-medium text-white/85">
-                      Votre profil (nom, prenom, entreprise, SIREN, taille, secteur) sera conserve.
+                      Votre profil (nom, prénom, entreprise, SIREN, taille, secteur) sera conservé.
                     </p>
                     <p className="mt-1 text-white/65">
-                      Risque: cette suppression est irreversible, vos KPI et historiques ne pourront pas etre recuperes.
+                      Risque: cette suppression est irréversible, vos KPI et historiques ne pourront pas être récupérés.
                     </p>
                   </div>
                 ) : (
                   <div className="mt-1 text-sm text-white/70">
-                    <p>Cette action supprime definitivement:</p>
+                    <p>Cette action supprime définitivement:</p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                       <li>Votre profil entreprise (nom, SIREN, taille, secteur)</li>
                       <li>Vos dossiers d&apos;analyse</li>
@@ -422,7 +479,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
                   autoFocus
                 >
                   <Trash2 className="h-4 w-4" />
-                  Confirmer suppression statistiques
+                  Confirmer la suppression des statistiques
                 </button>
               ) : (
                 <button
@@ -468,7 +525,8 @@ function Field({
           className="w-full border-0 bg-transparent text-sm text-white outline-none disabled:text-white/45"
         />
       </div>
-      {hint ? <p className="mt-1 text-xs text-white/50">{hint}</p> : null}
+      {/* Contraste légèrement renforcé pour les textes d'aide secondaires. */}
+      {hint ? <p className="mt-1 text-xs text-white/65">{hint}</p> : null}
       {error ? <span className="mt-1 block text-sm text-rose-300">{error}</span> : null}
     </label>
   );
