@@ -723,7 +723,8 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
       {/* Bandeau d'actions globales conserve (settings/offres/compte/logout) avec skin premium dark. */}
       <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
         <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
+          {/* Taille légèrement augmentée pour éviter l'effet visuel "logo coupé" dans le header. */}
+          <QuantisLogo withText={false} size={34} />
           <div>
             <p className="text-sm font-semibold text-white">{companyName}</p>
             <p className="text-xs text-white/55">Plateforme financiere</p>
