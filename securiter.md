@@ -122,6 +122,21 @@ Ce document est la source de vérité sécurité.
 - **Action à faire**:
   - renseigner `CRON_SECRET` en local et sur Vercel (Environment Variables)
 
+### 2026-03-21 — Hardening v1.3 (ajustement CSP scripts externes légitimes)
+
+#### 1) Correction CSP en environnement Vercel/Google API
+
+- **Fichier modifié**: `middleware.ts`
+- **Changements**:
+  - ajout de `https://apis.google.com` et `https://www.gstatic.com` dans `script-src`
+  - ajout explicite de `script-src-elem`
+  - ajout conditionnel de `https://vercel.live` quand `VERCEL=1`
+  - `style-src` autorise `https://fonts.googleapis.com`
+  - `font-src` autorise `https://fonts.gstatic.com`
+- **Risque/objectif**:
+  - éviter le blocage des scripts nécessaires (Google API, Vercel feedback)
+  - garder une CSP explicite plutôt qu’un assouplissement global trop large
+
 ## Limites connues (MVP)
 
 - Le rate limit est **en mémoire locale**:

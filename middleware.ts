@@ -6,28 +6,40 @@ import { NextResponse } from "next/server";
 /**
  * CSP "v1 pragmatique":
  * - verrouille les sources par défaut sur self
- * - garde `unsafe-inline` pour éviter de casser l'hydratation/les styles Next dans le MVP
- * - ouvre uniquement les domaines nécessaires à Firebase
+ * - garde `unsafe-inline`/`unsafe-eval` pour compatibilité MVP
+ * - ouvre explicitement Firebase/Google API + Vercel feedback en preview/prod
  */
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data: https:",
-  "connect-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com wss://*.firebaseio.com",
-  "frame-src 'none'"
-].join("; ");
+function buildContentSecurityPolicy(): string {
+  const scriptSources = [
+    "'self'",
+    "'unsafe-inline'",
+    "'unsafe-eval'",
+    "https://apis.google.com",
+    "https://www.gstatic.com",
+    "https://vercel.live"
+  ];
+
+  return [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    `script-src ${scriptSources.join(" ")}`,
+    `script-src-elem ${scriptSources.join(" ")}`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https://fonts.gstatic.com https:",
+    "connect-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://vercel.live wss://*.firebaseio.com",
+    "frame-src 'none'"
+  ].join("; ");
+}
 
 export function middleware(_request: NextRequest) {
   // On réutilise la réponse Next standard, puis on enrichit les headers.
   const response = NextResponse.next();
 
-  response.headers.set("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+  response.headers.set("Content-Security-Policy", buildContentSecurityPolicy());
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
