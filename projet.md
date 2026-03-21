@@ -115,6 +115,14 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
     - interaction locale sans reload (state client)
     - switch dynamique du contenu principal selon l'onglet actif
     - selecteur de periode (annee) integre au menu pour filtrer la vue dashboard
+  - menu horizontal "de test" ajoute sous le menu principal:
+    - memes onglets metier que le menu principal
+    - rendu alternatif isole dans `components/dashboard/test/*`
+    - premiere section de test disponible: `Creation de valeur (test)` avec DA premium/animations
+    - section `Financement (test)` integree avec mapping des KPI bancaires (capacite, CAF, FTE, liquidites, levier)
+    - section `Investissement (test)` integree avec mapping BFR (BFR, variation, ratio immo, DSO/DIO/DPO, rotation)
+    - section `Rentabilite (test)` integree avec mapping ROE/ROCE/leverage + graphe comparatif
+    - bandeau `SYS.OVR / Controle des flux` refactorise en composant partage (`TestTopStatus`) avec positionnement en flux normal
     - comportement ajuste UX:
       - menu affiche au-dessus du bloc `Cockpit financier`
       - affichage initial conserve au chargement

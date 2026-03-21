@@ -26,6 +26,11 @@ import {
   DashboardFinancialTabsMenu,
   type DashboardTabId
 } from "@/components/dashboard/tabs/DashboardFinancialTabs";
+import {
+  DashboardFinancialTestMenu,
+  type DashboardTestTabId
+} from "@/components/dashboard/test/DashboardFinancialTestMenu";
+import { DashboardFinancialTestContent } from "@/components/dashboard/test/DashboardFinancialTestContent";
 import { clearLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import {
   DEFAULT_FOLDER_NAME,
@@ -89,6 +94,8 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
   // null => affichage du dashboard initial; tab renseigne => affichage de la section choisie.
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTabId | null>(null);
+  // Menu de test isole: active une vue alternative sans impacter la navigation principale.
+  const [activeDashboardTestTab, setActiveDashboardTestTab] = useState<DashboardTestTabId | null>(null);
   // Le select du menu pilote l'année d'analyse affichée dans le dashboard.
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<string>(SYNTHESIS_CURRENT_YEAR_KEY);
   const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
@@ -260,6 +267,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   useEffect(() => {
     // Lors d'un changement d'analyse, on revient sur le contenu initial du tableau de bord.
     setActiveDashboardTab(null);
+    setActiveDashboardTestTab(null);
   }, [analysis?.id]);
 
   const folderNames = useMemo(() => {
@@ -684,7 +692,15 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
 
   function handleFinancialTabChange(nextTab: DashboardTabId) {
     // Recliquer sur l'onglet actif re-affiche le contenu initial du tableau de bord.
+    // Le menu principal désactive automatiquement la variante "test".
+    setActiveDashboardTestTab(null);
     setActiveDashboardTab((currentTab) => (currentTab === nextTab ? null : nextTab));
+  }
+
+  function handleFinancialTestTabChange(nextTab: DashboardTestTabId) {
+    // Le menu de test est exclusif: il masque les sections standards tant qu'il est actif.
+    setActiveDashboardTab(null);
+    setActiveDashboardTestTab((currentTab) => (currentTab === nextTab ? null : nextTab));
   }
 
   function onInputFilesSelected(fileList: FileList | null) {
@@ -1004,7 +1020,16 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
                 selectedYear={selectedDashboardYear}
                 onYearChange={setSelectedDashboardYear}
               />
-              {activeDashboardTab !== null ? (
+              {/* Menu de test ajouté sous le menu existant pour expérimenter des variantes UI. */}
+              <div className="mt-3">
+                <DashboardFinancialTestMenu
+                  activeTab={activeDashboardTestTab}
+                  onChange={handleFinancialTestTabChange}
+                />
+              </div>
+              {activeDashboardTestTab !== null ? (
+                <DashboardFinancialTestContent activeTab={activeDashboardTestTab} kpis={analysis.kpis} />
+              ) : activeDashboardTab !== null ? (
                 // UX demandee: quand un onglet métier est actif, on masque le cockpit
                 // pour afficher uniquement la section financière sélectionnée.
                 <DashboardFinancialTabContent
