@@ -88,7 +88,7 @@ function mapFirebaseAuthErrorToMessage(code: string | undefined): string {
     case "auth/too-many-requests":
       return "Trop de tentatives. Reessayez dans quelques minutes.";
     case "auth/email-not-verified":
-      return "Email non verifie. Cliquez sur le lien recu par email avant de vous connecter.";
+      return "Email non verifie. Cliquez sur le lien reçu par email (Vérifier les spams) avant de vous connecter.";
     default:
       return "Connexion impossible pour le moment. Veuillez reessayer.";
   }

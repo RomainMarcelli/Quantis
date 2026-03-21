@@ -9,7 +9,7 @@ export async function GET(
   const { analysisId } = await context.params;
   return NextResponse.json(
     {
-      error: `Direct API read disabled for ${analysisId}. Use Firestore client SDK in frontend.`
+      error: `Lecture API directe desactivee pour ${analysisId}. Utilisez le SDK client Firestore dans le frontend.`
     },
     { status: 405 }
   );

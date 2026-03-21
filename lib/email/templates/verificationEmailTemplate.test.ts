@@ -1,3 +1,5 @@
+// lib/email/templates/verificationEmailTemplate.test.ts
+// Verifie le template de confirmation de compte envoye par email transactionnel.
 import { describe, expect, it } from "vitest";
 import { buildVerificationEmailTemplate } from "@/lib/email/templates/verificationEmailTemplate";
 
@@ -8,7 +10,7 @@ describe("buildVerificationEmailTemplate", () => {
       verificationUrl: "https://quantis.app/verify?token=abc"
     });
 
-    expect(result.subject).toBe("Activez votre compte Quantis");
+    expect(result.subject).toBe("Confirmez votre compte Quantis");
     expect(result.html).toContain("Marie");
     expect(result.html).toContain("https://quantis.app/verify?token=abc");
     expect(result.text).toContain("Marie");

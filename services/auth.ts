@@ -1,11 +1,16 @@
+// services/auth.ts
+// Implante la passerelle d'authentification Firebase cote frontend.
 import {
+  confirmPasswordReset as firebaseConfirmPasswordReset,
   createUserWithEmailAndPassword,
   deleteUser,
   onAuthStateChanged,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   sendEmailVerification,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
+  verifyPasswordResetCode as firebaseVerifyPasswordResetCode,
   type User
 } from "firebase/auth";
 import { firebaseAuth } from "@/lib/firebase";
@@ -20,6 +25,9 @@ export interface AuthGateway {
   register(credentials: RegisterCredentials): Promise<AuthenticatedUser>;
   signOut(): Promise<void>;
   deleteCurrentUser(): Promise<void>;
+  sendPasswordReset(email: string): Promise<void>;
+  verifyPasswordResetCode(oobCode: string): Promise<string>;
+  confirmPasswordReset(oobCode: string, newPassword: string): Promise<void>;
   getCurrentUser(): AuthenticatedUser | null;
   subscribe(listener: AuthStateListener): () => void;
 }
@@ -57,6 +65,7 @@ export const firebaseAuthGateway: AuthGateway = {
       });
     }
 
+    // Envoi natif Firebase de l'email de verification.
     await sendEmailVerification(userCredential.user);
 
     return toAuthenticatedUser(userCredential.user);
@@ -71,6 +80,32 @@ export const firebaseAuthGateway: AuthGateway = {
       return;
     }
     await deleteUser(auth.currentUser);
+  },
+
+  async sendPasswordReset(email) {
+    const trimmedEmail = email.trim();
+
+    // On demande a Firebase de rediriger vers notre ecran applicatif apres
+    // validation du lien, pour garder un parcours UX coherent.
+    const continueUrl =
+      typeof window !== "undefined" ? `${window.location.origin}/reset-password` : undefined;
+
+    if (continueUrl) {
+      await firebaseSendPasswordResetEmail(auth, trimmedEmail, {
+        url: continueUrl
+      });
+      return;
+    }
+
+    await firebaseSendPasswordResetEmail(auth, trimmedEmail);
+  },
+
+  async verifyPasswordResetCode(oobCode) {
+    return firebaseVerifyPasswordResetCode(auth, oobCode);
+  },
+
+  async confirmPasswordReset(oobCode, newPassword) {
+    await firebaseConfirmPasswordReset(auth, oobCode, newPassword);
   },
 
   getCurrentUser() {

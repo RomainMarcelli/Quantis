@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { AnalysisRecord } from "@/types/analysis";
 
 type AnalysisHistoryProps = {
@@ -39,6 +40,14 @@ export function AnalysisHistory({ analyses, selectedAnalysisId, onSelect }: Anal
                   {analysis.sourceFiles.map((file) => file.name).join(", ")}
                 </p>
               </button>
+              <div className="px-5 pb-3">
+                <Link
+                  href="/analysis"
+                  className="text-xs font-medium text-quantis-carbon underline underline-offset-2"
+                >
+                  Inspecter cette analyse
+                </Link>
+              </div>
             </li>
           ))}
         </ul>
@@ -46,4 +55,3 @@ export function AnalysisHistory({ analyses, selectedAnalysisId, onSelect }: Anal
     </section>
   );
 }
-
