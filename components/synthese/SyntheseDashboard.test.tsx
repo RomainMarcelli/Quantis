@@ -8,6 +8,13 @@ import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 const sampleSynthese: SyntheseViewModel = {
   score: 74,
   scoreLabel: "Santé globale solide",
+  scorePiliers: {
+    rentabilite: 78,
+    solvabilite: 69,
+    liquidite: 72,
+    efficacite: 75
+  },
+  alerteInvestissement: false,
   metrics: [
     {
       id: "ca",

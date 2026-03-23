@@ -15,7 +15,7 @@ Ce document est la source de vérité sécurité.
 
 #### 1) Headers HTTP de sécurité globaux
 
-- **Fichier ajouté**: `middleware.ts`
+- **Fichier ajouté**: `proxy.ts` (anciennement `middleware.ts`)
 - **Mesures appliquées**:
   - `Content-Security-Policy` (politique restrictive compatible MVP)
   - `Strict-Transport-Security` (production uniquement)
@@ -126,7 +126,7 @@ Ce document est la source de vérité sécurité.
 
 #### 1) Correction CSP en environnement Vercel/Google API
 
-- **Fichier modifié**: `middleware.ts`
+- **Fichier modifié**: `proxy.ts` (anciennement `middleware.ts`)
 - **Changements**:
   - ajout de `https://apis.google.com` et `https://www.gstatic.com` dans `script-src`
   - ajout explicite de `script-src-elem`

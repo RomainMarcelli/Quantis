@@ -1,4 +1,4 @@
-// middleware.ts
+// proxy.ts
 // Applique des en-têtes de sécurité HTTP globaux sur l'application (frontend + API).
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -35,7 +35,7 @@ function buildContentSecurityPolicy(): string {
   ].join("; ");
 }
 
-export function middleware(_request: NextRequest) {
+export function proxy(_request: NextRequest) {
   // On réutilise la réponse Next standard, puis on enrichit les headers.
   const response = NextResponse.next();
 
@@ -57,6 +57,6 @@ export function middleware(_request: NextRequest) {
 }
 
 export const config = {
-  // On exclut les assets statiques de build pour réduire le coût middleware.
+  // On exclut les assets statiques de build pour réduire le coût proxy.
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"]
 };

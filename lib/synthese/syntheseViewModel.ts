@@ -1,14 +1,15 @@
-// File: lib/synthese/syntheseViewModel.ts
-// Role: transforme les KPI d'analyse en donnees de synthese lisibles (score, tendances, actions, alertes).
+﻿// File: lib/synthese/syntheseViewModel.ts
+// Role: transforme les KPI d'analyse en données de synthèse lisibles (score, tendances, actions, alertes).
 import type { CalculatedKpis } from "@/types/analysis";
+import { calculateQuantisScore } from "@/lib/quantisScore";
 
 export type TrendDirection = "up" | "down" | "flat" | "na";
 
 export type TrendInfo = {
   direction: TrendDirection;
-  // Variation en pourcentage vs periode precedente (null si non calculable).
+  // Variation en pourcentage vs période précédente (null si non calculable).
   changePercent: number | null;
-  // Libelle humain directement affichable dans l'UI.
+  // Libellé humain directement affichable dans l'UI.
   label: string;
   tone: "positive" | "negative" | "neutral";
 };
@@ -30,6 +31,13 @@ export type SyntheseAlert = {
 export type SyntheseViewModel = {
   score: number | null;
   scoreLabel: string;
+  scorePiliers: {
+    rentabilite: number;
+    solvabilite: number;
+    liquidite: number;
+    efficacite: number;
+  } | null;
+  alerteInvestissement: boolean;
   metrics: SyntheseMetric[];
   actions: string[];
   alerts: SyntheseAlert[];
@@ -39,6 +47,9 @@ export function buildSyntheseViewModel(
   currentKpis: CalculatedKpis,
   previousKpis?: CalculatedKpis | null
 ): SyntheseViewModel {
+  // Le Quantis Score est recalculé dynamiquement à partir des KPI courants.
+  const quantisScore = calculateQuantisScore(currentKpis);
+
   const metrics: SyntheseMetric[] = [
     {
       id: "ca",
@@ -65,8 +76,8 @@ export function buildSyntheseViewModel(
 
   const alerts: SyntheseAlert[] = [];
 
-  // Les seuils restent simples en MVP pour fournir une lecture immediate et actionnable.
-  if (currentKpis.healthScore !== null && currentKpis.healthScore < 50) {
+  // Les seuils restent simples en MVP pour fournir une lecture immédiate et actionnable.
+  if (quantisScore.quantis_score < 50) {
     alerts.push({
       id: "health-critical",
       label: "Score global fragile : renforcer la structure financière court terme.",
@@ -98,6 +109,14 @@ export function buildSyntheseViewModel(
     });
   }
 
+  if (quantisScore.alerte_investissement) {
+    alerts.push({
+      id: "investment-wear",
+      label: "Alerte investissement : usure des immobilisations à surveiller.",
+      severity: "medium"
+    });
+  }
+
   if (!alerts.length) {
     alerts.push({
       id: "no-alert",
@@ -109,15 +128,17 @@ export function buildSyntheseViewModel(
   const actions = buildActions(metrics, alerts);
 
   return {
-    score: currentKpis.healthScore,
-    scoreLabel: resolveScoreLabel(currentKpis.healthScore),
+    score: quantisScore.quantis_score,
+    scoreLabel: resolveScoreLabel(quantisScore.quantis_score),
+    scorePiliers: quantisScore.piliers,
+    alerteInvestissement: quantisScore.alerte_investissement,
     metrics,
     actions,
     alerts
   };
 }
 
-// Fonction pure de tendance: compare valeur courante et precedente avec gestion des cas limites.
+// Fonction pure de tendance: compare valeur courante et précédente avec gestion des cas limites.
 export function buildTrend(current: number | null, previous: number | null): TrendInfo {
   if (current === null || previous === null) {
     return {
@@ -177,7 +198,7 @@ function resolveScoreLabel(score: number | null): string {
   if (score === null) {
     return "Santé globale indéterminée";
   }
-  if (score >= 70) {
+  if (score > 80) {
     return "Santé globale solide";
   }
   if (score >= 50) {

@@ -1,5 +1,5 @@
-// File: lib/synthese/syntheseViewModel.test.ts
-// Role: tests unitaires de la logique de synthese (tendances, alertes, actions) sans dependance UI.
+﻿// File: lib/synthese/syntheseViewModel.test.ts
+// Role: tests unitaires de la logique de synthèse (tendances, score Quantis, alertes, actions) sans dépendance UI.
 import { describe, expect, it } from "vitest";
 import type { CalculatedKpis } from "@/types/analysis";
 import { buildSyntheseViewModel, buildTrend } from "@/lib/synthese/syntheseViewModel";
@@ -49,21 +49,21 @@ function makeKpis(partial: Partial<CalculatedKpis>): CalculatedKpis {
 }
 
 describe("buildTrend", () => {
-  it("retourne une tendance haussiere", () => {
+  it("retourne une tendance haussière", () => {
     const trend = buildTrend(120, 100);
     expect(trend.direction).toBe("up");
     expect(trend.tone).toBe("positive");
     expect(trend.label).toContain("+");
   });
 
-  it("retourne une tendance baissiere", () => {
+  it("retourne une tendance baissière", () => {
     const trend = buildTrend(80, 100);
     expect(trend.direction).toBe("down");
     expect(trend.tone).toBe("negative");
     expect(trend.label).toContain("-");
   });
 
-  it("retourne N/D si la periode precedente est absente", () => {
+  it("retourne N/D si la période précédente est absente", () => {
     const trend = buildTrend(80, null);
     expect(trend.direction).toBe("na");
     expect(trend.label).toBe("N/D");
@@ -71,37 +71,71 @@ describe("buildTrend", () => {
 });
 
 describe("buildSyntheseViewModel", () => {
-  it("construit les 3 KPI principaux attendus", () => {
+  it("construit les 3 KPI principaux et expose les piliers du score", () => {
     const vm = buildSyntheseViewModel(
       makeKpis({
-        ca: 120000,
-        ebe: 24000,
-        disponibilites: 19000,
-        healthScore: 72
+        ca: 300000,
+        ebe: 70000,
+        disponibilites: 60000,
+        grossMarginRate: 52,
+        marge_ebitda: 24,
+        resultat_net: 40000,
+        roce: 0.18,
+        roe: 0.22,
+        rot_bfr: 60,
+        tcam: 12,
+        point_mort: 150000,
+        fte: 15000,
+        solvabilite: 0.4,
+        gearing: 0.8,
+        liq_gen: 1.6,
+        liq_red: 1.2,
+        liq_imm: 0.9,
+        tn: 45000,
+        ratio_immo: 0.55
       }),
       makeKpis({
-        ca: 100000,
-        ebe: 22000,
-        disponibilites: 20000
+        ca: 250000,
+        ebe: 63000,
+        disponibilites: 55000
       })
     );
 
     expect(vm.metrics).toHaveLength(3);
     expect(vm.metrics.map((metric) => metric.id)).toEqual(["ca", "ebe", "cash"]);
-    expect(vm.scoreLabel).toBe("Santé globale solide");
+    expect(vm.score).not.toBeNull();
+    expect(vm.scorePiliers).not.toBeNull();
+    expect(vm.alerteInvestissement).toBe(false);
   });
 
-  it("genere des alertes metier si score/cash/bfr sont critiques", () => {
+  it("génère les alertes critiques si les KPI sont dégradés", () => {
     const vm = buildSyntheseViewModel(
       makeKpis({
-        healthScore: 40,
+        ca: 120000,
         disponibilites: -1200,
         bfr: 180000,
-        ebe: -800
+        ebe: -800,
+        grossMarginRate: 5,
+        marge_ebitda: -2,
+        resultat_net: -6000,
+        roce: -0.08,
+        roe: -0.11,
+        rot_bfr: 250,
+        tcam: -15,
+        point_mort: 200000,
+        fte: -3000,
+        solvabilite: 0.1,
+        gearing: 4,
+        liq_gen: 0.4,
+        liq_red: 0.3,
+        liq_imm: 0.05,
+        tn: -60000,
+        ratio_immo: 0.2
       })
     );
 
     expect(vm.alerts.length).toBeGreaterThanOrEqual(3);
+    expect(vm.alerteInvestissement).toBe(true);
     expect(vm.actions.length).toBeGreaterThan(0);
   });
 });

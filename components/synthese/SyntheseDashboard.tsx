@@ -68,6 +68,20 @@ export function SyntheseDashboard({
           {synthese.score === null ? "N/D" : Math.round(synthese.score)} / 100
         </p>
         <p className="mt-3 text-sm text-white/70">{synthese.scoreLabel}</p>
+        {/* Détail des piliers pour expliquer la composition du score global. */}
+        {synthese.scorePiliers ? (
+          <div className="mt-6 grid gap-2 text-left sm:grid-cols-2 lg:grid-cols-4">
+            <PiliersItem label="Rentabilité" value={synthese.scorePiliers.rentabilite} />
+            <PiliersItem label="Solvabilité" value={synthese.scorePiliers.solvabilite} />
+            <PiliersItem label="Liquidité" value={synthese.scorePiliers.liquidite} />
+            <PiliersItem label="Efficacité" value={synthese.scorePiliers.efficacite} />
+          </div>
+        ) : null}
+        {synthese.alerteInvestissement ? (
+          <p className="mt-4 text-xs text-amber-300">
+            Alerte investissement active : risque d&apos;usure des immobilisations.
+          </p>
+        ) : null}
       </article>
 
       {/* Ligne KPI: trois cartes horizontales responsives pour les métriques prioritaires du dirigeant. */}
@@ -240,13 +254,23 @@ function scoreColorClass(score: number | null): string {
   if (score === null) {
     return "text-white/80";
   }
-  if (score >= 70) {
+  // Règle produit demandée: strictement > 80 vert, 50-80 orange, < 50 rouge.
+  if (score > 80) {
     return "text-emerald-300";
   }
   if (score >= 50) {
     return "text-amber-300";
   }
   return "text-rose-300";
+}
+
+function PiliersItem({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-white/55">{label}</p>
+      <p className="mt-1 text-base font-semibold text-white">{Math.round(value)} / 100</p>
+    </div>
+  );
 }
 
 function alertSeverityClass(severity: "high" | "medium" | "low"): string {
