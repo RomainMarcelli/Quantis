@@ -1,5 +1,9 @@
+// File: app/layout.tsx
+// Role: layout racine Next.js qui applique font, metadata et initialisation du theme global.
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
+import { ScrollRevealInitializer } from "@/components/ui/ScrollRevealInitializer";
+import { ThemeInitializer } from "@/components/ui/ThemeInitializer";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -9,7 +13,12 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "Quantis",
-  description: "Quantis - Financial Intelligence Platform"
+  description: "Quantis - Plateforme d'intelligence financière",
+  icons: {
+    icon: "/images/LogoV3.png",
+    apple: "/images/LogoV3.png",
+    shortcut: "/images/LogoV3.png"
+  }
 };
 
 export default function RootLayout({
@@ -19,7 +28,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body className={manrope.variable}>{children}</body>
+      <body className={`${manrope.variable} premium-app-shell`}>
+        <ThemeInitializer />
+        <ScrollRevealInitializer />
+        {children}
+      </body>
     </html>
   );
 }

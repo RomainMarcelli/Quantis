@@ -1,4 +1,7 @@
+// File: services/accountService.ts
+// Role: orchestration metier du compte utilisateur (lecture profil, mises a jour, purges partielles/completes).
 import { deleteUserAnalyses } from "@/services/analysisStore";
+import { deleteUserFolders } from "@/services/folderStore";
 import {
   deleteUserProfile,
   getUserProfile,
@@ -38,8 +41,18 @@ export async function saveAccountProfile(
   await updateUserProfile(userId, updates);
 }
 
-export async function purgeAccountData(userId: string): Promise<{ deletedAnalysesCount: number }> {
+// Purge partielle: supprime uniquement les donnees d'analyse/statistiques.
+export async function purgeAnalysisData(userId: string): Promise<{ deletedAnalysesCount: number }> {
+  await deleteUserFolders(userId);
   const deletedAnalysesCount = await deleteUserAnalyses(userId);
+  return {
+    deletedAnalysesCount
+  };
+}
+
+// Purge complete: supprime analyses + profil.
+export async function purgeAccountData(userId: string): Promise<{ deletedAnalysesCount: number }> {
+  const { deletedAnalysesCount } = await purgeAnalysisData(userId);
   await deleteUserProfile(userId);
   return {
     deletedAnalysesCount

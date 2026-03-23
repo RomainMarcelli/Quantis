@@ -142,6 +142,5 @@ function mapDeleteError(error: unknown): string {
     }
   }
 
-  return "Operation impossible pour le moment. Veuillez reessayer.";
+  return "Opération impossible pour le moment. Veuillez réessayer.";
 }
-

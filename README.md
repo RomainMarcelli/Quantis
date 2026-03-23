@@ -17,6 +17,35 @@ Reconstruction from scratch de Quantis a partir des fichiers Markdown du projet 
 npm install
 ```
 
+## Variables d'environnement
+
+Copier `.env.example` vers `.env.local`, puis renseigner les valeurs Firebase:
+
+```bash
+cp .env.example .env.local
+```
+
+Variables requises:
+
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` (optionnelle)
+
+Variables serveur requises pour les emails transactionnels:
+
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_CLIENT_EMAIL`
+- `FIREBASE_PRIVATE_KEY`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL` (recommande: domaine verifie)
+- `APP_BASE_URL` (optionnelle, sinon origin de la requete)
+
+Pour l'envoi d'emails transactionnels custom, des variables serveur Firebase Admin + Resend sont necessaires (voir `.env.example`).
+
 ## Lancer le projet
 
 ```bash
@@ -44,7 +73,7 @@ Puis ouvrir `http://localhost:3000`.
   - toasts succes/erreur
   - messages inline de validation
   - tooltips sur champs sensibles
-- Verification email obligatoire apres inscription (envoi automatique Firebase)
+- Verification email obligatoire apres inscription (email transactionnel Resend + lien Firebase Admin)
 - Messages d'erreurs explicites:
   - format email invalide
   - mot de passe trop faible / non conforme
@@ -68,21 +97,49 @@ Puis ouvrir `http://localhost:3000`.
 
 ## Email de confirmation
 
-- L'envoi est gere par Firebase Auth (`sendEmailVerification`).
-- Un template HTML DA Quantis est fourni pour integration future avec un provider mail transactionnel:
+- Envoi gere via Resend (design DA Quantis) avec liens securises Firebase Admin.
+- Templates utilises:
   - `lib/email/templates/verificationEmailTemplate.ts`
-  - design premium + rappel explicite de verifier le dossier spam
+  - `lib/email/templates/passwordResetEmailTemplate.ts`
+- Endpoints serveur:
+  - `app/api/auth/send-verification-email/route.ts`
+  - `app/api/auth/send-password-reset-email/route.ts`
+- Fallback automatique Firebase natif conserve si le service transactionnel est indisponible.
 
 ## Pipeline data
 
 Flux implemente:
 
-`Upload -> Parsing -> Calcul KPI -> Stockage Firestore -> Affichage dashboard`
+`Upload -> Parsing -> Mapping -> Calcul KPI -> Stockage Firestore -> Affichage dashboard`
 
 - Parsing Excel/PDF: `services/parsers/`
-- Moteur KPI pur: `services/kpiEngine.ts`
+- Mapping 2033: `services/mapping/financialDataMapper.ts`
+- Moteur KPI complet (formules Quantis Mapping): `services/kpiEngine.ts`
 - Stockage Firestore: `services/analysisStore.ts`
 - Orchestration API parsing/kpi: `app/api/analyses/route.ts`
+- Chaque analyse stocke:
+  - `rawData`
+  - `mappedData`
+  - `kpis`
+  - (et champs legacy dashboard: `financialFacts`, `parsedData`)
+
+## Inspection d'une analyse
+
+- Page detail: `/analysis/[id]`
+- Dashboard decisionnel (SaaS):
+  - header personnalise
+  - top KPI cards
+  - score global + alertes
+  - sections metier (creation de valeur, BFR, financement, rentabilite)
+  - debug repliable (`rawData`, `mappedData`, `kpis`)
+
+## Page de test KPI (avant / apres)
+
+- Route: `/test-kpi`
+- Permet de:
+  - charger les analyses reelles stockees en Firestore
+  - comparer KPI stockes vs KPI recalcules
+  - verifier les donnees brutes/mappees/resultats en JSON
 
 ## Gestion de compte
 
@@ -114,4 +171,6 @@ Couvrent la logique metier (auth, parsing, KPI).
 
 ## Suivi projet
 
-Le fichier `projet.md` est la source de verite de pilotage (vision, etat d'avancement, decisions techniques, roadmap).
+Le fichier `projet.md` est la source de verite de pilotage (vision, etat d'avancement, decisions techniques, roadmap)
+
+

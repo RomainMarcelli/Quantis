@@ -1,4 +1,5 @@
 import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import type { OnboardingObjectiveValue } from "@/lib/onboarding/objectives";
 
 export type LoginCredentials = {
   email: string;
@@ -14,6 +15,7 @@ export type RegisterCredentials = {
   siren: string;
   companySize: CompanySizeValue | "";
   sector: SectorValue | "";
+  usageObjectives: OnboardingObjectiveValue[];
 };
 
 export type AuthenticatedUser = {
@@ -48,6 +50,7 @@ export type RegisterValidationErrors = {
   siren?: string;
   companySize?: string;
   sector?: string;
+  usageObjectives?: string;
   general?: string;
 };
 

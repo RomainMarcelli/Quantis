@@ -1,18 +1,29 @@
 import * as XLSX from "xlsx";
 import { extractFinancialFactsFromRows } from "@/services/parsers/financialFactsExtractor";
+import { extractRawDataFromSheetRows, mergeRawDataForSheets } from "@/services/parsers/rawDataExtractor";
 import type { ParsedFileData } from "@/types/analysis";
 
 export function parseExcelBuffer(buffer: Buffer, fileName: string): ParsedFileData {
   const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
-  const firstSheetName = workbook.SheetNames[0];
+  const sheetNames = workbook.SheetNames;
 
-  if (!firstSheetName) {
+  if (!sheetNames[0]) {
     return emptyParsedData(fileName, "excel");
   }
 
-  const firstSheet = workbook.Sheets[firstSheetName];
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, {
-    defval: null
+  const sheetRecords = sheetNames.map((sheetName) =>
+    XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheetName], {
+      defval: null
+    })
+  );
+  const rows = sheetRecords.flat();
+
+  const rawDataBySheet = sheetNames.map((sheetName) => {
+    const sheetRows = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], {
+      header: 1,
+      defval: null
+    });
+    return extractRawDataFromSheetRows(sheetRows as unknown[][]);
   });
 
   const previewRows = rows.slice(0, 20).map((row) => sanitizeRow(row));
@@ -24,7 +35,8 @@ export function parseExcelBuffer(buffer: Buffer, fileName: string): ParsedFileDa
     extractedAt: new Date().toISOString(),
     fiscalYear: inferFiscalYear(rows),
     metrics,
-    previewRows: previewRows.length > 0 ? previewRows : [factsToPreviewRow(facts)]
+    previewRows: previewRows.length > 0 ? previewRows : [factsToPreviewRow(facts)],
+    rawData: mergeRawDataForSheets(rawDataBySheet)
   };
 }
 
@@ -77,7 +89,11 @@ function emptyParsedData(fileName: string, fileType: ParsedFileData["fileType"])
     extractedAt: new Date().toISOString(),
     fiscalYear: null,
     metrics: [],
-    previewRows: []
+    previewRows: [],
+    rawData: {
+      byVariableCode: {},
+      byLineCode: {},
+      byLabel: {}
+    }
   };
 }
-

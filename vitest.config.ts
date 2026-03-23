@@ -4,7 +4,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["lib/**/*.test.ts", "services/**/*.test.ts"]
+    // On execute aussi les tests de composants premium (SSR statique react-dom/server).
+    include: ["lib/**/*.test.ts", "services/**/*.test.ts", "components/**/*.test.tsx"]
   },
   resolve: {
     alias: {

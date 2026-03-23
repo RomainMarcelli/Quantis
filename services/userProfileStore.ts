@@ -1,4 +1,8 @@
 import {
+  isOnboardingObjectiveValue,
+  type OnboardingObjectiveValue
+} from "@/lib/onboarding/objectives";
+import {
   deleteDoc,
   doc,
   getDoc,
@@ -50,6 +54,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     siren: String(data.siren ?? ""),
     companySize: (data.companySize as UserProfile["companySize"]) ?? "",
     sector: (data.sector as UserProfile["sector"]) ?? "",
+    usageObjectives: resolveUsageObjectives(data.usageObjectives),
     email: String(data.email ?? ""),
     emailVerified: Boolean(data.emailVerified),
     createdAt: toIsoString(data.createdAt),
@@ -87,4 +92,15 @@ function toIsoString(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+function resolveUsageObjectives(value: unknown): OnboardingObjectiveValue[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (item): item is OnboardingObjectiveValue =>
+      typeof item === "string" && isOnboardingObjectiveValue(item)
+  );
 }
