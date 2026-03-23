@@ -1,4 +1,5 @@
 import { computeKpis } from "@/services/kpiEngine";
+import { calculateQuantisScore } from "@/lib/quantisScore";
 import {
   applyLegacyFinancialFactsToMappedData,
   mapMappedDataToFinancialFacts,
@@ -13,6 +14,11 @@ export async function runAnalysisPipeline(params: {
   userId: string;
   folderName: string;
   files: UploadedBinaryFile[];
+  uploadContext?: {
+    companySize?: string | null;
+    sector?: string | null;
+    source?: "dashboard" | "analysis" | "upload" | "manual";
+  };
 }): Promise<AnalysisDraft> {
   const parsedData = await Promise.all(params.files.map((file) => parseUploadedFile(file)));
   const rawData = mergeRawAnalysisData(parsedData.map((item) => item.rawData));
@@ -22,6 +28,7 @@ export async function runAnalysisPipeline(params: {
     legacyFacts
   );
   const kpis = computeKpis(mappedData);
+  const quantisScore = calculateQuantisScore(kpis);
   const facts = mapMappedDataToFinancialFacts(mappedData);
 
   const candidateYears = parsedData.map((item) => item.fiscalYear).filter((year): year is number => year !== null);
@@ -42,7 +49,13 @@ export async function runAnalysisPipeline(params: {
     rawData,
     mappedData,
     financialFacts: facts,
-    kpis
+    kpis,
+    quantisScore,
+    uploadContext: {
+      companySize: params.uploadContext?.companySize?.trim() || null,
+      sector: params.uploadContext?.sector?.trim() || null,
+      source: params.uploadContext?.source ?? "dashboard"
+    }
   };
 
   return analysisDraft;

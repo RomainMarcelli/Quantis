@@ -15,7 +15,7 @@ export function KpiSummary({ kpis }: KpiSummaryProps) {
       value: formatPercent(kpis.grossMarginRate)
     },
     {
-      label: "Resultat net",
+      label: "Résultat net",
       value: formatCurrency(kpis.netProfit)
     },
     {

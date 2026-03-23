@@ -110,6 +110,21 @@ function buildDraft(): AnalysisDraft {
       capacite_remboursement_annees: null,
       etat_materiel_indice: null,
       healthScore: 75
+    },
+    quantisScore: {
+      quantis_score: 72.5,
+      piliers: {
+        rentabilite: 70,
+        solvabilite: 75,
+        liquidite: 68,
+        efficacite: 77
+      },
+      alerte_investissement: false
+    },
+    uploadContext: {
+      companySize: "pme",
+      sector: "SaaS & Edition de Logiciels",
+      source: "dashboard"
     }
   };
 }

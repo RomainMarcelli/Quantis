@@ -21,6 +21,9 @@ const sampleSynthese: SyntheseViewModel = {
       title: "Chiffre d'affaires",
       subtitle: "Performance commerciale",
       value: 120000,
+      status: "good",
+      missingMessage: null,
+      benchmarkLabel: "20.0% supérieur à la moyenne du secteur",
       trend: { direction: "up", changePercent: 20, label: "+20.0%", tone: "positive" }
     },
     {
@@ -28,6 +31,9 @@ const sampleSynthese: SyntheseViewModel = {
       title: "Rentabilité opérationnelle",
       subtitle: "EBE",
       value: 22000,
+      status: "medium",
+      missingMessage: null,
+      benchmarkLabel: "3.0% inférieur à la moyenne du secteur",
       trend: { direction: "down", changePercent: -5, label: "-5.0%", tone: "negative" }
     },
     {
@@ -35,6 +41,9 @@ const sampleSynthese: SyntheseViewModel = {
       title: "Cash disponible",
       subtitle: "Disponibilités",
       value: 18000,
+      status: "medium",
+      missingMessage: null,
+      benchmarkLabel: "10.0% inférieur à la moyenne du secteur",
       trend: { direction: "flat", changePercent: 0, label: "Stable", tone: "neutral" }
     }
   ],
@@ -55,6 +64,9 @@ describe("SyntheseDashboard", () => {
           { value: "2025", label: "2025" }
         ]}
         onYearChange={() => {}}
+        onDownloadReport={() => {}}
+        onReupload={() => {}}
+        onManualEntry={() => {}}
         synthese={sampleSynthese}
       />
     );
@@ -76,6 +88,9 @@ describe("SyntheseDashboard", () => {
           { value: "2025", label: "2025" }
         ]}
         onYearChange={() => {}}
+        onDownloadReport={() => {}}
+        onReupload={() => {}}
+        onManualEntry={() => {}}
         synthese={sampleSynthese}
       />
     );
@@ -84,5 +99,47 @@ describe("SyntheseDashboard", () => {
     expect(html).toContain("Rentabilité opérationnelle");
     expect(html).toContain("Cash disponible");
     expect(html).toContain("Année en cours (2026)");
+  });
+
+  it("affiche le message de donnée manquante avec actions", () => {
+    const syntheseWithMissingMetric: SyntheseViewModel = {
+      ...sampleSynthese,
+      metrics: [
+        {
+          id: "ca",
+          title: "Chiffre d'affaires",
+          subtitle: "Performance commerciale",
+          value: null,
+          status: "na",
+          missingMessage: "Pour visualiser votre chiffre d'affaires, uploader un document complet.",
+          benchmarkLabel: "Benchmark indisponible",
+          trend: { direction: "na", changePercent: null, label: "N/D", tone: "neutral" }
+        },
+        sampleSynthese.metrics[1],
+        sampleSynthese.metrics[2]
+      ]
+    };
+
+    const html = renderToStaticMarkup(
+      <SyntheseDashboard
+        greetingName="Romain"
+        companyName="Quantis"
+        analysisCreatedAt="2026-03-20T10:00:00.000Z"
+        selectedYearValue="current"
+        yearOptions={[
+          { value: "current", label: "Année en cours (2026)" },
+          { value: "2025", label: "2025" }
+        ]}
+        onYearChange={() => {}}
+        onDownloadReport={() => {}}
+        onReupload={() => {}}
+        onManualEntry={() => {}}
+        synthese={syntheseWithMissingMetric}
+      />
+    );
+
+    expect(html).toContain("uploader un document complet");
+    expect(html).toContain("Ré-uploader un fichier");
+    expect(html).toContain("Saisie manuelle");
   });
 });

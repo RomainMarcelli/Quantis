@@ -207,8 +207,8 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
       }
     });
 
-    // Après purge des données, on renvoie l'utilisateur vers l'espace de dépôt.
-    router.replace("/dashboard");
+    // Après purge des données, on renvoie l'utilisateur vers l'upload guidé.
+    router.replace("/upload");
   }
 
   async function onDeleteAccount() {
@@ -303,10 +303,10 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => router.push(fromAnalysis ? "/analysis" : "/dashboard")}
+              onClick={() => router.push(fromAnalysis ? "/analysis" : "/upload")}
               className="rounded-xl border border-quantis-gold/55 bg-quantis-gold/95 px-3.5 py-1.5 text-xs font-semibold text-black transition hover:bg-quantis-gold"
             >
-              {fromAnalysis ? "Retour au dashboard" : "Retour à l’espace de dépôt"}
+              {fromAnalysis ? "Retour à l’analyse" : "Aller à l’upload"}
             </button>
             <button
               type="button"

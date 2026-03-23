@@ -111,6 +111,7 @@ const EMPTY_KPIS: AnalysisRecord["kpis"] = {
   charges_fixes: null,
   point_mort: null,
   ratio_immo: null,
+  ratio_immo_usure: null,
   bfr: null,
   rot_bfr: null,
   dso: null,
@@ -137,6 +138,17 @@ const EMPTY_KPIS: AnalysisRecord["kpis"] = {
   capacite_remboursement_annees: null,
   etat_materiel_indice: null,
   healthScore: null
+};
+
+const EMPTY_QUANTIS_SCORE: NonNullable<AnalysisRecord["quantisScore"]> = {
+  quantis_score: 50,
+  piliers: {
+    rentabilite: 50,
+    solvabilite: 50,
+    liquidite: 50,
+    efficacite: 50
+  },
+  alerte_investissement: false
 };
 
 export async function saveAnalysisDraft(analysisDraft: AnalysisDraft): Promise<AnalysisRecord> {
@@ -318,6 +330,43 @@ function toAnalysisRecord(id: string, data: Record<string, unknown>): AnalysisRe
     kpis:
       data.kpis && typeof data.kpis === "object"
         ? { ...EMPTY_KPIS, ...(data.kpis as Partial<AnalysisRecord["kpis"]>) }
-        : { ...EMPTY_KPIS }
+        : { ...EMPTY_KPIS },
+    quantisScore:
+      data.quantisScore && typeof data.quantisScore === "object"
+        ? {
+            ...EMPTY_QUANTIS_SCORE,
+            ...(data.quantisScore as Partial<NonNullable<AnalysisRecord["quantisScore"]>>),
+            piliers: {
+              ...EMPTY_QUANTIS_SCORE.piliers,
+              ...((data.quantisScore as { piliers?: Partial<NonNullable<AnalysisRecord["quantisScore"]>["piliers"]> })
+                .piliers ?? {})
+            }
+          }
+        : null,
+    uploadContext:
+      data.uploadContext && typeof data.uploadContext === "object"
+        ? {
+            companySize: toNullableString((data.uploadContext as { companySize?: unknown }).companySize),
+            sector: toNullableString((data.uploadContext as { sector?: unknown }).sector),
+            source: resolveUploadSource((data.uploadContext as { source?: unknown }).source)
+          }
+        : null
   };
+}
+
+function toNullableString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function resolveUploadSource(
+  value: unknown
+): NonNullable<NonNullable<AnalysisRecord["uploadContext"]>["source"]> {
+  if (value === "dashboard" || value === "analysis" || value === "upload" || value === "manual") {
+    return value;
+  }
+  return "dashboard";
 }

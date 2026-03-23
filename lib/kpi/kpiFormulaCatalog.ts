@@ -36,8 +36,8 @@ export const KPI_FORMULA_CATALOG: KpiFormulaDefinition[] = [
   { key: "roce", label: "ROCE", formula: "(ebit * 0.75) / (total_actif_immo + bfr)" },
   { key: "roe", label: "ROE", formula: "res_net / total_cp" },
   { key: "effet_levier", label: "Effet de levier", formula: "roe - roce" },
-  { key: "resultat_net", label: "Resultat net", formula: "res_net || resultat_exercice" },
+  { key: "resultat_net", label: "Résultat net", formula: "res_net || resultat_exercice" },
   { key: "capacite_remboursement_annees", label: "Capacite de remboursement", formula: "emprunts / caf" },
-  { key: "etat_materiel_indice", label: "Etat du materiel (indice)", formula: "(total_actif_immo / total_actif) * 100" },
+  { key: "etat_materiel_indice", label: "État du matériel (indice)", formula: "(total_actif_immo / total_actif) * 100" },
   { key: "healthScore", label: "Score de sante", formula: "Score composite (marge, resultat, BFR, runway)" }
 ];

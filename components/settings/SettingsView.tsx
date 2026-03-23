@@ -1,5 +1,5 @@
 // File: components/settings/SettingsView.tsx
-// Role: page de parametres applicatifs (preferences metier + securite session) avec la DA premium de /analysis.
+// Role: page de paramètres applicatifs (préférences métier + sécurité session) avec la DA premium de /analysis.
 "use client";
 
 import { useEffect, useState } from "react";
@@ -60,12 +60,12 @@ export function SettingsView() {
       setPreferences(savedPreferences);
       setToast({
         type: "success",
-        message: "Parametres enregistres avec succes."
+        message: "Paramètres enregistrés avec succès."
       });
     } catch {
       setToast({
         type: "error",
-        message: "Impossible d'enregistrer les parametres."
+        message: "Impossible d'enregistrer les paramètres."
       });
     } finally {
       setSaving(false);
@@ -77,7 +77,7 @@ export function SettingsView() {
     setPreferences(resetPreferences);
     setToast({
       type: "info",
-      message: "Parametres reinitialises."
+      message: "Paramètres réinitialisés."
     });
   }
 
@@ -91,7 +91,7 @@ export function SettingsView() {
         <div className="flex items-center gap-3">
           <QuantisLogo withText={false} size={24} />
           <div>
-            <h1 className="text-2xl font-semibold text-white">Parametres</h1>
+            <h1 className="text-2xl font-semibold text-white">Paramètres</h1>
             <p className="text-sm text-white/60">Configuration essentielle de votre espace Quantis.</p>
           </div>
         </div>
@@ -102,7 +102,7 @@ export function SettingsView() {
           className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour dashboard
+          Retour à l’analyse
         </button>
       </header>
 
@@ -174,7 +174,7 @@ export function SettingsView() {
       <section className="precision-card relative z-10 space-y-4 rounded-2xl p-5">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-quantis-gold" />
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-white/85">Securite et session</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-white/85">Sécurité et session</h2>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-black/20 p-4">

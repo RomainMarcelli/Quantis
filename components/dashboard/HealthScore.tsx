@@ -97,7 +97,7 @@ export function HealthScore({ score, tag = "SCORE_01" }: HealthScoreProps) {
         </div>
         <p className="edu-text mt-0 border-t-0 pt-0 text-left">
           L&apos;indice de sante synthetise la liquidite, la rentabilite et la solvabilite pour piloter la
-          resilience financiere.
+          résilience financière.
         </p>
       </div>
     </article>

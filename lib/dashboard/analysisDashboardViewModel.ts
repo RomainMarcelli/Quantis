@@ -1,4 +1,4 @@
-import type { CalculatedKpis } from "@/types/analysis";
+﻿import type { CalculatedKpis } from "@/types/analysis";
 
 export type DashboardSeverity = "green" | "orange" | "red" | "neutral";
 export type DashboardMetricFormat =
@@ -96,7 +96,7 @@ export function buildAnalysisDashboardViewModel(
   return {
     topCards,
     score,
-    suggestions: ["Puis-je investir 80k€ ?", "Optimiser stock", "Retards clients", "Cash flow projete"],
+    suggestions: ["Puis-je investir 80k€ ?", "Optimiser stock", "Retards clients", "Cash flow projeté"],
     alerts,
     sections: buildSections(kpis)
   };
@@ -106,13 +106,13 @@ function buildSections(kpis: CalculatedKpis): DashboardSection[] {
   return [
     {
       id: "creation-valeur",
-      title: "Creation de valeur",
+      title: "Création de valeur",
       metrics: [
         metric("ca", "Chiffre d'affaires", kpis.ca, "currency"),
         metric("tcam", "TCAM", kpis.tcam, "percent"),
         metric("ebe", "EBE", kpis.ebe, "currency"),
         metric("tmscv", "TMSCV", kpis.tmscv, "percent"),
-        metric("resultat_net", "Resultat net", kpis.resultat_net, "currency")
+        metric("resultat_net", "Résultat net", kpis.resultat_net, "currency")
       ]
     },
     {
@@ -124,8 +124,8 @@ function buildSections(kpis: CalculatedKpis): DashboardSection[] {
         metric("rot_stocks", "Stocks", kpis.rot_stocks, "days"),
         metric("dso", "DSO clients", kpis.dso, "days"),
         metric("dpo", "DPO fournisseurs", kpis.dpo, "days"),
-        metric("ecart_dso_dpo", "Ecart cycle clients/fournisseurs", computeCycleGap(kpis), "days"),
-        metric("etat_materiel_indice", "Etat du materiel", kpis.etat_materiel_indice, "percent")
+        metric("ecart_dso_dpo", "Écart cycle clients/fournisseurs", computeCycleGap(kpis), "days"),
+        metric("etat_materiel_indice", "État du matériel", kpis.etat_materiel_indice, "percent")
       ]
     },
     {
@@ -200,7 +200,7 @@ function buildAlerts(kpis: CalculatedKpis): AnalysisDashboardViewModel["alerts"]
     if (kpis.dso > 90) {
       items.push({
         id: "dso",
-        title: "Retards clients eleves",
+        title: "Retards clients élevés",
         description: "Le DSO depasse 90 jours.",
         severity: "red"
       });
@@ -219,14 +219,14 @@ function buildAlerts(kpis: CalculatedKpis): AnalysisDashboardViewModel["alerts"]
     if (cycleGap > 60) {
       items.push({
         id: "cycle-gap",
-        title: "Ecart cycle clients/fournisseurs critique",
+        title: "Écart cycle clients/fournisseurs critique",
         description: "L'ecart DSO-DPO depasse 60 jours.",
         severity: "red"
       });
     } else if (cycleGap > 30) {
       items.push({
         id: "cycle-gap",
-        title: "Ecart cycle clients/fournisseurs eleve",
+        title: "Écart cycle clients/fournisseurs élevé",
         description: "L'ecart DSO-DPO est entre 31 et 60 jours.",
         severity: "orange"
       });
@@ -237,7 +237,7 @@ function buildAlerts(kpis: CalculatedKpis): AnalysisDashboardViewModel["alerts"]
     if (kpis.rot_bfr > 180) {
       items.push({
         id: "rot-bfr",
-        title: "BFR eleve",
+        title: "BFR élevé",
         description: "La rotation BFR depasse 180 jours.",
         severity: "red"
       });
@@ -357,3 +357,5 @@ function severityWeight(severity: DashboardAlert["severity"]): number {
       return 0;
   }
 }
+
+

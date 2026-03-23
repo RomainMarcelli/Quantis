@@ -146,3 +146,31 @@ Ce document est la source de vérité sécurité.
   - objectif v2: CSP avec nonce/hash et suppression progressive des directives permissives.
 - Le logging frontend est **fail-open**:
   - une panne d’audit ne bloque jamais les parcours utilisateur.
+
+### 2026-03-23 — Hardening v1.4 (durée de session maximale 24h + garde anti-écran noir)
+
+#### 1) Expiration automatique de session (24h)
+
+- **Fichiers ajoutés/modifiés**:
+  - `lib/auth/sessionLifetime.ts`
+  - `services/auth.ts`
+  - `lib/auth/sessionLifetime.test.ts`
+- **Comportement**:
+  - durée maximale de session: **24 heures** (`AUTH_SESSION_MAX_AGE_MS`)
+  - horodatage de début stocké en local (`quantis.auth.sessionStartedAt`)
+  - déconnexion automatique à l’échéance (timer + contrôle à chaque reprise de session)
+  - purge du contexte de session au logout
+- **Risque traité**:
+  - sessions trop longues/non maîtrisées
+  - réutilisation de session stale sur poste partagé
+
+#### 2) Garde UX en cas de session perdue
+
+- **Fichiers modifiés**:
+  - `components/analysis/AnalysisDetailView.tsx`
+  - `components/DashboardView.tsx`
+- **Comportement**:
+  - redirection vers `/login` si utilisateur absent/non vérifié
+  - fallback visuel explicite côté `/analysis` pour éviter un écran vide
+- **Risque traité**:
+  - écran noir perçu côté utilisateur lors d’une session invalide après inactivité.

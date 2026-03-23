@@ -1,5 +1,5 @@
 ﻿// File: app/account/page.tsx
-// Role: route serveur App Router qui charge la vue compte avec contexte de provenance (analysis/dashboard).
+// Role: route serveur App Router qui charge la vue compte avec contexte de provenance (analysis/upload).
 import { AccountView } from "@/components/account/AccountView";
 
 type AccountPageProps = {

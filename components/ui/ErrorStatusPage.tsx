@@ -16,8 +16,8 @@ export function ErrorStatusPage({
   statusCode,
   title,
   description,
-  primaryCtaLabel = "Retour au dashboard",
-  primaryCtaHref = "/dashboard"
+  primaryCtaLabel = "Retour à l’accueil",
+  primaryCtaHref = "/"
 }: ErrorStatusPageProps) {
   return (
     <main className="premium-analysis-root relative mx-auto flex min-h-screen w-full max-w-5xl items-center justify-center px-4 py-10">

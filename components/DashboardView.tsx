@@ -4,7 +4,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FlaskConical, FolderOpen, LayoutDashboard, LogOut, User } from "lucide-react";
+import {
+  FlaskConical,
+  FolderOpen,
+  LayoutDashboard,
+  LogOut,
+  RefreshCcw,
+  Upload,
+  User
+} from "lucide-react";
 import { UploadLanding } from "@/components/dashboard/UploadLanding";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { hasLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
@@ -12,7 +20,8 @@ import { ensureFolderName } from "@/lib/folders/activeFolder";
 import { loadAppPreferences } from "@/lib/settings/appPreferences";
 import { listUserAnalyses, saveAnalysisDraft } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
-import type { AnalysisDraft } from "@/types/analysis";
+import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
+import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 
 export function DashboardView() {
@@ -23,17 +32,22 @@ export function DashboardView() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hasExistingAnalyses, setHasExistingAnalyses] = useState(hasLocalAnalysisHint);
   const [loadingAnalyses, setLoadingAnalyses] = useState(false);
+  const [recentAnalyses, setRecentAnalyses] = useState<AnalysisRecord[]>([]);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
       if (!nextUser) {
-        router.replace("/");
+        setUser(null);
+        setLoadingAuth(false);
+        router.replace("/login");
         return;
       }
 
       if (!nextUser.emailVerified) {
         void firebaseAuthGateway.signOut();
-        router.replace("/");
+        setUser(null);
+        setLoadingAuth(false);
+        router.replace("/login");
         return;
       }
 
@@ -58,12 +72,21 @@ export function DashboardView() {
     async function loadAnalysesAvailability() {
       setLoadingAnalyses(true);
       try {
+        // Sécurise la transition post-inscription: on rattache d'abord une éventuelle
+        // analyse locale créée en mode invité avant de lire l'historique Firestore.
+        try {
+          await persistPendingAnalysisForUser(currentUserId);
+        } catch {
+          // Non bloquant: on conserve le chargement normal de l'historique.
+        }
+
         // On charge la presence d'analyses une seule fois pour piloter l'affichage
         // du bouton "Acceder aux dashboards" sur la page post-connexion.
         const analyses = await listUserAnalyses(currentUserId);
         const hasAnalyses = analyses.length > 0;
         if (isMounted) {
           setHasExistingAnalyses(hasAnalyses);
+          setRecentAnalyses(analyses.slice(0, 6));
         }
         // Synchronise un hint local pour gerer les retours utilisateur meme
         // si la lecture Firestore echoue ponctuellement.
@@ -73,6 +96,7 @@ export function DashboardView() {
         // (localStorage) plutot que de masquer brutalement le bouton.
         if (isMounted) {
           setHasExistingAnalyses(hasLocalAnalysisHint());
+          setRecentAnalyses([]);
         }
       } finally {
         if (isMounted) {
@@ -106,6 +130,7 @@ export function DashboardView() {
       const formData = new FormData();
       formData.append("userId", user.uid);
       formData.append("folderName", folderName);
+      formData.append("source", "dashboard");
       files.forEach((file) => formData.append("files", file));
 
       const response = await fetch("/api/analyses", {
@@ -156,6 +181,21 @@ export function DashboardView() {
     );
   }
 
+  if (!user) {
+    return (
+      <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/80">Votre session est expirée. Reconnectez-vous pour continuer.</p>
+        <button
+          type="button"
+          onClick={() => router.replace("/login")}
+          className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10"
+        >
+          Se connecter
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section className="relative z-10 mx-auto w-full max-w-6xl space-y-6">
       <header className="precision-card rounded-2xl p-5 md:p-6">
@@ -200,6 +240,14 @@ export function DashboardView() {
                 {"Acc\u00E9der aux dashboards"}
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => router.push("/upload")}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/85 transition-colors hover:bg-white/10"
+            >
+              <Upload className="h-4 w-4" />
+              Parcours upload guidé
+            </button>
             <button
               type="button"
               onClick={() => router.push("/test-kpi")}
@@ -247,6 +295,71 @@ export function DashboardView() {
           {errorMessage}
         </div>
       ) : null}
+
+      <section className="precision-card rounded-2xl p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Historique des analyses</h2>
+            <p className="text-xs text-white/55">
+              Accédez à vos analyses sans ré-uploader vos documents.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/analysis")}
+            className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10"
+          >
+            Voir tout l&apos;historique
+          </button>
+        </div>
+
+        {loadingAnalyses ? (
+          <p className="mt-3 text-sm text-white/60">Chargement de l&apos;historique...</p>
+        ) : null}
+
+        {!loadingAnalyses && recentAnalyses.length === 0 ? (
+          <p className="mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/65">
+            Aucune analyse enregistrée pour le moment.
+          </p>
+        ) : null}
+
+        {recentAnalyses.length > 0 ? (
+          <ul className="mt-3 space-y-2">
+            {recentAnalyses.map((analysis) => (
+              <li
+                key={analysis.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-white">
+                    {analysis.fiscalYear ? `Exercice ${analysis.fiscalYear}` : "Analyse sans exercice"}
+                  </p>
+                  <p className="text-xs text-white/55">
+                    {new Date(analysis.createdAt).toLocaleString("fr-FR")} • {analysis.folderName}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/analysis/${analysis.id}`)}
+                    className="rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-white/80 hover:bg-white/10"
+                  >
+                    Ouvrir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/analysis/${analysis.id}`)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-quantis-gold/35 bg-quantis-gold/10 px-2.5 py-1.5 text-xs text-quantis-gold hover:bg-quantis-gold/20"
+                  >
+                    <RefreshCcw className="h-3.5 w-3.5" />
+                    Relancer l&apos;analyse
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
     </section>
   );
 }

@@ -28,7 +28,9 @@ function makeAnalysis(id: string, createdAt: string, fiscalYear: number | null):
     rawData: {} as RawAnalysisData,
     mappedData: {} as MappedFinancialData,
     financialFacts: {} as FinancialFacts,
-    kpis: {} as CalculatedKpis
+    kpis: {} as CalculatedKpis,
+    quantisScore: null,
+    uploadContext: null
   };
 }
 

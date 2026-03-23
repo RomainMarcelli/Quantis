@@ -2,6 +2,7 @@
 // Role: transforme les KPI d'analyse en données de synthèse lisibles (score, tendances, actions, alertes).
 import type { CalculatedKpis } from "@/types/analysis";
 import { calculateQuantisScore } from "@/lib/quantisScore";
+import { buildSectorBenchmark } from "@/lib/synthese/sectorBenchmark";
 
 export type TrendDirection = "up" | "down" | "flat" | "na";
 
@@ -19,6 +20,9 @@ export type SyntheseMetric = {
   title: string;
   subtitle: string;
   value: number | null;
+  status: "good" | "medium" | "risk" | "na";
+  missingMessage: string | null;
+  benchmarkLabel: string;
   trend: TrendInfo;
 };
 
@@ -45,7 +49,8 @@ export type SyntheseViewModel = {
 
 export function buildSyntheseViewModel(
   currentKpis: CalculatedKpis,
-  previousKpis?: CalculatedKpis | null
+  previousKpis?: CalculatedKpis | null,
+  sector?: string | null
 ): SyntheseViewModel {
   // Le Quantis Score est recalculé dynamiquement à partir des KPI courants.
   const quantisScore = calculateQuantisScore(currentKpis);
@@ -56,6 +61,12 @@ export function buildSyntheseViewModel(
       title: "Chiffre d'affaires",
       subtitle: "Performance commerciale",
       value: currentKpis.ca,
+      status: resolveMetricStatus("ca", currentKpis.ca),
+      missingMessage:
+        currentKpis.ca === null
+          ? "Pour visualiser votre chiffre d'affaires, uploader un document complet."
+          : null,
+      benchmarkLabel: buildSectorBenchmark("ca", currentKpis.ca, sector).label,
       trend: buildTrend(currentKpis.ca, previousKpis?.ca ?? null)
     },
     {
@@ -63,6 +74,12 @@ export function buildSyntheseViewModel(
       title: "Rentabilité opérationnelle",
       subtitle: "EBE",
       value: currentKpis.ebe,
+      status: resolveMetricStatus("ebe", currentKpis.ebe),
+      missingMessage:
+        currentKpis.ebe === null
+          ? "Pour visualiser votre EBE, uploader un document complet."
+          : null,
+      benchmarkLabel: buildSectorBenchmark("ebe", currentKpis.ebe, sector).label,
       trend: buildTrend(currentKpis.ebe, previousKpis?.ebe ?? null)
     },
     {
@@ -70,6 +87,12 @@ export function buildSyntheseViewModel(
       title: "Cash disponible",
       subtitle: "Disponibilités",
       value: currentKpis.disponibilites,
+      status: resolveMetricStatus("cash", currentKpis.disponibilites),
+      missingMessage:
+        currentKpis.disponibilites === null
+          ? "Pour visualiser votre cash disponible, uploader un document complet."
+          : null,
+      benchmarkLabel: buildSectorBenchmark("cash", currentKpis.disponibilites, sector).label,
       trend: buildTrend(currentKpis.disponibilites, previousKpis?.disponibilites ?? null)
     }
   ];
@@ -136,6 +159,43 @@ export function buildSyntheseViewModel(
     actions,
     alerts
   };
+}
+
+function resolveMetricStatus(
+  metricId: SyntheseMetric["id"],
+  value: number | null
+): SyntheseMetric["status"] {
+  if (value === null) {
+    return "na";
+  }
+
+  if (metricId === "ca") {
+    if (value >= 200000) {
+      return "good";
+    }
+    if (value >= 80000) {
+      return "medium";
+    }
+    return "risk";
+  }
+
+  if (metricId === "ebe") {
+    if (value >= 30000) {
+      return "good";
+    }
+    if (value >= 0) {
+      return "medium";
+    }
+    return "risk";
+  }
+
+  if (value >= 50000) {
+    return "good";
+  }
+  if (value >= 0) {
+    return "medium";
+  }
+  return "risk";
 }
 
 // Fonction pure de tendance: compare valeur courante et précédente avec gestion des cas limites.

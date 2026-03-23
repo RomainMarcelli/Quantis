@@ -31,6 +31,13 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const userId = String(formData.get("userId") ?? "");
   const folderName = String(formData.get("folderName") ?? "").trim() || "Dossier principal";
+  const companySize = String(formData.get("companySize") ?? "").trim() || null;
+  const sector = String(formData.get("sector") ?? "").trim() || null;
+  const sourceRaw = String(formData.get("source") ?? "").trim();
+  const source: "dashboard" | "analysis" | "upload" | "manual" =
+    sourceRaw === "analysis" || sourceRaw === "upload" || sourceRaw === "manual"
+      ? sourceRaw
+      : "dashboard";
 
   if (!userId) {
     await safeLogSecurityEventFromRequest(request, {
@@ -82,7 +89,12 @@ export async function POST(request: NextRequest) {
     const analysisDraft = await runAnalysisPipeline({
       userId,
       folderName,
-      files: binaryFiles
+      files: binaryFiles,
+      uploadContext: {
+        companySize,
+        sector,
+        source
+      }
     });
 
     await safeLogSecurityEventFromRequest(request, {
@@ -93,7 +105,10 @@ export async function POST(request: NextRequest) {
       message: "Upload traité avec succès.",
       metadata: {
         folderName,
-        filesCount: binaryFiles.length
+        filesCount: binaryFiles.length,
+        source,
+        hasCompanySize: Boolean(companySize),
+        hasSector: Boolean(sector)
       }
     });
 

@@ -52,7 +52,7 @@ describe("value creation chart components", () => {
 
     expect(html).toContain("Graphique point mort");
     expect(html).toContain("Volume de point mort");
-    expect(html).toContain("Avant le point mort: pertes");
-    expect(html).toContain("Après le point mort: bénéfices");
+    expect(html).toContain("Zone d&#x27;activité non rentable.");
+    expect(html).toContain("Zone d&#x27;activité rentable.");
   });
 });

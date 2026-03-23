@@ -57,7 +57,7 @@ describe("requestPasswordReset", () => {
 
     expect(result).toEqual({
       success: true,
-      message: "Si un compte existe pour cet email, un lien de reinitialisation a ete envoye."
+      message: "Si un compte existe pour cet email, un lien de réinitialisation a été envoyé."
     });
   });
 
@@ -71,7 +71,7 @@ describe("requestPasswordReset", () => {
 
     expect(result).toEqual({
       success: true,
-      message: "Si un compte existe pour cet email, un lien de reinitialisation a ete envoye."
+      message: "Si un compte existe pour cet email, un lien de réinitialisation a été envoyé."
     });
   });
 });
@@ -108,7 +108,7 @@ describe("reset password flow", () => {
     const result = await verifyPasswordResetLink(gateway, "");
     expect(result).toEqual({
       success: false,
-      message: "Lien de reinitialisation invalide ou incomplet."
+      message: "Lien de réinitialisation invalide ou incomplet."
     });
     expect(gateway.verifyPasswordResetCode).not.toHaveBeenCalled();
   });
@@ -130,7 +130,7 @@ describe("reset password flow", () => {
     expect(result).toEqual({
       success: false,
       errors: {
-        general: "Ce lien de reinitialisation est invalide ou expire."
+        general: "Ce lien de réinitialisation est invalide ou expiré."
       }
     });
   });
@@ -149,9 +149,8 @@ describe("reset password flow", () => {
 
     expect(result).toEqual({
       success: true,
-      message: "Mot de passe mis a jour avec succes. Vous pouvez vous connecter."
+      message: "Mot de passe mis à jour avec succès. Vous pouvez vous connecter."
     });
     expect(confirmPasswordReset).toHaveBeenCalledWith("token", "Abcdef1!");
   });
 });
-

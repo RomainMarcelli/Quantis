@@ -330,7 +330,7 @@ export function KpiBeforeAfterView() {
                           : "rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-200"
                       }
                     >
-                      {entry.matches ? "OK" : "Ecart"}
+                      {entry.matches ? "OK" : "Écart"}
                     </span>
                   </td>
                 </tr>
@@ -364,8 +364,8 @@ export function KpiBeforeAfterView() {
   );
 }
 
-function formatMaybeNumber(value: number | null): string {
-  if (value === null) {
+function formatMaybeNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined) {
     return "N/D";
   }
   return formatNumber(value);

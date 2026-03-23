@@ -211,11 +211,6 @@ function resolveRatioImmoUsure(kpis: QuantisScoreInputKpis): number | null {
     return ratioIfPercent(direct);
   }
 
-  const ratioImmo = pickNumber(kpis.ratio_immo);
-  if (ratioImmo !== null) {
-    return ratioIfPercent(ratioImmo);
-  }
-
   const etatMateriel = pickNumber(kpis.etat_materiel_indice);
   if (etatMateriel !== null) {
     return ratioIfPercent(etatMateriel);

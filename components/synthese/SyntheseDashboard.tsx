@@ -10,6 +10,7 @@ import {
   Check,
   ChevronDown,
   CircleDot,
+  Download,
   Lightbulb
 } from "lucide-react";
 import { formatCurrency } from "@/components/dashboard/formatting";
@@ -23,6 +24,9 @@ type SyntheseDashboardProps = {
   selectedYearValue: string;
   yearOptions: SyntheseYearOption[];
   onYearChange: (nextYearValue: string) => void;
+  onDownloadReport: () => void;
+  onReupload: () => void;
+  onManualEntry: () => void;
   synthese: SyntheseViewModel;
 };
 
@@ -33,6 +37,9 @@ export function SyntheseDashboard({
   selectedYearValue,
   yearOptions,
   onYearChange,
+  onDownloadReport,
+  onReupload,
+  onManualEntry,
   synthese
 }: SyntheseDashboardProps) {
   return (
@@ -57,6 +64,14 @@ export function SyntheseDashboard({
             onYearChange={onYearChange}
           />
           <p className="text-xs text-white/55">Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}</p>
+          <button
+            type="button"
+            onClick={onDownloadReport}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Télécharger le rapport
+          </button>
         </div>
       </header>
 
@@ -87,7 +102,13 @@ export function SyntheseDashboard({
       {/* Ligne KPI: trois cartes horizontales responsives pour les métriques prioritaires du dirigeant. */}
       <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         {synthese.metrics.map((metric, index) => (
-          <MetricCard key={metric.id} metric={metric} delay={`${0.1 + index * 0.04}s`} />
+          <MetricCard
+            key={metric.id}
+            metric={metric}
+            delay={`${0.1 + index * 0.04}s`}
+            onReupload={onReupload}
+            onManualEntry={onManualEntry}
+          />
         ))}
       </section>
 
@@ -131,7 +152,17 @@ export function SyntheseDashboard({
   );
 }
 
-function MetricCard({ metric, delay }: { metric: SyntheseMetric; delay: string }) {
+function MetricCard({
+  metric,
+  delay,
+  onReupload,
+  onManualEntry
+}: {
+  metric: SyntheseMetric;
+  delay: string;
+  onReupload: () => void;
+  onManualEntry: () => void;
+}) {
   const isPositive = metric.trend.tone === "positive";
   const isNegative = metric.trend.tone === "negative";
 
@@ -139,15 +170,42 @@ function MetricCard({ metric, delay }: { metric: SyntheseMetric; delay: string }
     <article className="precision-card fade-up rounded-2xl p-5" style={{ animationDelay: delay }}>
       <p className="text-lg font-semibold text-white">{metric.title}</p>
       <p className="text-xs uppercase tracking-wide text-white/55">{metric.subtitle}</p>
-      <p className="mt-4 text-4xl font-semibold text-white">{formatCurrency(metric.value)}</p>
-      <div
-        className={`mt-4 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium ${trendToneClass(metric.trend.tone)}`}
-      >
-        {isPositive ? <ArrowUpRight className="h-3.5 w-3.5" /> : null}
-        {isNegative ? <ArrowDownRight className="h-3.5 w-3.5" /> : null}
-        {!isPositive && !isNegative ? <CircleDot className="h-3.5 w-3.5" /> : null}
-        <span>{metric.trend.label}</span>
-      </div>
+      <p className={`mt-4 text-4xl font-semibold ${metricValueClass(metric.status)}`}>
+        {formatCurrency(metric.value)}
+      </p>
+      {metric.value === null && metric.missingMessage ? (
+        <div className="mt-4 rounded-xl border border-amber-300/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+          <p>{metric.missingMessage}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onReupload}
+              className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-white/85 hover:bg-white/20"
+            >
+              Ré-uploader un fichier
+            </button>
+            <button
+              type="button"
+              onClick={onManualEntry}
+              className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-white/85 hover:bg-white/20"
+            >
+              Saisie manuelle
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div
+            className={`mt-4 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium ${trendToneClass(metric.trend.tone)}`}
+          >
+            {isPositive ? <ArrowUpRight className="h-3.5 w-3.5" /> : null}
+            {isNegative ? <ArrowDownRight className="h-3.5 w-3.5" /> : null}
+            {!isPositive && !isNegative ? <CircleDot className="h-3.5 w-3.5" /> : null}
+            <span>{metric.trend.label}</span>
+          </div>
+          <p className="mt-2 text-xs text-white/55">{metric.benchmarkLabel}</p>
+        </>
+      )}
     </article>
   );
 }
@@ -262,6 +320,19 @@ function scoreColorClass(score: number | null): string {
     return "text-amber-300";
   }
   return "text-rose-300";
+}
+
+function metricValueClass(status: SyntheseMetric["status"]): string {
+  if (status === "good") {
+    return "text-emerald-300";
+  }
+  if (status === "medium") {
+    return "text-amber-300";
+  }
+  if (status === "risk") {
+    return "text-rose-300";
+  }
+  return "text-white";
 }
 
 function PiliersItem({ label, value }: { label: string; value: number }) {

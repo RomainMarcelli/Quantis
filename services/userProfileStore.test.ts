@@ -39,7 +39,8 @@ describe("userProfileStore", () => {
       companyName: "Quantis SAS",
       siren: "123456789",
       companySize: "pme",
-      sector: "SaaS & Edition de Logiciels"
+      sector: "SaaS & Edition de Logiciels",
+      usageObjectives: ["analyser_comptes"]
     });
 
     expect(firestore.setDoc).toHaveBeenCalledWith(
@@ -102,6 +103,7 @@ describe("userProfileStore", () => {
       siren: "123456789",
       companySize: "pme",
       sector: "SaaS & Edition de Logiciels",
+      usageObjectives: [],
       email: "marie@quantis.fr",
       emailVerified: true,
       createdAt: "2026-03-01T10:00:00.000Z",

@@ -1,5 +1,5 @@
 // app/api/auth/send-password-reset-email/route.ts
-// Endpoint serveur qui envoie l'email de reinitialisation mot de passe via Resend.
+// Endpoint serveur qui envoie l'email de réinitialisation mot de passe via Resend.
 import { NextRequest, NextResponse } from "next/server";
 import { sendPasswordResetEmail } from "@/lib/server/authEmailService";
 import { enforceRouteRateLimit } from "@/lib/server/rateLimit";
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       message: error instanceof Error ? error.message : "Erreur inconnue"
     });
     return NextResponse.json(
-      { error: "Impossible d'envoyer l'email de reinitialisation pour le moment." },
+      { error: "Impossible d'envoyer l'email de réinitialisation pour le moment." },
       { status: 500 }
     );
   }

@@ -65,6 +65,7 @@ import {
   renameUserFoldersByName
 } from "@/services/folderStore";
 import { firebaseAuthGateway } from "@/services/auth";
+import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
@@ -132,13 +133,17 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
       if (!nextUser) {
-        router.replace("/");
+        setUser(null);
+        setLoadingAuth(false);
+        router.replace("/login");
         return;
       }
 
       if (!nextUser.emailVerified) {
         void firebaseAuthGateway.signOut();
-        router.replace("/");
+        setUser(null);
+        setLoadingAuth(false);
+        router.replace("/login");
         return;
       }
 
@@ -337,6 +342,14 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
     setErrorMessage(null);
 
     try {
+      // Persiste en base une éventuelle analyse locale créée avant inscription.
+      // Ce raccord empêche l'utilisateur de tomber sur un dashboard vide après connexion.
+      try {
+        await persistPendingAnalysisForUser(currentUser.uid);
+      } catch {
+        // Non bloquant: on garde le chargement des analyses déjà persistées.
+      }
+
       const [history, profile, persistedFolders] = await Promise.all([
         listUserAnalyses(currentUser.uid),
         getUserProfile(currentUser.uid),
@@ -355,7 +368,9 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
         clearLocalAnalysisHint();
         setAnalysis(null);
         setCurrentFolder(getActiveFolderName() ?? persistedFolderNames[0] ?? DEFAULT_FOLDER_NAME);
-        setErrorMessage("Aucune analyse disponible. Deposez un fichier pour afficher le dashboard.");
+        setErrorMessage(
+          "Aucune analyse disponible pour le moment. Importez un fichier pour démarrer votre analyse financière."
+        );
         return;
       }
 
@@ -414,6 +429,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
       const formData = new FormData();
       formData.append("userId", user.uid);
       formData.append("folderName", folderName);
+      formData.append("source", "analysis");
       files.forEach((file) => formData.append("files", file));
 
       const response = await fetch("/api/analyses", {
@@ -505,7 +521,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
         await createUserFolder(user.uid, normalizedInputName);
         setCurrentFolder(normalizedInputName);
         setKnownFolders(registerKnownFolderName(normalizedInputName));
-        setInfoMessage(`Dossier cree et actif: ${normalizedInputName}`);
+        setInfoMessage(`Dossier créé et actif : ${normalizedInputName}`);
       }
 
       if (folderDialogMode === "rename" && targetFolderName) {
@@ -650,7 +666,9 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
       if (!remainingAnalyses.length) {
         clearLocalAnalysisHint();
         setAnalysis(null);
-        setErrorMessage("Aucune analyse disponible. Déposez un fichier pour afficher le dashboard.");
+        setErrorMessage(
+          "Aucune analyse disponible pour le moment. Importez un fichier pour démarrer votre analyse financière."
+        );
       } else {
         setLocalAnalysisHint(true);
       }
@@ -734,6 +752,21 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
     );
   }
 
+  if (!user) {
+    return (
+      <section className="precision-card rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/80">Votre session est expirée. Reconnectez-vous pour continuer.</p>
+        <button
+          type="button"
+          onClick={() => router.replace("/login")}
+          className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10"
+        >
+          Se connecter
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-4">
       {/* Bandeau d'actions globales conserve (settings/offres/compte/logout) avec skin premium dark. */}
@@ -743,7 +776,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
           <QuantisLogo withText={false} size={34} />
           <div>
             <p className="text-sm font-semibold text-white">{companyName}</p>
-            <p className="text-xs text-white/55">Plateforme financiere</p>
+            <p className="text-xs text-white/55">Plateforme financière</p>
           </div>
         </div>
 
@@ -754,8 +787,8 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
             type="button"
             onClick={() => router.push("/settings")}
             className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Parametres"
-            title="Parametres"
+            aria-label="Paramètres"
+            title="Paramètres"
           >
             <Settings className="h-4 w-4" />
           </button>
@@ -1006,6 +1039,14 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
               <p className="mt-2 font-medium">Glisser-déposer</p>
               <p className="text-[11px] text-white/55">ou cliquer pour parcourir</p>
             </button>
+            <button
+              type="button"
+              onClick={() => router.push("/upload/manual")}
+              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-xs font-medium text-white/85 transition-colors hover:bg-white/10"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Saisie manuelle des données
+            </button>
           </div>
         </aside>
 
@@ -1070,7 +1111,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
               <p className="text-sm text-white/70">
                 {hasNoAnalysisForSelectedYear
                   ? "Aucune analyse disponible pour l'année sélectionnée."
-                  : "Ce dossier ne contient pas encore d&apos;analyse. Ajoutez un fichier pour demarrer."}
+                  : "Aucune analyse disponible pour le moment. Importez un fichier pour démarrer votre analyse financière."}
               </p>
             </section>
           )}
@@ -1089,7 +1130,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
                 ? `Vous allez supprimer le fichier "${pendingSourceFilesDeletion[0]?.name ?? "source"}".`
                 : `Vous allez supprimer ${pendingSourceFilesDeletion.length} fichiers sources.`}
               {" "}
-              Cette action supprime aussi les donnees d&apos;analyse associees ({pendingSourceFilesDeletionAnalysesCount} analyses)
+              Cette action supprime aussi les données d’analyse associées ({pendingSourceFilesDeletionAnalysesCount} analyses)
               et elle est irreversible.
             </p>
             <div className="mt-4 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-white/10 bg-black/25 p-3">
@@ -1133,7 +1174,7 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
           >
             <h3 className="text-base font-semibold text-white">
               {folderDialogMode === "create"
-                ? "Creer un dossier"
+                ? "Créer un dossier"
                 : folderDialogMode === "rename"
                   ? "Renommer le dossier"
                   : "Supprimer le dossier"}
@@ -1142,8 +1183,8 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
             {folderDialogMode === "delete" ? (
               <p className="mt-3 text-sm text-white/70">
                 {folderDialogAnalysesCount > 0
-                  ? `Le dossier "${folderDialogTargetName}" contient ${folderDialogAnalysesCount} analyses. Elles seront supprimees.`
-                  : `Le dossier "${folderDialogTargetName}" est vide et sera supprime.`}
+                  ? `Le dossier "${folderDialogTargetName}" contient ${folderDialogAnalysesCount} analyses. Elles seront supprimées.`
+                  : `Le dossier "${folderDialogTargetName}" est vide et sera supprimé.`}
               </p>
             ) : (
               <div className="mt-4">

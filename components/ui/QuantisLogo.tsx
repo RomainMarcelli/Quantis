@@ -13,13 +13,13 @@ export function QuantisLogo({
   withText = true,
   textClassName = "text-xs uppercase tracking-wide text-quantis-slate",
   className = "",
-  imageClassName = "shrink-0 object-contain"
+  imageClassName = "shrink-0 bg-transparent object-contain"
 }: QuantisLogoProps) {
   return (
     <div className={`inline-flex items-center gap-2 ${className}`.trim()}>
       {/* Source unique du logo applicatif pour garantir une cohérence globale dans toute l'application. */}
       <Image
-        src="/images/logo.png"
+        src="/images/LogoV3.png"
         alt="Logo Quantis"
         width={size}
         height={size}

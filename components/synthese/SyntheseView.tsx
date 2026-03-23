@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
+import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
@@ -23,6 +24,7 @@ import {
 import { buildSyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import { listUserAnalyses } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
+import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
@@ -34,6 +36,7 @@ export function SyntheseView() {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Quantis");
+  const [sector, setSector] = useState<string | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
   const [selectedYearValue, setSelectedYearValue] = useState<string>(SYNTHESIS_CURRENT_YEAR_KEY);
   const [loading, setLoading] = useState(true);
@@ -93,6 +96,12 @@ export function SyntheseView() {
     () => filterAnalysesByYear(allAnalyses, selectedYearValue, currentCalendarYear),
     [allAnalyses, selectedYearValue, currentCalendarYear]
   );
+  const selectedYearLabel = useMemo(
+    () =>
+      yearOptions.find((option) => option.value === selectedYearValue)?.label ??
+      `Année en cours (${currentCalendarYear})`,
+    [currentCalendarYear, selectedYearValue, yearOptions]
+  );
 
   const analysisPair = useMemo(() => {
     if (!analysesBySelectedYear.length) {
@@ -107,8 +116,8 @@ export function SyntheseView() {
     if (!analysisPair.current) {
       return null;
     }
-    return buildSyntheseViewModel(analysisPair.current.kpis, analysisPair.previous?.kpis ?? null);
-  }, [analysisPair]);
+    return buildSyntheseViewModel(analysisPair.current.kpis, analysisPair.previous?.kpis ?? null, sector);
+  }, [analysisPair, sector]);
 
   useEffect(() => {
     // Si l'option active n'existe plus après reload, on revient sur "Année en cours".
@@ -139,6 +148,15 @@ export function SyntheseView() {
     setErrorMessage(null);
 
     try {
+      // Si une analyse "invité" existe, on la rattache d'abord au compte connecté.
+      // Cette étape garantit qu'aucune analyse n'est perdue après inscription.
+      try {
+        await persistPendingAnalysisForUser(currentUser.uid);
+      } catch {
+        // Non bloquant: on conserve la lecture des analyses existantes et
+        // la donnée locale restera disponible pour une prochaine tentative.
+      }
+
       const [history, profile] = await Promise.all([
         listUserAnalyses(currentUser.uid),
         getUserProfile(currentUser.uid)
@@ -146,10 +164,13 @@ export function SyntheseView() {
 
       setGreetingName(resolveFirstName(currentUser, profile?.firstName));
       setCompanyName(profile?.companyName?.trim() || "Quantis");
+      setSector(profile?.sector ?? null);
       setAllAnalyses(history);
 
       if (!history.length) {
-        setErrorMessage("Aucune analyse disponible. Déposez un fichier pour afficher la synthèse.");
+        setErrorMessage(
+          "Aucune analyse disponible pour le moment. Importez un fichier pour démarrer votre analyse financière."
+        );
       }
     } catch (error) {
       setErrorMessage(
@@ -270,6 +291,20 @@ export function SyntheseView() {
               selectedYearValue={selectedYearValue}
               yearOptions={yearOptions}
               onYearChange={setSelectedYearValue}
+              onDownloadReport={() => {
+                if (!analysisPair.current) {
+                  return;
+                }
+                void downloadSyntheseReport({
+                  companyName,
+                  greetingName,
+                  analysisCreatedAt: analysisPair.current.createdAt,
+                  selectedYearLabel,
+                  synthese
+                });
+              }}
+              onReupload={() => router.push("/upload")}
+              onManualEntry={() => router.push("/upload/manual")}
               synthese={synthese}
             />
           ) : (
@@ -279,6 +314,22 @@ export function SyntheseView() {
                   ? "Déposez un fichier dans l'espace dashboard pour débloquer la synthèse."
                   : "Aucune synthèse disponible pour l'année sélectionnée."}
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/upload")}
+                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+                >
+                  Ré-uploader un fichier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/upload/manual")}
+                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+                >
+                  Saisie manuelle
+                </button>
+              </div>
             </section>
           )}
         </div>

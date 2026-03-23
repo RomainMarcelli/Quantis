@@ -40,7 +40,7 @@ export interface PasswordResetGateway {
 }
 
 const GENERIC_RESET_REQUEST_SUCCESS_MESSAGE =
-  "Si un compte existe pour cet email, un lien de reinitialisation a ete envoye.";
+  "Si un compte existe pour cet email, un lien de réinitialisation a été envoyé.";
 
 export function validateForgotPasswordInput(
   input: ForgotPasswordInput
@@ -78,7 +78,7 @@ export async function requestPasswordReset(
   } catch (error) {
     const code = extractErrorCode(error);
 
-    // Contrainte securite: on ne revele jamais si l'email existe ou non.
+    // Contrainte sécurité: on ne révèle jamais si l'email existe ou non.
     if (code === "auth/user-not-found") {
       return {
         success: true,
@@ -99,7 +99,7 @@ export async function requestPasswordReset(
       return {
         success: false,
         errors: {
-          general: "Trop de tentatives. Reessayez dans quelques minutes."
+          general: "Trop de tentatives. Réessayez dans quelques minutes."
         }
       };
     }
@@ -107,7 +107,7 @@ export async function requestPasswordReset(
     return {
       success: false,
       errors: {
-        general: "Impossible d'envoyer le lien pour le moment. Veuillez reessayer."
+        general: "Impossible d'envoyer le lien pour le moment. Veuillez réessayer."
       }
     };
   }
@@ -121,7 +121,7 @@ export async function verifyPasswordResetLink(
   if (!trimmedCode) {
     return {
       success: false,
-      message: "Lien de reinitialisation invalide ou incomplet."
+      message: "Lien de réinitialisation invalide ou incomplet."
     };
   }
 
@@ -145,7 +145,7 @@ export function validateResetPasswordInput(
   const errors: ResetPasswordValidationErrors = {};
 
   if (!input.oobCode.trim()) {
-    errors.general = "Lien de reinitialisation invalide ou incomplet.";
+    errors.general = "Lien de réinitialisation invalide ou incomplet.";
   }
 
   const passwordError = getPasswordValidationError(input.password);
@@ -178,7 +178,7 @@ export async function confirmPasswordResetFlow(
     await gateway.confirmPasswordReset(input.oobCode.trim(), input.password);
     return {
       success: true,
-      message: "Mot de passe mis a jour avec succes. Vous pouvez vous connecter."
+      message: "Mot de passe mis à jour avec succès. Vous pouvez vous connecter."
     };
   } catch (error) {
     return {
@@ -215,13 +215,12 @@ function mapResetLinkErrorToMessage(code: string | undefined): string {
   switch (code) {
     case "auth/invalid-action-code":
     case "auth/expired-action-code":
-      return "Ce lien de reinitialisation est invalide ou expire.";
+      return "Ce lien de réinitialisation est invalide ou expiré.";
     case "auth/weak-password":
-      return "Mot de passe trop faible. Verifiez les criteres de securite.";
+      return "Mot de passe trop faible. Vérifiez les critères de sécurité.";
     case "auth/too-many-requests":
-      return "Trop de tentatives. Reessayez dans quelques minutes.";
+      return "Trop de tentatives. Réessayez dans quelques minutes.";
     default:
-      return "Operation impossible pour le moment. Veuillez reessayer.";
+      return "Opération impossible pour le moment. Veuillez réessayer.";
   }
 }
-

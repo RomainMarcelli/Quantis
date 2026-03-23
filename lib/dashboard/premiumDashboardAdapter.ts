@@ -50,7 +50,7 @@ export function getPremiumHealthState(score: number | null): PremiumHealthState 
     return {
       label: "Excellente",
       message:
-        "Structure financiere robuste. La capacite d'autofinancement soutient le plan de croissance.",
+        "Structure financière robuste. La capacité d'autofinancement soutient le plan de croissance.",
       colorHex: "#10B981",
       severity: "excellent"
     };
@@ -67,7 +67,7 @@ export function getPremiumHealthState(score: number | null): PremiumHealthState 
 
   return {
     label: "Critique",
-    message: "Alerte liquidite. Le risque de tension court terme est eleve.",
+    message: "Alerte liquidité. Le risque de tension court terme est élevé.",
     colorHex: "#EF4444",
     severity: "critical"
   };

@@ -1,5 +1,5 @@
 // lib/email/templates/verificationEmailTemplate.ts
-// Genere le template transactionnel de verification de compte dans la DA Quantis.
+// Génère le template transactionnel de vérification de compte dans la DA Quantis.
 type VerificationEmailTemplateInput = {
   firstName?: string;
   verificationUrl: string;
@@ -30,12 +30,12 @@ export function buildVerificationEmailTemplate({
               </tr>
               <tr>
                 <td style="padding:0 32px 0 32px;font-size:30px;line-height:1.2;font-weight:700;color:#ffffff;">
-                  Activez votre <span style="color:#C5A059;">compte securise</span>
+                  Activez votre <span style="color:#C5A059;">compte sécurisé</span>
                 </td>
               </tr>
               <tr>
                 <td style="padding:14px 32px 0 32px;font-size:15px;line-height:1.65;color:#d4d4d8;">
-                  ${safeFirstName}, votre espace Quantis est presque pret. Confirmez votre adresse email pour finaliser l'activation.
+                  ${safeFirstName}, votre espace Quantis est presque prêt. Confirmez votre adresse email pour finaliser l'activation.
                 </td>
               </tr>
               <tr>
@@ -50,7 +50,7 @@ export function buildVerificationEmailTemplate({
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #27272a;border-radius:12px;background:#0b0c10;">
                     <tr>
                       <td style="padding:12px 14px;font-size:13px;line-height:1.6;color:#a1a1aa;">
-                        Si vous ne voyez pas l'email dans votre boite principale, verifiez aussi votre dossier spam/courrier indesirable.
+                        Si vous ne voyez pas l'email dans votre boîte principale, vérifiez aussi votre dossier spam/courrier indésirable.
                       </td>
                     </tr>
                   </table>
@@ -75,7 +75,7 @@ export function buildVerificationEmailTemplate({
   </html>
   `;
 
-  const text = `${safeFirstName}, confirmez votre compte Quantis via ce lien: ${verificationUrl}\n\nSi vous ne trouvez pas l'email, verifiez aussi votre dossier spam.`;
+  const text = `${safeFirstName}, confirmez votre compte Quantis via ce lien: ${verificationUrl}\n\nSi vous ne trouvez pas l'email, vérifiez aussi votre dossier spam.`;
 
   return {
     subject,

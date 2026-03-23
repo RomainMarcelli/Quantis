@@ -3,12 +3,16 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Circle, Eye, EyeOff, Info } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Eye, EyeOff, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getPasswordRuleChecks } from "@/lib/auth/passwordPolicy";
 import { COMPANY_SIZE_OPTIONS, SECTOR_OPTIONS } from "@/lib/onboarding/options";
 import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import {
+  ONBOARDING_OBJECTIVE_OPTIONS,
+  type OnboardingObjectiveValue
+} from "@/lib/onboarding/objectives";
 import { loginWithEmailPassword } from "@/lib/auth/login";
 import { registerWithEmailPassword } from "@/lib/auth/register";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
@@ -25,21 +29,38 @@ type ToastState = { type: "success" | "error" | "info"; message: string } | null
 const EMPTY_LOGIN_ERRORS: LoginValidationErrors = {};
 const EMPTY_REGISTER_ERRORS: RegisterValidationErrors = {};
 
-export function LoginForm() {
+type LoginFormProps = {
+  initialMode?: AuthMode;
+  lockMode?: boolean;
+  initialCompanySize?: CompanySizeValue | "";
+  initialSector?: SectorValue | "";
+  backHref?: string;
+  postLoginRedirect?: string;
+};
+
+export function LoginForm({
+  initialMode = "login",
+  lockMode = false,
+  initialCompanySize = "",
+  initialSector = "",
+  backHref = "/",
+  postLoginRedirect = "/analysis"
+}: LoginFormProps) {
   const router = useRouter();
   // Reference de la carte pour recentrer la vue en haut apres une inscription reussie.
   const cardRef = useRef<HTMLElement | null>(null);
 
   // Etat principal du formulaire auth (connexion / inscription).
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [siren, setSiren] = useState("");
-  const [companySize, setCompanySize] = useState<CompanySizeValue | "">("");
-  const [sector, setSector] = useState<SectorValue | "">("");
+  const [companySize, setCompanySize] = useState<CompanySizeValue | "">(initialCompanySize);
+  const [sector, setSector] = useState<SectorValue | "">(initialSector);
+  const [usageObjectives, setUsageObjectives] = useState<OnboardingObjectiveValue[]>([]);
   const [showPassword, setShowPassword] = useState(false);
 
   const [loginErrors, setLoginErrors] = useState<LoginValidationErrors>(EMPTY_LOGIN_ERRORS);
@@ -56,15 +77,29 @@ export function LoginForm() {
   const [authInfoMessage, setAuthInfoMessage] = useState<string | null>(null);
 
   const currentErrors = mode === "login" ? loginErrors : registerErrors;
+  const safePostLoginRedirect =
+    postLoginRedirect.trim().startsWith("/") ? postLoginRedirect.trim() : "/analysis";
   const passwordRules = useMemo(() => getPasswordRuleChecks(password), [password]);
 
   useEffect(() => {
     const currentUser = firebaseAuthGateway.getCurrentUser();
 
     if (currentUser?.emailVerified) {
-      router.replace("/dashboard");
+      router.replace(safePostLoginRedirect);
     }
-  }, [router]);
+  }, [router, safePostLoginRedirect]);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  useEffect(() => {
+    setCompanySize(initialCompanySize);
+  }, [initialCompanySize]);
+
+  useEffect(() => {
+    setSector(initialSector);
+  }, [initialSector]);
 
   useEffect(() => {
     if (!toast) {
@@ -119,7 +154,7 @@ export function LoginForm() {
         userId: result.user.uid,
         message: "Connexion utilisateur réussie."
       });
-      router.push("/dashboard");
+      router.push(safePostLoginRedirect);
       return;
     }
 
@@ -136,7 +171,8 @@ export function LoginForm() {
         companyName,
         siren,
         companySize,
-        sector
+        sector,
+        usageObjectives
       }
     );
 
@@ -144,7 +180,7 @@ export function LoginForm() {
       setRegisterErrors(result.errors);
       setToast({
         type: "error",
-        message: result.errors.general ?? "Inscription invalide. Verifiez le formulaire."
+        message: result.errors.general ?? "Inscription invalide. Vérifiez le formulaire."
       });
       setIsSubmitting(false);
       return;
@@ -154,11 +190,11 @@ export function LoginForm() {
     setIsSubmitting(false);
     setMode("login");
     setLoginErrors(EMPTY_LOGIN_ERRORS);
-    setAuthInfoMessage("Compte cree. Verifiez votre email et votre dossier spam avant de vous connecter.");
-    setToast({
-      type: "success",
-      message: "Compte cree avec succes. Verifiez votre boite email et vos spams."
-    });
+    setAuthInfoMessage("Compte créé. Vérifiez votre email et votre dossier spam avant de vous connecter.");
+    if (lockMode) {
+      router.replace("/");
+      return;
+    }
 
     // On recentre la vue en haut pour que le message de confirmation soit visible immediatement.
     if (typeof window !== "undefined") {
@@ -172,7 +208,7 @@ export function LoginForm() {
   if (isCheckingSession) {
     return (
       <section className="precision-card relative z-10 w-full max-w-xl rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Verification de session...</p>
+        <p className="text-sm text-white/70">Vérification de session...</p>
       </section>
     );
   }
@@ -189,53 +225,79 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="space-y-4">
+        {!lockMode ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href={backHref}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/80 transition-colors hover:border-quantis-gold/40 hover:bg-white/10 hover:text-white"
+              aria-label="Retour"
+              title="Retour"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setRegisterErrors(EMPTY_REGISTER_ERRORS);
+                  setAuthInfoMessage(null);
+                  setPassword("");
+                }}
+                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                  mode === "login"
+                    ? "bg-quantis-gold text-black"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                Connexion
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setLoginErrors(EMPTY_LOGIN_ERRORS);
+                  setAuthInfoMessage(null);
+                  setPassword("");
+                }}
+                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                  mode === "register"
+                    ? "bg-quantis-gold text-black"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                Inscription
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex items-center gap-4">
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-transparent p-1.5">
+            <QuantisLogo
+              withText={false}
+              size={56}
+              imageClassName="h-14 w-14 shrink-0 object-contain"
+            />
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-quantis-gold">Quantis</p>
+            <p className="mt-1 text-xs text-white/55">Plateforme financière</p>
+          </div>
+        </div>
+
         <div>
-          <QuantisLogo withText={false} size={34} className="mb-3" />
           <h1 className="text-3xl font-semibold leading-tight text-white md:text-4xl">
-            {mode === "login" ? "Connexion" : "Creation de compte"}
+            {mode === "login" ? "Connexion" : "Création de compte"}
             <span className="ml-2 text-quantis-gold">Quantis</span>
           </h1>
           <p className="mt-3 text-sm text-white/60">
             {mode === "login"
-              ? "Accedez a votre cockpit financier en quelques secondes."
+              ? "Accédez à votre cockpit financier en quelques secondes."
               : "Configurez votre compte entreprise pour lancer vos analyses."}
           </p>
-        </div>
-
-        <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/5 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("login");
-              setRegisterErrors(EMPTY_REGISTER_ERRORS);
-              setAuthInfoMessage(null);
-              setPassword("");
-            }}
-            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-              mode === "login"
-                ? "bg-quantis-gold text-black"
-                : "text-white/70 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            Connexion
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("register");
-              setLoginErrors(EMPTY_LOGIN_ERRORS);
-              setAuthInfoMessage(null);
-              setPassword("");
-            }}
-            className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-              mode === "register"
-                ? "bg-quantis-gold text-black"
-                : "text-white/70 hover:bg-white/10 hover:text-white"
-            }`}
-          >
-            Inscription
-          </button>
         </div>
       </div>
 
@@ -261,16 +323,16 @@ export function LoginForm() {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-white">Prenom</span>
+              <span className="mb-1.5 block text-sm font-medium text-white">Prénom</span>
               <div className="quantis-input bg-white/5 px-3 py-2">
                 <input
                   type="text"
                   value={firstName}
                   onChange={(event) => setFirstName(event.target.value)}
-                  placeholder="Votre prenom"
+                  placeholder="Votre prénom"
                   className="w-full border-0 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
                   autoComplete="given-name"
-                  title="Prenom de la personne responsable"
+                  title="Prénom de la personne responsable"
                 />
               </div>
               {registerErrors.firstName ? <InlineError message={registerErrors.firstName} /> : null}
@@ -331,11 +393,11 @@ export function LoginForm() {
 
         {mode === "register" ? (
           <>
-            {/* Bloc securite en chips pour un feedback lisible sans casser la mise en page. */}
+            {/* Bloc sécurité en chips pour un feedback lisible sans casser la mise en page. */}
             <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/75">
                 <Info className="h-3.5 w-3.5" />
-                Securite mot de passe
+                Sécurité mot de passe
               </p>
               <ul className="flex flex-wrap gap-1.5">
                 {passwordRules.map((rule) => (
@@ -431,6 +493,45 @@ export function LoginForm() {
                 {registerErrors.sector ? <InlineError message={registerErrors.sector} /> : null}
               </label>
             </div>
+
+            <fieldset className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <legend className="px-1 text-xs uppercase tracking-wide text-white/60">
+                Objectif d&apos;utilisation
+              </legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {ONBOARDING_OBJECTIVE_OPTIONS.map((option) => {
+                  const checked = usageObjectives.includes(option.value);
+                  return (
+                    <label
+                      key={option.value}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-xs transition-colors ${
+                        checked
+                          ? "border-quantis-gold/50 bg-quantis-gold/10 text-quantis-gold"
+                          : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 accent-quantis-gold"
+                        checked={checked}
+                        onChange={(event) => {
+                          setUsageObjectives((current) => {
+                            if (event.target.checked) {
+                              return [...current, option.value];
+                            }
+                            return current.filter((value) => value !== option.value);
+                          });
+                        }}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {registerErrors.usageObjectives ? (
+                <InlineError message={registerErrors.usageObjectives} />
+              ) : null}
+            </fieldset>
           </>
         ) : null}
 
@@ -451,11 +552,11 @@ export function LoginForm() {
               : "Inscription..."
             : mode === "login"
               ? "Se connecter"
-              : "Creer mon compte"}
+              : "Créer mon compte"}
         </button>
       </form>
 
-      <div className="mt-5 text-sm text-white/65">
+      {!lockMode ? <div className="mt-5 text-sm text-white/65">
         {mode === "login" ? (
           <>
             Pas encore de compte ?{" "}
@@ -489,7 +590,7 @@ export function LoginForm() {
             </button>
           </>
         )}
-      </div>
+      </div> : null}
     </section>
   );
 }

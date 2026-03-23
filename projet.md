@@ -6,6 +6,31 @@ Quantis est un copilote financier B2B pour PME.
 Le produit convertit des donnees comptables (Excel/PDF) en decisions exploitables via un pipeline clair:
 Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 
+## Parcours utilisateur (optimisé)
+
+1. Arrivée non connectée sur `/` avec CTA principal `Évaluer votre santé financière`.
+2. Redirection utilisateur vers `/upload` (page dédiée au dépôt de fichiers).
+3. Validation stricte du format Excel (`.xlsx`, `.xls`, `.csv`) + drag & drop.
+4. Saisie obligatoire du contexte avant analyse:
+   - nombre d’employés
+   - secteur d’activité
+5. Parsing + calcul KPI + calcul `Quantis Score` côté pipeline serveur.
+6. Persistance Firestore dans `analyses`:
+   - fichiers sources
+   - KPI calculés
+   - score Quantis et piliers
+   - contexte d’upload
+7. Redirection vers `/synthese` après traitement.
+8. Gestion des données manquantes sur les KPI:
+   - message explicite
+   - actions `Ré-uploader un fichier` et `Saisie manuelle`
+9. Version lite benchmark secteur affichée sur les KPI de synthèse (mock backend).
+10. Export rapport via bouton `Télécharger le rapport` (impression/PDF navigateur).
+11. Route `/register` dédiée à l’inscription:
+   - email, mot de passe, SIREN, entreprise, taille, secteur
+   - objectifs d’utilisation (checkbox)
+12. `/dashboard` conserve l’espace de dépôt et expose l’historique des analyses (accès sans re-upload).
+
 ## Fonctionnalites implementees
 
 - Base technique Next.js App Router + TypeScript + Tailwind.
@@ -13,7 +38,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - fond clair, anthracite, accent or
   - cartes sobrement bordees
   - hierarchie visuelle type landing Quantis
-  - logo de marque centralise dans `public/images/logo.png` et integre aux ecrans principaux
+  - logo de marque centralise dans `public/images/LogoV3.png` et integre aux ecrans principaux
 - Authentification Firebase complete:
   - login email/password
   - recuperation de mot de passe complete:
@@ -321,3 +346,54 @@ Purge automatique mensuelle des logs sécurité pour maîtriser la volumétrie F
   - `0 3 1 * *` (1er de chaque mois à 03:00 UTC)
 - Variable d’environnement documentée:
   - `CRON_SECRET` dans `.env.example`
+
+## Mise à jour 2026-03-23
+
+- Logo applicatif unifié sur toute l’application avec `public/images/LogoV3.png`:
+  - composant central `components/ui/QuantisLogo.tsx`
+  - icônes metadata Next (`app/layout.tsx`)
+  - logo export PDF (`lib/synthese/downloadSyntheseReport.ts`)
+- Stabilité session renforcée:
+  - session utilisateur limitée à 24h max (déconnexion automatique)
+  - garde de session anti-écran noir sur `/analysis` et `/dashboard`
+  - redirection explicite vers `/login` quand la session est invalide
+- Tests unitaires ajoutés pour la logique de durée de session:
+  - `lib/auth/sessionLifetime.test.ts`
+- Parcours clarifié (suppression de la page intermédiaire dashboard):
+  - `/dashboard` est conservée en route legacy mais redirige maintenant vers `/analysis`
+  - les redirections post-connexion pointent vers `/analysis`
+  - les CTA de retour ont été harmonisés (`/analysis`, `/upload`, `/` selon le contexte)
+- Upload simplifié pour les utilisateurs déjà connectés:
+  - les champs `Nombre d'employés` et `Secteur d'activité` sont masqués
+  - la validation du contexte est désactivée pour un utilisateur authentifié
+  - l'analyse peut être lancée directement après sélection des fichiers
+- Tests unitaires étendus sur la validation upload:
+  - `lib/upload/uploadValidation.test.ts` couvre le cas connecté sans contexte.
+- Refonte complète de la saisie manuelle KPI (`/upload/manual`):
+  - formulaire en 3 blocs (Activité, Rentabilité, Trésorerie & BFR)
+  - section avancée repliable pour les données de structure bilan
+  - aides contextuelles sur chaque champ (labels explicites + info)
+- Nouveau moteur de construction KPI: `lib/kpiBuilder.ts`
+  - `buildCompleteKpis(input)` calcule automatiquement marges, rotation BFR, liquidité, solvabilité, gearing, FCF, point mort et usure actifs
+  - protections anti division par zéro et anti NaN
+- Pipeline manuel aligné produit:
+  - `input utilisateur -> buildCompleteKpis -> calculateQuantisScore -> sauvegarde analyse`
+- Tests unitaires ajoutés:
+  - `lib/kpiBuilder.test.ts` (marges, rot_bfr, liquidité, robustesse valeurs manquantes, intégration Quantis Score).
+
+## Mise à jour 2026-03-23 (persistance analyse post-inscription)
+
+- Correction du bug critique "analyse perdue après inscription":
+  - nouvelle persistance locale de brouillon d’analyse invité: `lib/analysis/pendingAnalysis.ts`
+  - synchronisation automatique après connexion email validé: `services/pendingAnalysisSync.ts`
+  - l’analyse locale est rattachée au `userId` réel avant chargement des vues.
+- Flux utilisateur renforcé:
+  - `/upload` (non connecté): calcul de l’analyse, stockage local temporaire, puis redirection vers `/register`.
+  - `/register` et `/login`: support d’un `next` sécurisé pour redirection post-login vers `/synthese`.
+  - `/synthese`, `/analysis`, `/dashboard`: tentative non bloquante de persistance de l’analyse en attente.
+- UX messages harmonisés:
+  - nouveau message vide: `Aucune analyse disponible pour le moment. Importez un fichier pour démarrer votre analyse financière.`
+  - suppression du texte HTML affiché brut (`d&apos;analyse`) dans les messages métier.
+- Tests ajoutés:
+  - `lib/analysis/pendingAnalysis.test.ts`
+  - `services/pendingAnalysisSync.test.ts`

@@ -15,7 +15,8 @@ describe("validateRegisterCredentials", () => {
       companyName: "",
       siren: "1234",
       companySize: "",
-      sector: ""
+      sector: "",
+      usageObjectives: []
     });
 
     expect(errors.lastName).toBeDefined();
@@ -26,6 +27,7 @@ describe("validateRegisterCredentials", () => {
     expect(errors.siren).toBe("Le SIREN doit contenir exactement 9 chiffres.");
     expect(errors.companySize).toBeDefined();
     expect(errors.sector).toBeDefined();
+    expect(errors.usageObjectives).toBeDefined();
   });
 
   it("accepts strong and complete credentials", () => {
@@ -37,7 +39,8 @@ describe("validateRegisterCredentials", () => {
       companyName: "Quantis SAS",
       siren: "123456789",
       companySize: "pme",
-      sector: "SaaS & Edition de Logiciels"
+      sector: "SaaS & Edition de Logiciels",
+      usageObjectives: ["analyser_comptes"]
     });
 
     expect(errors).toEqual({});
@@ -69,7 +72,8 @@ describe("registerWithEmailPassword", () => {
       companyName: "",
       siren: "",
       companySize: "",
-      sector: ""
+      sector: "",
+      usageObjectives: []
     });
 
     expect(result.success).toBe(false);
@@ -88,7 +92,8 @@ describe("registerWithEmailPassword", () => {
       companyName: "Quantis SAS",
       siren: "123456789",
       companySize: "pme",
-      sector: "SaaS & Edition de Logiciels"
+      sector: "SaaS & Edition de Logiciels",
+      usageObjectives: ["analyser_comptes"]
     });
 
     expect(result).toEqual({
@@ -109,7 +114,8 @@ describe("registerWithEmailPassword", () => {
       companyName: "Quantis SAS",
       siren: "123456789",
       companySize: "pme",
-      sector: "SaaS & Edition de Logiciels"
+      sector: "SaaS & Edition de Logiciels",
+      usageObjectives: ["analyser_comptes"]
     });
   });
 
@@ -126,7 +132,8 @@ describe("registerWithEmailPassword", () => {
       companyName: "Quantis SAS",
       siren: "123456789",
       companySize: "pme",
-      sector: "SaaS & Edition de Logiciels"
+      sector: "SaaS & Edition de Logiciels",
+      usageObjectives: ["analyser_comptes"]
     });
 
     expect(result).toEqual({

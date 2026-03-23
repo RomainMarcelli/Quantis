@@ -1,5 +1,5 @@
 // lib/email/templates/passwordResetEmailTemplate.ts
-// Genere le template transactionnel de reinitialisation mot de passe dans la DA Quantis.
+// Génère le template transactionnel de réinitialisation mot de passe dans la DA Quantis.
 type PasswordResetEmailTemplateInput = {
   firstName?: string;
   resetUrl: string;
@@ -9,7 +9,7 @@ export function buildPasswordResetEmailTemplate({
   firstName,
   resetUrl
 }: PasswordResetEmailTemplateInput): { subject: string; html: string; text: string } {
-  const subject = "Reinitialisez votre mot de passe Quantis";
+  const subject = "Réinitialisez votre mot de passe Quantis";
   const safeFirstName = firstName?.trim() || "Bonjour";
 
   const html = `
@@ -30,23 +30,23 @@ export function buildPasswordResetEmailTemplate({
               </tr>
               <tr>
                 <td style="padding:0 32px 0 32px;font-size:30px;line-height:1.2;font-weight:700;color:#ffffff;">
-                  Reinitialisez votre <span style="color:#C5A059;">mot de passe</span>
+                  Réinitialisez votre <span style="color:#C5A059;">mot de passe</span>
                 </td>
               </tr>
               <tr>
                 <td style="padding:14px 32px 0 32px;font-size:15px;line-height:1.65;color:#d4d4d8;">
-                  ${safeFirstName}, une demande de reinitialisation a ete effectuee pour votre compte Quantis.
+                  ${safeFirstName}, une demande de réinitialisation a été effectuée pour votre compte Quantis.
                 </td>
               </tr>
               <tr>
                 <td style="padding:18px 32px 0 32px;font-size:14px;line-height:1.6;color:#a1a1aa;">
-                  Si c'etait bien vous, cliquez sur le bouton ci-dessous pour definir un nouveau mot de passe.
+                  Si c'était bien vous, cliquez sur le bouton ci-dessous pour définir un nouveau mot de passe.
                 </td>
               </tr>
               <tr>
                 <td style="padding:24px 32px 0 32px;">
                   <a href="${resetUrl}" style="display:inline-block;background:#C5A059;color:#09090b;text-decoration:none;border-radius:12px;padding:13px 20px;font-weight:700;font-size:14px;">
-                    Reinitialiser mon mot de passe
+                    Réinitialiser mon mot de passe
                   </a>
                 </td>
               </tr>
@@ -55,7 +55,7 @@ export function buildPasswordResetEmailTemplate({
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #27272a;border-radius:12px;background:#0b0c10;">
                     <tr>
                       <td style="padding:12px 14px;font-size:13px;line-height:1.6;color:#a1a1aa;">
-                        Si vous n'etes pas a l'origine de cette demande, ignorez simplement cet email. Votre mot de passe restera inchange.
+                        Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email. Votre mot de passe restera inchangé.
                       </td>
                     </tr>
                   </table>
@@ -80,7 +80,7 @@ export function buildPasswordResetEmailTemplate({
   </html>
   `;
 
-  const text = `${safeFirstName}, reinitialisez votre mot de passe Quantis via ce lien: ${resetUrl}\n\nSi vous n'etes pas a l'origine de cette demande, ignorez cet email.`;
+  const text = `${safeFirstName}, réinitialisez votre mot de passe Quantis via ce lien: ${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`;
 
   return {
     subject,

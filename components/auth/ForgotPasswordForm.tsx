@@ -37,7 +37,7 @@ export function ForgotPasswordForm() {
 
     const result = await requestPasswordReset(firebaseAuthGateway, { email });
     if (!result.success) {
-      const message = result.errors.email ?? result.errors.general ?? "Operation impossible pour le moment.";
+      const message = result.errors.email ?? result.errors.general ?? "Opération impossible pour le moment.";
       setFormError(message);
       setToast({
         type: "error",
@@ -47,7 +47,7 @@ export function ForgotPasswordForm() {
       return;
     }
 
-    setSuccessMessage("Un email de reinitialisation a ete envoye. Pensez a verifier vos spams.");
+    setSuccessMessage("Un email de réinitialisation a été envoyé. Pensez à vérifier vos spams.");
     setToast({
       type: "success",
       message: result.message
@@ -61,11 +61,11 @@ export function ForgotPasswordForm() {
       <QuantisLogo className="mb-1" />
       <h1 className="mt-2 text-3xl font-semibold leading-tight text-quantis-carbon">
         Mot de passe
-        <span className="ml-2 text-quantis-gold">oublie</span>
+        <span className="ml-2 text-quantis-gold">oublié</span>
       </h1>
       <div className="quantis-accent-line mt-4" />
       <p className="mt-4 text-sm text-quantis-slate">
-        Saisissez votre email pour recevoir un lien de reinitialisation.
+        Saisissez votre email pour recevoir un lien de réinitialisation.
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
@@ -100,13 +100,13 @@ export function ForgotPasswordForm() {
           disabled={!canSubmit}
           className="quantis-primary w-full py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? "Envoi..." : "Envoyer un lien de reinitialisation"}
+          {isSubmitting ? "Envoi..." : "Envoyer un lien de réinitialisation"}
         </button>
       </form>
 
       <div className="mt-5 text-sm text-quantis-slate">
         <Link href="/" className="font-medium text-quantis-carbon underline underline-offset-2">
-          Retour a la connexion
+          Retour à la connexion
         </Link>
       </div>
     </section>

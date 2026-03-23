@@ -123,6 +123,7 @@ export type CalculatedKpis = {
   charges_fixes: number | null;
   point_mort: number | null;
   ratio_immo: number | null;
+  ratio_immo_usure?: number | null;
   bfr: number | null;
   rot_bfr: number | null;
   dso: number | null;
@@ -163,6 +164,21 @@ export type AnalysisRecord = {
   mappedData: MappedFinancialData;
   financialFacts: FinancialFacts;
   kpis: CalculatedKpis;
+  quantisScore: {
+    quantis_score: number;
+    piliers: {
+      rentabilite: number;
+      solvabilite: number;
+      liquidite: number;
+      efficacite: number;
+    };
+    alerte_investissement: boolean;
+  } | null;
+  uploadContext: {
+    companySize: string | null;
+    sector: string | null;
+    source: "dashboard" | "analysis" | "upload" | "manual";
+  } | null;
 };
 
 export type NewAnalysisRecord = Omit<AnalysisRecord, "id">;

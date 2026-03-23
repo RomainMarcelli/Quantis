@@ -89,7 +89,7 @@ export function PricingView() {
             onClick={() => router.push("/analysis")}
             className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/85 transition-colors hover:bg-white/10"
           >
-            {"Retour dashboard"}
+            {"Retour à l’analyse"}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>

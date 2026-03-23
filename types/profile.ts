@@ -1,4 +1,5 @@
 import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import type { OnboardingObjectiveValue } from "@/lib/onboarding/objectives";
 
 export type UserProfile = {
   firstName: string;
@@ -7,6 +8,7 @@ export type UserProfile = {
   siren: string;
   companySize: CompanySizeValue | "";
   sector: SectorValue | "";
+  usageObjectives?: OnboardingObjectiveValue[];
   email: string;
   emailVerified: boolean;
   createdAt?: string;
@@ -14,4 +16,3 @@ export type UserProfile = {
 };
 
 export type UserProfileUpdateInput = Omit<UserProfile, "email" | "emailVerified" | "createdAt" | "updatedAt">;
-

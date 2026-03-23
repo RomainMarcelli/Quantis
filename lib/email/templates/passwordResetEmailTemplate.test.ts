@@ -1,5 +1,5 @@
 // lib/email/templates/passwordResetEmailTemplate.test.ts
-// Verifie le template de reinitialisation de mot de passe envoye via Resend.
+// Vérifie le template de réinitialisation de mot de passe envoyé via Resend.
 import { describe, expect, it } from "vitest";
 import { buildPasswordResetEmailTemplate } from "@/lib/email/templates/passwordResetEmailTemplate";
 
@@ -10,7 +10,7 @@ describe("buildPasswordResetEmailTemplate", () => {
       resetUrl: "https://quantis.app/reset-password?oobCode=abc"
     });
 
-    expect(result.subject).toBe("Reinitialisez votre mot de passe Quantis");
+    expect(result.subject).toBe("Réinitialisez votre mot de passe Quantis");
     expect(result.html).toContain("Romain");
     expect(result.html).toContain("https://quantis.app/reset-password?oobCode=abc");
     expect(result.text).toContain("Romain");

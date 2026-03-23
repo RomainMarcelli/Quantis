@@ -13,11 +13,11 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "Quantis",
-  description: "Quantis - Plateforme d'intelligence financiere",
+  description: "Quantis - Plateforme d'intelligence financière",
   icons: {
-    icon: "/images/logo.png",
-    apple: "/images/logo.png",
-    shortcut: "/images/logo.png"
+    icon: "/images/LogoV3.png",
+    apple: "/images/LogoV3.png",
+    shortcut: "/images/LogoV3.png"
   }
 };
 

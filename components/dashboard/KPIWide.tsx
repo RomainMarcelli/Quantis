@@ -56,7 +56,7 @@ export function KPIWide({ title, tag, value, target = 50000 }: KPIWideProps) {
 
       <p className="edu-text">
         L&apos;EBE mesure la performance operationnelle pure de l&apos;entreprise, independamment de la structure
-        financiere.
+        financière.
       </p>
     </article>
   );

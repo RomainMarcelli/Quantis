@@ -34,7 +34,7 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
 
-  // Memoize la validation pour des retours UX immediats sans logique dupliquee.
+  // Memoize la validation pour des retours UX immédiats sans logique dupliquée.
   const validation = useMemo(
     () => validateResetPasswordInput({ oobCode, password, confirmPassword }),
     [oobCode, password, confirmPassword]
@@ -96,7 +96,7 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
         result.errors.password ??
         result.errors.confirmPassword ??
         result.errors.general ??
-        "Operation impossible pour le moment.";
+        "Opération impossible pour le moment.";
       // Journalisation sécurité: échec de finalisation du reset mot de passe.
       void logClientSecurityEvent({
         eventType: "password_reset_completion_failed",
@@ -135,7 +135,7 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
   if (isCheckingCode) {
     return (
       <section className="quantis-panel w-full max-w-xl p-8 text-center">
-        <p className="text-sm text-quantis-slate">Verification du lien de reinitialisation...</p>
+        <p className="text-sm text-quantis-slate">Vérification du lien de réinitialisation...</p>
       </section>
     );
   }
@@ -147,7 +147,7 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
         <QuantisLogo className="mb-1" />
         <h1 className="mt-2 text-2xl font-semibold text-quantis-carbon">Lien invalide</h1>
         <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
-          {codeMessage ?? "Ce lien de reinitialisation est invalide ou expire."}
+          {codeMessage ?? "Ce lien de réinitialisation est invalide ou expiré."}
         </p>
         <div className="mt-5">
           <Link href="/forgot-password" className="font-medium text-quantis-carbon underline underline-offset-2">
@@ -176,7 +176,7 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
       </h1>
       <div className="quantis-accent-line mt-4" />
       <p className="mt-4 text-sm text-quantis-slate">
-        Definissez un mot de passe securise pour finaliser la reinitialisation.
+        Définissez un mot de passe sécurisé pour finaliser la réinitialisation.
       </p>
       {codeMessage ? (
         <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
@@ -238,7 +238,7 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
         <div className="rounded-xl border border-quantis-mist bg-white px-3 py-2">
           <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-quantis-slate">
             <Info className="h-3.5 w-3.5" />
-            Securite mot de passe
+            Sécurité mot de passe
           </p>
           <ul className="grid grid-cols-3 gap-1.5">
             {passwordRules.map((rule) => (
@@ -276,7 +276,7 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
           disabled={!canSubmit}
           className="quantis-primary w-full py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? "Mise a jour..." : "Mettre a jour le mot de passe"}
+          {isSubmitting ? "Mise à jour..." : "Mettre à jour le mot de passe"}
         </button>
       </form>
 
