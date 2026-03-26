@@ -13,13 +13,11 @@ import {
   Layers,
   PieChart as PieChartIcon
 } from "lucide-react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { formatPercent } from "@/components/dashboard/formatting";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
   buildBreakEvenModel,
-  buildMonthlyRevenueSeries,
-  buildTmscvPieData
+  buildMonthlyRevenueSeries
 } from "@/lib/dashboard/tabs/valueCreationData";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis } from "@/types/analysis";
@@ -40,9 +38,6 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
       }),
     [kpis.ca, kpis.tcam, kpis.ebe, kpis.resultat_net]
   );
-
-  // Donut TMSCV enrichi: basé sur la composition déjà centralisée dans la couche data.
-  const tmscvPieData = useMemo(() => buildTmscvPieData(kpis.tmscv), [kpis.tmscv]);
 
   // Modèle de point mort réutilisé pour conserver la même logique que le dashboard principal.
   const breakEvenModel = useMemo(
@@ -253,36 +248,9 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
               <div className="data-react tnum text-[2.6rem] font-semibold leading-none tracking-tight text-white">
                 {tmscvLabel}
               </div>
-              <div className="h-32 w-full sm:w-44">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={tmscvPieData}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={34}
-                      outerRadius={52}
-                      stroke="#121217"
-                      strokeWidth={1}
-                    >
-                      {tmscvPieData.map((slice) => (
-                        <Cell key={slice.name} fill={slice.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "#111216",
-                        border: "1px solid #2a2a30",
-                        borderRadius: "10px"
-                      }}
-                      formatter={(value, _name, payload) => {
-                        const actualValue = Number(payload?.payload?.actualValue ?? value ?? 0);
-                        return `${actualValue.toFixed(1)}%`;
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              <span className="text-[11px] uppercase tracking-wide text-white/50">
+                Taux actuel
+              </span>
             </div>
           </div>
           <p className="edu-text">

@@ -16,10 +16,7 @@ import {
 } from "lucide-react";
 import { formatNumber, formatPercent } from "@/components/dashboard/formatting";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
-import {
-  buildBfrVariationSeries,
-  buildClientsVsSuppliersComparison
-} from "@/lib/dashboard/investment/investmentViewModel";
+import { buildBfrVariationSeries } from "@/lib/dashboard/investment/investmentViewModel";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis } from "@/types/analysis";
 
@@ -42,23 +39,20 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
   const lastBfr = bfrSeries[bfrSeries.length - 1]?.value ?? 0;
   const variationPercent = firstBfr !== 0 ? ((lastBfr - firstBfr) / Math.abs(firstBfr)) * 100 : 0;
 
-  // Comparaison DSO/DPO pour orienter le message de pilotage de trésorerie.
-  const clientsVsSuppliers = useMemo(
-    () => buildClientsVsSuppliersComparison(kpis.dso, kpis.dpo),
-    [kpis.dso, kpis.dpo]
-  );
-
   // Répartition visuelle des segments du cycle d'exploitation (emplois vs ressources).
   const dsoDays = Math.max(kpis.dso ?? 0, 0);
   const dioDays = Math.max(kpis.rot_stocks ?? 0, 0);
   const dpoDays = Math.max(kpis.dpo ?? 0, 0);
   const emploisDays = dsoDays + dioDays;
   const cycleMax = Math.max(emploisDays, dpoDays, 1);
-  const stocksWidth = (dioDays / cycleMax) * 100;
-  const clientsWidth = (dsoDays / cycleMax) * 100;
-  const fournisseursWidth = (dpoDays / cycleMax) * 100;
   const bfrGapDays = kpis.rot_bfr ?? Math.max(emploisDays - dpoDays, 0);
-  const bfrGapWidth = (Math.max(bfrGapDays, 0) / cycleMax) * 100;
+  const chartScale = 880 / Math.max(emploisDays + 8, dpoDays + Math.max(bfrGapDays, 0) + 8, 1);
+  const stocksRectWidth = Math.max(dioDays * chartScale, 60);
+  const clientsRectX = stocksRectWidth + 5;
+  const clientsRectWidth = Math.max(dsoDays * chartScale, 120);
+  const fournisseursRectWidth = Math.max(dpoDays * chartScale, 140);
+  const bfrRectX = fournisseursRectWidth + 5;
+  const bfrRectWidth = Math.max(Math.max(bfrGapDays, 0) * chartScale, 70);
 
   // Mouse glow local: limité à cette section test pour éviter les effets de bord.
   const [mouseGlow, setMouseGlow] = useState({ x: 0, y: 0, visible: false });
@@ -230,62 +224,52 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
             />
           </div>
 
-          {/* Schéma synthétique emplois/ressources pour matérialiser le "trou" de BFR. */}
-          <div className="rounded-xl border border-white/5 bg-quantis-base p-6">
-            <h4 className="text-center text-[11px] uppercase tracking-widest text-white/65">
+          {/* Modélisation alignée sur la maquette HTML d'origine (bars SVG emplois/ressources + écart BFR). */}
+          <div className="w-full rounded-xl border border-white/5 bg-quantis-base p-6 transition-colors group-hover:border-quantis-gold/10">
+            <h4 className="mb-6 text-center text-[11px] font-semibold uppercase tracking-widest text-white/60 transition-colors group-hover:text-white/80">
               Modélisation de l&apos;équilibre du BFR
             </h4>
 
-            <div className="mt-6 space-y-4">
-              <div>
-                <p className="mb-1 text-[10px] uppercase text-amber-300/80">Stocks</p>
-                <div className="relative h-6 overflow-hidden rounded border border-amber-400/40 bg-amber-500/10">
-                  <div className="bar-segment h-full bg-amber-500/25" style={{ width: `${stocksWidth}%` }} />
-                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-amber-200">
-                    {kpis.rot_stocks === null ? "N/D" : `${Math.round(animatedDio)} j`}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <p className="mb-1 text-[10px] uppercase text-amber-300/80">Clients</p>
-                <div className="relative h-6 overflow-hidden rounded border border-amber-400/40 bg-amber-500/10">
-                  <div className="bar-segment h-full bg-amber-500/25" style={{ width: `${clientsWidth}%` }} />
-                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-amber-200">
-                    {kpis.dso === null ? "N/D" : `${Math.round(animatedDso)} j`}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <p className="mb-1 text-[10px] uppercase text-emerald-300/80">Fournisseurs</p>
-                <div className="relative h-6 overflow-hidden rounded border border-emerald-400/40 bg-emerald-500/10">
-                  <div className="bar-segment h-full bg-emerald-500/25" style={{ width: `${fournisseursWidth}%` }} />
-                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-emerald-200">
-                    {kpis.dpo === null ? "N/D" : `${Math.round(animatedDpo)} j`}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <p className="mb-1 text-[10px] uppercase text-rose-300/80">Écart BFR</p>
-                <div className="relative h-6 overflow-hidden rounded border border-rose-400/40 bg-rose-500/10">
-                  <div className="bar-segment h-full bg-rose-500/25" style={{ width: `${bfrGapWidth}%` }} />
-                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-semibold text-rose-200">
-                    {kpis.rot_bfr === null ? "N/D" : `${Math.round(animatedRotBfr)} j`}
-                  </span>
-                </div>
-              </div>
-            </div>
+            <svg className="h-24 w-full" viewBox="0 0 1000 100" preserveAspectRatio="none">
+              <line x1="0" y1="0" x2="0" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
+              <line x1="250" y1="0" x2="250" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
+              <line x1="500" y1="0" x2="500" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
+              <line x1="750" y1="0" x2="750" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
+              <line x1="1000" y1="0" x2="1000" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
+
+              <g className="bar-segment">
+                <rect x="0" y="10" width={stocksRectWidth} height="24" fill="rgba(245, 158, 11, 0.15)" stroke="#F59E0B" strokeWidth="1" rx="2" />
+                <text x={stocksRectWidth / 2} y="26" fill="#FDBA74" fontSize="10" fontWeight="600" fontFamily="Inter" textAnchor="middle">
+                  STOCKS ({kpis.rot_stocks === null ? "N/D" : `${Math.round(animatedDio)}j`})
+                </text>
+              </g>
+              <g className="bar-segment">
+                <rect x={clientsRectX} y="10" width={clientsRectWidth} height="24" fill="rgba(245, 158, 11, 0.15)" stroke="#F59E0B" strokeWidth="1" rx="2" />
+                <text x={clientsRectX + clientsRectWidth / 2} y="26" fill="#FDBA74" fontSize="10" fontWeight="600" fontFamily="Inter" textAnchor="middle">
+                  CLIENTS ({kpis.dso === null ? "N/D" : `${Math.round(animatedDso)}j`})
+                </text>
+              </g>
+
+              <g className="bar-segment">
+                <rect x="0" y="50" width={fournisseursRectWidth} height="24" fill="rgba(16, 185, 129, 0.15)" stroke="#10B981" strokeWidth="1" rx="2" />
+                <text x={fournisseursRectWidth / 2} y="66" fill="#6EE7B7" fontSize="10" fontWeight="600" fontFamily="Inter" textAnchor="middle">
+                  FOURNISSEURS ({kpis.dpo === null ? "N/D" : `${Math.round(animatedDpo)}j`})
+                </text>
+              </g>
+              <g className="bar-segment">
+                <rect x={bfrRectX} y="50" width={bfrRectWidth} height="24" fill="rgba(239, 68, 68, 0.15)" stroke="#EF4444" strokeWidth="1" strokeDasharray="4 4" rx="2" />
+                <text x={bfrRectX + bfrRectWidth / 2} y="66" fill="#FCA5A5" fontSize="10" fontWeight="700" fontFamily="Inter" textAnchor="middle">
+                  BFR: {kpis.rot_bfr === null ? "N/D" : `${Math.round(animatedRotBfr)}j`}
+                </text>
+              </g>
+            </svg>
           </div>
 
-          <div className="mt-6 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/75">
-            <span className="font-medium text-white">Interprétation cycle:</span>{" "}
-            {clientsVsSuppliers.deltaDays === null
-              ? "Données incomplètes pour comparer les délais."
-              : `Écart DSO-DPO: ${Math.round(clientsVsSuppliers.deltaDays)} j`}
-          </div>
-
-          <p className="edu-text mt-6">
-            L&apos;objectif est de réduire les délais d&apos;encaissement et de rotation stock, tout en sécurisant un
-            délai fournisseur adapté.
+          <p className="edu-text mt-8 text-[13px]">
+            <strong className="text-white/60 transition-colors group-hover:text-quantis-gold">Lecture stratégique :</strong>{" "}
+            Le BFR est l&apos;argent immobilisé au quotidien. L&apos;objectif est de réduire les blocs oranges
+            (encaisser plus vite, stocker moins) et d&apos;allonger le bloc vert (payer plus tard) afin de réduire le
+            &quot;trou&quot; rouge que vous devez financer.
           </p>
         </article>
 
