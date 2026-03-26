@@ -38,7 +38,11 @@ body {
     radial-gradient(circle at 85% -20%, rgb(45 212 191 / 7%), transparent 40%),
     var(--quantis-smoke);
   color: var(--quantis-carbon);
-  font-family: var(--font-quantis), "Segoe UI", sans-serif;
+  font-family: var(--font-quantis), "Inter", "Segoe UI", sans-serif;
+}
+
+.font-mono {
+  font-family: var(--font-quantis-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .premium-app-shell {
@@ -371,6 +375,35 @@ body {
 
 .quantis-search-highlight {
   animation: quantis-search-pulse 2.4s ease-out;
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) !important;
+  filter: none !important;
+}
+
+@keyframes quantis-search-term-glow {
+  0% {
+    background-color: rgb(224 190 74 / 20%);
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+  }
+  45% {
+    background-color: rgb(224 190 74 / 36%);
+    box-shadow: 0 0 0 3px rgb(224 190 74 / 18%);
+  }
+  100% {
+    background-color: rgb(224 190 74 / 20%);
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+  }
+}
+
+.quantis-search-term-highlight {
+  display: inline;
+  margin: 0 0.02em;
+  border-radius: 0.25rem;
+  padding: 0 0.2em;
+  color: #fff5d6;
+  background: rgb(224 190 74 / 20%);
+  box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+  animation: quantis-search-term-glow 2.4s ease-out;
 }
 
 .edu-text {

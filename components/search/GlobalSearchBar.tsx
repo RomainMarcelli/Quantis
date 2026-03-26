@@ -27,11 +27,12 @@ export function GlobalSearchBar({
   const pathname = usePathname();
   const [query, setQuery] = useState("");
 
-  function handleSelection(item: SearchItem) {
+  function handleSelection(item: SearchItem, submittedQuery: string) {
     const target: SearchNavigationTarget = {
       route: item.route,
       section: item.section,
-      refId: item.refId
+      refId: item.refId,
+      query: submittedQuery
     };
 
     if (routeMatchesPath(pathname, item.route)) {
@@ -55,7 +56,7 @@ export function GlobalSearchBar({
       return;
     }
 
-    handleSelection(bestMatch);
+    handleSelection(bestMatch, trimmed);
   }
 
   return (

@@ -24,6 +24,7 @@ export type SearchNavigationTarget = {
   route: SearchRoute;
   section?: SearchSection;
   refId?: string;
+  query?: string;
 };
 
 const SEARCH_TARGET_STORAGE_KEY = "quantis.globalSearchTarget";
@@ -305,7 +306,7 @@ export function emitSearchNavigation(target: SearchNavigationTarget): void {
   window.dispatchEvent(new CustomEvent<SearchNavigationTarget>(SEARCH_NAVIGATE_EVENT, { detail: target }));
 }
 
-export async function scrollToSearchTarget(refId: string): Promise<boolean> {
+export async function scrollToSearchTarget(refId: string, query?: string): Promise<boolean> {
   const maxAttempts = 24;
   const delayMs = 90;
 
@@ -313,9 +314,12 @@ export async function scrollToSearchTarget(refId: string): Promise<boolean> {
     const target = resolveSearchElement(refId);
     if (target) {
       target.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      const clearTextHighlights = applySearchTermHighlight(target, query);
       target.classList.add("quantis-search-highlight");
       window.setTimeout(() => {
         target.classList.remove("quantis-search-highlight");
+        clearTextHighlights();
       }, 2600);
       return true;
     }
@@ -347,4 +351,97 @@ function wait(delayMs: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, delayMs);
   });
+}
+
+function applySearchTermHighlight(target: HTMLElement, query?: string): () => void {
+  clearSearchTermHighlights(target);
+
+  if (!query?.trim()) {
+    return () => {};
+  }
+
+  const tokens = Array.from(
+    new Set(
+      query
+        .trim()
+        .split(/\s+/)
+        .map((token) => token.trim())
+        .filter((token) => token.length >= 2)
+    )
+  );
+
+  if (!tokens.length) {
+    return () => {};
+  }
+
+  const escapedTokens = tokens.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const regex = new RegExp(`(${escapedTokens.join("|")})`, "gi");
+
+  const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+  const textNodes: Text[] = [];
+  let currentNode = walker.nextNode();
+  while (currentNode) {
+    textNodes.push(currentNode as Text);
+    currentNode = walker.nextNode();
+  }
+
+  textNodes.forEach((textNode) => {
+    const text = textNode.nodeValue ?? "";
+    if (!text.trim()) {
+      return;
+    }
+
+    const parent = textNode.parentElement;
+    if (!parent) {
+      return;
+    }
+
+    if (parent.closest("script, style, noscript, mark.quantis-search-term-highlight")) {
+      return;
+    }
+
+    regex.lastIndex = 0;
+    if (!regex.test(text)) {
+      return;
+    }
+
+    regex.lastIndex = 0;
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+    let match = regex.exec(text);
+
+    while (match) {
+      const index = match.index;
+      const matchedText = match[0];
+
+      if (index > lastIndex) {
+        fragment.appendChild(document.createTextNode(text.slice(lastIndex, index)));
+      }
+
+      const mark = document.createElement("mark");
+      mark.className = "quantis-search-term-highlight";
+      mark.textContent = matchedText;
+      fragment.appendChild(mark);
+
+      lastIndex = index + matchedText.length;
+      match = regex.exec(text);
+    }
+
+    if (lastIndex < text.length) {
+      fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+
+    textNode.parentNode?.replaceChild(fragment, textNode);
+  });
+
+  return () => {
+    clearSearchTermHighlights(target);
+  };
+}
+
+function clearSearchTermHighlights(target: HTMLElement): void {
+  target.querySelectorAll<HTMLElement>("mark.quantis-search-term-highlight").forEach((mark) => {
+    mark.replaceWith(document.createTextNode(mark.textContent ?? ""));
+  });
+  target.normalize();
 }

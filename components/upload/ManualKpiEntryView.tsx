@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Info, Save } from "lucide-react";
+import { ArrowLeft, ChevronDown, Info, Save } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import { buildCompleteKpis, type ManualKpiInput } from "@/lib/kpiBuilder";
@@ -106,6 +106,14 @@ export function ManualKpiEntryView() {
     ]
   );
 
+  function onGoBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/upload");
+  }
+
   async function onSubmit() {
     if (!user) {
       return;
@@ -204,14 +212,30 @@ export function ManualKpiEntryView() {
   return (
     <section className="relative z-10 mx-auto w-full max-w-5xl space-y-6">
       <header className="precision-card rounded-2xl p-5">
-        <QuantisLogo withText={false} size={30} className="mb-2" />
-        <h1 className="text-2xl font-semibold text-white md:text-3xl">
-          Saisie manuelle <span className="text-quantis-gold">des KPI</span>
-        </h1>
-        <p className="mt-2 text-sm text-white/70">
-          Renseignez quelques indicateurs simples. Quantis calcule ensuite automatiquement les KPI avancés
-          pour produire un Quantis Score fiable.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <button
+              type="button"
+              onClick={onGoBack}
+              className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 transition-colors hover:bg-white/10"
+              aria-label="Revenir à la page précédente"
+              title="Retour"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Retour
+            </button>
+            <h1 className="text-2xl font-semibold text-white md:text-3xl">
+              Saisie manuelle <span className="text-quantis-gold">des KPI</span>
+            </h1>
+            <p className="mt-2 text-sm text-white/70">
+              Renseignez quelques indicateurs simples. Quantis calcule ensuite automatiquement les KPI avancés
+              pour produire un Quantis Score fiable.
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
+            <QuantisLogo withText={false} size={34} />
+          </div>
+        </div>
       </header>
 
       <section className="precision-card rounded-2xl p-5">
