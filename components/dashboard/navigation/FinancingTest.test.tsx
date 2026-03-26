@@ -1,8 +1,8 @@
-﻿// File: components/dashboard/investment/InvestmentPage.test.tsx
-// Role: tests de rendu de la section Investissement (BFR, rotation, comparaison DSO/DPO, état matériel).
+// File: components/dashboard/navigation/FinancingTest.test.tsx
+// Role: vérifie le rendu principal de la section Financement (test) et son alimentation par KPI.
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { InvestmentPage } from "@/components/dashboard/investment/InvestmentPage";
+import { FinancingTest } from "@/components/dashboard/navigation/FinancingTest";
 import type { CalculatedKpis } from "@/types/analysis";
 
 function makeKpis(overrides: Partial<CalculatedKpis> = {}): CalculatedKpis {
@@ -49,25 +49,29 @@ function makeKpis(overrides: Partial<CalculatedKpis> = {}): CalculatedKpis {
   };
 }
 
-describe("InvestmentPage", () => {
-  it("affiche les blocs principaux de la section Investissement", () => {
+describe("FinancingTest", () => {
+  it("affiche les blocs clés de la section financement test", () => {
     const html = renderToStaticMarkup(
-      <InvestmentPage
+      <FinancingTest
         kpis={makeKpis({
-          bfr: 95000,
-          rot_bfr: 77,
-          rot_stocks: 38,
-          dso: 61,
-          dpo: 42,
-          etat_materiel_indice: 72
+          capacite_remboursement_annees: 2.4,
+          caf: 185000,
+          fte: 160000,
+          liq_gen: 1.8,
+          liq_red: 1.2,
+          liq_imm: 0.5,
+          effet_levier: 0.45
         })}
       />
     );
 
-    expect(html).toContain("Argent bloqué (BFR)");
-    expect(html).toContain("Variation du BFR");
-    expect(html).toContain("Jours à avancer (Rotation du BFR)");
-    expect(html).toContain("Clients vs Fournisseurs");
-    expect(html).toContain("État du matériel");
+    expect(html).toContain("Banque &amp; financement");
+    expect(html).toContain("Poids de la dette");
+    expect(html).toContain("Résistance aux imprévus");
+    expect(html).toContain("Liquidit");
+    expect(html).toContain("Indépendance");
+    expect(html).toContain("MODÉLISATION DE FINANCEMENT");
   });
 });
+
+

@@ -18,6 +18,7 @@ type KPIBlockProps = {
   trendValue?: number | null;
   trendLabel?: string;
   sideLabel?: string;
+  searchId?: string;
 };
 
 export function KPIBlock({
@@ -28,13 +29,14 @@ export function KPIBlock({
   icon,
   trendValue,
   trendLabel = "vs periode precedente",
-  sideLabel
+  sideLabel,
+  searchId
 }: KPIBlockProps) {
   // Le compteur anime uniquement la valeur principale de la carte.
   const animatedValue = useAnimatedNumber(value, { durationMs: 1200 });
 
   return (
-    <article className="precision-card group fade-up flex flex-col justify-between rounded-2xl p-6">
+    <article className="precision-card group fade-up flex flex-col justify-between rounded-2xl p-6" data-search-id={searchId}>
       <div>
         <div className="card-header flex items-start justify-between">
           <div className="flex flex-col gap-1">

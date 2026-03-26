@@ -77,6 +77,7 @@ export function Header({ data, logoSrc }: HeaderProps) {
     <View style={styles.container}>
       <View style={styles.left}>
         {logoSrc ? (
+          // eslint-disable-next-line jsx-a11y/alt-text
           <Image src={logoSrc} style={styles.logo} />
         ) : (
           <View style={styles.logoFallback}>
@@ -93,11 +94,10 @@ export function Header({ data, logoSrc }: HeaderProps) {
       </View>
 
       <View style={styles.meta}>
-        <Text style={styles.metaText}>Date de l'analyse : {data.analysisDateLabel}</Text>
+        <Text style={styles.metaText}>Date de l&apos;analyse : {data.analysisDateLabel}</Text>
         <Text style={styles.metaText}>Période : {data.periodLabel}</Text>
         <Text style={styles.metaText}>Généré le : {data.generatedAtLabel}</Text>
       </View>
     </View>
   );
 }
-

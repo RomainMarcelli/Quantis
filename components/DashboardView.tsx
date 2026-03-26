@@ -1,5 +1,5 @@
 // components/DashboardView.tsx
-// Vue client de l'espace de d�p�t avec DA premium coh�rente avec /analysis.
+// Vue client de l'espace de dépôt avec DA premium cohérente avec /analysis.
 "use client";
 
 import { useEffect, useState } from "react";

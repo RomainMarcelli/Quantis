@@ -1,8 +1,8 @@
-// File: components/dashboard/test/RentabilityTest.test.tsx
+// File: components/dashboard/navigation/RentabilityTest.test.tsx
 // Role: vérifie le rendu principal de la section Rentabilité (test) et son alimentation par KPI.
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { RentabilityTest } from "@/components/dashboard/test/RentabilityTest";
+import { RentabilityTest } from "@/components/dashboard/navigation/RentabilityTest";
 import type { CalculatedKpis } from "@/types/analysis";
 
 function makeKpis(overrides: Partial<CalculatedKpis> = {}): CalculatedKpis {
@@ -61,7 +61,7 @@ describe("RentabilityTest", () => {
       />
     );
 
-    expect(html).toContain("Profits &amp; rentabilité (test)");
+    expect(html).toContain("Profits &amp; rentabilité");
     expect(html).toContain("Gain sur mon capital");
     expect(html).toContain("Performance de l&#x27;activité");
     expect(html).toContain("Analyse de la création de valeur");
@@ -69,3 +69,4 @@ describe("RentabilityTest", () => {
     expect(html).toContain("RECOMMANDATION STRATÉGIQUE");
   });
 });
+

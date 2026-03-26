@@ -1,4 +1,4 @@
-// File: components/dashboard/test/TestTopStatus.tsx
+// File: components/dashboard/navigation/TestTopStatus.tsx
 // Role: affiche un bandeau de contexte simple et propre pour les vues de test (sans superposition absolue).
 "use client";
 

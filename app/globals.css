@@ -352,6 +352,27 @@ body {
   transform: translateY(10px);
 }
 
+@keyframes quantis-search-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+    border-color: rgb(224 190 74 / 20%);
+  }
+  35% {
+    box-shadow:
+      0 0 0 4px rgb(224 190 74 / 14%),
+      0 0 22px 4px rgb(224 190 74 / 22%);
+    border-color: rgb(224 190 74 / 55%);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+    border-color: rgb(224 190 74 / 20%);
+  }
+}
+
+.quantis-search-highlight {
+  animation: quantis-search-pulse 2.4s ease-out;
+}
+
 .edu-text {
   font-size: 12px;
   color: rgb(255 255 255 / 35%);

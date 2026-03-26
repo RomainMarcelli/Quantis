@@ -21,7 +21,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
 
   const initialCompanySize = isCompanySizeValue(rawCompanySize) ? rawCompanySize : "";
   const initialSector = isSectorValue(rawSector) ? rawSector : "";
-  const postLoginRedirect = rawNext.startsWith("/") ? rawNext : "/analysis";
+  const postLoginRedirect = rawNext.startsWith("/") ? rawNext : "/synthese";
 
   return (
     <main className="premium-analysis-root relative mx-auto flex min-h-screen w-full items-center justify-center overflow-hidden px-4 py-10">

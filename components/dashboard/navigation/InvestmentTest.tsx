@@ -1,4 +1,4 @@
-// File: components/dashboard/test/InvestmentTest.tsx
+// File: components/dashboard/navigation/InvestmentTest.tsx
 // Role: propose une variante "test" premium de la section Investissement avec les KPI réels de l'analyse.
 "use client";
 
@@ -20,7 +20,7 @@ import {
   buildBfrVariationSeries,
   buildClientsVsSuppliersComparison
 } from "@/lib/dashboard/investment/investmentViewModel";
-import { TestTopStatus } from "@/components/dashboard/test/TestTopStatus";
+import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis } from "@/types/analysis";
 
 type InvestmentTestProps = {
@@ -112,7 +112,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
             </div>
           </div>
           <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-            Clients & fournisseurs (test)
+            Clients & fournisseurs
           </h2>
         </div>
 
@@ -133,6 +133,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
         <InvestmentMetricCard
           delayMs={100}
+          searchId="analysis-invest-bfr"
           className="md:col-span-4"
           title="Cash immobilisé"
           tag="Besoin en fonds de roulement"
@@ -145,6 +146,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
 
         <InvestmentMetricCard
           delayMs={150}
+          searchId="analysis-invest-variation-bfr"
           className="md:col-span-4"
           title="Tension de trésorerie"
           tag="Variation du BFR %"
@@ -163,6 +165,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
 
         <InvestmentMetricCard
           delayMs={200}
+          searchId="analysis-invest-ratio-immo"
           className="md:col-span-4"
           title="Couverture invest."
           tag="Ratio actif / immo nettes"
@@ -182,6 +185,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
         <article
           className="precision-card fade-up group col-span-1 rounded-2xl p-8 md:col-span-12"
           style={{ animationDelay: "300ms" }}
+          data-search-id="analysis-invest-rotation-bfr"
         >
           {/* Bloc central: lecture détaillée de la rotation BFR et des trois composantes de délai. */}
           <div className="card-header mb-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -316,6 +320,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
 }
 
 type InvestmentMetricCardProps = {
+  searchId?: string;
   title: string;
   tag: string;
   value: string;
@@ -328,6 +333,7 @@ type InvestmentMetricCardProps = {
 };
 
 function InvestmentMetricCard({
+  searchId,
   title,
   tag,
   value,
@@ -342,6 +348,7 @@ function InvestmentMetricCard({
     <article
       className={`precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 ${className ?? ""}`}
       style={{ animationDelay: `${delayMs}ms` }}
+      data-search-id={searchId}
     >
       <div>
         <div className="card-header flex items-start justify-between">
@@ -397,3 +404,4 @@ function DelayCard({ title, value, hint, badgeLabel, badgeTone, icon }: DelayCar
 function formatCompactCurrency(value: number): string {
   return `${Math.round(value).toLocaleString("fr-FR")} €`;
 }
+

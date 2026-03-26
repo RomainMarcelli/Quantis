@@ -9,11 +9,14 @@ import {
   LayoutDashboard,
   Lock,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Sparkles,
   UserCircle2
 } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
 import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
 import {
@@ -29,6 +32,13 @@ import { getUserProfile } from "@/services/userProfileStore";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
+import {
+  consumeSearchTarget,
+  routeMatchesPath,
+  SEARCH_NAVIGATE_EVENT,
+  scrollToSearchTarget,
+  type SearchNavigationTarget
+} from "@/lib/search/globalSearch";
 
 export function SyntheseView() {
   const router = useRouter();
@@ -41,6 +51,8 @@ export function SyntheseView() {
   const [selectedYearValue, setSelectedYearValue] = useState<string>(SYNTHESIS_CURRENT_YEAR_KEY);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
 
   // Référence utilisée pour l'option "Année en cours" dans le sélecteur de synthèse.
   const currentCalendarYear = new Date().getFullYear();
@@ -58,6 +70,24 @@ export function SyntheseView() {
       }
       root.removeAttribute("data-theme");
     };
+  }, []);
+
+  useEffect(() => {
+    const initialTarget = consumeSearchTarget();
+    if (initialTarget) {
+      setPendingSearchTarget(initialTarget);
+    }
+
+    const onSearchNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<SearchNavigationTarget>).detail;
+      if (!detail) {
+        return;
+      }
+      setPendingSearchTarget(detail);
+    };
+
+    window.addEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
+    return () => window.removeEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
   }, []);
 
   useEffect(() => {
@@ -143,6 +173,22 @@ export function SyntheseView() {
     }
   }, [allAnalyses.length, analysesBySelectedYear.length, selectedYearValue, yearOptions]);
 
+  useEffect(() => {
+    if (!pendingSearchTarget) {
+      return;
+    }
+    if (!routeMatchesPath("/synthese", pendingSearchTarget.route)) {
+      return;
+    }
+    if (!pendingSearchTarget.refId) {
+      setPendingSearchTarget(null);
+      return;
+    }
+    void scrollToSearchTarget(pendingSearchTarget.refId).finally(() => {
+      setPendingSearchTarget(null);
+    });
+  }, [pendingSearchTarget, analysisPair.current?.id]);
+
   async function loadSyntheseData(currentUser: AuthenticatedUser) {
     setLoading(true);
     setErrorMessage(null);
@@ -197,9 +243,20 @@ export function SyntheseView() {
           </div>
         </div>
 
-        <div className="hidden text-sm font-medium text-white md:block">Synthèse</div>
+        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
+          <GlobalSearchBar placeholder="Rechercher un KPI, une alerte ou une section..." />
+        </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed((previous) => !previous)}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 transition hover:bg-white/10"
+            aria-label={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Fermer le menu latéral"}
+            title={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Fermer le menu latéral"}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
           <button
             type="button"
             onClick={() => router.push("/settings")}
@@ -238,6 +295,9 @@ export function SyntheseView() {
           </button>
         </div>
       </header>
+      <div className="md:hidden">
+        <GlobalSearchBar placeholder="Rechercher..." />
+      </div>
 
       {loading ? (
         <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de la synthèse...</div>
@@ -249,8 +309,9 @@ export function SyntheseView() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <aside className="precision-card h-fit rounded-2xl p-4 lg:sticky lg:top-4">
+      <div className={`relative grid gap-6 ${isSidebarCollapsed ? "grid-cols-1" : "lg:grid-cols-[280px_1fr]"}`}>
+        {!isSidebarCollapsed ? (
+        <aside className="precision-card relative h-fit rounded-2xl p-4 lg:sticky lg:top-4">
           <nav className="space-y-1 text-sm">
             <NavRow icon={<Sparkles className="h-4 w-4" />} active>
               Synthèse
@@ -258,10 +319,30 @@ export function SyntheseView() {
             <NavRow icon={<LayoutDashboard className="h-4 w-4" />} onClick={() => router.push("/analysis")}>
               Tableau de bord
             </NavRow>
-            <NavRow icon={<FileText className="h-4 w-4" />} disabled>
-              Documents (bientôt)
+            <NavRow icon={<FileText className="h-4 w-4" />} onClick={() => router.push("/documents")}>
+              Documents
             </NavRow>
           </nav>
+
+          {yearOptions.length > 1 ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+              <label htmlFor="sidebar-synthese-year" className="text-[11px] uppercase tracking-wide text-white/50">
+                Année de synthèse
+              </label>
+              <select
+                id="sidebar-synthese-year"
+                value={selectedYearValue}
+                onChange={(event) => setSelectedYearValue(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
+              >
+                {yearOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           <button
             type="button"
@@ -281,6 +362,7 @@ export function SyntheseView() {
             </div>
           </button>
         </aside>
+        ) : null}
 
         <div>
           {analysisPair.current && synthese ? (
@@ -288,9 +370,6 @@ export function SyntheseView() {
               greetingName={greetingName}
               companyName={companyName}
               analysisCreatedAt={analysisPair.current.createdAt}
-              selectedYearValue={selectedYearValue}
-              yearOptions={yearOptions}
-              onYearChange={setSelectedYearValue}
               onDownloadReport={() => {
                 if (!analysisPair.current) {
                   return;
