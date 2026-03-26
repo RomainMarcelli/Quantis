@@ -39,6 +39,10 @@ import {
   scrollToSearchTarget,
   type SearchNavigationTarget
 } from "@/lib/search/globalSearch";
+import {
+  readSidebarCollapsedPreference,
+  writeSidebarCollapsedPreference
+} from "@/lib/ui/sidebarPreference";
 
 export function SyntheseView() {
   const router = useRouter();
@@ -51,26 +55,11 @@ export function SyntheseView() {
   const [selectedYearValue, setSelectedYearValue] = useState<string>(SYNTHESIS_CURRENT_YEAR_KEY);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
   const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
 
   // Référence utilisée pour l'option "Année en cours" dans le sélecteur de synthèse.
   const currentCalendarYear = new Date().getFullYear();
-
-  useEffect(() => {
-    // La page synthèse reprend le thème sombre premium pour rester cohérente avec /analysis.
-    const root = document.documentElement;
-    const previousTheme = root.getAttribute("data-theme");
-    root.setAttribute("data-theme", "dark");
-
-    return () => {
-      if (previousTheme) {
-        root.setAttribute("data-theme", previousTheme);
-        return;
-      }
-      root.removeAttribute("data-theme");
-    };
-  }, []);
 
   useEffect(() => {
     const initialTarget = consumeSearchTarget();
@@ -89,6 +78,10 @@ export function SyntheseView() {
     window.addEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
     return () => window.removeEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
   }, []);
+
+  useEffect(() => {
+    writeSidebarCollapsedPreference(isSidebarCollapsed);
+  }, [isSidebarCollapsed]);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {

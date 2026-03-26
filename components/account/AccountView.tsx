@@ -98,21 +98,6 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
     })();
   }, [user]);
 
-  useEffect(() => {
-    // La page compte adopte la même DA premium que /analysis (thème dark forcé localement).
-    const root = document.documentElement;
-    const previousTheme = root.getAttribute("data-theme");
-    root.setAttribute("data-theme", "dark");
-
-    return () => {
-      if (previousTheme) {
-        root.setAttribute("data-theme", previousTheme);
-        return;
-      }
-      root.removeAttribute("data-theme");
-    };
-  }, []);
-
   async function onSaveProfile() {
     if (!user) {
       return;

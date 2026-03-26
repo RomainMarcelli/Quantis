@@ -3,7 +3,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ScrollRevealInitializer } from "@/components/ui/ScrollRevealInitializer";
-import { ThemeInitializer } from "@/components/ui/ThemeInitializer";
+import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -32,11 +32,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
+    <html lang="fr" className="dark" data-theme="dark">
       <body className={`${inter.variable} ${jetBrainsMono.variable} premium-app-shell`}>
-        <ThemeInitializer />
-        <ScrollRevealInitializer />
-        {children}
+        <ThemeProvider>
+          <ScrollRevealInitializer />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

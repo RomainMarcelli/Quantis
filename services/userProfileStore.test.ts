@@ -22,6 +22,7 @@ import {
   deleteUserProfile,
   getUserProfile,
   markUserEmailAsVerified,
+  saveUserThemePreference,
   saveUserProfile,
   updateUserProfile
 } from "@/services/userProfileStore";
@@ -125,6 +126,18 @@ describe("userProfileStore", () => {
       expect.objectContaining({ path: "users/uid-1" }),
       expect.objectContaining({
         firstName: "Marie"
+      }),
+      { merge: true }
+    );
+  });
+
+  it("saves theme preference with merge=true", async () => {
+    await saveUserThemePreference("uid-1", "light");
+
+    expect(firestore.setDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "users/uid-1" }),
+      expect.objectContaining({
+        themePreference: "light"
       }),
       { merge: true }
     );

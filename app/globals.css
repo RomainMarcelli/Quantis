@@ -14,6 +14,19 @@
   --quantis-gold: #e0be4a;
   --quantis-emerald: #2dd4bf;
   --quantis-crimson: #fb7185;
+  --quantis-premium-root-bg: #09090b;
+  --quantis-premium-root-fg: #e4e4e7;
+  --quantis-card-bg: #0f0f12;
+  --quantis-card-bg-hover: #131318;
+  --quantis-card-border: rgb(255 255 255 / 6%);
+  --quantis-card-border-top: rgb(255 255 255 / 12%);
+  --quantis-card-shadow: 0 4px 20px -2px rgb(0 0 0 / 50%);
+  --quantis-noise-opacity: 0.035;
+  --quantis-spotlight: radial-gradient(ellipse at center, rgb(197 160 89 / 6%) 0%, transparent 60%);
+  --quantis-card-header-border: rgb(255 255 255 / 6%);
+  --quantis-card-header-border-hover: rgb(197 160 89 / 20%);
+  --quantis-edu-text: rgb(255 255 255 / 35%);
+  --quantis-edu-text-hover: rgb(255 255 255 / 60%);
   color-scheme: dark;
 }
 
@@ -27,6 +40,19 @@
   --quantis-gold: #d4af37;
   --quantis-emerald: #0f766e;
   --quantis-crimson: #9f1239;
+  --quantis-premium-root-bg: #f2f4f8;
+  --quantis-premium-root-fg: #111827;
+  --quantis-card-bg: #ffffff;
+  --quantis-card-bg-hover: #f8fafc;
+  --quantis-card-border: rgb(15 23 42 / 12%);
+  --quantis-card-border-top: rgb(15 23 42 / 20%);
+  --quantis-card-shadow: 0 8px 24px -12px rgb(15 23 42 / 22%);
+  --quantis-noise-opacity: 0.012;
+  --quantis-spotlight: radial-gradient(ellipse at center, rgb(212 175 55 / 9%) 0%, transparent 62%);
+  --quantis-card-header-border: rgb(15 23 42 / 12%);
+  --quantis-card-header-border-hover: rgb(212 175 55 / 35%);
+  --quantis-edu-text: rgb(30 41 59 / 62%);
+  --quantis-edu-text-hover: rgb(15 23 42 / 82%);
   color-scheme: light;
 }
 
@@ -155,8 +181,8 @@ body {
 
 /* Theme premium /analysis: surface sombre independante du reste de l'app. */
 .premium-analysis-root {
-  background-color: #09090b;
-  color: #e4e4e7;
+  background-color: var(--quantis-premium-root-bg);
+  color: var(--quantis-premium-root-fg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -165,7 +191,7 @@ body {
   position: absolute;
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  opacity: 0.035;
+  opacity: var(--quantis-noise-opacity);
   pointer-events: none;
   z-index: 2;
 }
@@ -178,18 +204,18 @@ body {
   transform: translateX(-50%);
   width: 80vw;
   height: 60vh;
-  background: radial-gradient(ellipse at center, rgb(197 160 89 / 6%) 0%, transparent 60%);
+  background: var(--quantis-spotlight);
   pointer-events: none;
   z-index: 1;
 }
 
 /* Carte premium commune avec hover or et relief progressif. */
 .precision-card {
-  background: #0f0f12;
-  border: 1px solid rgb(255 255 255 / 6%);
-  border-top: 1px solid rgb(255 255 255 / 12%);
+  background: var(--quantis-card-bg);
+  border: 1px solid var(--quantis-card-border);
+  border-top: 1px solid var(--quantis-card-border-top);
   box-shadow:
-    0 4px 20px -2px rgb(0 0 0 / 50%),
+    var(--quantis-card-shadow),
     inset 0 0 0 1px rgb(255 255 255 / 2%);
   position: relative;
   overflow: hidden;
@@ -220,7 +246,7 @@ body {
 
 .precision-card:hover {
   border-color: rgb(197 160 89 / 30%);
-  background: #131318;
+  background: var(--quantis-card-bg-hover);
   transform: translateY(-2px);
   box-shadow:
     0 20px 34px -15px rgb(0 0 0 / 85%),
@@ -242,14 +268,14 @@ body {
 }
 
 .card-header {
-  border-bottom: 1px solid rgb(255 255 255 / 6%);
+  border-bottom: 1px solid var(--quantis-card-header-border);
   padding-bottom: 1rem;
   margin-bottom: 1.5rem;
   transition: border-color 0.4s ease;
 }
 
 .precision-card:hover .card-header {
-  border-bottom-color: rgb(197 160 89 / 20%);
+  border-bottom-color: var(--quantis-card-header-border-hover);
 }
 
 .data-react {
@@ -408,7 +434,7 @@ body {
 
 .edu-text {
   font-size: 12px;
-  color: rgb(255 255 255 / 35%);
+  color: var(--quantis-edu-text);
   font-style: italic;
   line-height: 1.6;
   margin-top: 1rem;
@@ -418,7 +444,32 @@ body {
 }
 
 .precision-card:hover .edu-text {
-  color: rgb(255 255 255 / 60%);
+  color: var(--quantis-edu-text-hover);
+}
+
+/* Mode clair premium: harmonise les classes utilitaires sombres existantes sans réécrire tout le JSX. */
+:root[data-theme="light"] .premium-analysis-root [class*="text-white"] {
+  color: rgb(15 23 42 / 86%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="bg-black/"] {
+  background-color: rgb(255 255 255 / 72%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="border-white/"] {
+  border-color: rgb(15 23 42 / 16%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="bg-white/"] {
+  background-color: rgb(15 23 42 / 6%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root .dial-ticks {
+  stroke: rgb(15 23 42 / 22%);
+}
+
+:root[data-theme="light"] .premium-analysis-root .dial-track {
+  stroke: rgb(15 23 42 / 10%);
 }
 
 /* Animation globale au scroll: révèle progressivement les cartes sans casser la DA premium. */

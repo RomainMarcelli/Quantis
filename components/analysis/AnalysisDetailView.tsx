@@ -71,6 +71,10 @@ import {
   type SearchNavigationTarget,
   type SearchRoute
 } from "@/lib/search/globalSearch";
+import {
+  readSidebarCollapsedPreference,
+  writeSidebarCollapsedPreference
+} from "@/lib/ui/sidebarPreference";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
@@ -122,7 +126,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [fileActionKey, setFileActionKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
   const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
 
   useEffect(() => {
@@ -133,6 +137,10 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     const timeout = window.setTimeout(() => setInfoMessage(null), 2600);
     return () => window.clearTimeout(timeout);
   }, [infoMessage]);
+
+  useEffect(() => {
+    writeSidebarCollapsedPreference(isSidebarCollapsed);
+  }, [isSidebarCollapsed]);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
@@ -183,21 +191,6 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     allAnalyses.forEach((item) => registerKnownFolderName(item.folderName));
     setKnownFolders(getKnownFolderNames());
   }, [allAnalyses]);
-
-  useEffect(() => {
-    // Contrainte produit: /analysis doit rester en mode dark par defaut.
-    const root = document.documentElement;
-    const previousTheme = root.getAttribute("data-theme");
-    root.setAttribute("data-theme", "dark");
-
-    return () => {
-      if (previousTheme) {
-        root.setAttribute("data-theme", previousTheme);
-        return;
-      }
-      root.removeAttribute("data-theme");
-    };
-  }, []);
 
   useEffect(() => {
     const initialTarget = consumeSearchTarget();
