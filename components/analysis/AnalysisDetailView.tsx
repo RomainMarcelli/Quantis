@@ -13,24 +13,19 @@ import {
   LogOut,
   Pencil,
   Plus,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Sparkles,
   Trash2,
   Upload,
   UserCircle2
 } from "lucide-react";
-import { buildAnalysisDashboardViewModel } from "@/lib/dashboard/analysisDashboardViewModel";
-import { toPremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
-import {
-  DashboardFinancialTabContent,
-  DashboardFinancialTabsMenu,
-  type DashboardTabId
-} from "@/components/dashboard/tabs/DashboardFinancialTabs";
 import {
   DashboardFinancialTestMenu,
   type DashboardTestTabId
-} from "@/components/dashboard/test/DashboardFinancialTestMenu";
-import { DashboardFinancialTestContent } from "@/components/dashboard/test/DashboardFinancialTestContent";
+} from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
+import { DashboardFinancialTestContent } from "@/components/dashboard/navigation/DashboardFinancialTestContent";
 import { clearLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import {
   DEFAULT_FOLDER_NAME,
@@ -43,13 +38,12 @@ import {
   setActiveFolderName
 } from "@/lib/folders/activeFolder";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
   SYNTHESIS_CURRENT_YEAR_KEY
 } from "@/lib/synthese/synthesePeriod";
-import { loadAppPreferences } from "@/lib/settings/appPreferences";
 import {
   deleteUserAnalysisById,
   deleteUserFolderAnalyses,
@@ -69,9 +63,18 @@ import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
+import {
+  consumeSearchTarget,
+  routeMatchesPath,
+  SEARCH_NAVIGATE_EVENT,
+  scrollToSearchTarget,
+  type SearchNavigationTarget,
+  type SearchRoute
+} from "@/lib/search/globalSearch";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
+  viewMode?: "analysis" | "documents";
 };
 
 type FolderFileItem = {
@@ -84,24 +87,23 @@ type FolderFileItem = {
 type FolderDialogMode = "create" | "rename" | "delete" | null;
 
 const ACCEPTED_EXTENSIONS = [".xlsx", ".xls", ".csv", ".pdf"];
+const DEFAULT_ANALYSIS_TAB: DashboardTestTabId = "creation-valeur";
 
-export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
+export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: AnalysisDetailViewProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const currentCalendarYear = new Date().getFullYear();
+  const isDocumentsView = viewMode === "documents";
 
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
-  // null => affichage du dashboard initial; tab renseigne => affichage de la section choisie.
-  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTabId | null>(null);
-  // Menu de test isole: active une vue alternative sans impacter la navigation principale.
-  const [activeDashboardTestTab, setActiveDashboardTestTab] = useState<DashboardTestTabId | null>(null);
+  // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
+  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
   // Le select du menu pilote l'année d'analyse affichée dans le dashboard.
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<string>(SYNTHESIS_CURRENT_YEAR_KEY);
   const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
-  const [showDebugSection, setShowDebugSection] = useState<boolean>(() => loadAppPreferences().showDebugSection);
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Quantis");
   const [loadingAuth, setLoadingAuth] = useState(true);
@@ -120,6 +122,8 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   const [fileActionKey, setFileActionKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
 
   useEffect(() => {
     // Les messages de succes sont temporaires pour eviter d'encombrer l'ecran.
@@ -181,19 +185,6 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   }, [allAnalyses]);
 
   useEffect(() => {
-    // Synchronise la preference debug quand elle est modifiee depuis /settings.
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key && event.key !== "quantis.appPreferences") {
-        return;
-      }
-      setShowDebugSection(loadAppPreferences().showDebugSection);
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
-
-  useEffect(() => {
     // Contrainte produit: /analysis doit rester en mode dark par defaut.
     const root = document.documentElement;
     const previousTheme = root.getAttribute("data-theme");
@@ -206,6 +197,24 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
       }
       root.removeAttribute("data-theme");
     };
+  }, []);
+
+  useEffect(() => {
+    const initialTarget = consumeSearchTarget();
+    if (initialTarget) {
+      setPendingSearchTarget(initialTarget);
+    }
+
+    const onSearchNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<SearchNavigationTarget>).detail;
+      if (!detail) {
+        return;
+      }
+      setPendingSearchTarget(detail);
+    };
+
+    window.addEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
+    return () => window.removeEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
   }, []);
 
   const dashboardYearOptions = useMemo(
@@ -227,6 +236,38 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   );
 
   const hasNoAnalysisForSelectedYear = allAnalyses.length > 0 && analysesFilteredByYear.length === 0;
+
+  useEffect(() => {
+    if (!pendingSearchTarget) {
+      return;
+    }
+
+    const currentRoute: SearchRoute = isDocumentsView ? "/documents" : "/analysis";
+    if (!routeMatchesPath(currentRoute, pendingSearchTarget.route)) {
+      return;
+    }
+
+    // Si la recherche cible un onglet d'analyse, on l'ouvre avant d'appliquer le scroll.
+    if (!isDocumentsView && pendingSearchTarget.section) {
+      const targetTab =
+        pendingSearchTarget.section === "cockpit"
+          ? DEFAULT_ANALYSIS_TAB
+          : (pendingSearchTarget.section as DashboardTestTabId);
+      if (targetTab !== activeDashboardTab) {
+        setActiveDashboardTab(targetTab);
+        return;
+      }
+    }
+
+    if (!pendingSearchTarget.refId) {
+      setPendingSearchTarget(null);
+      return;
+    }
+
+    void scrollToSearchTarget(pendingSearchTarget.refId).finally(() => {
+      setPendingSearchTarget(null);
+    });
+  }, [pendingSearchTarget, isDocumentsView, activeDashboardTab, analysis?.id, loadingAnalysis]);
 
   useEffect(() => {
     // Le filtre d'année revient sur une valeur valide quand la liste d'options change.
@@ -270,9 +311,8 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   }, [analysis, analysesFilteredByYear, analysesInCurrentFolder, allAnalyses, currentFolder]);
 
   useEffect(() => {
-    // Lors d'un changement d'analyse, on revient sur le contenu initial du tableau de bord.
-    setActiveDashboardTab(null);
-    setActiveDashboardTestTab(null);
+    // Lors d'un changement d'analyse, on garde l'entrée par défaut sur "Création de valeur".
+    setActiveDashboardTab(DEFAULT_ANALYSIS_TAB);
   }, [analysis?.id]);
 
   const folderNames = useMemo(() => {
@@ -324,17 +364,6 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
   const pendingSourceFilesDeletionAnalysesCount = useMemo(
     () => new Set(pendingSourceFilesDeletion.map((file) => file.analysisId)).size,
     [pendingSourceFilesDeletion]
-  );
-
-  const dashboardView = useMemo(
-    () => (analysis ? buildAnalysisDashboardViewModel(analysis.kpis) : null),
-    [analysis]
-  );
-
-  // Adaptateur UI premium: isole les cles de presentation sans toucher la logique metier.
-  const premiumKpis = useMemo(
-    () => (analysis ? toPremiumKpis(analysis.kpis) : null),
-    [analysis]
   );
 
   async function loadDashboardData(currentUser: AuthenticatedUser, targetAnalysisId?: string) {
@@ -708,17 +737,8 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
     void handleSubmitFolderDialog();
   }
 
-  function handleFinancialTabChange(nextTab: DashboardTabId) {
-    // Recliquer sur l'onglet actif re-affiche le contenu initial du tableau de bord.
-    // Le menu principal désactive automatiquement la variante "test".
-    setActiveDashboardTestTab(null);
-    setActiveDashboardTab((currentTab) => (currentTab === nextTab ? null : nextTab));
-  }
-
-  function handleFinancialTestTabChange(nextTab: DashboardTestTabId) {
-    // Le menu de test est exclusif: il masque les sections standards tant qu'il est actif.
-    setActiveDashboardTab(null);
-    setActiveDashboardTestTab((currentTab) => (currentTab === nextTab ? null : nextTab));
+  function handleFinancialTabChange(nextTab: DashboardTestTabId) {
+    setActiveDashboardTab(nextTab);
   }
 
   function onInputFilesSelected(fileList: FileList | null) {
@@ -780,9 +800,20 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
           </div>
         </div>
 
-        <div className="hidden text-sm font-medium text-white md:block">Tableau de bord</div>
+        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
+          <GlobalSearchBar placeholder="Rechercher un KPI, une section ou un document..." />
+        </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed((previous) => !previous)}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 transition hover:bg-white/10"
+            aria-label={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Fermer le menu latéral"}
+            title={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Fermer le menu latéral"}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+          </button>
           <button
             type="button"
             onClick={() => router.push("/settings")}
@@ -821,6 +852,9 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
           </button>
         </div>
       </header>
+      <div className="md:hidden">
+        <GlobalSearchBar placeholder="Rechercher..." />
+      </div>
 
       {loadingAnalysis ? (
         <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de l&apos;analyse...</div>
@@ -845,21 +879,42 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+      <div className={`relative grid gap-6 ${isSidebarCollapsed ? "grid-cols-1" : "lg:grid-cols-[280px_1fr]"}`}>
         {/* Sidebar metier: dossiers + fichiers + upload, conservee mais re-skinee premium. */}
-        <aside className="precision-card h-fit rounded-2xl p-4 lg:sticky lg:top-4">
+        {!isSidebarCollapsed ? (
+        <aside className="precision-card relative h-fit rounded-2xl p-4 lg:sticky lg:top-4">
           <nav className="space-y-1 text-sm">
-            <NavRow icon={<LayoutDashboard className="h-4 w-4" />} active>
+            <NavRow icon={<LayoutDashboard className="h-4 w-4" />} active={!isDocumentsView} onClick={() => router.push("/analysis")}>
               Tableau de bord
             </NavRow>
             {/* L'item "Analyses" est remplace par "Synthese" et devient navigable. */}
             <NavRow icon={<Sparkles className="h-4 w-4" />} onClick={() => router.push("/synthese")}>
               Synthèse
             </NavRow>
-            <NavRow icon={<Sparkles className="h-4 w-4" />} disabled>
-              Documents (bientôt)
+            <NavRow icon={<FileText className="h-4 w-4" />} active={isDocumentsView} onClick={() => router.push("/documents")}>
+              Documents
             </NavRow>
           </nav>
+
+          {!isDocumentsView && dashboardYearOptions.length > 1 ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+              <label htmlFor="sidebar-dashboard-year" className="text-[11px] uppercase tracking-wide text-white/50">
+                Année de synthèse
+              </label>
+              <select
+                id="sidebar-dashboard-year"
+                value={selectedDashboardYear}
+                onChange={(event) => setSelectedDashboardYear(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
+              >
+                {dashboardYearOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
 
           {/* Le bloc compte remplace le lien de navigation "Compte" pour eviter le doublon. */}
           <button
@@ -880,231 +935,195 @@ export function AnalysisDetailView({ analysisId }: AnalysisDetailViewProps) {
             </div>
           </button>
 
-          <div className="mt-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wide text-white/50">Dossiers</p>
-              <button
-                type="button"
-                onClick={handleNewFolder}
-                className="rounded p-1 text-white/60 hover:bg-white/10 hover:text-white"
-                aria-label="Nouveau dossier"
-                title="Nouveau dossier"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-2 space-y-1">
-              {folderNames.map((folderName) => {
-                const isActive = normalizeFolderName(folderName) === normalizeFolderName(currentFolder);
-                const count = allAnalyses.filter((item) => normalizeFolderName(item.folderName) === normalizeFolderName(folderName)).length;
-                const isBusy = folderActionName ? isSameFolderName(folderActionName, folderName) : false;
-                return (
-                  <div
-                    key={folderName}
-                    className={`flex items-center gap-1 rounded-lg px-1 py-1 ${
-                      isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setCurrentFolder(normalizeFolderName(folderName))}
-                      className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left"
-                      disabled={isBusy}
-                    >
-                      <Folder className="h-4 w-4" />
-                      <span className="min-w-0 flex-1 truncate text-sm">{folderName}</span>
-                      <span className="text-[11px]">{count}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openRenameFolderDialog(folderName)}
-                      className="rounded p-1 text-white/60 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                      aria-label={`Renommer le dossier ${folderName}`}
-                      title="Renommer"
-                      disabled={isBusy}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openDeleteFolderDialog(folderName)}
-                      className="rounded p-1 text-white/60 hover:bg-rose-500/20 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
-                      aria-label={`Supprimer le dossier ${folderName}`}
-                      title="Supprimer"
-                      disabled={isBusy}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="mt-5 border-t border-white/10 pt-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs uppercase tracking-wide text-white/50">Fichiers sources</p>
-              {sourceFiles.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={toggleSelectAllSourceFiles}
-                  className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-white/75 hover:bg-white/10"
-                >
-                  {selectedSourceFileKeys.length === sourceFiles.length
-                    ? "Tout deselectionner"
-                    : "Tout selectionner"}
-                </button>
-              ) : null}
-            </div>
-            {selectedSourceFiles.length > 0 ? (
-              <div className="mt-2">
-                <button
-                  type="button"
-                  onClick={() => requestSourceFilesDeletion(selectedSourceFiles)}
-                  className="w-full rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-xs font-medium text-rose-200 hover:bg-rose-500/20"
-                >
-                  Supprimer la selection ({selectedSourceFiles.length})
-                </button>
-              </div>
-            ) : null}
-            <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
-              {sourceFiles.length === 0 ? (
-                <p className="px-1 text-xs text-white/55">Aucun fichier importé pour le moment.</p>
-              ) : (
-                sourceFiles.map((file) => (
-                  <div
-                    key={`${file.analysisId}-${file.name}-${file.createdAt}`}
-                    className="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5"
-                  >
-                    <div className="flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedSourceFileKeys.includes(buildSourceFileKey(file))}
-                        onChange={() => toggleSourceFileSelection(file)}
-                        className="mt-1 h-3.5 w-3.5 rounded border-white/20 bg-black/40 text-quantis-gold accent-quantis-gold"
-                        aria-label={`Selectionner ${file.name}`}
-                      />
-                      <FileText className="mt-0.5 h-3.5 w-3.5 text-white/55" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-white">{file.name}</p>
-                        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-white/55">
-                          <span>{new Date(file.createdAt).toLocaleDateString("fr-FR")}</span>
-                          <span>•</span>
-                          <span className="truncate">{file.folderName}</span>
-                          <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => requestSourceFilesDeletion([file])}
-                        className="rounded p-1 text-white/55 transition-colors hover:bg-rose-500/20 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
-                        aria-label={`Supprimer ${file.name}`}
-                        title="Supprimer ce fichier source"
-                        disabled={fileActionKey === file.analysisId || sourceFilesDeletionSubmitting}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-dashed border-white/20 bg-black/15 p-3 text-center">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".xlsx,.xls,.csv,.pdf"
-              className="hidden"
-              onChange={(event) => {
-                onInputFilesSelected(event.target.files);
-                event.currentTarget.value = "";
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="w-full rounded-lg px-2 py-3 text-xs text-white/85 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-              onDrop={(event) => {
-                event.preventDefault();
-                onInputFilesSelected(event.dataTransfer.files);
-              }}
-              onDragOver={(event) => event.preventDefault()}
-            >
-              <Upload className="mx-auto h-4 w-4 text-white/60" />
-              <p className="mt-2 font-medium">Glisser-déposer</p>
-              <p className="text-[11px] text-white/55">ou cliquer pour parcourir</p>
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/upload/manual")}
-              className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-xs font-medium text-white/85 transition-colors hover:bg-white/10"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-              Saisie manuelle des données
-            </button>
-          </div>
         </aside>
+        ) : null}
 
         <div className="space-y-6">
-          {analysis && dashboardView && premiumKpis ? (
+          {isDocumentsView ? (
             <>
-              {/* Menu horizontal placé AU-DESSUS du bloc Cockpit financier, comme demandé. */}
-              <DashboardFinancialTabsMenu
+              <section className="precision-card rounded-2xl p-5" data-search-id="documents-folders">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Dossiers</p>
+                  <button
+                    type="button"
+                    onClick={handleNewFolder}
+                    className="rounded p-1 text-white/60 hover:bg-white/10 hover:text-white"
+                    aria-label="Nouveau dossier"
+                    title="Nouveau dossier"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-2 space-y-1">
+                  {folderNames.map((folderName) => {
+                    const isActive = normalizeFolderName(folderName) === normalizeFolderName(currentFolder);
+                    const count = allAnalyses.filter(
+                      (item) => normalizeFolderName(item.folderName) === normalizeFolderName(folderName)
+                    ).length;
+                    const isBusy = folderActionName ? isSameFolderName(folderActionName, folderName) : false;
+                    return (
+                      <div
+                        key={folderName}
+                        className={`flex items-center gap-1 rounded-lg px-1 py-1 ${
+                          isActive ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setCurrentFolder(normalizeFolderName(folderName))}
+                          className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 py-1 text-left"
+                          disabled={isBusy}
+                        >
+                          <Folder className="h-4 w-4" />
+                          <span className="min-w-0 flex-1 truncate text-sm">{folderName}</span>
+                          <span className="text-[11px]">{count}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openRenameFolderDialog(folderName)}
+                          className="rounded p-1 text-white/60 hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Renommer le dossier ${folderName}`}
+                          title="Renommer"
+                          disabled={isBusy}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDeleteFolderDialog(folderName)}
+                          className="rounded p-1 text-white/60 hover:bg-rose-500/20 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Supprimer le dossier ${folderName}`}
+                          title="Supprimer"
+                          disabled={isBusy}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="precision-card rounded-2xl p-5" data-search-id="documents-files">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Fichiers sources</p>
+                  {sourceFiles.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={toggleSelectAllSourceFiles}
+                      className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-white/75 hover:bg-white/10"
+                    >
+                      {selectedSourceFileKeys.length === sourceFiles.length
+                        ? "Tout désélectionner"
+                        : "Tout sélectionner"}
+                    </button>
+                  ) : null}
+                </div>
+
+                {selectedSourceFiles.length > 0 ? (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => requestSourceFilesDeletion(selectedSourceFiles)}
+                      className="w-full rounded-lg border border-rose-400/30 bg-rose-500/15 px-3 py-2 text-xs font-medium text-rose-200 hover:bg-rose-500/20"
+                    >
+                      Supprimer la sélection ({selectedSourceFiles.length})
+                    </button>
+                  </div>
+                ) : null}
+
+                <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
+                  {sourceFiles.length === 0 ? (
+                    <p className="px-1 text-xs text-white/55">Aucun fichier importé pour le moment.</p>
+                  ) : (
+                    sourceFiles.map((file) => (
+                      <div
+                        key={`${file.analysisId}-${file.name}-${file.createdAt}`}
+                        className="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5"
+                      >
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedSourceFileKeys.includes(buildSourceFileKey(file))}
+                            onChange={() => toggleSourceFileSelection(file)}
+                            className="mt-1 h-3.5 w-3.5 rounded border-white/20 bg-black/40 text-quantis-gold accent-quantis-gold"
+                            aria-label={`Sélectionner ${file.name}`}
+                          />
+                          <FileText className="mt-0.5 h-3.5 w-3.5 text-white/55" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-medium text-white">{file.name}</p>
+                            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-white/55">
+                              <span>{new Date(file.createdAt).toLocaleDateString("fr-FR")}</span>
+                              <span>•</span>
+                              <span className="truncate">{file.folderName}</span>
+                              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => requestSourceFilesDeletion([file])}
+                            className="rounded p-1 text-white/55 transition-colors hover:bg-rose-500/20 hover:text-rose-300 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label={`Supprimer ${file.name}`}
+                            title="Supprimer ce fichier source"
+                            disabled={fileActionKey === file.analysisId || sourceFilesDeletionSubmitting}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
+
+              <section className="precision-card rounded-2xl p-5" data-search-id="documents-upload">
+                <div className="rounded-xl border border-dashed border-white/20 bg-black/15 p-3 text-center">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".xlsx,.xls,.csv,.pdf"
+                    className="hidden"
+                    onChange={(event) => {
+                      onInputFilesSelected(event.target.files);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="w-full rounded-lg px-2 py-3 text-xs text-white/85 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      onInputFilesSelected(event.dataTransfer.files);
+                    }}
+                    onDragOver={(event) => event.preventDefault()}
+                  >
+                    <Upload className="mx-auto h-4 w-4 text-white/60" />
+                    <p className="mt-2 font-medium">Glisser-déposer</p>
+                    <p className="text-[11px] text-white/55">ou cliquer pour parcourir</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/upload/manual")}
+                    className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-2 text-xs font-medium text-white/85 transition-colors hover:bg-white/10"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Saisie manuelle des données
+                  </button>
+                </div>
+              </section>
+            </>
+          ) : analysis ? (
+            <>
+              {/* Navigation principale unique: version design alternative. */}
+              <DashboardFinancialTestMenu
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}
-                yearOptions={dashboardYearOptions}
-                selectedYear={selectedDashboardYear}
-                onYearChange={setSelectedDashboardYear}
               />
-              {/* Menu de test ajouté sous le menu existant pour expérimenter des variantes UI. */}
-              <div className="mt-3">
-                <DashboardFinancialTestMenu
-                  activeTab={activeDashboardTestTab}
-                  onChange={handleFinancialTestTabChange}
-                />
-              </div>
-              {activeDashboardTestTab !== null ? (
-                <DashboardFinancialTestContent activeTab={activeDashboardTestTab} kpis={analysis.kpis} />
-              ) : activeDashboardTab !== null ? (
-                // UX demandee: quand un onglet métier est actif, on masque le cockpit
-                // pour afficher uniquement la section financière sélectionnée.
-                <DashboardFinancialTabContent
-                  activeTab={activeDashboardTab}
-                  kpis={analysis.kpis}
-                  viewModel={dashboardView}
-                />
-              ) : (
-                <DashboardLayout
-                  // Le key force un remount propre quand on change d'analyse (reset slider IA local).
-                  key={analysis.id}
-                  companyName={companyName}
-                  greetingName={greetingName}
-                  kpis={premiumKpis}
-                >
-                  <DashboardFinancialTabContent
-                    activeTab={activeDashboardTab}
-                    kpis={analysis.kpis}
-                    viewModel={dashboardView}
-                  />
-                  {showDebugSection && activeDashboardTab === null ? (
-                  <details className="precision-card rounded-2xl p-5">
-                    <summary className="cursor-pointer text-sm font-semibold text-white">
-                      Donnees source (debug)
-                    </summary>
-                    <div className="mt-4 grid gap-4 xl:grid-cols-3">
-                      <JsonPanel title="rawData" value={analysis.rawData} />
-                      <JsonPanel title="mappedData" value={analysis.mappedData} />
-                      <JsonPanel title="kpis" value={analysis.kpis} />
-                    </div>
-                  </details>
-                  ) : null}
-                </DashboardLayout>
-              )}
+              <DashboardFinancialTestContent activeTab={activeDashboardTab} kpis={analysis.kpis} />
             </>
           ) : (
             <section className="precision-card rounded-2xl p-5">
@@ -1323,17 +1342,4 @@ function NavRow({
     </button>
   );
 }
-
-function JsonPanel({ title, value }: { title: string; value: unknown }) {
-  return (
-    <section>
-      <p className="text-xs uppercase tracking-wide text-white/60">{title}</p>
-      <pre className="mt-2 max-h-80 overflow-auto rounded-xl border border-white/10 bg-black/30 p-3 text-xs text-white/80">
-        {JSON.stringify(value, null, 2)}
-      </pre>
-    </section>
-  );
-}
-
-
 

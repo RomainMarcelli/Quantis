@@ -13,12 +13,13 @@ import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 type HealthScoreProps = {
   score: number | null;
   tag?: string;
+  searchId?: string;
 };
 
 const DIAL_RADIUS = 130;
 const DIAL_CIRCUMFERENCE = 2 * Math.PI * DIAL_RADIUS;
 
-export function HealthScore({ score, tag = "SCORE_01" }: HealthScoreProps) {
+export function HealthScore({ score, tag = "SCORE_01", searchId }: HealthScoreProps) {
   // Animation fluide du score central pour reproduire l'effet cockpit.
   const animatedScore = useAnimatedNumber(score, { durationMs: 900 });
   // Le status est derive de la vraie valeur KPI, pas de la valeur animee.
@@ -27,7 +28,10 @@ export function HealthScore({ score, tag = "SCORE_01" }: HealthScoreProps) {
   const progressOffset = computeHealthStrokeDashoffset(animatedScore, DIAL_RADIUS);
 
   return (
-    <article className="precision-card group fade-up relative flex min-h-[560px] flex-col rounded-2xl px-6 pb-6 pt-7 lg:col-span-5">
+    <article
+      className="precision-card group fade-up relative flex min-h-[560px] flex-col rounded-2xl px-6 pb-6 pt-7 lg:col-span-5"
+      data-search-id={searchId}
+    >
       <div className="card-header mb-5 flex w-full items-center justify-between">
         <div className="flex items-center gap-2 text-white/60 transition-colors group-hover:text-white">
           <ShieldCheck className="h-4 w-4" />

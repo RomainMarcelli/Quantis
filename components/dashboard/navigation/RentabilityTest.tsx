@@ -1,4 +1,4 @@
-// File: components/dashboard/test/RentabilityTest.tsx
+// File: components/dashboard/navigation/RentabilityTest.tsx
 // Role: propose une variante "test" premium de la section Ratio et rentabilité avec les KPI réels de l'analyse.
 "use client";
 
@@ -13,7 +13,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { formatNumber } from "@/components/dashboard/formatting";
-import { TestTopStatus } from "@/components/dashboard/test/TestTopStatus";
+import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
   buildRentabilitySeries,
@@ -133,7 +133,7 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
             </div>
           </div>
           <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-            Profits & rentabilité (test)
+            Profits & rentabilité
           </h2>
           <p className="text-sm text-quantis-muted">
             Création de richesse, performance du capital et effet de levier.
@@ -145,6 +145,7 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
         <RentabilityMetricCard
           className="md:col-span-6"
           delayMs={100}
+          searchId="analysis-rent-roe"
           title="Gain sur mon capital"
           tag="Return on Equity (ROE)"
           value={roePercent === null ? "N/D" : `${formatNumber(animatedRoe, 1)}%`}
@@ -158,6 +159,7 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
         <RentabilityMetricCard
           className="md:col-span-6"
           delayMs={150}
+          searchId="analysis-rent-roce"
           title="Performance de l'activité"
           tag="Return on Capital Employed (ROCE)"
           value={rocePercent === null ? "N/D" : `${formatNumber(animatedRoce, 1)}%`}
@@ -173,6 +175,7 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
         <article
           className="precision-card fade-up group col-span-1 rounded-2xl p-8 md:col-span-12"
           style={{ animationDelay: "200ms" }}
+          data-search-id="analysis-rent-comparatif"
         >
           {/* Graphique comparatif ROE/ROCE: visualise l'effet de levier via l'écart entre les courbes. */}
           <div className="card-header mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -266,6 +269,7 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
         <article
           className="precision-card fade-up group col-span-1 flex flex-col gap-6 rounded-2xl p-6 md:col-span-12 md:flex-row md:items-center md:justify-between"
           style={{ animationDelay: "250ms" }}
+          data-search-id="analysis-rent-levier"
         >
           {/* Dépendance bancaire: lecture simple du levier pour un profil non-financier. */}
           <div className="md:max-w-[65%]">
@@ -338,6 +342,7 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
 }
 
 type RentabilityMetricCardProps = {
+  searchId?: string;
   title: string;
   tag: string;
   value: string;
@@ -351,6 +356,7 @@ type RentabilityMetricCardProps = {
 };
 
 function RentabilityMetricCard({
+  searchId,
   title,
   tag,
   value,
@@ -366,6 +372,7 @@ function RentabilityMetricCard({
     <article
       className={`precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 ${className ?? ""}`}
       style={{ animationDelay: `${delayMs}ms` }}
+      data-search-id={searchId}
     >
       <div>
         <div className="card-header flex items-start justify-between">
@@ -483,3 +490,4 @@ function round(value: number, digits: number): number {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+

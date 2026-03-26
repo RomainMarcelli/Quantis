@@ -11,7 +11,7 @@ type LoginPageProps = {
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = (await searchParams) ?? {};
   const rawNext = Array.isArray(params.next) ? params.next[0] ?? "" : params.next ?? "";
-  const postLoginRedirect = rawNext.startsWith("/") ? rawNext : "/analysis";
+  const postLoginRedirect = rawNext.startsWith("/") ? rawNext : "/synthese";
 
   return (
     <main className="premium-analysis-root relative mx-auto flex min-h-screen w-full items-center justify-center overflow-hidden px-4 py-10">

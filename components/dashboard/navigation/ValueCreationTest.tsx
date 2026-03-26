@@ -1,4 +1,4 @@
-// File: components/dashboard/test/ValueCreationTest.tsx
+// File: components/dashboard/navigation/ValueCreationTest.tsx
 // Role: propose une variante "test" premium de la section Création de valeur avec les KPI réels de l'analyse.
 "use client";
 
@@ -21,7 +21,7 @@ import {
   buildMonthlyRevenueSeries,
   buildTmscvPieData
 } from "@/lib/dashboard/tabs/valueCreationData";
-import { TestTopStatus } from "@/components/dashboard/test/TestTopStatus";
+import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis } from "@/types/analysis";
 
 type ValueCreationTestProps = {
@@ -148,7 +148,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
             </div>
           </div>
           <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-            Création de valeur (test)
+            Création de valeur
           </h2>
         </div>
 
@@ -169,6 +169,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
         <MetricCard
           delayMs={100}
+          searchId="analysis-vc-ca"
           title="Volume d'activité"
           tag="Chiffre d'affaires"
           value={caLabel}
@@ -179,6 +180,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
         />
         <MetricCard
           delayMs={150}
+          searchId="analysis-vc-tcam"
           title="Vitesse de développement"
           tag="TCAM %"
           value={tcamLabel}
@@ -189,6 +191,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
         />
         <MetricCard
           delayMs={200}
+          searchId="analysis-vc-ebe"
           title="Performance opérationnelle"
           tag="Excédent Brut (EBE)"
           value={ebeLabel}
@@ -201,6 +204,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
         <article
           className="precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 md:col-span-6"
           style={{ animationDelay: "250ms" }}
+          data-search-id="analysis-vc-resultat-net"
         >
           <div>
             <div className="card-header flex items-start justify-between">
@@ -230,6 +234,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
         <article
           className="precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 md:col-span-6"
           style={{ animationDelay: "300ms" }}
+          data-search-id="analysis-vc-tmscv"
         >
           <div>
             <div className="card-header flex items-start justify-between">
@@ -288,6 +293,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
         <article
           className="precision-card fade-up group col-span-1 rounded-2xl p-8 md:col-span-12"
           style={{ animationDelay: "400ms" }}
+          data-search-id="analysis-vc-point-mort"
         >
           <div className="card-header mb-6 flex items-center justify-between gap-3">
             <div>
@@ -380,6 +386,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
 }
 
 type MetricCardProps = {
+  searchId?: string;
   title: string;
   tag: string;
   value: string;
@@ -391,6 +398,7 @@ type MetricCardProps = {
 };
 
 function MetricCard({
+  searchId,
   title,
   tag,
   value,
@@ -404,6 +412,7 @@ function MetricCard({
     <article
       className="precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 md:col-span-4"
       style={{ animationDelay: `${delayMs}ms` }}
+      data-search-id={searchId}
     >
       <div>
         <div className="card-header flex items-start justify-between">
@@ -441,3 +450,4 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 function formatCompactCurrency(value: number): string {
   return `${Math.round(value).toLocaleString("fr-FR")} €`;
 }
+

@@ -58,12 +58,6 @@ describe("SyntheseDashboard", () => {
         greetingName="Romain"
         companyName="Quantis"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
-        selectedYearValue="current"
-        yearOptions={[
-          { value: "current", label: "Année en cours (2026)" },
-          { value: "2025", label: "2025" }
-        ]}
-        onYearChange={() => {}}
         onDownloadReport={() => {}}
         onReupload={() => {}}
         onManualEntry={() => {}}
@@ -72,7 +66,7 @@ describe("SyntheseDashboard", () => {
     );
 
     expect(html).toContain("Quantis Score");
-    expect(html).toContain("74 / 100");
+    expect(html).toContain(">74<");
     expect(html).toContain("Santé globale solide");
   });
 
@@ -82,12 +76,6 @@ describe("SyntheseDashboard", () => {
         greetingName="Romain"
         companyName="Quantis"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
-        selectedYearValue="current"
-        yearOptions={[
-          { value: "current", label: "Année en cours (2026)" },
-          { value: "2025", label: "2025" }
-        ]}
-        onYearChange={() => {}}
         onDownloadReport={() => {}}
         onReupload={() => {}}
         onManualEntry={() => {}}
@@ -95,10 +83,9 @@ describe("SyntheseDashboard", () => {
       />
     );
 
-    expect(html).toContain("Chiffre d&#x27;affaires");
-    expect(html).toContain("Rentabilité opérationnelle");
-    expect(html).toContain("Cash disponible");
-    expect(html).toContain("Année en cours (2026)");
+    expect(html).toContain("Chiffre d&#x27;Affaires");
+    expect(html).toContain("Tresorerie Nette");
+    expect(html).toContain("Excedent Brut d&#x27;Exploitation");
   });
 
   it("affiche le message de donnée manquante avec actions", () => {
@@ -125,12 +112,6 @@ describe("SyntheseDashboard", () => {
         greetingName="Romain"
         companyName="Quantis"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
-        selectedYearValue="current"
-        yearOptions={[
-          { value: "current", label: "Année en cours (2026)" },
-          { value: "2025", label: "2025" }
-        ]}
-        onYearChange={() => {}}
         onDownloadReport={() => {}}
         onReupload={() => {}}
         onManualEntry={() => {}}
@@ -138,8 +119,8 @@ describe("SyntheseDashboard", () => {
       />
     );
 
-    expect(html).toContain("uploader un document complet");
-    expect(html).toContain("Ré-uploader un fichier");
+    expect(html).toContain("Certaines donnees sont manquantes");
+    expect(html).toContain("Re-uploader un fichier");
     expect(html).toContain("Saisie manuelle");
   });
 });

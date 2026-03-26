@@ -213,10 +213,10 @@ export function UploadPageView() {
             </Link>
             {user ? (
               <Link
-                href="/analysis"
+                href="/synthese"
                 className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/85 transition-colors hover:bg-white/10"
               >
-                Analyse
+                Synthèse
               </Link>
             ) : null}
           </div>

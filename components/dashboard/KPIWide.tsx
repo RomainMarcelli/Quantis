@@ -12,9 +12,10 @@ type KPIWideProps = {
   tag: string;
   value: number | null;
   target?: number;
+  searchId?: string;
 };
 
-export function KPIWide({ title, tag, value, target = 50000 }: KPIWideProps) {
+export function KPIWide({ title, tag, value, target = 50000, searchId }: KPIWideProps) {
   // Animation de la valeur EBE.
   const animatedValue = useAnimatedNumber(value, { durationMs: 1200 });
   // Animation de la barre de progression vers l'objectif.
@@ -22,7 +23,7 @@ export function KPIWide({ title, tag, value, target = 50000 }: KPIWideProps) {
   const animatedProgress = useAnimatedNumber(progressTarget, { durationMs: 1000 });
 
   return (
-    <article className="precision-card group fade-up flex flex-col rounded-2xl p-6 md:col-span-2">
+    <article className="precision-card group fade-up flex flex-col rounded-2xl p-6 md:col-span-2" data-search-id={searchId}>
       <div className="card-header mb-6 flex flex-col gap-1">
         <h3 className="text-sm font-semibold text-white">{title}</h3>
         <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>

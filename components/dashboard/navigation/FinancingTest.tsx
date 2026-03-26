@@ -1,4 +1,4 @@
-// File: components/dashboard/test/FinancingTest.tsx
+// File: components/dashboard/navigation/FinancingTest.tsx
 // Role: propose une variante "test" premium de la section Financement avec les KPI réels de l'analyse.
 "use client";
 
@@ -20,7 +20,7 @@ import {
   severityClass,
   type FinancingSeverity
 } from "@/lib/dashboard/financement/financingViewModel";
-import { TestTopStatus } from "@/components/dashboard/test/TestTopStatus";
+import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis } from "@/types/analysis";
 
 type FinancingTestProps = {
@@ -121,7 +121,7 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
             </div>
           </div>
           <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-            Banque & financement (test)
+            Banque & financement
           </h2>
           <p className="text-sm text-quantis-muted">Structure financière, solvabilité et ratios d&apos;emprunt</p>
         </div>
@@ -143,6 +143,7 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
         <FinancingMetricCard
           delayMs={100}
+          searchId="analysis-fin-capacite-remboursement"
           className="md:col-span-4"
           title="Poids de la dette"
           tag="Capacité de remboursement"
@@ -156,6 +157,7 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
 
         <FinancingMetricCard
           delayMs={150}
+          searchId="analysis-fin-caf"
           className="md:col-span-4"
           title="Moteur de trésorerie"
           tag="Capacité d'autofinancement (CAF)"
@@ -169,6 +171,7 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
 
         <FinancingMetricCard
           delayMs={200}
+          searchId="analysis-fin-fte"
           className="md:col-span-4"
           title="Cash réel généré"
           tag="Flux de trésorerie d'exploit."
@@ -183,6 +186,7 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
         <article
           className="precision-card fade-up group col-span-1 rounded-2xl p-8 md:col-span-8"
           style={{ animationDelay: "250ms" }}
+          data-search-id="analysis-fin-liquidite"
         >
           {/* Bloc central: compare les trois ratios de liquidité avec un même cadre de lecture. */}
           <div className="card-header mb-8">
@@ -224,6 +228,7 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
         <article
           className="precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 md:col-span-4"
           style={{ animationDelay: "300ms" }}
+          data-search-id="analysis-fin-levier"
         >
           <div>
             <div className="card-header flex items-start justify-between">
@@ -287,6 +292,7 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
 }
 
 type FinancingMetricCardProps = {
+  searchId?: string;
   title: string;
   tag: string;
   value: string;
@@ -300,6 +306,7 @@ type FinancingMetricCardProps = {
 };
 
 function FinancingMetricCard({
+  searchId,
   title,
   tag,
   value,
@@ -315,6 +322,7 @@ function FinancingMetricCard({
     <article
       className={`precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 ${className ?? ""}`}
       style={{ animationDelay: `${delayMs}ms` }}
+      data-search-id={searchId}
     >
       <div>
         <div className="card-header flex items-start justify-between">
@@ -357,3 +365,4 @@ function formatCompactCurrency(value: number): string {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+

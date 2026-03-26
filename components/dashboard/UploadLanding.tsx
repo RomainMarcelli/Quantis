@@ -1,5 +1,5 @@
 // components/dashboard/UploadLanding.tsx
-// Composant de d�p�t de fichiers styl� DA premium pour l'�cran /dashboard.
+// Composant de dépôt de fichiers stylé DA premium pour l'écran /dashboard.
 "use client";
 
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";

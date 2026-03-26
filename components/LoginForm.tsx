@@ -44,7 +44,7 @@ export function LoginForm({
   initialCompanySize = "",
   initialSector = "",
   backHref = "/",
-  postLoginRedirect = "/analysis"
+  postLoginRedirect = "/synthese"
 }: LoginFormProps) {
   const router = useRouter();
   // Reference de la carte pour recentrer la vue en haut apres une inscription reussie.
@@ -78,7 +78,7 @@ export function LoginForm({
 
   const currentErrors = mode === "login" ? loginErrors : registerErrors;
   const safePostLoginRedirect =
-    postLoginRedirect.trim().startsWith("/") ? postLoginRedirect.trim() : "/analysis";
+    postLoginRedirect.trim().startsWith("/") ? postLoginRedirect.trim() : "/synthese";
   const passwordRules = useMemo(() => getPasswordRuleChecks(password), [password]);
 
   useEffect(() => {

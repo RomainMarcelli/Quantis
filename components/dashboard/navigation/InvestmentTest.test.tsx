@@ -1,8 +1,8 @@
-// File: components/dashboard/test/FinancingTest.test.tsx
-// Role: vérifie le rendu principal de la section Financement (test) et son alimentation par KPI.
+// File: components/dashboard/navigation/InvestmentTest.test.tsx
+// Role: vérifie le rendu principal de la section Investissement (test) et son alimentation par KPI.
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { FinancingTest } from "@/components/dashboard/test/FinancingTest";
+import { InvestmentTest } from "@/components/dashboard/navigation/InvestmentTest";
 import type { CalculatedKpis } from "@/types/analysis";
 
 function makeKpis(overrides: Partial<CalculatedKpis> = {}): CalculatedKpis {
@@ -49,28 +49,28 @@ function makeKpis(overrides: Partial<CalculatedKpis> = {}): CalculatedKpis {
   };
 }
 
-describe("FinancingTest", () => {
-  it("affiche les blocs clés de la section financement test", () => {
+describe("InvestmentTest", () => {
+  it("affiche les blocs clés de la section investissement test", () => {
     const html = renderToStaticMarkup(
-      <FinancingTest
+      <InvestmentTest
         kpis={makeKpis({
-          capacite_remboursement_annees: 2.4,
-          caf: 185000,
-          fte: 160000,
-          liq_gen: 1.8,
-          liq_red: 1.2,
-          liq_imm: 0.5,
-          effet_levier: 0.45
+          bfr: 145000,
+          ratio_immo: 1.45,
+          rot_bfr: 9,
+          dso: 45,
+          rot_stocks: 22,
+          dpo: 58
         })}
       />
     );
 
-    expect(html).toContain("Banque &amp; financement (test)");
-    expect(html).toContain("Poids de la dette");
-    expect(html).toContain("Résistance aux imprévus");
-    expect(html).toContain("Liquidité Générale");
-    expect(html).toContain("Indépendance");
-    expect(html).toContain("MODÉLISATION DE FINANCEMENT");
+    expect(html).toContain("Clients &amp; fournisseurs");
+    expect(html).toContain("Cash immobilisé");
+    expect(html).toContain("Tension de trésorerie");
+    expect(html).toContain("Vitesse du cycle d&#x27;exploitation");
+    expect(html).toContain("Délai clients (DSO)");
+    expect(html).toContain("OPTIMISATION BFR");
   });
 });
+
 
