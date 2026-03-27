@@ -315,7 +315,7 @@ export function SyntheseView() {
               {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </button>
           </div>
-          <nav className="space-y-1 text-sm">
+          <nav className="space-y-1 text-sm" data-tour-id="synthese-sidebar-nav">
             <NavRow icon={<Sparkles className="h-4 w-4" />} active collapsed={isSidebarCollapsed}>
               Synthèse
             </NavRow>

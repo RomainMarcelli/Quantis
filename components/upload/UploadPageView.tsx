@@ -11,8 +11,13 @@ import {
   Upload,
   X
 } from "lucide-react";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { QuantisSelect } from "@/components/ui/QuantisSelect";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import {
+  ONBOARDING_UPLOAD_CONTEXT_COMPLETED_EVENT,
+  ONBOARDING_UPLOAD_FILE_ADDED_EVENT
+} from "@/lib/onboarding/events";
 import {
   COMPANY_SIZE_OPTIONS,
   OTHER_SECTOR_OPTION_VALUE,
@@ -31,6 +36,9 @@ import type { AuthenticatedUser } from "@/types/auth";
 export function UploadPageView() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const selectedFilesRef = useRef<File[]>([]);
+  const hasDispatchedContextStepRef = useRef(false);
+  const { currentStep } = useOnboarding();
 
   const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
   const [isDragging, setIsDragging] = useState(false);
@@ -62,6 +70,31 @@ export function UploadPageView() {
     return `${selectedFiles.length} fichiers Excel sélectionnés`;
   }, [selectedFiles]);
 
+  useEffect(() => {
+    selectedFilesRef.current = selectedFiles;
+  }, [selectedFiles]);
+
+  useEffect(() => {
+    const resolvedSector =
+      sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector.trim();
+    const isContextComplete = Boolean(companySize) && resolvedSector.length >= 2;
+    const isContextStepActive = currentStep?.id === "tour-upload-context";
+
+    if (!isContextComplete || !isContextStepActive || !shouldShowContextFields) {
+      hasDispatchedContextStepRef.current = false;
+      return;
+    }
+
+    if (hasDispatchedContextStepRef.current) {
+      return;
+    }
+
+    hasDispatchedContextStepRef.current = true;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(ONBOARDING_UPLOAD_CONTEXT_COMPLETED_EVENT));
+    }, 0);
+  }, [companySize, currentStep?.id, customSector, sector, shouldShowContextFields]);
+
   function onDragOver(event: DragEvent<HTMLElement>) {
     event.preventDefault();
     setIsDragging(true);
@@ -89,24 +122,37 @@ export function UploadPageView() {
       return;
     }
 
-    setSelectedFiles((current) => {
-      const deduped = files.filter(
-        (nextFile) =>
-          !current.some(
-            (currentFile) =>
-              currentFile.name === nextFile.name &&
-              currentFile.size === nextFile.size &&
-              currentFile.lastModified === nextFile.lastModified
-          )
-      );
-      return [...current, ...deduped];
-    });
+    const currentFiles = selectedFilesRef.current;
+    const deduped = files.filter(
+      (nextFile) =>
+        !currentFiles.some(
+          (currentFile) =>
+            currentFile.name === nextFile.name &&
+            currentFile.size === nextFile.size &&
+            currentFile.lastModified === nextFile.lastModified
+        )
+    );
+
+    if (!deduped.length) {
+      return;
+    }
+
+    const nextFiles = [...currentFiles, ...deduped];
+    selectedFilesRef.current = nextFiles;
+    setSelectedFiles(nextFiles);
+
+    if (typeof window !== "undefined") {
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent(ONBOARDING_UPLOAD_FILE_ADDED_EVENT));
+      }, 0);
+    }
 
     setSuccessMessage(null);
     setErrors((current) => ({ ...current, files: undefined, general: undefined }));
   }
 
   function resetUploadForm() {
+    selectedFilesRef.current = [];
     setSelectedFiles([]);
     setCompanySize("");
     setSector("");
@@ -115,7 +161,11 @@ export function UploadPageView() {
     setSuccessMessage(null);
   }
 
-  async function requestAnalysisDraft(targetUserId: string, sectorValue: string): Promise<AnalysisDraft> {
+  async function requestAnalysisDraft(
+    targetUserId: string,
+    sectorValue: string,
+    filesToSubmit: File[]
+  ): Promise<AnalysisDraft> {
     const folderName = ensureFolderName(DEFAULT_FOLDER_NAME) ?? DEFAULT_FOLDER_NAME;
     const formData = new FormData();
     formData.append("userId", targetUserId);
@@ -123,7 +173,7 @@ export function UploadPageView() {
     formData.append("companySize", companySize);
     formData.append("sector", sectorValue);
     formData.append("source", "upload");
-    selectedFiles.forEach((file) => formData.append("files", file));
+    filesToSubmit.forEach((file) => formData.append("files", file));
 
     const response = await fetch("/api/analyses", {
       method: "POST",
@@ -143,13 +193,14 @@ export function UploadPageView() {
   }
 
   async function onSubmit() {
+    const filesToSubmit = selectedFilesRef.current;
     const resolvedSector =
       sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector.trim();
 
     const validation = validateUploadInput(
-      selectedFiles,
+      filesToSubmit,
       { companySize, sector: resolvedSector },
-      { requireContext: shouldShowContextFields }
+      { requireContext: false }
     );
     if (!validation.valid) {
       setErrors(validation.errors);
@@ -165,7 +216,11 @@ export function UploadPageView() {
         // Flow invité: on calcule l'analyse tout de suite, puis on la garde localement
         // pour la rattacher au vrai userId juste après inscription/connexion.
         const temporaryUserId = `guest-${Date.now()}`;
-        const pendingDraft = await requestAnalysisDraft(temporaryUserId, resolvedSector);
+        const pendingDraft = await requestAnalysisDraft(
+          temporaryUserId,
+          resolvedSector,
+          filesToSubmit
+        );
         savePendingAnalysisDraft(pendingDraft);
         if (!getPendingAnalysisDraft()) {
           throw new Error(
@@ -175,14 +230,22 @@ export function UploadPageView() {
         setLocalAnalysisHint(true);
 
         const params = new URLSearchParams();
-        params.set("companySize", companySize);
-        params.set("sector", resolvedSector);
+        if (companySize) {
+          params.set("companySize", companySize);
+        }
+        if (resolvedSector) {
+          params.set("sector", resolvedSector);
+        }
         params.set("next", "/synthese");
         router.push(`/register?${params.toString()}`);
         return;
       }
 
-      const persistedDraft = await requestAnalysisDraft(user.uid, resolvedSector);
+      const persistedDraft = await requestAnalysisDraft(
+        user.uid,
+        resolvedSector,
+        filesToSubmit
+      );
       await saveAnalysisDraft(persistedDraft);
       setActiveFolderName(persistedDraft.folderName);
       setLocalAnalysisHint(true);
@@ -236,7 +299,10 @@ export function UploadPageView() {
       <section className="precision-card rounded-2xl p-5 md:p-6">
         <div className="grid gap-4 md:grid-cols-3">
           <StepCard step="1" title="Ajoutez vos fichiers" />
-          <StepCard step="2" title={shouldShowContextFields ? "Choisissez votre contexte" : "Contexte déjà enregistré"} />
+          <StepCard
+            step="2"
+            title={shouldShowContextFields ? "Contexte entreprise (optionnel)" : "Contexte déjà enregistré"}
+          />
           <StepCard step="3" title="Lancez l'analyse" />
         </div>
 
@@ -255,6 +321,7 @@ export function UploadPageView() {
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
+          data-tour-id="upload-dropzone"
           className={`mt-5 flex w-full items-center gap-3 rounded-xl border border-dashed px-4 py-5 text-left transition-colors ${
             isDragging
               ? "border-quantis-gold/80 bg-quantis-gold/10"
@@ -278,7 +345,10 @@ export function UploadPageView() {
           {selectedFiles.length > 0 ? (
             <button
               type="button"
-              onClick={() => setSelectedFiles([])}
+              onClick={() => {
+                selectedFilesRef.current = [];
+                setSelectedFiles([]);
+              }}
               className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-white/80 transition-colors hover:bg-white/10"
             >
               Vider
@@ -288,9 +358,9 @@ export function UploadPageView() {
         {errors.files ? <InlineError message={errors.files} /> : null}
 
         {shouldShowContextFields ? (
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <div className="mt-5 grid gap-4 md:grid-cols-2" data-tour-id="upload-context">
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-white">Nombre d&apos;employés</span>
+              <span className="mb-1.5 block text-sm font-medium text-white">Nombre d&apos;employés (optionnel)</span>
               <QuantisSelect
                 value={companySize}
                 onChange={(value) => setCompanySize(value as CompanySizeValue | "")}
@@ -304,7 +374,7 @@ export function UploadPageView() {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-white">Secteur d&apos;activité</span>
+              <span className="mb-1.5 block text-sm font-medium text-white">Secteur d&apos;activité (optionnel)</span>
               <QuantisSelect
                 value={sector}
                 onChange={(value) => {
@@ -355,6 +425,7 @@ export function UploadPageView() {
             type="button"
             onClick={() => void onSubmit()}
             disabled={isSubmitting}
+            data-tour-id="upload-submit"
             className="btn-gold-premium rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? "Analyse en cours..." : "Lancer l'analyse"}

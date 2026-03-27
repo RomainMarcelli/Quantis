@@ -6,7 +6,12 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, Circle, Eye, EyeOff, Info, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { getPasswordRuleChecks } from "@/lib/auth/passwordPolicy";
+import {
+  ONBOARDING_REGISTER_COMPANY_COMPLETED_EVENT,
+  ONBOARDING_REGISTER_IDENTITY_COMPLETED_EVENT
+} from "@/lib/onboarding/events";
 import {
   COMPANY_SIZE_OPTIONS,
   OTHER_SECTOR_OPTION_VALUE,
@@ -56,6 +61,9 @@ export function LoginForm({
   const router = useRouter();
   // Reference de la carte pour recentrer la vue en haut apres une inscription reussie.
   const cardRef = useRef<HTMLElement | null>(null);
+  const hasDispatchedCompanyStepRef = useRef(false);
+  const hasDispatchedIdentityStepRef = useRef(false);
+  const { currentStep } = useOnboarding();
 
   // Etat principal du formulaire auth (connexion / inscription).
   const [mode, setMode] = useState<AuthMode>(initialMode);
@@ -115,6 +123,64 @@ export function LoginForm({
       setCustomSector("");
     }
   }, [sector]);
+
+  useEffect(() => {
+    if (mode !== "register") {
+      hasDispatchedCompanyStepRef.current = false;
+      hasDispatchedIdentityStepRef.current = false;
+      return;
+    }
+
+    const resolvedSector = sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector.trim();
+    const isCompanyContextComplete =
+      companyName.trim().length > 0 &&
+      siren.length === 9 &&
+      Boolean(companySize) &&
+      resolvedSector.length >= 2;
+    const isCompanyTourStepActive = currentStep?.id === "tour-register-company";
+
+    if (!isCompanyContextComplete || !isCompanyTourStepActive) {
+      hasDispatchedCompanyStepRef.current = false;
+      return;
+    }
+
+    if (hasDispatchedCompanyStepRef.current) {
+      return;
+    }
+
+    hasDispatchedCompanyStepRef.current = true;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(ONBOARDING_REGISTER_COMPANY_COMPLETED_EVENT));
+    }, 0);
+  }, [companyName, companySize, currentStep?.id, customSector, mode, sector, siren]);
+
+  useEffect(() => {
+    if (mode !== "register") {
+      hasDispatchedIdentityStepRef.current = false;
+      return;
+    }
+
+    const isIdentityStepActive = currentStep?.id === "tour-register-identity";
+    const isIdentityComplete =
+      lastName.trim().length > 0 &&
+      firstName.trim().length > 0 &&
+      email.trim().length > 0 &&
+      password.trim().length > 0;
+
+    if (!isIdentityStepActive || !isIdentityComplete) {
+      hasDispatchedIdentityStepRef.current = false;
+      return;
+    }
+
+    if (hasDispatchedIdentityStepRef.current) {
+      return;
+    }
+
+    hasDispatchedIdentityStepRef.current = true;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(ONBOARDING_REGISTER_IDENTITY_COMPLETED_EVENT));
+    }, 0);
+  }, [currentStep?.id, email, firstName, lastName, mode, password]);
 
   useEffect(() => {
     if (!toast) {
@@ -206,7 +272,9 @@ export function LoginForm({
     setIsSubmitting(false);
     setMode("login");
     setLoginErrors(EMPTY_LOGIN_ERRORS);
-    setAuthInfoMessage("Compte créé. Vérifiez votre email et votre dossier spam avant de vous connecter.");
+    setAuthInfoMessage(
+      "Compte cree. Ouvrez votre email (et le dossier spam), cliquez sur le lien de verification, puis revenez vous connecter."
+    );
     if (lockMode) {
       router.replace("/");
       return;
@@ -253,7 +321,10 @@ export function LoginForm({
               <ArrowLeft className="h-4 w-4" />
             </Link>
 
-            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1">
+            <div
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1"
+              data-tour-id="auth-mode-switch"
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -320,6 +391,8 @@ export function LoginForm({
       <div className="card-header mt-6" />
 
       <form className="space-y-4" onSubmit={onSubmit}>
+        <div data-tour-id={mode === "register" ? "auth-identity-context" : undefined} className="space-y-4">
+
         {mode === "register" ? (
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
@@ -406,6 +479,7 @@ export function LoginForm({
             </div>
           ) : null}
         </label>
+        </div>
 
         {mode === "register" ? (
           <>
@@ -437,7 +511,7 @@ export function LoginForm({
               </ul>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2" data-tour-id="auth-company-context">
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-white">Nom entreprise</span>
                 <div className="quantis-input bg-white/5 px-3 py-2">
@@ -572,6 +646,7 @@ export function LoginForm({
         <button
           type="submit"
           disabled={isSubmitting}
+          data-tour-id="auth-submit"
           className="btn-gold-premium w-full rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting

@@ -66,6 +66,7 @@ export default function HomePage() {
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Link
                   href="/upload"
+                  data-tour-id="home-cta-evaluate"
                   className="btn-gold-premium inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-all"
                 >
                   Évaluer votre santé financière

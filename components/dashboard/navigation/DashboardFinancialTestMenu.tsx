@@ -25,7 +25,11 @@ export function DashboardFinancialTestMenu({
   onChange
 }: DashboardFinancialTestMenuProps) {
   return (
-    <nav className="precision-card rounded-2xl p-2" aria-label="Navigation des sections financières">
+    <nav
+      className="precision-card rounded-2xl p-2"
+      aria-label="Navigation des sections financières"
+      data-tour-id="analysis-tabs-menu"
+    >
       <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
         <ul className="flex flex-wrap gap-2">
           {TEST_TABS.map((tab) => {

@@ -14,6 +14,7 @@ export type UserProfile = {
   email: string;
   emailVerified: boolean;
   themePreference?: UserThemePreference;
+  onboardingTourCompleted?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };

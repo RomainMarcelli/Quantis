@@ -63,6 +63,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     email: String(data.email ?? ""),
     emailVerified: Boolean(data.emailVerified),
     ...(themePreference ? { themePreference } : {}),
+    onboardingTourCompleted: Boolean(data.onboardingTourCompleted),
     createdAt: toIsoString(data.createdAt),
     updatedAt: toIsoString(data.updatedAt)
   };
@@ -92,6 +93,21 @@ export async function saveUserThemePreference(
     ref,
     {
       themePreference,
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+export async function saveUserOnboardingTourCompleted(
+  userId: string,
+  isCompleted: boolean
+): Promise<void> {
+  const ref = doc(firestoreDb, "users", userId);
+  await setDoc(
+    ref,
+    {
+      onboardingTourCompleted: isCompleted,
       updatedAt: serverTimestamp()
     },
     { merge: true }

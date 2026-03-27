@@ -539,6 +539,26 @@ body {
   animation: quantis-search-term-glow 2.4s ease-out;
 }
 
+@keyframes quantis-tour-focus-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+  }
+  45% {
+    box-shadow:
+      0 0 0 4px rgb(224 190 74 / 16%),
+      0 0 24px 6px rgb(224 190 74 / 22%);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+  }
+}
+
+.quantis-tour-target-active {
+  outline: 1px solid rgb(224 190 74 / 22%);
+  outline-offset: 1px;
+  animation: none;
+}
+
 .edu-text {
   font-size: 12px;
   color: var(--quantis-edu-text);

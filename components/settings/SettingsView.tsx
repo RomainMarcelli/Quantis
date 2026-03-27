@@ -16,6 +16,7 @@ import {
 import { useRouter } from "next/navigation";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { useTheme } from "@/hooks/useTheme";
 import {
   type ExportFormat,
@@ -30,6 +31,7 @@ type ToastState = { type: "success" | "error" | "info"; message: string } | null
 export function SettingsView() {
   const router = useRouter();
   const { isDark, setTheme } = useTheme();
+  const { restartTour } = useOnboarding();
   const [preferences, setPreferences] = useState<AppPreferences>(() => loadAppPreferences());
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
@@ -205,6 +207,24 @@ export function SettingsView() {
           <p className="mt-2 text-xs text-white/50">
             Astuce: la suppression complète du compte reste disponible dans l'onglet Compte.
           </p>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-white/90">Guide interactif</p>
+              <p className="mt-1 text-xs text-white/50">
+                Relancez le tour produit pour revoir la navigation et les blocs clés.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={restartTour}
+              className="btn-gold-premium rounded-xl px-3 py-2 text-xs font-semibold"
+            >
+              Revoir le guide
+            </button>
+          </div>
         </div>
       </section>
 

@@ -1,4 +1,4 @@
-import type { ProductTourAudience, ProductTourStep } from "@/types/onboarding";
+﻿import type { ProductTourAudience, ProductTourStep } from "@/types/onboarding";
 
 const AUTHENTICATED_TOUR_STEPS: ProductTourStep[] = [
   {
@@ -36,7 +36,8 @@ const AUTHENTICATED_TOUR_STEPS: ProductTourStep[] = [
   {
     id: "tour-analysis-tabs",
     title: "Sections financières",
-    description: "Ces onglets permettent d'explorer chaque angle d'analyse: création, investissement, financement et rentabilité.",
+    description:
+      "Ces onglets permettent d'explorer chaque angle d'analyse: création, investissement, financement et rentabilité.",
     route: "/analysis",
     targetId: "analysis-tabs-menu",
     preferredPlacement: "bottom"
@@ -101,6 +102,7 @@ const ANONYMOUS_TOUR_STEPS: ProductTourStep[] = [
     description: "Commencez ici pour lancer l'évaluation financière de votre entreprise.",
     route: "/",
     targetId: "home-cta-evaluate",
+    advanceOnTargetClick: true,
     preferredPlacement: "bottom"
   },
   {
@@ -114,10 +116,18 @@ const ANONYMOUS_TOUR_STEPS: ProductTourStep[] = [
   {
     id: "tour-upload-context",
     title: "Contexte entreprise",
-    description: "Renseignez la taille et le secteur pour contextualiser les KPI et les recommandations.",
+    description: "Optionnel: renseignez la taille et le secteur pour contextualiser les KPI.",
     route: "/upload",
     targetId: "upload-context",
     preferredPlacement: "top"
+  },
+  {
+    id: "tour-upload-submit",
+    title: "Lancer l'analyse",
+    description: "Une fois pret, cliquez sur \"Lancer l'analyse\" pour generer vos resultats.",
+    route: "/upload",
+    targetId: "upload-submit",
+    preferredPlacement: "bottom"
   },
   {
     id: "tour-register-switch",
@@ -126,6 +136,15 @@ const ANONYMOUS_TOUR_STEPS: ProductTourStep[] = [
     route: "/register",
     targetId: "auth-mode-switch",
     preferredPlacement: "bottom"
+  },
+  {
+    id: "tour-register-identity",
+    title: "Informations du compte",
+    description:
+      "Renseignez nom, prenom, email et mot de passe pour creer votre acces personnel en toute securite.",
+    route: "/register",
+    targetId: "auth-identity-context",
+    preferredPlacement: "top"
   },
   {
     id: "tour-register-company",

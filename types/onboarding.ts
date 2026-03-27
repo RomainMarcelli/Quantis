@@ -21,4 +21,5 @@ export type ProductTourStep = {
   targetId: string;
   section?: SearchSection;
   preferredPlacement?: TourTooltipPlacement;
+  advanceOnTargetClick?: boolean;
 };
