@@ -187,7 +187,7 @@ export function SettingsView() {
               className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
                 isDark
                   ? "border-white/20 bg-white/10 text-white hover:bg-white/15"
-                  : "border-quantis-gold/45 bg-quantis-gold/20 text-black hover:bg-quantis-gold/30"
+                  : "btn-gold-premium"
               }`}
               aria-label={isDark ? "Passer en mode clair" : "Passer en mode sombre"}
               title={isDark ? "Passer en mode clair" : "Passer en mode sombre"}
@@ -222,7 +222,7 @@ export function SettingsView() {
             type="button"
             disabled={saving}
             onClick={handleSavePreferences}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-quantis-gold/90 px-4 py-2 text-sm font-medium text-black hover:bg-quantis-gold disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-gold-premium inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? <Download className="h-4 w-4 animate-pulse" /> : <Save className="h-4 w-4" />}
             {saving ? "Enregistrement..." : "Enregistrer"}

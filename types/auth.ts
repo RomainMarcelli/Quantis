@@ -1,4 +1,4 @@
-import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import type { CompanySizeValue } from "@/lib/onboarding/options";
 import type { OnboardingObjectiveValue } from "@/lib/onboarding/objectives";
 
 export type LoginCredentials = {
@@ -14,7 +14,7 @@ export type RegisterCredentials = {
   companyName: string;
   siren: string;
   companySize: CompanySizeValue | "";
-  sector: SectorValue | "";
+  sector: string;
   usageObjectives: OnboardingObjectiveValue[];
 };
 

@@ -139,7 +139,7 @@ export function PricingView() {
               type="button"
               className={`mt-6 w-full rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
                 offer.highlighted
-                  ? "bg-quantis-gold text-black hover:bg-yellow-300"
+                  ? "btn-gold-premium"
                   : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
               }`}
             >

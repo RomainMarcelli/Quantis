@@ -5,15 +5,20 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  ChevronDown,
   FileSpreadsheet,
   Plus,
   RefreshCcw,
-  Upload
+  Upload,
+  X
 } from "lucide-react";
+import { QuantisSelect } from "@/components/ui/QuantisSelect";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { COMPANY_SIZE_OPTIONS, SECTOR_OPTIONS } from "@/lib/onboarding/options";
-import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import {
+  COMPANY_SIZE_OPTIONS,
+  OTHER_SECTOR_OPTION_VALUE,
+  SECTOR_OPTIONS
+} from "@/lib/onboarding/options";
+import type { CompanySizeValue } from "@/lib/onboarding/options";
 import { DEFAULT_FOLDER_NAME, ensureFolderName, setActiveFolderName } from "@/lib/folders/activeFolder";
 import { validateUploadInput } from "@/lib/upload/uploadValidation";
 import { setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
@@ -31,7 +36,8 @@ export function UploadPageView() {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [companySize, setCompanySize] = useState<CompanySizeValue | "">("");
-  const [sector, setSector] = useState<SectorValue | "">("");
+  const [sector, setSector] = useState("");
+  const [customSector, setCustomSector] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ files?: string; companySize?: string; sector?: string; general?: string }>(
     {}
@@ -104,17 +110,18 @@ export function UploadPageView() {
     setSelectedFiles([]);
     setCompanySize("");
     setSector("");
+    setCustomSector("");
     setErrors({});
     setSuccessMessage(null);
   }
 
-  async function requestAnalysisDraft(targetUserId: string): Promise<AnalysisDraft> {
+  async function requestAnalysisDraft(targetUserId: string, sectorValue: string): Promise<AnalysisDraft> {
     const folderName = ensureFolderName(DEFAULT_FOLDER_NAME) ?? DEFAULT_FOLDER_NAME;
     const formData = new FormData();
     formData.append("userId", targetUserId);
     formData.append("folderName", folderName);
     formData.append("companySize", companySize);
-    formData.append("sector", sector);
+    formData.append("sector", sectorValue);
     formData.append("source", "upload");
     selectedFiles.forEach((file) => formData.append("files", file));
 
@@ -136,9 +143,12 @@ export function UploadPageView() {
   }
 
   async function onSubmit() {
+    const resolvedSector =
+      sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector.trim();
+
     const validation = validateUploadInput(
       selectedFiles,
-      { companySize, sector },
+      { companySize, sector: resolvedSector },
       { requireContext: shouldShowContextFields }
     );
     if (!validation.valid) {
@@ -155,7 +165,7 @@ export function UploadPageView() {
         // Flow invité: on calcule l'analyse tout de suite, puis on la garde localement
         // pour la rattacher au vrai userId juste après inscription/connexion.
         const temporaryUserId = `guest-${Date.now()}`;
-        const pendingDraft = await requestAnalysisDraft(temporaryUserId);
+        const pendingDraft = await requestAnalysisDraft(temporaryUserId, resolvedSector);
         savePendingAnalysisDraft(pendingDraft);
         if (!getPendingAnalysisDraft()) {
           throw new Error(
@@ -166,13 +176,13 @@ export function UploadPageView() {
 
         const params = new URLSearchParams();
         params.set("companySize", companySize);
-        params.set("sector", sector);
+        params.set("sector", resolvedSector);
         params.set("next", "/synthese");
         router.push(`/register?${params.toString()}`);
         return;
       }
 
-      const persistedDraft = await requestAnalysisDraft(user.uid);
+      const persistedDraft = await requestAnalysisDraft(user.uid, resolvedSector);
       await saveAnalysisDraft(persistedDraft);
       setActiveFolderName(persistedDraft.folderName);
       setLocalAnalysisHint(true);
@@ -281,41 +291,56 @@ export function UploadPageView() {
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-white">Nombre d&apos;employés</span>
-              <div className="relative">
-                <select
-                  value={companySize}
-                  onChange={(event) => setCompanySize(event.target.value as CompanySizeValue | "")}
-                  className="quantis-input w-full appearance-none rounded-xl border-white/20 bg-black/30 px-3 py-2.5 pr-9 text-sm text-white outline-none"
-                >
-                  <option value="">Sélectionner une tranche</option>
-                  {COMPANY_SIZE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label} - {option.range}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55" />
-              </div>
+              <QuantisSelect
+                value={companySize}
+                onChange={(value) => setCompanySize(value as CompanySizeValue | "")}
+                placeholder="Sélectionner une tranche"
+                options={COMPANY_SIZE_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: `${option.label} - ${option.range}`
+                }))}
+              />
               {errors.companySize ? <InlineError message={errors.companySize} /> : null}
             </label>
 
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-white">Secteur d&apos;activité</span>
-              <div className="relative">
-                <select
-                  value={sector}
-                  onChange={(event) => setSector(event.target.value as SectorValue | "")}
-                  className="quantis-input w-full appearance-none rounded-xl border-white/20 bg-black/30 px-3 py-2.5 pr-9 text-sm text-white outline-none"
-                >
-                  <option value="">Sélectionner un secteur</option>
-                  {SECTOR_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/55" />
-              </div>
+              <QuantisSelect
+                value={sector}
+                onChange={(value) => {
+                  setSector(value);
+                  if (value !== OTHER_SECTOR_OPTION_VALUE) {
+                    setCustomSector("");
+                  }
+                }}
+                placeholder="Sélectionner un secteur"
+                options={[
+                  ...SECTOR_OPTIONS.map((option) => ({ value: option, label: option })),
+                  { value: OTHER_SECTOR_OPTION_VALUE, label: OTHER_SECTOR_OPTION_VALUE }
+                ]}
+              />
+              {sector === OTHER_SECTOR_OPTION_VALUE ? (
+                <div className="quantis-input relative mt-2 bg-white/5 px-3 py-2">
+                  <input
+                    type="text"
+                    value={customSector}
+                    onChange={(event) => setCustomSector(event.target.value)}
+                    placeholder="Précisez votre secteur d'activité"
+                    className="w-full border-0 bg-transparent pr-8 text-sm text-white placeholder:text-white/35 outline-none"
+                  />
+                  {customSector ? (
+                    <button
+                      type="button"
+                      onClick={() => setCustomSector("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-white/60 transition hover:bg-white/10 hover:text-white"
+                      aria-label="Effacer le secteur"
+                      title="Effacer"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               {errors.sector ? <InlineError message={errors.sector} /> : null}
             </label>
           </div>
@@ -330,7 +355,7 @@ export function UploadPageView() {
             type="button"
             onClick={() => void onSubmit()}
             disabled={isSubmitting}
-            className="rounded-xl bg-quantis-gold px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-gold-premium rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSubmitting ? "Analyse en cours..." : "Lancer l'analyse"}
           </button>

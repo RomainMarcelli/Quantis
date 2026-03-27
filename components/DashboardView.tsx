@@ -234,7 +234,7 @@ export function DashboardView() {
               <button
                 type="button"
                 onClick={() => router.push("/analysis")}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-quantis-gold/35 bg-quantis-gold/15 px-4 py-2 text-sm font-medium text-quantis-gold transition-colors hover:bg-quantis-gold/25"
+                className="btn-gold-premium inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium transition-colors"
               >
                 <LayoutDashboard className="h-4 w-4" />
                 {"Acc\u00E9der aux dashboards"}
@@ -349,7 +349,7 @@ export function DashboardView() {
                   <button
                     type="button"
                     onClick={() => router.push(`/analysis/${analysis.id}`)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-quantis-gold/35 bg-quantis-gold/10 px-2.5 py-1.5 text-xs text-quantis-gold hover:bg-quantis-gold/20"
+                    className="btn-gold-premium inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium"
                   >
                     <RefreshCcw className="h-3.5 w-3.5" />
                     Relancer l&apos;analyse

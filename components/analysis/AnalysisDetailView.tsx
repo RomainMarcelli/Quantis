@@ -1259,7 +1259,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
               </button>
               <button
                 type="submit"
-                className="rounded-lg border border-white/15 bg-quantis-gold/85 px-3 py-2 text-sm font-medium text-black hover:bg-quantis-gold disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-gold-premium rounded-lg px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={folderDialogSubmitting}
                 autoFocus={folderDialogMode === "delete"}
               >

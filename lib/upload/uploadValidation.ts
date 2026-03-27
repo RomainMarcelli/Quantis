@@ -1,14 +1,14 @@
 ﻿// File: lib/upload/uploadValidation.ts
 // Role: centralise la validation du parcours d'upload (formats + infos obligatoires).
 
-import { isCompanySizeValue, isSectorValue } from "@/lib/onboarding/options";
-import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import { isCompanySizeValue } from "@/lib/onboarding/options";
+import type { CompanySizeValue } from "@/lib/onboarding/options";
 
 const EXCEL_EXTENSIONS = [".xlsx", ".xls", ".csv"] as const;
 
 export type UploadContextInput = {
   companySize: CompanySizeValue | "";
-  sector: SectorValue | "";
+  sector: string;
 };
 
 export type UploadValidationOptions = {
@@ -49,7 +49,7 @@ export function validateUploadInput(
       errors.companySize = "Sélectionnez le nombre d'employés.";
     }
 
-    if (!context.sector || !isSectorValue(context.sector)) {
+    if (!context.sector || context.sector.trim().length < 2) {
       errors.sector = "Sélectionnez le secteur d'activité.";
     }
   }

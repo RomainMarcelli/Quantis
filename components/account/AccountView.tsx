@@ -3,19 +3,26 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
+import { AlertTriangle, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { deleteAccountCompletely, deleteAccountData, updateAccountProfile } from "@/lib/account/account";
+import { QuantisSelect } from "@/components/ui/QuantisSelect";
+import { useTheme } from "@/hooks/useTheme";
+import { deleteAccountData, updateAccountProfile } from "@/lib/account/account";
 import { clearLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import { clearActiveFolderName } from "@/lib/folders/activeFolder";
-import { COMPANY_SIZE_OPTIONS, SECTOR_OPTIONS } from "@/lib/onboarding/options";
-import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import {
+  COMPANY_SIZE_OPTIONS,
+  OTHER_SECTOR_OPTION_VALUE,
+  SECTOR_OPTIONS,
+  isSectorValue
+} from "@/lib/onboarding/options";
+import type { CompanySizeValue } from "@/lib/onboarding/options";
+import { deleteAccountEverywhere } from "@/services/accountDeletionApi";
 import {
   loadAccountProfile,
   purgeAnalysisData,
-  purgeAccountData,
   saveAccountProfile
 } from "@/services/accountService";
 import { firebaseAuthGateway } from "@/services/auth";
@@ -32,6 +39,7 @@ type AccountViewProps = {
 
 export function AccountView({ fromAnalysis = false }: AccountViewProps) {
   const router = useRouter();
+  const { isDark } = useTheme();
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +56,8 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
   const [companyName, setCompanyName] = useState("");
   const [siren, setSiren] = useState("");
   const [companySize, setCompanySize] = useState<CompanySizeValue | "">("");
-  const [sector, setSector] = useState<SectorValue | "">("");
+  const [sector, setSector] = useState("");
+  const [customSector, setCustomSector] = useState("");
   const [email, setEmail] = useState("");
 
   useEffect(() => {
@@ -85,7 +94,13 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
         setCompanyName(profile.companyName);
         setSiren(profile.siren);
         setCompanySize(profile.companySize);
-        setSector(profile.sector);
+        if (profile.sector && !isSectorValue(profile.sector)) {
+          setSector(OTHER_SECTOR_OPTION_VALUE);
+          setCustomSector(profile.sector);
+        } else {
+          setSector(profile.sector);
+          setCustomSector("");
+        }
         setEmail(profile.email || user.email || "");
       } catch {
         setToast({
@@ -113,7 +128,8 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
       companyName,
       siren,
       companySize,
-      sector
+      sector:
+        sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector.trim()
     };
 
     const result = await updateAccountProfile(
@@ -201,41 +217,54 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
       return;
     }
 
-    const result = await deleteAccountCompletely(
-      {
-        deleteUserData: purgeAccountData,
-        deleteAuthAccount: firebaseAuthGateway.deleteCurrentUser
-      },
-      user.uid
-    );
+    try {
+      const idToken = await firebaseAuthGateway.getIdToken(true);
+      if (!idToken) {
+        setToast({
+          type: "error",
+          message: "Session expirée. Reconnectez-vous pour supprimer le compte."
+        });
+        return;
+      }
 
-    if (!result.success) {
+      const result = await deleteAccountEverywhere(idToken);
+
+      // Journalisation sécurité: suppression complète de compte validée.
+      void logClientSecurityEvent({
+        eventType: "account_deleted",
+        statusCode: 200,
+        userId: user.uid,
+        message: "Suppression complète du compte validée.",
+        metadata: {
+          deletedAnalysesCount: result.deletedAnalysesCount ?? 0,
+          deletedFoldersCount: result.deletedFoldersCount ?? 0
+        }
+      });
+
+      // Le compte est détruit: on nettoie aussi les traces locales.
+      clearActiveFolderName();
+      clearLocalAnalysisHint();
+      try {
+        await firebaseAuthGateway.signOut();
+      } catch {
+        // Non bloquant: le compte est déjà supprimé côté serveur.
+      }
+      router.replace("/");
+    } catch (error) {
       // Journalisation sécurité: échec de suppression complète de compte.
       void logClientSecurityEvent({
         eventType: "account_delete_failed",
         statusCode: 500,
         userId: user.uid,
-        message: result.message
+        message:
+          error instanceof Error ? error.message : "Suppression complète du compte impossible pour le moment."
       });
-      setToast({ type: "error", message: result.message });
-      return;
+      setToast({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Suppression complète du compte impossible pour le moment."
+      });
     }
-
-    // Journalisation sécurité: suppression complète de compte validée.
-    void logClientSecurityEvent({
-      eventType: "account_deleted",
-      statusCode: 200,
-      userId: user.uid,
-      message: "Suppression complète du compte validée.",
-      metadata: {
-        deletedAnalysesCount: result.deletedAnalysesCount ?? 0
-      }
-    });
-
-    // Le compte est détruit: on nettoie aussi les traces locales.
-    clearActiveFolderName();
-    clearLocalAnalysisHint();
-    router.replace("/");
   }
 
   function onDeleteDialogSubmit(event: FormEvent<HTMLFormElement>) {
@@ -289,14 +318,18 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
             <button
               type="button"
               onClick={() => router.push(fromAnalysis ? "/analysis" : "/upload")}
-              className="rounded-xl border border-quantis-gold/55 bg-quantis-gold/95 px-3.5 py-1.5 text-xs font-semibold text-black transition hover:bg-quantis-gold"
+              className="btn-gold-premium rounded-xl px-3.5 py-1.5 text-xs font-semibold transition"
             >
               {fromAnalysis ? "Retour à l’analyse" : "Aller à l’upload"}
             </button>
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3.5 py-1.5 text-xs font-medium text-rose-200 transition hover:bg-rose-500/20"
+              className={`rounded-xl border px-3.5 py-1.5 text-xs font-medium transition ${
+                isDark
+                  ? "border-rose-400/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                  : "border-rose-700/50 bg-rose-100 text-rose-900 hover:bg-rose-200"
+              }`}
             >
               Se déconnecter
             </button>
@@ -339,16 +372,49 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
               value: item.value,
               label: `${item.label} - ${item.range}`
             }))}
+            placeholder="Choisir une taille"
             error={errors.companySize}
           />
 
-          <SelectField
-            label="Secteur"
-            value={sector}
-            onChange={(value) => setSector(value as SectorValue | "")}
-            options={SECTOR_OPTIONS.map((item) => ({ value: item, label: item }))}
-            error={errors.sector}
-          />
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-white/85">Secteur</span>
+            <QuantisSelect
+              value={sector}
+              onChange={(value) => {
+                setSector(value);
+                if (value !== OTHER_SECTOR_OPTION_VALUE) {
+                  setCustomSector("");
+                }
+              }}
+              placeholder="Choisir un secteur"
+              options={[
+                ...SECTOR_OPTIONS.map((item) => ({ value: item, label: item })),
+                { value: OTHER_SECTOR_OPTION_VALUE, label: OTHER_SECTOR_OPTION_VALUE }
+              ]}
+            />
+            {sector === OTHER_SECTOR_OPTION_VALUE ? (
+              <div className="quantis-input relative mt-2 px-3 py-2">
+                <input
+                  value={customSector}
+                  onChange={(event) => setCustomSector(event.target.value)}
+                  className="w-full border-0 bg-transparent pr-8 text-sm text-white outline-none"
+                  placeholder="Précisez votre secteur d'activité"
+                />
+                {customSector ? (
+                  <button
+                    type="button"
+                    onClick={() => setCustomSector("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-white/60 transition hover:bg-white/10 hover:text-white"
+                    aria-label="Effacer le secteur"
+                    title="Effacer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            {errors.sector ? <span className="mt-1 block text-sm text-rose-300">{errors.sector}</span> : null}
+          </label>
         </div>
 
         <div className="mt-5">
@@ -356,7 +422,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
             type="button"
             disabled={submitting}
             onClick={onSaveProfile}
-            className="rounded-xl border border-white/10 bg-quantis-gold/90 px-4 py-2 text-sm font-medium text-black hover:bg-quantis-gold disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-gold-premium rounded-xl px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? "Enregistrement..." : "Mettre à jour le profil"}
           </button>
@@ -379,14 +445,22 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
         <div className="mt-4 flex flex-wrap gap-3">
           <button
             type="button"
-            className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-500/20"
+            className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${
+              isDark
+                ? "border-rose-400/30 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                : "border-rose-700/50 bg-rose-100 text-rose-900 hover:bg-rose-200"
+            }`}
             onClick={() => setDeleteMode("data")}
           >
             Supprimer mes statistiques
           </button>
           <button
             type="button"
-            className="rounded-xl border border-rose-500/40 bg-black/20 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-500/20"
+            className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${
+              isDark
+                ? "border-rose-500/40 bg-black/20 text-rose-200 hover:bg-rose-500/20"
+                : "border-rose-800/60 bg-rose-100 text-rose-900 hover:bg-rose-200"
+            }`}
             onClick={() => setDeleteMode("account")}
           >
             Supprimer mon compte
@@ -460,7 +534,9 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
               {deleteMode === "data" ? (
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-1 rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700"
+                  className={`inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                    isDark ? "bg-rose-600 text-white hover:bg-rose-700" : "bg-rose-700 text-white hover:bg-rose-800"
+                  }`}
                   autoFocus
                 >
                   <Trash2 className="h-4 w-4" />
@@ -470,7 +546,9 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
                 <button
                   type="submit"
                   disabled={!accountDeletionReady}
-                  className="inline-flex items-center gap-1 rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className={`inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    isDark ? "bg-rose-600 hover:bg-rose-700" : "bg-rose-700 hover:bg-rose-800"
+                  }`}
                 >
                   <Trash2 className="h-4 w-4" />
                   Supprimer mon compte
@@ -522,31 +600,20 @@ function SelectField({
   value,
   onChange,
   options,
+  placeholder = "Choisir",
   error
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   options: Array<{ value: string; label: string }>;
+  placeholder?: string;
   error?: string;
 }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-medium text-white/85">{label}</span>
-      <div className="quantis-input px-3 py-2">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="w-full border-0 bg-transparent text-sm text-white outline-none"
-        >
-          <option value="">Choisir</option>
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <QuantisSelect value={value} onChange={onChange} options={options} placeholder={placeholder} />
       {error ? <span className="mt-1 block text-sm text-rose-300">{error}</span> : null}
     </label>
   );

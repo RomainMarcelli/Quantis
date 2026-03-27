@@ -1,7 +1,11 @@
 ﻿// File: app/register/page.tsx
 // Role: page dédiée à l'inscription avec retour et accès au mode connexion.
 import { LoginForm } from "@/components/LoginForm";
-import { isCompanySizeValue, isSectorValue } from "@/lib/onboarding/options";
+import {
+  OTHER_SECTOR_OPTION_VALUE,
+  isCompanySizeValue,
+  isSectorValue
+} from "@/lib/onboarding/options";
 
 type RegisterPageProps = {
   searchParams?: Promise<{
@@ -20,7 +24,8 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
   const rawNext = Array.isArray(params.next) ? params.next[0] ?? "" : params.next ?? "";
 
   const initialCompanySize = isCompanySizeValue(rawCompanySize) ? rawCompanySize : "";
-  const initialSector = isSectorValue(rawSector) ? rawSector : "";
+  const initialSector = rawSector ? (isSectorValue(rawSector) ? rawSector : OTHER_SECTOR_OPTION_VALUE) : "";
+  const initialCustomSector = rawSector && !isSectorValue(rawSector) ? rawSector : "";
   const postLoginRedirect = rawNext.startsWith("/") ? rawNext : "/synthese";
 
   return (
@@ -32,6 +37,7 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
           initialMode="register"
           initialCompanySize={initialCompanySize}
           initialSector={initialSector}
+          initialCustomSector={initialCustomSector}
           backHref="/"
           postLoginRedirect={postLoginRedirect}
         />

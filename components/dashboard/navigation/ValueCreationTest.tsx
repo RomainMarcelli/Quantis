@@ -355,7 +355,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
                 <Cpu className={`h-5 w-5 ${isDark ? "text-white/60" : "text-slate-700"}`} />
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-mono text-quantis-gold">
+                <span className="agent-kicker text-[10px] font-mono">
                   QUANTIS_AGENT {" > "} SIMULATION RENTABILITÉ
                 </span>
                 <p className={`text-[14px] font-medium ${isDark ? "text-white/80" : "text-slate-700"}`}>
@@ -438,6 +438,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 function formatCompactCurrency(value: number): string {
   return `${Math.round(value).toLocaleString("fr-FR")} €`;
 }
+
 
 
 

@@ -34,6 +34,7 @@ export interface AuthGateway {
   register(credentials: RegisterCredentials): Promise<AuthenticatedUser>;
   signOut(): Promise<void>;
   deleteCurrentUser(): Promise<void>;
+  getIdToken(forceRefresh?: boolean): Promise<string | null>;
   sendPasswordReset(email: string): Promise<void>;
   verifyPasswordResetCode(oobCode: string): Promise<string>;
   confirmPasswordReset(oobCode: string, newPassword: string): Promise<void>;
@@ -95,6 +96,13 @@ export const firebaseAuthGateway: AuthGateway = {
       return;
     }
     await deleteUser(auth.currentUser);
+  },
+
+  async getIdToken(forceRefresh = false) {
+    if (!auth.currentUser) {
+      return null;
+    }
+    return auth.currentUser.getIdToken(forceRefresh);
   },
 
   async sendPasswordReset(email) {

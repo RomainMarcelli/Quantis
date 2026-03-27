@@ -22,6 +22,8 @@ export const SECTOR_OPTIONS = [
   "Immobilier & Gestion d'actifs"
 ] as const;
 
+export const OTHER_SECTOR_OPTION_VALUE = "Autres" as const;
+
 export type CompanySizeValue = (typeof COMPANY_SIZE_OPTIONS)[number]["value"];
 export type SectorValue = (typeof SECTOR_OPTIONS)[number];
 
@@ -32,4 +34,3 @@ export function isCompanySizeValue(value: string): value is CompanySizeValue {
 export function isSectorValue(value: string): value is SectorValue {
   return SECTOR_OPTIONS.some((option) => option === value);
 }
-
