@@ -389,7 +389,7 @@ export function ManualKpiEntryView() {
             type="button"
             onClick={() => void onSubmit()}
             disabled={isSubmitting}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-quantis-gold px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-gold-premium inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Save className="h-4 w-4" />
             {isSubmitting ? "Enregistrement..." : "Calculer et enregistrer"}

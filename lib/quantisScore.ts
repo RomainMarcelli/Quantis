@@ -216,6 +216,13 @@ function resolveRatioImmoUsure(kpis: QuantisScoreInputKpis): number | null {
     return ratioIfPercent(etatMateriel);
   }
 
+  // Compat legacy: certains flux exposent encore "ratio_immo".
+  // On le conserve comme fallback de l'indice d'usure pour éviter une alerte manquante.
+  const ratioImmoLegacy = pickNumber(kpis.ratio_immo);
+  if (ratioImmoLegacy !== null) {
+    return ratioIfPercent(ratioImmoLegacy);
+  }
+
   return null;
 }
 

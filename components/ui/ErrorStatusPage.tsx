@@ -44,7 +44,7 @@ export function ErrorStatusPage({
         <div className="mt-6 flex flex-wrap items-center gap-2">
           <Link
             href={primaryCtaHref}
-            className="inline-flex items-center gap-2 rounded-xl border border-quantis-gold/55 bg-quantis-gold/95 px-4 py-2 text-sm font-semibold text-black transition hover:bg-quantis-gold"
+            className="btn-gold-premium inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition"
           >
             <ArrowLeft className="h-4 w-4" />
             {primaryCtaLabel}

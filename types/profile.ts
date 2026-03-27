@@ -1,5 +1,7 @@
-import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import type { CompanySizeValue } from "@/lib/onboarding/options";
 import type { OnboardingObjectiveValue } from "@/lib/onboarding/objectives";
+
+export type UserThemePreference = "dark" | "light";
 
 export type UserProfile = {
   firstName: string;
@@ -7,10 +9,12 @@ export type UserProfile = {
   companyName: string;
   siren: string;
   companySize: CompanySizeValue | "";
-  sector: SectorValue | "";
+  sector: string;
   usageObjectives?: OnboardingObjectiveValue[];
   email: string;
   emailVerified: boolean;
+  themePreference?: UserThemePreference;
+  onboardingTourCompleted?: boolean;
   createdAt?: string;
   updatedAt?: string;
 };

@@ -1,12 +1,23 @@
-// File: components/settings/SettingsView.tsx
+﻿// File: components/settings/SettingsView.tsx
 // Role: page de paramètres applicatifs (préférences métier + sécurité session) avec la DA premium de /analysis.
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, Download, Save, ShieldCheck, SlidersHorizontal, RotateCcw } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  Moon,
+  RotateCcw,
+  Save,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sun
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { useTheme } from "@/hooks/useTheme";
 import {
   type ExportFormat,
   type AppPreferences,
@@ -19,24 +30,11 @@ type ToastState = { type: "success" | "error" | "info"; message: string } | null
 
 export function SettingsView() {
   const router = useRouter();
+  const { isDark, setTheme } = useTheme();
+  const { restartTour } = useOnboarding();
   const [preferences, setPreferences] = useState<AppPreferences>(() => loadAppPreferences());
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
-
-  useEffect(() => {
-    // Cette page conserve la meme ambiance visuelle premium que /analysis.
-    const root = document.documentElement;
-    const previousTheme = root.getAttribute("data-theme");
-    root.setAttribute("data-theme", "dark");
-
-    return () => {
-      if (previousTheme) {
-        root.setAttribute("data-theme", previousTheme);
-        return;
-      }
-      root.removeAttribute("data-theme");
-    };
-  }, []);
 
   useEffect(() => {
     if (!toast) {
@@ -102,19 +100,19 @@ export function SettingsView() {
           className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour à l’analyse
+          Retour à l'analyse
         </button>
       </header>
 
       <section className="precision-card relative z-10 space-y-4 rounded-2xl p-5">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="h-4 w-4 text-quantis-gold" />
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-white/85">Preferences metier</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-white/85">Préférences métier</h2>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-wide text-white/60">Exercice fiscal par defaut</span>
+            <span className="text-xs uppercase tracking-wide text-white/60">Exercice fiscal par défaut</span>
             <input
               type="number"
               min={2000}
@@ -131,11 +129,11 @@ export function SettingsView() {
               className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-quantis-gold/60"
               placeholder="Ex: 2026"
             />
-            <p className="text-xs text-white/45">Preselectionne l&apos;annee dans les futurs ecrans de filtre.</p>
+            <p className="text-xs text-white/45">Préselectionne l'année dans les futurs écrans de filtre.</p>
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-wide text-white/60">Format d&apos;export prefere</span>
+            <span className="text-xs uppercase tracking-wide text-white/60">Format d'export préféré</span>
             <select
               value={preferences.preferredExportFormat}
               onChange={(event) => updatePreference("preferredExportFormat", event.target.value as ExportFormat)}
@@ -145,20 +143,20 @@ export function SettingsView() {
               <option value="csv">CSV (.csv)</option>
               <option value="pdf">PDF (.pdf)</option>
             </select>
-            <p className="text-xs text-white/45">Utilise ce format comme choix par defaut pour les exports.</p>
+            <p className="text-xs text-white/45">Utilise ce format comme choix par défaut pour les exports.</p>
           </label>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
           <ToggleRow
             label="Afficher la section debug"
-            hint="Permet d&apos;afficher rawData / mappedData / kpis dans les vues d&apos;analyse."
+            hint="Permet d'afficher rawData / mappedData / kpis dans les vues d'analyse."
             checked={preferences.showDebugSection}
             onChange={(nextChecked) => updatePreference("showDebugSection", nextChecked)}
           />
           <ToggleRow
             label="Ouvrir automatiquement l'analyse"
-            hint="Apres upload, ouvre directement le dashboard d&apos;analyse detaille."
+            hint="Après upload, ouvre directement le dashboard d'analyse détaillé."
             checked={preferences.autoOpenAnalysisAfterUpload}
             onChange={(nextChecked) => updatePreference("autoOpenAnalysisAfterUpload", nextChecked)}
           />
@@ -178,12 +176,55 @@ export function SettingsView() {
         </div>
 
         <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-white/90">Thème d'affichage</p>
+              <p className="mt-1 text-xs text-white/50">
+                Basculer entre mode sombre et mode clair. Le choix est sauvegardé automatiquement.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTheme(isDark ? "light" : "dark")}
+              className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                isDark
+                  ? "border-white/20 bg-white/10 text-white hover:bg-white/15"
+                  : "btn-gold-premium"
+              }`}
+              aria-label={isDark ? "Passer en mode clair" : "Passer en mode sombre"}
+              title={isDark ? "Passer en mode clair" : "Passer en mode sombre"}
+            >
+              {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {isDark ? "Mode sombre" : "Mode clair"}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
           <p className="text-sm text-white/80">
-            Le mode nuit est impose globalement pour garantir une experience visuelle coherente.
+            Votre session reste active jusqu'à expiration automatique de sécurité.
           </p>
           <p className="mt-2 text-xs text-white/50">
-            Astuce: la suppression complete du compte reste disponible dans l&apos;onglet Compte.
+            Astuce: la suppression complète du compte reste disponible dans l'onglet Compte.
           </p>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-white/90">Guide interactif</p>
+              <p className="mt-1 text-xs text-white/50">
+                Relancez le tour produit pour revoir la navigation et les blocs clés.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={restartTour}
+              className="btn-gold-premium rounded-xl px-3 py-2 text-xs font-semibold"
+            >
+              Revoir le guide
+            </button>
+          </div>
         </div>
       </section>
 
@@ -195,13 +236,13 @@ export function SettingsView() {
             className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
           >
             <RotateCcw className="h-4 w-4" />
-            Reinitialiser
+            Réinitialiser
           </button>
           <button
             type="button"
             disabled={saving}
             onClick={handleSavePreferences}
-            className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-quantis-gold/90 px-4 py-2 text-sm font-medium text-black hover:bg-quantis-gold disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-gold-premium inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? <Download className="h-4 w-4 animate-pulse" /> : <Save className="h-4 w-4" />}
             {saving ? "Enregistrement..." : "Enregistrer"}

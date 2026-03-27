@@ -1,4 +1,4 @@
-import { isCompanySizeValue, isSectorValue } from "@/lib/onboarding/options";
+import { isCompanySizeValue } from "@/lib/onboarding/options";
 import type { UserProfileUpdateInput } from "@/types/profile";
 
 export type AccountValidationErrors = {
@@ -50,7 +50,7 @@ export function validateAccountProfileInput(
     errors.companySize = "Veuillez choisir une taille d'entreprise.";
   }
 
-  if (!input.sector || !isSectorValue(input.sector)) {
+  if (!input.sector || input.sector.trim().length < 2) {
     errors.sector = "Veuillez choisir un secteur.";
   }
 

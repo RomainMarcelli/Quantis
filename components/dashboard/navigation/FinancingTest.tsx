@@ -1,4 +1,4 @@
-// File: components/dashboard/navigation/FinancingTest.tsx
+﻿// File: components/dashboard/navigation/FinancingTest.tsx
 // Role: propose une variante "test" premium de la section Financement avec les KPI réels de l'analyse.
 "use client";
 
@@ -267,22 +267,22 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
           style={{ animationDelay: "400ms" }}
         >
           {/* Bandeau d'action IA de test pour garder le même langage UX que les autres sections test. */}
-          <div className="flex flex-col items-start justify-between gap-4 bg-gradient-to-r from-quantis-base to-[#121215] p-6 md:flex-row md:items-center">
+          <div className="flex flex-col items-start justify-between gap-4 agent-panel p-6 md:flex-row md:items-center">
             <div className="flex items-center gap-5">
-              <div className="flex h-12 w-12 items-center justify-center rounded border border-white/10 bg-white/5">
+              <div className="flex h-12 w-12 items-center justify-center rounded agent-icon-shell">
                 <Cpu className="h-5 w-5 text-white/60" />
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-mono text-quantis-gold">
+                <span className="agent-kicker text-[10px] font-mono">
                   QUANTIS_AGENT {" > "} MODÉLISATION DE FINANCEMENT
                 </span>
-                <p className="text-[14px] font-medium text-white/80">
+                <p className="text-[14px] font-medium agent-message">
                   Capacité d&apos;emprunt résiduelle estimée pour la prochaine simulation bancaire.
                 </p>
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 hover:border-quantis-gold hover:bg-quantis-gold">
-              <ArrowRight className="h-5 w-5 text-white transition-colors hover:text-black" />
+            <div className="flex h-10 w-10 items-center justify-center rounded agent-arrow-shell transition-all duration-300 hover:border-quantis-gold hover:bg-quantis-gold">
+              <ArrowRight className="h-5 w-5 transition-colors hover:text-black agent-arrow-icon" />
             </div>
           </div>
         </button>
@@ -365,4 +365,6 @@ function formatCompactCurrency(value: number): string {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+
+
 

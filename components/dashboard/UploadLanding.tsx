@@ -173,7 +173,7 @@ export function UploadLanding({ loading, onUpload }: UploadLandingProps) {
                   type="button"
                   onClick={submitFiles}
                   disabled={loading}
-                  className="w-full rounded-xl bg-quantis-gold py-2.5 text-sm font-semibold text-black transition-colors hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-gold-premium w-full rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {loading ? "Traitement..." : "G\u00E9n\u00E9rer le tableau de bord"}
                 </button>

@@ -12,7 +12,11 @@ import {
 } from "firebase/firestore";
 import { firestoreDb } from "@/lib/firebase";
 import type { RegisterProfilePayload } from "@/lib/auth/register";
-import type { UserProfile, UserProfileUpdateInput } from "@/types/profile";
+import type {
+  UserProfile,
+  UserProfileUpdateInput,
+  UserThemePreference
+} from "@/types/profile";
 
 export async function saveUserProfile(userId: string, profile: RegisterProfilePayload): Promise<void> {
   const ref = doc(firestoreDb, "users", userId);
@@ -46,6 +50,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   }
 
   const data = snapshot.data();
+  const themePreference = resolveThemePreference(data.themePreference);
 
   return {
     firstName: String(data.firstName ?? ""),
@@ -57,6 +62,8 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
     usageObjectives: resolveUsageObjectives(data.usageObjectives),
     email: String(data.email ?? ""),
     emailVerified: Boolean(data.emailVerified),
+    ...(themePreference ? { themePreference } : {}),
+    onboardingTourCompleted: Boolean(data.onboardingTourCompleted),
     createdAt: toIsoString(data.createdAt),
     updatedAt: toIsoString(data.updatedAt)
   };
@@ -71,6 +78,36 @@ export async function updateUserProfile(
     ref,
     {
       ...updates,
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+export async function saveUserThemePreference(
+  userId: string,
+  themePreference: UserThemePreference
+): Promise<void> {
+  const ref = doc(firestoreDb, "users", userId);
+  await setDoc(
+    ref,
+    {
+      themePreference,
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+export async function saveUserOnboardingTourCompleted(
+  userId: string,
+  isCompleted: boolean
+): Promise<void> {
+  const ref = doc(firestoreDb, "users", userId);
+  await setDoc(
+    ref,
+    {
+      onboardingTourCompleted: isCompleted,
       updatedAt: serverTimestamp()
     },
     { merge: true }
@@ -103,4 +140,11 @@ function resolveUsageObjectives(value: unknown): OnboardingObjectiveValue[] {
     (item): item is OnboardingObjectiveValue =>
       typeof item === "string" && isOnboardingObjectiveValue(item)
   );
+}
+
+function resolveThemePreference(value: unknown): UserThemePreference | undefined {
+  if (value === "light" || value === "dark") {
+    return value;
+  }
+  return undefined;
 }

@@ -3,12 +3,21 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, Circle, Eye, EyeOff, Info } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Eye, EyeOff, Info, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { getPasswordRuleChecks } from "@/lib/auth/passwordPolicy";
-import { COMPANY_SIZE_OPTIONS, SECTOR_OPTIONS } from "@/lib/onboarding/options";
-import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import {
+  ONBOARDING_REGISTER_COMPANY_COMPLETED_EVENT,
+  ONBOARDING_REGISTER_IDENTITY_COMPLETED_EVENT
+} from "@/lib/onboarding/events";
+import {
+  COMPANY_SIZE_OPTIONS,
+  OTHER_SECTOR_OPTION_VALUE,
+  SECTOR_OPTIONS
+} from "@/lib/onboarding/options";
+import type { CompanySizeValue } from "@/lib/onboarding/options";
 import {
   ONBOARDING_OBJECTIVE_OPTIONS,
   type OnboardingObjectiveValue
@@ -17,6 +26,7 @@ import { loginWithEmailPassword } from "@/lib/auth/login";
 import { registerWithEmailPassword } from "@/lib/auth/register";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { QuantisSelect } from "@/components/ui/QuantisSelect";
 import { firebaseAuthGateway } from "@/services/auth";
 import { logClientSecurityEvent } from "@/services/securityAuditClient";
 import { markUserEmailAsVerified, saveUserProfile } from "@/services/userProfileStore";
@@ -33,7 +43,8 @@ type LoginFormProps = {
   initialMode?: AuthMode;
   lockMode?: boolean;
   initialCompanySize?: CompanySizeValue | "";
-  initialSector?: SectorValue | "";
+  initialSector?: string;
+  initialCustomSector?: string;
   backHref?: string;
   postLoginRedirect?: string;
 };
@@ -43,12 +54,16 @@ export function LoginForm({
   lockMode = false,
   initialCompanySize = "",
   initialSector = "",
+  initialCustomSector = "",
   backHref = "/",
   postLoginRedirect = "/synthese"
 }: LoginFormProps) {
   const router = useRouter();
   // Reference de la carte pour recentrer la vue en haut apres une inscription reussie.
   const cardRef = useRef<HTMLElement | null>(null);
+  const hasDispatchedCompanyStepRef = useRef(false);
+  const hasDispatchedIdentityStepRef = useRef(false);
+  const { currentStep } = useOnboarding();
 
   // Etat principal du formulaire auth (connexion / inscription).
   const [mode, setMode] = useState<AuthMode>(initialMode);
@@ -59,7 +74,8 @@ export function LoginForm({
   const [companyName, setCompanyName] = useState("");
   const [siren, setSiren] = useState("");
   const [companySize, setCompanySize] = useState<CompanySizeValue | "">(initialCompanySize);
-  const [sector, setSector] = useState<SectorValue | "">(initialSector);
+  const [sector, setSector] = useState(initialSector);
+  const [customSector, setCustomSector] = useState(initialCustomSector);
   const [usageObjectives, setUsageObjectives] = useState<OnboardingObjectiveValue[]>([]);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -99,7 +115,72 @@ export function LoginForm({
 
   useEffect(() => {
     setSector(initialSector);
-  }, [initialSector]);
+    setCustomSector(initialCustomSector);
+  }, [initialSector, initialCustomSector]);
+
+  useEffect(() => {
+    if (sector !== OTHER_SECTOR_OPTION_VALUE) {
+      setCustomSector("");
+    }
+  }, [sector]);
+
+  useEffect(() => {
+    if (mode !== "register") {
+      hasDispatchedCompanyStepRef.current = false;
+      hasDispatchedIdentityStepRef.current = false;
+      return;
+    }
+
+    const resolvedSector = sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector.trim();
+    const isCompanyContextComplete =
+      companyName.trim().length > 0 &&
+      siren.length === 9 &&
+      Boolean(companySize) &&
+      resolvedSector.length >= 2;
+    const isCompanyTourStepActive = currentStep?.id === "tour-register-company";
+
+    if (!isCompanyContextComplete || !isCompanyTourStepActive) {
+      hasDispatchedCompanyStepRef.current = false;
+      return;
+    }
+
+    if (hasDispatchedCompanyStepRef.current) {
+      return;
+    }
+
+    hasDispatchedCompanyStepRef.current = true;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(ONBOARDING_REGISTER_COMPANY_COMPLETED_EVENT));
+    }, 0);
+  }, [companyName, companySize, currentStep?.id, customSector, mode, sector, siren]);
+
+  useEffect(() => {
+    if (mode !== "register") {
+      hasDispatchedIdentityStepRef.current = false;
+      return;
+    }
+
+    const isIdentityStepActive = currentStep?.id === "tour-register-identity";
+    const isIdentityComplete =
+      lastName.trim().length > 0 &&
+      firstName.trim().length > 0 &&
+      email.trim().length > 0 &&
+      password.trim().length > 0;
+
+    if (!isIdentityStepActive || !isIdentityComplete) {
+      hasDispatchedIdentityStepRef.current = false;
+      return;
+    }
+
+    if (hasDispatchedIdentityStepRef.current) {
+      return;
+    }
+
+    hasDispatchedIdentityStepRef.current = true;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(ONBOARDING_REGISTER_IDENTITY_COMPLETED_EVENT));
+    }, 0);
+  }, [currentStep?.id, email, firstName, lastName, mode, password]);
 
   useEffect(() => {
     if (!toast) {
@@ -171,7 +252,8 @@ export function LoginForm({
         companyName,
         siren,
         companySize,
-        sector,
+        sector:
+          sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector.trim(),
         usageObjectives
       }
     );
@@ -190,7 +272,9 @@ export function LoginForm({
     setIsSubmitting(false);
     setMode("login");
     setLoginErrors(EMPTY_LOGIN_ERRORS);
-    setAuthInfoMessage("Compte créé. Vérifiez votre email et votre dossier spam avant de vous connecter.");
+    setAuthInfoMessage(
+      "Compte cree. Ouvrez votre email (et le dossier spam), cliquez sur le lien de verification, puis revenez vous connecter."
+    );
     if (lockMode) {
       router.replace("/");
       return;
@@ -237,7 +321,10 @@ export function LoginForm({
               <ArrowLeft className="h-4 w-4" />
             </Link>
 
-            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1">
+            <div
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1"
+              data-tour-id="auth-mode-switch"
+            >
               <button
                 type="button"
                 onClick={() => {
@@ -248,7 +335,7 @@ export function LoginForm({
                 }}
                 className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                   mode === "login"
-                    ? "bg-quantis-gold text-black"
+                    ? "btn-gold-premium"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
@@ -264,7 +351,7 @@ export function LoginForm({
                 }}
                 className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
                   mode === "register"
-                    ? "bg-quantis-gold text-black"
+                    ? "btn-gold-premium"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
@@ -304,6 +391,8 @@ export function LoginForm({
       <div className="card-header mt-6" />
 
       <form className="space-y-4" onSubmit={onSubmit}>
+        <div data-tour-id={mode === "register" ? "auth-identity-context" : undefined} className="space-y-4">
+
         {mode === "register" ? (
           <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
@@ -390,6 +479,7 @@ export function LoginForm({
             </div>
           ) : null}
         </label>
+        </div>
 
         {mode === "register" ? (
           <>
@@ -421,7 +511,7 @@ export function LoginForm({
               </ul>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2" data-tour-id="auth-company-context">
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-white">Nom entreprise</span>
                 <div className="quantis-input bg-white/5 px-3 py-2">
@@ -457,39 +547,51 @@ export function LoginForm({
 
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-white">Taille d&apos;entreprise</span>
-                <div className="quantis-input bg-white/5 px-3 py-2">
-                  <select
-                    value={companySize}
-                    onChange={(event) => setCompanySize(event.target.value as CompanySizeValue | "")}
-                    className="w-full border-0 bg-transparent text-sm text-white outline-none"
-                  >
-                    <option value="">Choisir une taille</option>
-                    {COMPANY_SIZE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label} - {option.range}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <QuantisSelect
+                  value={companySize}
+                  onChange={(value) => setCompanySize(value as CompanySizeValue | "")}
+                  placeholder="Choisir une taille"
+                  options={COMPANY_SIZE_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: `${option.label} - ${option.range}`
+                  }))}
+                />
                 {registerErrors.companySize ? <InlineError message={registerErrors.companySize} /> : null}
               </label>
 
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-white">Secteur</span>
-                <div className="quantis-input bg-white/5 px-3 py-2">
-                  <select
-                    value={sector}
-                    onChange={(event) => setSector(event.target.value as SectorValue | "")}
-                    className="w-full border-0 bg-transparent text-sm text-white outline-none"
-                  >
-                    <option value="">Choisir un secteur</option>
-                    {SECTOR_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <QuantisSelect
+                  value={sector}
+                  onChange={(value) => setSector(value)}
+                  placeholder="Choisir un secteur"
+                  options={[
+                    ...SECTOR_OPTIONS.map((option) => ({ value: option, label: option })),
+                    { value: OTHER_SECTOR_OPTION_VALUE, label: OTHER_SECTOR_OPTION_VALUE }
+                  ]}
+                />
+                {sector === OTHER_SECTOR_OPTION_VALUE ? (
+                  <div className="quantis-input relative mt-2 bg-white/5 px-3 py-2">
+                    <input
+                      type="text"
+                      value={customSector}
+                      onChange={(event) => setCustomSector(event.target.value)}
+                      placeholder="Précisez votre secteur d'activité"
+                      className="w-full border-0 bg-transparent pr-8 text-sm text-white placeholder:text-white/35 outline-none"
+                    />
+                    {customSector ? (
+                      <button
+                        type="button"
+                        onClick={() => setCustomSector("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-white/60 transition hover:bg-white/10 hover:text-white"
+                        aria-label="Effacer le secteur"
+                        title="Effacer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
                 {registerErrors.sector ? <InlineError message={registerErrors.sector} /> : null}
               </label>
             </div>
@@ -544,7 +646,8 @@ export function LoginForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full rounded-xl bg-quantis-gold py-2.5 text-sm font-semibold text-black transition-colors hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
+          data-tour-id="auth-submit"
+          className="btn-gold-premium w-full rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting
             ? mode === "login"

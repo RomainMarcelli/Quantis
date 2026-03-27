@@ -1,4 +1,4 @@
-// File: components/dashboard/navigation/ValueCreationTest.tsx
+﻿// File: components/dashboard/navigation/ValueCreationTest.tsx
 // Role: propose une variante "test" premium de la section Création de valeur avec les KPI réels de l'analyse.
 "use client";
 
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { formatPercent } from "@/components/dashboard/formatting";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
+import { useTheme } from "@/hooks/useTheme";
 import {
   buildBreakEvenModel,
   buildMonthlyRevenueSeries
@@ -27,6 +28,7 @@ type ValueCreationTestProps = {
 };
 
 export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
+  const { isDark } = useTheme();
   // Les séries restent alimentées par les KPI backend: aucun recalcul métier côté UI.
   const monthlySeries = useMemo(
     () =>
@@ -94,6 +96,24 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
   )}`;
   const pointX = xScale(splitVolume);
   const pointY = yScale(breakEvenModel.pointMortValeur);
+
+  const chartGridStroke = isDark ? "rgba(255,255,255,0.08)" : "rgba(71,85,105,0.24)";
+  const chartAxisStroke = isDark ? "rgba(255,255,255,0.2)" : "rgba(51,65,85,0.4)";
+  const caStroke = isDark ? "rgba(255,255,255,0.9)" : "#0f172a";
+  const coutStroke = isDark ? "#C5A059" : "#b58427";
+  const margeStroke = isDark ? "#f59e0b" : "#d97706";
+  const lossZoneFill = isDark ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.2)";
+  const profitZoneFill = isDark ? "rgba(16,185,129,0.16)" : "rgba(16,185,129,0.22)";
+  const pointCoreFill = isDark ? "#0f0f12" : "#ffffff";
+  const labelNeutralClass = isDark
+    ? "border-quantis-gold/30 bg-black/55 text-quantis-gold"
+    : "border-amber-500/40 bg-white/92 text-amber-700";
+  const labelLossClass = isDark
+    ? "border-rose-400/35 bg-rose-500/15 text-rose-200"
+    : "border-rose-400/55 bg-rose-100/90 text-rose-700";
+  const labelProfitClass = isDark
+    ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-200"
+    : "border-emerald-500/55 bg-emerald-100/95 text-emerald-700";
 
   const startRevenue = monthlySeries[0]?.revenue ?? 0;
   const endRevenue = monthlySeries[monthlySeries.length - 1]?.revenue ?? 0;
@@ -265,10 +285,10 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
         >
           <div className="card-header mb-6 flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-semibold text-white">Seuil de rentabilité</h3>
-              <p className="mt-1 text-[10px] font-mono uppercase text-white/45">Analyse du point mort</p>
+              <h3 className={`text-sm font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>Seuil de rentabilité</h3>
+              <p className={`mt-1 text-[10px] font-mono uppercase ${isDark ? "text-white/45" : "text-slate-500"}`}>Analyse du point mort</p>
             </div>
-            <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase text-white/60">
+            <div className={`flex flex-wrap items-center gap-3 text-[10px] uppercase ${isDark ? "text-white/60" : "text-slate-600"}`}>
               <LegendDot color="#f3f4f6" label="CA" />
               <LegendDot color="#C5A059" label="Coûts" />
               <LegendDot color="#f59e0b" label="Marge" />
@@ -277,49 +297,49 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
 
           <div className="relative h-72 w-full">
             <svg className="h-full w-full" viewBox="0 0 1000 250" preserveAspectRatio="none">
-              <line x1="0" y1="50" x2="1000" y2="50" stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
-              <line x1="0" y1="100" x2="1000" y2="100" stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
-              <line x1="0" y1="150" x2="1000" y2="150" stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
-              <line x1="0" y1="200" x2="1000" y2="200" stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
+              <line x1="0" y1="50" x2="1000" y2="50" stroke={chartGridStroke} strokeDasharray="4 4" />
+              <line x1="0" y1="100" x2="1000" y2="100" stroke={chartGridStroke} strokeDasharray="4 4" />
+              <line x1="0" y1="150" x2="1000" y2="150" stroke={chartGridStroke} strokeDasharray="4 4" />
+              <line x1="0" y1="200" x2="1000" y2="200" stroke={chartGridStroke} strokeDasharray="4 4" />
 
-              <line x1="0" y1="0" x2="0" y2="250" stroke="rgba(255,255,255,0.2)" />
-              <line x1="0" y1="250" x2="1000" y2="250" stroke="rgba(255,255,255,0.2)" />
+              <line x1="0" y1="0" x2="0" y2="250" stroke={chartAxisStroke} />
+              <line x1="0" y1="250" x2="1000" y2="250" stroke={chartAxisStroke} />
 
               {/* Zone de pertes avant point mort. */}
               <polygon
                 points={`0,250 ${pointX},${pointY} 0,${yScale(breakEvenModel.points[0]?.couts ?? 0)}`}
-                fill="rgba(239,68,68,0.12)"
+                fill={lossZoneFill}
               />
               {/* Zone de bénéfices après point mort. */}
               <polygon
                 points={`${pointX},${pointY} 1000,${yScale(maxVolume)} 1000,${yScale(
                   breakEvenModel.points[breakEvenModel.points.length - 1]?.couts ?? 0
                 )}`}
-                fill="rgba(16,185,129,0.16)"
+                fill={profitZoneFill}
               />
 
-              <path d={caLine} stroke="rgba(255,255,255,0.9)" strokeWidth="2.5" fill="none" />
-              <path d={coutLine} stroke="#C5A059" strokeWidth="2.5" fill="none" />
-              <path d={margeLine} stroke="#f59e0b" strokeWidth="2.5" fill="none" />
+              <path d={caLine} stroke={caStroke} strokeWidth="2.5" fill="none" />
+              <path d={coutLine} stroke={coutStroke} strokeWidth="2.5" fill="none" />
+              <path d={margeLine} stroke={margeStroke} strokeWidth="2.5" fill="none" />
 
-              <line x1={pointX} y1={pointY} x2={pointX} y2="250" stroke="rgba(255,255,255,0.2)" strokeDasharray="4 4" />
-              <line x1="0" y1={pointY} x2={pointX} y2={pointY} stroke="rgba(255,255,255,0.2)" strokeDasharray="4 4" />
-              <circle cx={pointX} cy={pointY} r="6" fill="#0f0f12" stroke="#C5A059" strokeWidth="3" />
-              <circle cx={pointX} cy={pointY} r="13" fill="rgba(197,160,89,0.14)" />
+              <line x1={pointX} y1={pointY} x2={pointX} y2="250" stroke={chartAxisStroke} strokeDasharray="4 4" />
+              <line x1="0" y1={pointY} x2={pointX} y2={pointY} stroke={chartAxisStroke} strokeDasharray="4 4" />
+              <circle cx={pointX} cy={pointY} r="6" fill={pointCoreFill} stroke={coutStroke} strokeWidth="3" />
+              <circle cx={pointX} cy={pointY} r="13" fill={isDark ? "rgba(197,160,89,0.14)" : "rgba(197,160,89,0.22)"} />
             </svg>
 
-            <div className="absolute left-3 top-3 rounded-md border border-quantis-gold/30 bg-black/55 px-2 py-1 text-[11px] text-quantis-gold">
+            <div className={`absolute left-3 top-3 rounded-md border px-2 py-1 text-[11px] font-medium ${labelNeutralClass}`}>
               Point mort: {formatCompactCurrency(splitVolume)}
             </div>
-            <div className="absolute bottom-2 left-3 rounded-md border border-rose-400/35 bg-rose-500/15 px-2 py-1 text-[11px] text-rose-200">
+            <div className={`absolute bottom-2 left-3 rounded-md border px-2 py-1 text-[11px] font-medium ${labelLossClass}`}>
               Avant: pertes
             </div>
-            <div className="absolute bottom-2 right-3 rounded-md border border-emerald-400/35 bg-emerald-500/15 px-2 py-1 text-[11px] text-emerald-200">
+            <div className={`absolute bottom-2 right-3 rounded-md border px-2 py-1 text-[11px] font-medium ${labelProfitClass}`}>
               Après: bénéfices
             </div>
           </div>
 
-          <p className="edu-text mt-8">
+          <p className={`edu-text mt-8 ${isDark ? "" : "!border-slate-300/80 !text-slate-600 group-hover:!text-slate-700"}`}>
             Le point mort indique le niveau d&apos;activité où le chiffre d&apos;affaires couvre exactement les coûts.
           </p>
         </article>
@@ -329,22 +349,22 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
           className="precision-card fade-up col-span-1 w-full overflow-hidden rounded-xl p-0 text-left md:col-span-12"
           style={{ animationDelay: "500ms" }}
         >
-          <div className="flex flex-col items-start justify-between gap-4 bg-gradient-to-r from-quantis-base to-[#121215] p-6 md:flex-row md:items-center">
+          <div className={`flex flex-col items-start justify-between gap-4 p-6 md:flex-row md:items-center ${isDark ? "bg-gradient-to-r from-quantis-base to-[#121215]" : "border border-slate-200/90 bg-white"}` }>
             <div className="flex items-center gap-5">
-              <div className="flex h-12 w-12 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300">
-                <Cpu className="h-5 w-5 text-white/60" />
+              <div className={`flex h-12 w-12 items-center justify-center rounded transition-all duration-300 ${isDark ? "border border-white/10 bg-white/5" : "border border-slate-300 bg-slate-50"}`}>
+                <Cpu className={`h-5 w-5 ${isDark ? "text-white/60" : "text-slate-700"}`} />
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-mono text-quantis-gold">
+                <span className="agent-kicker text-[10px] font-mono">
                   QUANTIS_AGENT {" > "} SIMULATION RENTABILITÉ
                 </span>
-                <p className="text-[14px] font-medium text-white/80">
+                <p className={`text-[14px] font-medium ${isDark ? "text-white/80" : "text-slate-700"}`}>
                   Une baisse des charges fixes de 3% avancerait le point mort de 12 jours.
                 </p>
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 hover:border-quantis-gold hover:bg-quantis-gold">
-              <ArrowRight className="h-5 w-5 text-white transition-colors hover:text-black" />
+            <div className={`flex h-10 w-10 items-center justify-center rounded transition-all duration-300 ${isDark ? "border border-white/10 bg-white/5 hover:border-quantis-gold hover:bg-quantis-gold" : "border border-slate-300 bg-slate-50 hover:border-quantis-gold hover:bg-quantis-gold/20"}`}>
+              <ArrowRight className={`h-5 w-5 transition-colors ${isDark ? "text-white hover:text-black" : "text-slate-700"}`} />
             </div>
           </div>
         </button>
@@ -418,4 +438,8 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 function formatCompactCurrency(value: number): string {
   return `${Math.round(value).toLocaleString("fr-FR")} €`;
 }
+
+
+
+
 

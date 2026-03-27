@@ -25,7 +25,11 @@ export function DashboardFinancialTestMenu({
   onChange
 }: DashboardFinancialTestMenuProps) {
   return (
-    <nav className="precision-card rounded-2xl p-2" aria-label="Navigation des sections financières">
+    <nav
+      className="precision-card rounded-2xl p-2"
+      aria-label="Navigation des sections financières"
+      data-tour-id="analysis-tabs-menu"
+    >
       <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
         <ul className="flex flex-wrap gap-2">
           {TEST_TABS.map((tab) => {
@@ -37,7 +41,7 @@ export function DashboardFinancialTestMenu({
                   onClick={() => onChange(tab.id)}
                   className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-quantis-gold/25 text-quantis-gold shadow-[inset_0_-2px_0_#d4af37]"
+                      ? "btn-gold-premium"
                       : "text-white/70 hover:bg-white/10 hover:text-white"
                   }`}
                   aria-pressed={isActive}

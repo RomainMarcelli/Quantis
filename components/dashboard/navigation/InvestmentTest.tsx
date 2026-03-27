@@ -1,4 +1,4 @@
-// File: components/dashboard/navigation/InvestmentTest.tsx
+﻿// File: components/dashboard/navigation/InvestmentTest.tsx
 // Role: propose une variante "test" premium de la section Investissement avec les KPI réels de l'analyse.
 "use client";
 
@@ -279,22 +279,22 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
           style={{ animationDelay: "400ms" }}
         >
           {/* Bandeau d'action IA: cohérent avec la narration des autres sections de test. */}
-          <div className="flex flex-col items-start justify-between gap-4 bg-gradient-to-r from-quantis-base to-[#121215] p-6 md:flex-row md:items-center">
+          <div className="flex flex-col items-start justify-between gap-4 agent-panel p-6 md:flex-row md:items-center">
             <div className="flex items-center gap-5">
-              <div className="flex h-12 w-12 items-center justify-center rounded border border-white/10 bg-white/5">
+              <div className="flex h-12 w-12 items-center justify-center rounded agent-icon-shell">
                 <Cpu className="h-5 w-5 text-white/60" />
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-mono text-quantis-gold">
+                <span className="agent-kicker text-[10px] font-mono">
                   QUANTIS_AGENT {" > "} OPTIMISATION BFR
                 </span>
-                <p className="text-[14px] font-medium text-white/80">
+                <p className="text-[14px] font-medium agent-message">
                   Le délai client peut être réduit via une relance automatisée segmentée.
                 </p>
               </div>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 hover:border-quantis-gold hover:bg-quantis-gold">
-              <ArrowRight className="h-5 w-5 text-white transition-colors hover:text-black" />
+            <div className="flex h-10 w-10 items-center justify-center rounded agent-arrow-shell transition-all duration-300 hover:border-quantis-gold hover:bg-quantis-gold">
+              <ArrowRight className="h-5 w-5 transition-colors hover:text-black agent-arrow-icon" />
             </div>
           </div>
         </button>
@@ -388,4 +388,6 @@ function DelayCard({ title, value, hint, badgeLabel, badgeTone, icon }: DelayCar
 function formatCompactCurrency(value: number): string {
   return `${Math.round(value).toLocaleString("fr-FR")} €`;
 }
+
+
 

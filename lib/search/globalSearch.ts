@@ -1,4 +1,4 @@
-// File: lib/search/globalSearch.ts
+﻿// File: lib/search/globalSearch.ts
 // Role: centralise l'index de recherche global et la navigation intelligente (route + section + bloc).
 
 export type SearchRoute = "/analysis" | "/synthese" | "/documents";
@@ -34,7 +34,7 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   {
     id: "synthese-score",
     label: "Quantis Score",
-    description: "SynthÃ¨se Â· SantÃ© globale",
+    description: "Synthèse · Santé globale",
     keywords: ["score", "sante", "synthese", "indice"],
     route: "/synthese",
     refId: "synthese-quantis-score"
@@ -42,15 +42,15 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   {
     id: "synthese-ca",
     label: "Chiffre d'affaires",
-    description: "SynthÃ¨se Â· KPI principal",
+    description: "Synthèse · KPI principal",
     keywords: ["ca", "revenu", "vente", "kpi"],
     route: "/synthese",
     refId: "synthese-kpi-ca"
   },
   {
     id: "synthese-ebe",
-    label: "RentabilitÃ© opÃ©rationnelle (EBE)",
-    description: "SynthÃ¨se Â· KPI principal",
+    label: "Rentabilité opérationnelle (EBE)",
+    description: "Synthèse · KPI principal",
     keywords: ["ebe", "rentabilite", "marge"],
     route: "/synthese",
     refId: "synthese-kpi-ebe"
@@ -58,15 +58,15 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   {
     id: "synthese-cash",
     label: "Cash disponible",
-    description: "SynthÃ¨se Â· KPI principal",
+    description: "Synthèse · KPI principal",
     keywords: ["cash", "tresorerie", "liquidite"],
     route: "/synthese",
     refId: "synthese-kpi-cash"
   },
   {
     id: "synthese-actions",
-    label: "Actions recommandÃ©es",
-    description: "SynthÃ¨se Â· Recommandations",
+    label: "Actions recommandées",
+    description: "Synthèse · Recommandations",
     keywords: ["actions", "recommandations", "priorites"],
     route: "/synthese",
     refId: "synthese-actions"
@@ -74,7 +74,7 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   {
     id: "synthese-alertes",
     label: "Alertes",
-    description: "SynthÃ¨se Â· Signaux de risque",
+    description: "Synthèse · Signaux de risque",
     keywords: ["alertes", "risque", "warning", "bfr", "cash faible"],
     route: "/synthese",
     refId: "synthese-alertes"
@@ -90,8 +90,8 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-vc-ca",
-    label: "CrÃ©ation de valeur Â· Chiffre d'affaires",
-    description: "Tableau de bord Â· CrÃ©ation de valeur",
+    label: "Création de valeur · Chiffre d'affaires",
+    description: "Tableau de bord · Création de valeur",
     keywords: ["creation", "valeur", "ca", "revenu", "vente"],
     route: "/analysis",
     section: "creation-valeur",
@@ -99,8 +99,8 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-vc-tcam",
-    label: "CrÃ©ation de valeur Â· TCAM",
-    description: "Tableau de bord Â· Croissance",
+    label: "Création de valeur · TCAM",
+    description: "Tableau de bord · Croissance",
     keywords: ["tcam", "croissance", "developpement"],
     route: "/analysis",
     section: "creation-valeur",
@@ -108,17 +108,17 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-vc-ebe",
-    label: "CrÃ©ation de valeur Â· EBE",
-    description: "Tableau de bord Â· Performance opÃ©rationnelle",
-    keywords: ["ebe", "excÃ©dent brut", "operationnel"],
+    label: "Création de valeur · EBE",
+    description: "Tableau de bord · Performance opérationnelle",
+    keywords: ["ebe", "excédent brut", "operationnel"],
     route: "/analysis",
     section: "creation-valeur",
     refId: "analysis-vc-ebe"
   },
   {
     id: "analysis-vc-net",
-    label: "CrÃ©ation de valeur Â· RÃ©sultat net",
-    description: "Tableau de bord Â· Profit",
+    label: "Création de valeur · Résultat net",
+    description: "Tableau de bord · Profit",
     keywords: ["resultat net", "benefice", "profit"],
     route: "/analysis",
     section: "creation-valeur",
@@ -126,8 +126,8 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-vc-point-mort",
-    label: "CrÃ©ation de valeur Â· Point mort",
-    description: "Tableau de bord Â· Seuil de rentabilitÃ©",
+    label: "Création de valeur · Point mort",
+    description: "Tableau de bord · Seuil de rentabilité",
     keywords: ["point mort", "seuil", "rentabilite", "break even"],
     route: "/analysis",
     section: "creation-valeur",
@@ -135,8 +135,8 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-invest-bfr",
-    label: "Investissement Â· Argent bloquÃ© (BFR)",
-    description: "Tableau de bord Â· Investissement",
+    label: "Investissement · Argent bloqué (BFR)",
+    description: "Tableau de bord · Investissement",
     keywords: ["bfr", "argent bloque", "cycle"],
     route: "/analysis",
     section: "investissement-bfr",
@@ -144,8 +144,8 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-invest-rotation",
-    label: "Investissement Â· Rotation du BFR",
-    description: "Tableau de bord Â· Investissement",
+    label: "Investissement · Rotation du BFR",
+    description: "Tableau de bord · Investissement",
     keywords: ["rotation", "dso", "dpo", "stocks", "jours"],
     route: "/analysis",
     section: "investissement-bfr",
@@ -153,8 +153,8 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-fin-independance",
-    label: "Financement Â· IndÃ©pendance",
-    description: "Tableau de bord Â· Levier financier",
+    label: "Financement · Indépendance",
+    description: "Tableau de bord · Levier financier",
     keywords: ["independance", "levier", "gearing", "banque", "dependance"],
     route: "/analysis",
     section: "financement",
@@ -162,8 +162,8 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-fin-liquidite",
-    label: "Financement Â· LiquiditÃ©",
-    description: "Tableau de bord Â· SÃ©curitÃ© financiÃ¨re",
+    label: "Financement · Liquidité",
+    description: "Tableau de bord · Sécurité financière",
     keywords: ["liquidite", "generale", "reduite", "immediate"],
     route: "/analysis",
     section: "financement",
@@ -171,8 +171,8 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-rent-roe",
-    label: "RentabilitÃ© Â· ROE",
-    description: "Tableau de bord Â· Gain sur capital",
+    label: "Rentabilité · ROE",
+    description: "Tableau de bord · Gain sur capital",
     keywords: ["roe", "capital", "rendement"],
     route: "/analysis",
     section: "rentabilite",
@@ -180,8 +180,8 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "analysis-rent-roce",
-    label: "RentabilitÃ© Â· ROCE",
-    description: "Tableau de bord Â· Performance activitÃ©",
+    label: "Rentabilité · ROCE",
+    description: "Tableau de bord · Performance activité",
     keywords: ["roce", "performance", "capital employed"],
     route: "/analysis",
     section: "rentabilite",
@@ -189,24 +189,24 @@ export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   },
   {
     id: "documents-folders",
-    label: "Documents Â· Dossiers",
-    description: "Documents Â· Gestion des dossiers",
+    label: "Documents · Dossiers",
+    description: "Documents · Gestion des dossiers",
     keywords: ["dossiers", "projets", "folders"],
     route: "/documents",
     refId: "documents-folders"
   },
   {
     id: "documents-files",
-    label: "Documents Â· Fichiers sources",
-    description: "Documents Â· Liste des fichiers",
+    label: "Documents · Fichiers sources",
+    description: "Documents · Liste des fichiers",
     keywords: ["fichiers", "sources", "uploades", "supprimer"],
     route: "/documents",
     refId: "documents-files"
   },
   {
     id: "documents-upload",
-    label: "Documents Â· Glisser-dÃ©poser",
-    description: "Documents Â· Import de fichier",
+    label: "Documents · Glisser-déposer",
+    description: "Documents · Import de fichier",
     keywords: ["upload", "glisser", "deposer", "excel", "pdf", "saisie manuelle"],
     route: "/documents",
     refId: "documents-upload"
@@ -445,3 +445,6 @@ function clearSearchTermHighlights(target: HTMLElement): void {
   });
   target.normalize();
 }
+
+
+

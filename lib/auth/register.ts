@@ -1,4 +1,4 @@
-import { isCompanySizeValue, isSectorValue } from "@/lib/onboarding/options";
+import { isCompanySizeValue } from "@/lib/onboarding/options";
 import {
   isOnboardingObjectiveValue,
   type OnboardingObjectiveValue
@@ -37,6 +37,7 @@ export function validateRegisterCredentials(
   const password = credentials.password;
   const companyName = credentials.companyName.trim();
   const siren = credentials.siren.trim();
+  const sector = credentials.sector.trim();
 
   if (lastName.length < 2) {
     errors.lastName = "Le nom doit contenir au moins 2 caracteres.";
@@ -75,7 +76,7 @@ export function validateRegisterCredentials(
     errors.companySize = "Veuillez choisir une taille d'entreprise.";
   }
 
-  if (!credentials.sector || !isSectorValue(credentials.sector)) {
+  if (sector.length < 2) {
     errors.sector = "Veuillez choisir un secteur.";
   }
 
@@ -112,6 +113,7 @@ export async function registerWithEmailPassword(
       email: credentials.email.trim(),
       companyName: credentials.companyName.trim(),
       siren: credentials.siren.trim(),
+      sector: credentials.sector.trim(),
       usageObjectives: credentials.usageObjectives.filter((objective) =>
         isOnboardingObjectiveValue(objective)
       )

@@ -23,6 +23,9 @@ import type { AuthenticatedUser, LoginCredentials, RegisterCredentials } from "@
 
 const auth = firebaseAuth;
 const SESSION_STARTED_AT_STORAGE_KEY = "quantis.auth.sessionStartedAt";
+const USE_E2E_MOCK_AUTH = process.env.NEXT_PUBLIC_E2E_MOCK_AUTH === "1";
+const E2E_AUTH_STORAGE_KEY = "quantis.e2e.mockAuthUser";
+const E2E_AUTH_TOKEN = "quantis-e2e-token";
 
 let sessionAutoLogoutTimer: number | null = null;
 let sessionLogoutInProgress = false;
@@ -34,6 +37,7 @@ export interface AuthGateway {
   register(credentials: RegisterCredentials): Promise<AuthenticatedUser>;
   signOut(): Promise<void>;
   deleteCurrentUser(): Promise<void>;
+  getIdToken(forceRefresh?: boolean): Promise<string | null>;
   sendPasswordReset(email: string): Promise<void>;
   verifyPasswordResetCode(oobCode: string): Promise<string>;
   confirmPasswordReset(oobCode: string, newPassword: string): Promise<void>;
@@ -41,7 +45,7 @@ export interface AuthGateway {
   subscribe(listener: AuthStateListener): () => void;
 }
 
-export const firebaseAuthGateway: AuthGateway = {
+const realFirebaseAuthGateway: AuthGateway = {
   async signIn(credentials) {
     const userCredential = await signInWithEmailAndPassword(
       auth,
@@ -95,6 +99,13 @@ export const firebaseAuthGateway: AuthGateway = {
       return;
     }
     await deleteUser(auth.currentUser);
+  },
+
+  async getIdToken(forceRefresh = false) {
+    if (!auth.currentUser) {
+      return null;
+    }
+    return auth.currentUser.getIdToken(forceRefresh);
   },
 
   async sendPasswordReset(email) {
@@ -274,4 +285,154 @@ function clearSessionLifetimeContext(): void {
   }
 
   clearStoredSessionStartedAt();
+}
+
+const e2eAuthListeners = new Set<AuthStateListener>();
+let e2eCurrentUser: AuthenticatedUser | null = readE2eStoredUser();
+
+export const firebaseAuthGateway: AuthGateway = USE_E2E_MOCK_AUTH
+  ? createE2eMockAuthGateway()
+  : realFirebaseAuthGateway;
+
+function createE2eMockAuthGateway(): AuthGateway {
+  return {
+    async signIn(credentials) {
+      const email = credentials.email.trim().toLowerCase();
+      const password = credentials.password.trim();
+
+      if (!email || !password) {
+        throw withFirebaseLikeCode("auth/invalid-credential", "Email ou mot de passe invalide.");
+      }
+
+      const [displayName = "Utilisateur"] = email.split("@");
+      e2eCurrentUser = {
+        uid: `e2e-${displayName || "user"}`,
+        email,
+        displayName,
+        emailVerified: true
+      };
+      persistE2eUser(e2eCurrentUser);
+      notifyE2eAuthListeners();
+      return e2eCurrentUser;
+    },
+
+    async register(credentials) {
+      const email = credentials.email.trim().toLowerCase();
+      const firstName = credentials.firstName.trim();
+      const lastName = credentials.lastName.trim();
+      const displayName = `${firstName} ${lastName}`.trim() || email.split("@")[0] || "Utilisateur";
+
+      e2eCurrentUser = {
+        uid: `e2e-${displayName.replace(/\s+/g, "-").toLowerCase()}`,
+        email,
+        displayName,
+        emailVerified: false
+      };
+      persistE2eUser(e2eCurrentUser);
+      notifyE2eAuthListeners();
+      return e2eCurrentUser;
+    },
+
+    async signOut() {
+      e2eCurrentUser = null;
+      clearSessionLifetimeContext();
+      persistE2eUser(null);
+      notifyE2eAuthListeners();
+    },
+
+    async deleteCurrentUser() {
+      e2eCurrentUser = null;
+      persistE2eUser(null);
+      notifyE2eAuthListeners();
+    },
+
+    async getIdToken() {
+      return e2eCurrentUser ? E2E_AUTH_TOKEN : null;
+    },
+
+    async sendPasswordReset() {
+      return;
+    },
+
+    async verifyPasswordResetCode() {
+      return "mocked-user@quantis.test";
+    },
+
+    async confirmPasswordReset() {
+      return;
+    },
+
+    getCurrentUser() {
+      if (!e2eCurrentUser) {
+        e2eCurrentUser = readE2eStoredUser();
+      }
+      return e2eCurrentUser;
+    },
+
+    subscribe(listener) {
+      e2eAuthListeners.add(listener);
+      listener(e2eCurrentUser);
+      return () => {
+        e2eAuthListeners.delete(listener);
+      };
+    }
+  };
+}
+
+function notifyE2eAuthListeners(): void {
+  for (const listener of e2eAuthListeners) {
+    listener(e2eCurrentUser);
+  }
+}
+
+function readE2eStoredUser(): AuthenticatedUser | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(E2E_AUTH_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<AuthenticatedUser>;
+    if (typeof parsed.uid !== "string" || !parsed.uid) {
+      return null;
+    }
+    if (typeof parsed.email !== "string" || !parsed.email) {
+      return null;
+    }
+
+    return {
+      uid: parsed.uid,
+      email: parsed.email,
+      displayName: typeof parsed.displayName === "string" ? parsed.displayName : null,
+      emailVerified: Boolean(parsed.emailVerified)
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistE2eUser(user: AuthenticatedUser | null): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    if (!user) {
+      window.localStorage.removeItem(E2E_AUTH_STORAGE_KEY);
+      return;
+    }
+    window.localStorage.setItem(E2E_AUTH_STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    // non bloquant
+  }
+}
+
+function withFirebaseLikeCode(code: string, message: string): Error & { code: string } {
+  const error = new Error(message) as Error & { code: string };
+  error.code = code;
+  return error;
 }

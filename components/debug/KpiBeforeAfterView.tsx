@@ -184,7 +184,7 @@ export function KpiBeforeAfterView() {
                 router.push("/analysis");
               }
             }}
-            className="rounded-xl bg-quantis-gold px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-yellow-300"
+            className="btn-gold-premium rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
             disabled={!selectedAnalysis}
           >
             Ouvrir la page détail
