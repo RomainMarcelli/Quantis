@@ -37,6 +37,8 @@ export function DashboardFinancialTestMenu({
             return (
               <li key={tab.id}>
                 <button
+                  id={getTourTabTargetId(tab.id)}
+                  data-tour-id={getTourTabTargetId(tab.id)}
                   type="button"
                   onClick={() => onChange(tab.id)}
                   className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
@@ -55,4 +57,17 @@ export function DashboardFinancialTestMenu({
       </div>
     </nav>
   );
+}
+
+function getTourTabTargetId(tabId: DashboardTestTabId): string {
+  if (tabId === "creation-valeur") {
+    return "tour-tab-valeur";
+  }
+  if (tabId === "investissement-bfr") {
+    return "tour-tab-investissement";
+  }
+  if (tabId === "financement") {
+    return "tour-tab-financement";
+  }
+  return "tour-tab-rentabilite";
 }

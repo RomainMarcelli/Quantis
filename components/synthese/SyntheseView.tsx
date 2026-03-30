@@ -55,7 +55,8 @@ export function SyntheseView() {
   const [selectedYearValue, setSelectedYearValue] = useState<string>(SYNTHESIS_CURRENT_YEAR_KEY);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarPreferenceReady, setIsSidebarPreferenceReady] = useState(false);
   const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
 
   // Référence utilisée pour l'option "Année en cours" dans le sélecteur de synthèse.
@@ -80,8 +81,16 @@ export function SyntheseView() {
   }, []);
 
   useEffect(() => {
+    setIsSidebarCollapsed(readSidebarCollapsedPreference());
+    setIsSidebarPreferenceReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isSidebarPreferenceReady) {
+      return;
+    }
     writeSidebarCollapsedPreference(isSidebarCollapsed);
-  }, [isSidebarCollapsed]);
+  }, [isSidebarCollapsed, isSidebarPreferenceReady]);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
@@ -226,7 +235,7 @@ export function SyntheseView() {
   }
 
   return (
-    <section className="space-y-4">
+    <section className="w-full space-y-4">
       <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
         <div className="flex items-center gap-3">
           <QuantisLogo withText={false} size={28} />

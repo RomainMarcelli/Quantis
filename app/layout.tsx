@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ScrollRevealInitializer } from "@/components/ui/ScrollRevealInitializer";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
-import { OnboardingProvider } from "@/components/onboarding/OnboardingProvider";
+import { ProductTourProvider } from "@/components/product-tour/ProductTourProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -34,12 +34,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className="dark" data-theme="dark">
-      <body className={`${inter.variable} ${jetBrainsMono.variable} premium-app-shell`}>
+      <body id="body" className={`${inter.variable} ${jetBrainsMono.variable} premium-app-shell`}>
         <ThemeProvider>
-          <OnboardingProvider>
+          <ProductTourProvider>
             <ScrollRevealInitializer />
             {children}
-          </OnboardingProvider>
+          </ProductTourProvider>
         </ThemeProvider>
       </body>
     </html>

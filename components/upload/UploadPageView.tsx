@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import Link from "next/link";
@@ -11,7 +11,7 @@ import {
   Upload,
   X
 } from "lucide-react";
-import { useOnboarding } from "@/hooks/useOnboarding";
+import { useProductTour } from "@/hooks/useProductTour";
 import { QuantisSelect } from "@/components/ui/QuantisSelect";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import {
@@ -38,7 +38,7 @@ export function UploadPageView() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const selectedFilesRef = useRef<File[]>([]);
   const hasDispatchedContextStepRef = useRef(false);
-  const { currentStep } = useOnboarding();
+  const { currentStep } = useProductTour();
 
   const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
   const [isDragging, setIsDragging] = useState(false);

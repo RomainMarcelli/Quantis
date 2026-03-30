@@ -80,7 +80,7 @@ export function SyntheseDashboard({
           <article className="precision-card fade-up rounded-2xl p-5" style={{ animationDelay: "0.22s" }} data-search-id="synthese-actions-details">
             <div className="card-header flex items-center gap-2">
               <Lightbulb className="h-4 w-4 text-quantis-gold" />
-              <h2 className="text-xl font-semibold text-white">Plan d'action detaille</h2>
+              <h2 className="text-xl font-semibold text-white">Plan d&apos;action detaille</h2>
             </div>
             <ul className="space-y-2">
               {synthese.actions.map((action, index) => (
@@ -96,7 +96,7 @@ export function SyntheseDashboard({
             {hasMissingMetric ? (
               <div className="mt-4 rounded-xl border border-amber-300/25 bg-amber-500/10 p-3">
                 <p className="text-xs text-amber-100">
-                  Certaines donnees sont manquantes. Completez vos informations pour fiabiliser l'analyse.
+                  Certaines donnees sont manquantes. Completez vos informations pour fiabiliser l&apos;analyse.
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button

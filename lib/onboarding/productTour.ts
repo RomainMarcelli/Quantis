@@ -1,101 +1,130 @@
-﻿import type { ProductTourAudience, ProductTourStep } from "@/types/onboarding";
+import type { ProductTourAudience, ProductTourStep } from "@/types/onboarding";
 
-const AUTHENTICATED_TOUR_STEPS: ProductTourStep[] = [
+export const AUTHENTICATED_TOUR_STEPS: ProductTourStep[] = [
   {
-    id: "tour-synthese-score",
-    title: "Votre score global",
-    description: "Le Quantis Score résume la santé financière globale de votre entreprise.",
+    id: "tour-welcome",
+    title: "Bienvenue sur Quantis",
+    description:
+      "Ravi de vous compter parmi nous. Quantis est votre nouvel allié dans le pilotage de votre entreprise. Commençons par découvrir les fonctionnalités.",
     route: "/synthese",
-    targetId: "synthese-quantis-score",
-    preferredPlacement: "right"
-  },
-  {
-    id: "tour-synthese-kpis",
-    title: "Vos KPI prioritaires",
-    description: "Ici, vous retrouvez les indicateurs clés: chiffre d'affaires, EBE et trésorerie.",
-    route: "/synthese",
-    targetId: "synthese-kpi-ca",
-    preferredPlacement: "bottom"
-  },
-  {
-    id: "tour-synthese-actions",
-    title: "Actions recommandées",
-    description: "Cette zone liste les actions les plus utiles pour améliorer votre trajectoire.",
-    route: "/synthese",
-    targetId: "synthese-actions",
-    preferredPlacement: "top"
+    targetId: "body",
+    preferredPlacement: "center"
   },
   {
     id: "tour-synthese-sidebar",
-    title: "Navigation latérale",
-    description: "Utilisez ce menu pour passer rapidement entre synthèse, tableau de bord et documents.",
+    title: "Naviguer dans Quantis",
+    description:
+      "Utilisez ce menu pour passer instantanément entre votre synthèse globale, vos analyses détaillées, vos documents et la gestion de votre compte.",
     route: "/synthese",
     targetId: "synthese-sidebar-nav",
     preferredPlacement: "right"
   },
   {
-    id: "tour-analysis-tabs",
-    title: "Sections financières",
+    id: "tour-synthese-kpis",
+    title: "La synthèse de votre entreprise",
     description:
-      "Ces onglets permettent d'explorer chaque angle d'analyse: création, investissement, financement et rentabilité.",
+      "Gardez un œil sur vos indicateurs clés : Chiffre d'affaires, EBE et Trésorerie. L'essentiel de votre performance est réuni ici pour un pilotage réactif.",
+    route: "/synthese",
+    targetId: "synthese-kpi-container",
+    preferredPlacement: "bottom"
+  },
+  {
+    id: "tour-synthese-score",
+    title: "Le Quantis Score",
+    description:
+      "Cet indicateur résume la santé financière globale de votre entreprise. Votre objectif : optimiser vos leviers pour atteindre les 100.",
+    route: "/synthese",
+    targetId: "synthese-quantis-score",
+    preferredPlacement: "right"
+  },
+  {
+    id: "tour-analysis-tabs",
+    title: "Le tableau de bord",
+    description:
+      "Explorez votre performance sous tous les angles : création de valeur, investissements, financement et rentabilité. C'est ici que se prennent les décisions stratégiques.",
     route: "/analysis",
     targetId: "analysis-tabs-menu",
     preferredPlacement: "bottom"
   },
   {
-    id: "tour-analysis-point-mort",
-    title: "Seuil de rentabilité",
-    description: "Ce bloc montre à partir de quel niveau d'activité vous couvrez vos coûts.",
+    id: "tour-analysis-1",
+    title: "Votre création de valeur",
+    description:
+      "Analysez la richesse réelle générée par votre exploitation. Suivez votre croissance et identifiez précisément votre point mort opérationnel.",
     route: "/analysis",
-    targetId: "analysis-vc-point-mort",
+    targetId: "tour-tab-valeur",
     section: "creation-valeur",
     preferredPlacement: "top"
   },
   {
-    id: "tour-analysis-financement",
-    title: "Indépendance financière",
-    description: "Cet indicateur explique votre dépendance à la dette et la robustesse de votre structure.",
+    id: "tour-analysis-2",
+    title: "Gestion des investissements",
+    description:
+      "Optimisez votre Besoin en Fonds de Roulement (BFR). Suivez vos ratios de rotation pour libérer des liquidités et améliorer votre agilité financière.",
     route: "/analysis",
-    targetId: "analysis-fin-levier",
-    section: "financement",
-    preferredPlacement: "left"
+    targetId: "tour-tab-investissement",
+    section: "investissements",
+    preferredPlacement: "top"
   },
   {
-    id: "tour-analysis-rentabilite",
-    title: "Rentabilité du capital",
-    description: "Le ROE vous aide à lire ce que vos fonds propres rapportent réellement.",
+    id: "tour-analysis-3",
+    title: "Votre financement",
+    description:
+      "Pilotez votre indépendance financière. Surveillez vos ratios de liquidité et de solvabilité pour garantir la pérennité de votre structure.",
     route: "/analysis",
-    targetId: "analysis-rent-roe",
+    targetId: "tour-tab-financement",
+    section: "financement",
+    preferredPlacement: "top"
+  },
+  {
+    id: "tour-analysis-4",
+    title: "Vos rentabilités",
+    description:
+      "Mesurez le rendement de vos capitaux. Comparez vos performances économiques et financières pour valider la pertinence de votre stratégie.",
+    route: "/analysis",
+    targetId: "tour-tab-rentabilite",
     section: "rentabilite",
-    preferredPlacement: "right"
+    preferredPlacement: "top"
   },
   {
     id: "tour-documents-files",
-    title: "Historique documentaire",
-    description: "Retrouvez ici vos fichiers importés et leur rattachement aux analyses.",
+    title: "Votre coffre-fort documentaire",
+    description:
+      "Retrouvez ici tous vos documents comptables et financiers importés. Votre historique de données est centralisé et sécurisé.",
     route: "/documents",
     targetId: "documents-files",
     preferredPlacement: "right"
   },
   {
     id: "tour-documents-upload",
-    title: "Ajouter des données",
-    description: "Vous pouvez déposer un fichier ou saisir des données manuellement depuis cet espace.",
+    title: "Nourrir votre croissance",
+    description:
+      "Un nouveau bilan ? Déposez vos fichiers ou saisissez vos données manuellement pour obtenir une analyse instantanément mise à jour.",
     route: "/documents",
     targetId: "documents-upload",
     preferredPlacement: "right"
   },
   {
     id: "tour-upload-cta",
-    title: "Lancer une nouvelle analyse",
-    description: "Cette zone d'import permet de démarrer une nouvelle analyse en quelques secondes.",
-    route: "/upload",
-    targetId: "upload-dropzone",
+    title: "Actualiser l'analyse",
+    description:
+      "Lancez une nouvelle analyse en un clic pour intégrer vos dernières données et ajuster votre trajectoire stratégique.",
+    route: "/documents",
+    targetId: "documents-update",
     preferredPlacement: "bottom"
+  },
+  {
+    id: "tour-final",
+    title: "Vous êtes prêt à utiliser Quantis",
+    description:
+      "Le guide est terminé. Vous pouvez le relancer à tout moment depuis les paramètres ou nous contacter directement si vous avez des questions.",
+    route: "/synthese",
+    targetId: "body",
+    preferredPlacement: "center"
   }
 ];
 
-const ANONYMOUS_TOUR_STEPS: ProductTourStep[] = [
+export const ANONYMOUS_TOUR_STEPS: ProductTourStep[] = [
   {
     id: "tour-home-cta",
     title: "Point d'entrée principal",
@@ -124,7 +153,7 @@ const ANONYMOUS_TOUR_STEPS: ProductTourStep[] = [
   {
     id: "tour-upload-submit",
     title: "Lancer l'analyse",
-    description: "Une fois pret, cliquez sur \"Lancer l'analyse\" pour generer vos resultats.",
+    description: "Une fois prêt, cliquez sur \"Lancer l'analyse\" pour générer vos résultats.",
     route: "/upload",
     targetId: "upload-submit",
     preferredPlacement: "bottom"
@@ -141,7 +170,7 @@ const ANONYMOUS_TOUR_STEPS: ProductTourStep[] = [
     id: "tour-register-identity",
     title: "Informations du compte",
     description:
-      "Renseignez nom, prenom, email et mot de passe pour creer votre acces personnel en toute securite.",
+      "Renseignez nom, prénom, email et mot de passe pour créer votre accès personnel en toute sécurité.",
     route: "/register",
     targetId: "auth-identity-context",
     preferredPlacement: "top"

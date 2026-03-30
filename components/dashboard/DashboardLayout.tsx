@@ -98,7 +98,11 @@ export function DashboardLayout({
       <div className="relative z-10 grid grid-cols-1 gap-5 md:grid-cols-12">
         {scoreCard ?? <HealthScore score={kpis.healthScore} tag={healthState.severity.toUpperCase()} searchId={searchIds?.score} />}
 
-        <div className="grid grid-cols-1 gap-5 md:col-span-12 md:grid-cols-2 lg:col-span-7">
+        <div
+          id="synthese-kpi-container"
+          data-tour-id="synthese-kpi-container"
+          className="grid grid-cols-1 gap-5 md:col-span-12 md:grid-cols-2 lg:col-span-7"
+        >
           <KPIBlock
             title="Ce qui rentre"
             tag="Chiffre d'Affaires"

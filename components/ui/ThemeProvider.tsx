@@ -80,6 +80,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     });
 
     return unsubscribe;
+    // syncThemeFromUserProfile uses refs and stable setters only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

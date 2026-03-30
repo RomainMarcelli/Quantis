@@ -8,6 +8,8 @@ describe("productTour", () => {
 
     expect(steps.length).toBeGreaterThan(0);
     expect(new Set(ids).size).toBe(ids.length);
+    expect(ids[0]).toBe("tour-welcome");
+    expect(ids[ids.length - 1]).toBe("tour-final");
   });
 
   it("provides anonymous tour steps with non-empty route and target", () => {

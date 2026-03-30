@@ -15,6 +15,7 @@ import {
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
+  RefreshCcw,
   Settings,
   Sparkles,
   Trash2,
@@ -126,7 +127,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [fileActionKey, setFileActionKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarPreferenceReady, setIsSidebarPreferenceReady] = useState(false);
   const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
 
   useEffect(() => {
@@ -139,8 +141,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   }, [infoMessage]);
 
   useEffect(() => {
+    setIsSidebarCollapsed(readSidebarCollapsedPreference());
+    setIsSidebarPreferenceReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isSidebarPreferenceReady) {
+      return;
+    }
     writeSidebarCollapsedPreference(isSidebarCollapsed);
-  }, [isSidebarCollapsed]);
+  }, [isSidebarCollapsed, isSidebarPreferenceReady]);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
@@ -757,6 +767,13 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     router.replace("/");
   }
 
+  async function handleDocumentsRefresh() {
+    if (!user) {
+      return;
+    }
+    await loadDashboardData(user, analysis?.id);
+  }
+
   if (loadingAuth) {
     return (
       <section className="precision-card rounded-2xl p-8 text-center">
@@ -781,7 +798,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   }
 
   return (
-    <section className="space-y-4">
+    <section className="w-full space-y-4">
       {/* Bandeau d'actions globales conserve (settings/offres/compte/logout) avec skin premium dark. */}
       <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
         <div className="flex items-center gap-3">
@@ -1032,7 +1049,12 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 </div>
               </section>
 
-              <section className="precision-card rounded-2xl p-5" data-search-id="documents-files">
+              <section
+                className="precision-card rounded-2xl p-5"
+                id="documents-files"
+                data-search-id="documents-files"
+                data-tour-id="documents-files"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs uppercase tracking-wide text-white/50">Fichiers sources</p>
                   {sourceFiles.length > 0 ? (
@@ -1104,7 +1126,25 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 </div>
               </section>
 
-              <section className="precision-card rounded-2xl p-5" data-search-id="documents-upload">
+              <section
+                className="precision-card rounded-2xl p-5"
+                id="documents-upload"
+                data-search-id="documents-upload"
+                data-tour-id="documents-upload"
+              >
+                <div className="mb-3 flex justify-end">
+                  <button
+                    type="button"
+                    id="documents-update"
+                    data-tour-id="documents-update"
+                    onClick={() => void handleDocumentsRefresh()}
+                    disabled={loadingAnalysis}
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <RefreshCcw className={`h-3.5 w-3.5 ${loadingAnalysis ? "animate-spin" : ""}`} />
+                    Actualiser l&apos;analyse
+                  </button>
+                </div>
                 <div className="rounded-xl border border-dashed border-white/20 bg-black/15 p-3 text-center">
                   <input
                     ref={fileInputRef}
