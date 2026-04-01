@@ -7,6 +7,7 @@ import type { AuthenticatedUser } from "@/types/auth";
 import { computeKpis } from "@/services/kpiEngine";
 import { firebaseAuthGateway } from "@/services/auth";
 import { listUserAnalyses } from "@/services/analysisStore";
+import { resolveAnalysisFiscalYear } from "@/services/analysisHistory";
 import { KPI_FORMULA_CATALOG } from "@/lib/kpi/kpiFormulaCatalog";
 import {
   compareStoredAndRecalculatedKpis,
@@ -26,13 +27,21 @@ export function KpiBeforeAfterView() {
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
       if (!nextUser) {
-        router.replace("/");
+        setUser(null);
+        setAnalyses([]);
+        setSelectedAnalysisId(null);
+        setLoadingAuth(false);
+        setErrorMessage("Aucune session active detectee. Connectez-vous pour charger vos analyses.");
         return;
       }
 
       if (!nextUser.emailVerified) {
         void firebaseAuthGateway.signOut();
-        router.replace("/");
+        setUser(null);
+        setAnalyses([]);
+        setSelectedAnalysisId(null);
+        setLoadingAuth(false);
+        setErrorMessage("Votre email n'est pas verifie. Verifiez votre boite mail puis reconnectez-vous.");
         return;
       }
 
@@ -119,10 +128,41 @@ export function KpiBeforeAfterView() {
     [comparedKpis]
   );
 
+  const resolvedFiscalYear = useMemo(
+    () => (selectedAnalysis ? resolveAnalysisFiscalYear(selectedAnalysis) : null),
+    [selectedAnalysis]
+  );
+
   if (loadingAuth) {
     return (
       <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
         <p className="text-sm text-white/70">Chargement de la session...</p>
+      </section>
+    );
+  }
+
+  if (!user) {
+    return (
+      <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/75">
+          {errorMessage ?? "Session indisponible. Connectez-vous pour acceder au comparateur KPI."}
+        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/login")}
+            className="btn-gold-premium rounded-xl px-4 py-2 text-sm font-semibold"
+          >
+            Aller a la connexion
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10"
+          >
+            Retour accueil
+          </button>
+        </div>
       </section>
     );
   }
@@ -212,7 +252,7 @@ export function KpiBeforeAfterView() {
             <p>
               Exercice:{" "}
               <span className="font-medium">
-                {selectedAnalysis.fiscalYear !== null ? selectedAnalysis.fiscalYear : "Non renseigne"}
+                {resolvedFiscalYear ?? "Non renseigne"}
               </span>
             </p>
             <p className="md:col-span-2 text-white/80">

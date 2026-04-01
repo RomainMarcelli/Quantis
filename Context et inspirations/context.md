@@ -1,3 +1,12 @@
+## Statut document (mise a jour 2026-04-01)
+
+Ce fichier reste un document d'inspiration strategique (vision produit).
+Pour l'etat implemente dans l'application, utiliser en priorite:
+- `README.md`
+- `projet.md`
+
+---
+
 QUANTIS : L'INTELLIGENCE FINANCIÈRE POUR PME
 Livre Blanc Stratégique Context, Vision & Value Proposition
 
@@ -61,5 +70,4 @@ Benchmarking Précis : Nous permettrons à une boulangerie de Lille de comparer 
 Référentiel de Santé Économique : Nous deviendrons la source la plus fiable sur la santé réelle du tissu économique des PME, créant une valeur immense pour l'écosystème financier global.
 3. La Démocratisation de l'Excellence Financière
 Jusqu'à présent, l'analyse financière de haut niveau (scénarios, projections, optimisation de BFR) était réservée aux grandes entreprises dotées de départements financiers ou de consultants coûteux. La stratégie de Quantis est de rendre cette excellence accessible à la TPE du coin, simplement en uploadant un PDF, pour le prix d'un abonnement téléphonique. Nous transformons une obligation administrative (la comptabilité) en un avantage compétitif décisif.
-
 

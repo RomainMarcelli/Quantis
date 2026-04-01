@@ -25,13 +25,13 @@ describe("premium dashboard components", () => {
     const html = renderToStaticMarkup(
       <KPIWide
         title="Ce qu'il reste vraiment"
-        tag="Excedent Brut d'Exploitation"
+        tag="Excédent brut d'exploitation"
         value={32000}
       />
     );
 
     expect(html).toContain("Objectif");
-    expect(html).toContain("Excedent Brut d&#x27;Exploitation");
+    expect(html).toContain("Excédent brut d&#x27;exploitation");
   });
 
   it("keeps child sections rendered inside DashboardLayout", () => {

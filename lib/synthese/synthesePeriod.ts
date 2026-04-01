@@ -1,5 +1,6 @@
 ﻿// File: lib/synthese/synthesePeriod.ts
 // Role: gère les options d'année de synthèse et le filtrage des analyses par période.
+import { resolveAnalysisFiscalYear } from "@/services/analysisHistory";
 import type { AnalysisRecord } from "@/types/analysis";
 
 export const SYNTHESIS_CURRENT_YEAR_KEY = "current";
@@ -9,16 +10,12 @@ export type SyntheseYearOption = {
   label: string;
 };
 
-// Extrait l'année d'une analyse en priorisant la date d'ajout (createdAt).
-// Le fallback fiscalYear reste uniquement défensif si la date est invalide.
+// Extrait l'année d'une analyse en priorisant l'année fiscale détectée dans la liasse.
+// Le fallback sur createdAt reste défensif si aucune année fiscale n'est disponible.
 export function resolveAnalysisYear(analysis: AnalysisRecord): number {
-  const createdAtYear = new Date(analysis.createdAt).getFullYear();
-  if (Number.isFinite(createdAtYear)) {
-    return createdAtYear;
-  }
-
-  if (analysis.fiscalYear !== null) {
-    return analysis.fiscalYear;
+  const fiscalYear = resolveAnalysisFiscalYear(analysis);
+  if (fiscalYear !== null) {
+    return fiscalYear;
   }
 
   return new Date().getFullYear();

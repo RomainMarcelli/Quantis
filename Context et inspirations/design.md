@@ -1,3 +1,10 @@
+## Statut document (mise a jour 2026-04-01)
+
+Ce fichier est un blueprint design/inspiration.
+Le rendu effectif de l'application suit la DA premium Quantis implementee dans `components/` et documentee dans `projet.md`.
+
+---
+
 💎 QUANTIS : PRODUCT BLUEPRINT (Version Validée)
 Concept UX : Le "Navigateur Financier Sécurisé". Style Visuel : "Premium Fintech" (Grille modulaire Bento, palette restreinte, finitions matte/metal). Device : Desktop First (Architecture PC large).
 
@@ -384,4 +391,3 @@ CTA : Un gros bouton "Déposer mes premiers documents" (Secure Vault).
 Erreur de chargement / IA indisponible
 Pas de message rouge agressif.
 Un message toast (notification flottante) en bas d'écran : "La connexion est lente, mais vos données sont en sécurité. Nouvelle tentative..."
-

@@ -108,15 +108,15 @@ export function QuantisScoreCard({
 
         {scorePiliers ? (
           <div className="grid gap-2 sm:grid-cols-2">
-            <PiliersItem label="Rentabilite" value={scorePiliers.rentabilite} />
-            <PiliersItem label="Solvabilite" value={scorePiliers.solvabilite} />
-            <PiliersItem label="Liquidite" value={scorePiliers.liquidite} />
-            <PiliersItem label="Efficacite" value={scorePiliers.efficacite} />
+            <PiliersItem label="Rentabilité" value={scorePiliers.rentabilite} />
+            <PiliersItem label="Solvabilité" value={scorePiliers.solvabilite} />
+            <PiliersItem label="Liquidité" value={scorePiliers.liquidite} />
+            <PiliersItem label="Efficacité" value={scorePiliers.efficacite} />
           </div>
         ) : null}
 
         {alerteInvestissement ? (
-          <p className="text-xs text-amber-300">Alerte investissement active : usure des immobilisations a surveiller.</p>
+          <p className="text-xs text-amber-300">Alerte investissement active : usure des immobilisations à surveiller.</p>
         ) : null}
       </div>
     </article>
@@ -125,7 +125,7 @@ export function QuantisScoreCard({
 
 function getQuantisScoreState(score: number | null): { label: string; colorHex: string } {
   if (score === null) {
-    return { label: "Indetermine", colorHex: "#8b8b93" };
+    return { label: "Indéterminé", colorHex: "#8b8b93" };
   }
   if (score > 80) {
     return { label: "Excellent", colorHex: "#10B981" };

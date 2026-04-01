@@ -5,6 +5,8 @@ const MAPPED_VARIABLE_KEYS: Array<keyof MappedFinancialData> = [
   "immob_corp",
   "immob_fin",
   "total_actif_immo",
+  "total_actif_immo_brut",
+  "total_actif_immo_net",
   "stocks_mp",
   "stocks_march",
   "total_stocks",
@@ -269,6 +271,9 @@ export function mapRawDataToMappedFinancialData(rawData: RawAnalysisData): Mappe
   );
   mapped.res_net = fallback(mapped.res_net, mapped.resultat_exercice);
   mapped.resultat_exercice = fallback(mapped.resultat_exercice, mapped.res_net);
+  mapped.total_actif_immo_net = fallback(mapped.total_actif_immo_net, mapped.total_actif_immo);
+  mapped.total_actif_immo = fallback(mapped.total_actif_immo, mapped.total_actif_immo_net);
+  mapped.total_actif_immo_brut = fallback(mapped.total_actif_immo_brut, mapped.total_actif_immo);
   mapped.n = fallback(mapped.n, 1);
 
   return mapped;

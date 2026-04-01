@@ -103,8 +103,8 @@ export function buildCompleteKpis(input: ManualKpiInput): CalculatedKpis {
   const ratioImmoUsure = safeDivide(immoNet, immoBrut, 1);
   const etatMaterielIndice = ratioImmoUsure !== null ? ratioImmoUsure * 100 : null;
 
-  // Ratio de couverture des immobilisations pour les vues existantes.
-  const ratioImmo = safeDivide(totalActif, immoNet, 1);
+  // Ratio d'état des immobilisations (net / brut).
+  const ratioImmo = ratioImmoUsure;
 
   // CAF simplifiée pour alimenter les blocs financement.
   const caf = ebe ?? resultatNet;

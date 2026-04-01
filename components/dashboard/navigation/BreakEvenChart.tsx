@@ -77,7 +77,7 @@ function BreakEvenChartComponent({ model, isDark }: BreakEvenChartProps) {
         <SummaryCard
           label="TMSCV retenu"
           value={model.metrics.tmscv === null ? "N/D" : formatPercent(model.metrics.tmscv, 1)}
-          hint="Calcule sur ventes de marchandises + production vendue."
+          hint="Calculé sur les ventes de marchandises + la production vendue."
           isDark={isDark}
           tone={model.metrics.tmscv !== null && model.metrics.tmscv > 0 ? "success" : "danger"}
         />
@@ -96,8 +96,8 @@ function BreakEvenChartComponent({ model, isDark }: BreakEvenChartProps) {
       <BreakEvenFullscreenModal
         isOpen={isFullscreenOpen}
         onClose={() => setIsFullscreenOpen(false)}
-        title="Seuil de rentabilite - Vue plein ecran"
-        subtitle="Visualisation detaillee du point mort (CA, couts fixes, couts totaux)"
+        title="Seuil de rentabilité - Vue plein écran"
+        subtitle="Visualisation détaillée du point mort (CA, coûts fixes, coûts totaux)"
         isDark={isDark}
       >
         <BreakEvenChartCanvas
@@ -180,8 +180,8 @@ function BreakEvenChartCanvas({
                 ? "border-white/15 bg-black/35 text-white/70 hover:border-quantis-gold/45 hover:bg-quantis-gold/12 hover:text-quantis-gold"
                 : "border-slate-300 bg-white/95 text-slate-600 hover:border-amber-400 hover:bg-amber-50 hover:text-amber-700"
             }`}
-            aria-label="Ouvrir le graphique en plein ecran"
-            title="Plein ecran"
+            aria-label="Ouvrir le graphique en plein écran"
+            title="Plein écran"
           >
             <Maximize2 className="h-4 w-4" />
           </button>
@@ -321,7 +321,7 @@ function BreakEvenChartCanvas({
           <Line
             type="linear"
             dataKey="totalCosts"
-            name="Couts totaux"
+            name="Coûts totaux"
             stroke="#C5A059"
             strokeWidth={3.1}
             strokeOpacity={1}
@@ -347,7 +347,7 @@ function BreakEvenChartCanvas({
       ) : (
         <div className="flex h-full items-center justify-center px-6 text-center">
           <p className={`max-w-md text-sm ${isDark ? "text-white/60" : "text-slate-600"}`}>
-            Donnees insuffisantes pour calculer precisement le point mort. Le graphique s&apos;active des que le
+            Données insuffisantes pour calculer précisément le point mort. Le graphique s&apos;active dès que le
             CA, les charges fixes et les charges variables sont disponibles.
           </p>
         </div>
@@ -399,7 +399,7 @@ function SummaryCard({ label, value, hint, isDark, tone = "neutral" }: SummaryCa
 }
 
 function formatBreakEvenTick(value: number): string {
-  return value > 12 ? "Cloture" : `${Math.round(value)}`;
+  return value > 12 ? "Clôture" : `${Math.round(value)}`;
 }
 
 function formatAxisCurrency(value: number): string {
@@ -439,26 +439,26 @@ function buildBreakEvenDateLabel(model: BreakEvenModel): string {
   }
 
   if (days <= 0) {
-    return "Des le demarrage";
+    return "Dès le démarrage";
   }
 
   if (days <= 365) {
     return `Jour ${Math.round(days)} (~${Math.max(1, Math.round(months))} mois)`;
   }
 
-  return `Apres cloture (~${Math.round(months)} mois)`;
+  return `Après clôture (~${Math.round(months)} mois)`;
 }
 
 function buildBreakEvenTimingHint(model: BreakEvenModel): string {
   if (model.metrics.pointMortDateDays === null) {
-    return "TMSCV nul ou negatif, ou donnees incompletes.";
+    return "TMSCV nul ou négatif, ou données incomplètes.";
   }
 
   if (model.metrics.pointMortDateDays <= 365) {
     return "Le seuil est atteint dans l'exercice courant.";
   }
 
-  return "Le seuil depasse la cloture annuelle.";
+  return "Le seuil dépasse la clôture annuelle.";
 }
 
 function buildTimingTone(model: BreakEvenModel): SummaryCardProps["tone"] {
@@ -487,14 +487,14 @@ function buildLossBadgeLabel(model: BreakEvenModel): string {
 
 function buildProfitBadgeLabel(model: BreakEvenModel): string {
   if (model.metrics.pointMort === 0) {
-    return "Benefices immediats";
+    return "Bénéfices immédiats";
   }
 
   if (model.intersection?.withinFiscalYear) {
-    return "Zone benefices";
+    return "Zone bénéfices";
   }
 
-  return "Benefices apres cloture";
+  return "Bénéfices après clôture";
 }
 
 function buildBreakEvenInsight(model: BreakEvenModel): string {
@@ -503,14 +503,14 @@ function buildBreakEvenInsight(model: BreakEvenModel): string {
   }
 
   if (model.metrics.tmscv === null || model.metrics.tmscv <= 0) {
-    return "La marge sur couts variables est insuffisante pour absorber les charges fixes: le point mort n'est pas atteignable dans le perimetre courant.";
+    return "La marge sur coûts variables est insuffisante pour absorber les charges fixes : le point mort n'est pas atteignable dans le périmètre courant.";
   }
 
   if (model.intersection?.withinFiscalYear) {
-    return `Le point mort est atteint au jour ${Math.round(model.intersection.dayIndex)}. Avant ce repere, le CA reste sous les couts totaux; apres, l'activite entre en zone de benefices.`;
+    return `Le point mort est atteint au jour ${Math.round(model.intersection.dayIndex)}. Avant ce repère, le CA reste sous les coûts totaux ; après, l'activité entre en zone de bénéfices.`;
   }
 
-  return "Le point mort existe mathematiquement mais depasse la cloture de l'exercice: la zone benefices n'est pas atteinte sur l'annee.";
+  return "Le point mort existe mathématiquement mais dépasse la clôture de l'exercice : la zone bénéfices n'est pas atteinte sur l'année.";
 }
 
 function clampNumber(value: number, min: number, max: number): number {

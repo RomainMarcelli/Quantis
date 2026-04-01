@@ -51,4 +51,18 @@ describe("rawDataExtractor", () => {
     expect(raw.byVariableCode.total_prod_expl).toBe(1200);
     expect(raw.byVariableCode.dispo).toBe(300);
   });
+
+  it("captures brut/net values when dedicated columns exist", () => {
+    const rows: unknown[][] = [
+      ["Libelle Source", "Code", "Variable Code", "Brut", "Amort", "Net"],
+      ["Total I", "044", "total_actif_immo", 608223.53, 211956.68, 396266.85]
+    ];
+
+    const raw = extractRawDataFromSheetRows(rows);
+
+    expect(raw.byVariableCode.total_actif_immo).toBe(396266.85);
+    expect(raw.byVariableCode.total_actif_immo_brut).toBe(608223.53);
+    expect(raw.byVariableCode.total_actif_immo_net).toBe(396266.85);
+    expect(raw.byLineCode["044"]).toBe(396266.85);
+  });
 });

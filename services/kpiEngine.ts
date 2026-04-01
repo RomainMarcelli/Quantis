@@ -1,25 +1,29 @@
 import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
 export function computeKpis(data: MappedFinancialData): CalculatedKpis {
-  const tcam = percent(powMinusOne(div(data.total_prod_expl, data.ca_n_minus_1), inv(data.n)));
-  const ca = data.total_prod_expl;
+  const ca = firstNonNull(sum(data.ventes_march, data.prod_vendue), data.total_prod_expl);
+  const tcam = percent(powMinusOne(div(ca, data.ca_n_minus_1), inv(data.n)));
   const va = sub(data.total_prod_expl, sum(data.achats_march, data.achats_mp, data.ace));
   const ebitda = sub(va, sum(data.impots_taxes, data.salaires, data.charges_soc));
   const ebe = ebitda;
   const marge_ebitda = percent(div(ebitda, data.total_prod_expl));
   const charges_var = sum(data.achats_march, data.achats_mp, data.var_stock_march, data.var_stock_mp);
-  const mscv = sub(data.total_prod_expl, charges_var);
-  const tmscv = div(mscv, data.total_prod_expl);
+  const mscv = sub(ca, charges_var);
+  const tmscv = div(mscv, ca);
   const charges_fixes = sum(data.ace, data.salaires, data.charges_soc, data.dap);
   const point_mort = div(charges_fixes, tmscv);
-  const ratio_immo = div(data.total_actif_immo, data.total_actif);
-  const bfr = sub(sum(data.total_stocks, data.creances), sum(data.fournisseurs, data.dettes_fisc_soc));
+  const ratio_immo = computeImmobilizationRatio({
+    totalActifImmoNet: data.total_actif_immo_net,
+    totalActifImmoBrut: data.total_actif_immo_brut,
+    totalActifImmo: data.total_actif_immo
+  });
+  const bfr = sub(sum(data.total_stocks, data.creances), data.fournisseurs);
   const rot_bfr = mul(div(bfr, mul(data.total_prod_expl, 1.2)), 365);
   const dso = div(mul(data.clients, 365), mul(data.total_prod_expl, 1.2));
   const dpo = div(mul(data.fournisseurs, 365), mul(sum(data.achats_march, data.ace), 1.2));
   const rot_stocks = div(mul(data.total_stocks, 365), data.total_prod_expl);
   const caf = sum(data.res_net, data.dap);
-  const fte = sub(caf, data.delta_bfr);
+  const fte = caf === null ? null : caf - (data.delta_bfr ?? 0);
   const tn = sub(data.dispo, data.emprunts);
   const solvabilite = div(data.total_cp, data.total_passif);
   const gearing = div(sub(data.emprunts, data.dispo), ebitda);
@@ -125,6 +129,10 @@ function scoreHealth({
   return round((score / weights) * 100);
 }
 
+function firstNonNull(primary: number | null, fallback: number | null): number | null {
+  return primary ?? fallback;
+}
+
 function normalize(value: number, low: number, high: number): number {
   if (value <= low) {
     return 0;
@@ -204,4 +212,38 @@ function computeDebtRepaymentCapacity(
     return null;
   }
   return debt / cashFlowCapacity;
+}
+
+function computeImmobilizationRatio(input: {
+  totalActifImmoNet: number | null;
+  totalActifImmoBrut: number | null;
+  totalActifImmo: number | null;
+}): number | null {
+  const { totalActifImmoNet, totalActifImmoBrut, totalActifImmo } = input;
+
+  if (totalActifImmoNet !== null && totalActifImmoBrut !== null) {
+    return div(totalActifImmoNet, totalActifImmoBrut);
+  }
+
+  if (
+    totalActifImmoNet !== null &&
+    totalActifImmo !== null &&
+    totalActifImmo > 0 &&
+    totalActifImmo >= totalActifImmoNet &&
+    totalActifImmo !== totalActifImmoNet
+  ) {
+    return div(totalActifImmoNet, totalActifImmo);
+  }
+
+  if (
+    totalActifImmoBrut !== null &&
+    totalActifImmo !== null &&
+    totalActifImmo > 0 &&
+    totalActifImmoBrut >= totalActifImmo &&
+    totalActifImmoBrut !== totalActifImmo
+  ) {
+    return div(totalActifImmo, totalActifImmoBrut);
+  }
+
+  return null;
 }

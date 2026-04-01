@@ -35,7 +35,7 @@ export function HealthScore({ score, tag = "SCORE_01", searchId }: HealthScorePr
       <div className="card-header mb-5 flex w-full items-center justify-between">
         <div className="flex items-center gap-2 text-white/60 transition-colors group-hover:text-white">
           <ShieldCheck className="h-4 w-4" />
-          <h2 className="text-[11px] font-bold uppercase tracking-widest">Indice de Sante</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-widest">Indice de santé</h2>
         </div>
         <span className="tech-tag text-[9px] font-mono text-white/40">{tag}</span>
       </div>
@@ -100,7 +100,7 @@ export function HealthScore({ score, tag = "SCORE_01", searchId }: HealthScorePr
           <p className="text-[13px] font-medium leading-relaxed text-white/85">{healthState.message}</p>
         </div>
         <p className="edu-text mt-0 border-t-0 pt-0 text-left">
-          L&apos;indice de sante synthetise la liquidite, la rentabilite et la solvabilite pour piloter la
+          L&apos;indice de santé synthétise la liquidité, la rentabilité et la solvabilité pour piloter la
           résilience financière.
         </p>
       </div>

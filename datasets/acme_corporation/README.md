@@ -1,5 +1,11 @@
 # Datasets Acme Corporation - Documentation
 
+## Mise a jour (2026-04-01)
+
+- Ce dataset 2023 reste un jeu de reference pour tests et demos.
+- L'application supporte maintenant un historique multi-annees via `fiscalYear` (analyse de plusieurs exercices).
+- Les nouvelles liasses reelles (ex: 2025) peuvent etre chargees en complement, sans remplacer ce dataset de base.
+
 ## Vue d'ensemble
 
 Ce dossier contient les fichiers Excel complets et cohérents pour **Acme Corporation**, une PME manufacturière fictive utilisée pour tester l'application Quantis.
@@ -156,4 +162,3 @@ Pour valider les fichiers :
 ```bash
 python scripts/validate_acme_datasets.py
 ```
-

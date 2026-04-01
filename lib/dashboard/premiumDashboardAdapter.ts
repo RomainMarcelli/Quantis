@@ -39,8 +39,8 @@ export function toPremiumKpis(kpis: CalculatedKpis): PremiumKpis {
 export function getPremiumHealthState(score: number | null): PremiumHealthState {
   if (score === null) {
     return {
-      label: "Indeterminee",
-      message: "Donnees insuffisantes pour etablir la sante globale.",
+      label: "Indéterminée",
+      message: "Données insuffisantes pour établir la santé globale.",
       colorHex: "#8b8b93",
       severity: "neutral"
     };
@@ -58,8 +58,8 @@ export function getPremiumHealthState(score: number | null): PremiumHealthState 
 
   if (score > 40) {
     return {
-      label: "Sous Tension",
-      message: "Tension detectee. Une surveillance rapprochee des encaissements est recommandee.",
+      label: "Sous tension",
+      message: "Tension détectée. Une surveillance rapprochée des encaissements est recommandée.",
       colorHex: "#F59E0B",
       severity: "warning"
     };

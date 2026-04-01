@@ -54,4 +54,37 @@ describe("parseExcelBuffer", () => {
       byLabel: {}
     });
   });
+
+  it("falls back to file name to infer fiscal year when workbook text has no year", () => {
+    const buffer = buildWorkbookBuffer([
+      { poste: "Chiffre d'affaires", montant: "1 000 000" }
+    ]);
+
+    const result = parseExcelBuffer(buffer, "Quantis_Full_Liasse_31-12-2025.xlsx");
+
+    expect(result.fiscalYear).toBe(2025);
+  });
+
+  it("infers fiscal year when the year is carried by column headers", () => {
+    const buffer = buildWorkbookBuffer([
+      {
+        "Exercice N clos le 31/12/2025": "Libellé Source",
+        "__EMPTY_1": "Variable Code",
+        "__EMPTY_2": "Brut",
+        "__EMPTY_3": "Amort",
+        "__EMPTY_4": "Net"
+      },
+      {
+        "Exercice N clos le 31/12/2025": "Total I",
+        "__EMPTY_1": "total_actif_immo",
+        "__EMPTY_2": 608223.53,
+        "__EMPTY_3": 211956.68,
+        "__EMPTY_4": 396266.85
+      }
+    ]);
+
+    const result = parseExcelBuffer(buffer, "liasse.xlsx");
+
+    expect(result.fiscalYear).toBe(2025);
+  });
 });

@@ -61,12 +61,11 @@ describe("RentabilityTest", () => {
       />
     );
 
-    expect(html).toContain("Profits &amp; rentabilité");
-    expect(html).toContain("Gain sur mon capital");
-    expect(html).toContain("Performance de l&#x27;activité");
+    expect(html).toContain("Rentabilité &amp; valeur actionnariale");
+    expect(html).toContain("Rentabilité actionnariale");
+    expect(html).toContain("Rentabilité opérationnelle");
     expect(html).toContain("Analyse de la création de valeur");
     expect(html).toContain("Dépendance bancaire");
     expect(html).toContain("RECOMMANDATION STRATÉGIQUE");
   });
 });
-

@@ -26,6 +26,11 @@ import {
 } from "@/lib/synthese/synthesePeriod";
 import { buildSyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import { listUserAnalyses } from "@/services/analysisStore";
+import {
+  findPreviousAnalysisByFiscalYear,
+  normalizeAnalysisFolderName,
+  sortAnalysesByFiscalYear
+} from "@/services/analysisHistory";
 import { firebaseAuthGateway } from "@/services/auth";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
@@ -140,9 +145,19 @@ export function SyntheseView() {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
 
-    // On conserve la logique de priorité dossier actif déjà utilisée sur /analysis.
-    return resolveCurrentAndPreviousAnalysis(analysesBySelectedYear, getActiveFolderName());
-  }, [analysesBySelectedYear]);
+    const current = resolveCurrentAnalysis(analysesBySelectedYear, getActiveFolderName());
+    if (!current) {
+      return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
+    }
+
+    const previous = findPreviousAnalysisByFiscalYear({
+      analyses: allAnalyses,
+      currentAnalysis: current,
+      preferSameFolder: true
+    });
+
+    return { current, previous };
+  }, [allAnalyses, analysesBySelectedYear]);
 
   const synthese = useMemo(() => {
     if (!analysisPair.current) {
@@ -447,25 +462,23 @@ export function SyntheseView() {
   );
 }
 
-// Sélectionne l'analyse courante puis la période précédente (priorité au dossier actif).
-function resolveCurrentAndPreviousAnalysis(
+// Sélectionne l'analyse courante en priorisant le dossier actif.
+function resolveCurrentAnalysis(
   analyses: AnalysisRecord[],
   activeFolderName: string | null
-): { current: AnalysisRecord; previous: AnalysisRecord | null } {
-  const sorted = [...analyses].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-  const normalizedActiveFolder = normalizeFolderName(activeFolderName);
+): AnalysisRecord | null {
+  const sorted = sortAnalysesByFiscalYear(analyses, "desc");
+  if (!sorted.length) {
+    return null;
+  }
 
-  const current =
-    sorted.find((analysis) => normalizeFolderName(analysis.folderName) === normalizedActiveFolder) ?? sorted[0];
+  const normalizedActiveFolder = normalizeAnalysisFolderName(activeFolderName);
 
-  const sameFolderHistory = sorted.filter(
-    (analysis) =>
-      analysis.id !== current.id &&
-      normalizeFolderName(analysis.folderName) === normalizeFolderName(current.folderName)
+  return (
+    sorted.find(
+      (analysis) => normalizeAnalysisFolderName(analysis.folderName) === normalizedActiveFolder
+    ) ?? sorted[0]
   );
-
-  const previous = sameFolderHistory[0] ?? sorted.find((analysis) => analysis.id !== current.id) ?? null;
-  return { current, previous };
 }
 
 function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): string {
@@ -482,10 +495,6 @@ function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): s
   }
 
   return "Utilisateur";
-}
-
-function normalizeFolderName(folderName?: string | null): string {
-  return folderName?.trim() || "";
 }
 
 function NavRow({

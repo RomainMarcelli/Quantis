@@ -15,8 +15,10 @@ import {
 } from "lucide-react";
 import { formatPercent } from "@/components/dashboard/formatting";
 import { BreakEvenChart } from "@/components/dashboard/navigation/BreakEvenChart";
+import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import { useTheme } from "@/hooks/useTheme";
+import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import {
   buildBreakEvenModel,
   buildMonthlyRevenueSeries
@@ -27,9 +29,10 @@ import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 type ValueCreationTestProps = {
   kpis: CalculatedKpis;
   mappedData: MappedFinancialData;
+  previousKpis?: CalculatedKpis | null;
 };
 
-export function ValueCreationTest({ kpis, mappedData }: ValueCreationTestProps) {
+export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: ValueCreationTestProps) {
   const { isDark } = useTheme();
   // Les séries restent alimentées par les KPI backend: aucun recalcul métier côté UI.
   const monthlySeries = useMemo(
@@ -140,6 +143,26 @@ export function ValueCreationTest({ kpis, mappedData }: ValueCreationTestProps) 
 
     return "Le point mort est déjà absorbé dès le démarrage de l'exercice.";
   }, [breakEvenModel]);
+  const caTrend = useMemo(
+    () => buildKpiTrend(kpis.ca, previousKpis?.ca ?? null),
+    [kpis.ca, previousKpis?.ca]
+  );
+  const tcamTrend = useMemo(
+    () => buildKpiTrend(kpis.tcam, previousKpis?.tcam ?? null),
+    [kpis.tcam, previousKpis?.tcam]
+  );
+  const ebeTrend = useMemo(
+    () => buildKpiTrend(kpis.ebe, previousKpis?.ebe ?? null),
+    [kpis.ebe, previousKpis?.ebe]
+  );
+  const resultatNetTrend = useMemo(
+    () => buildKpiTrend(kpis.resultat_net, previousKpis?.resultat_net ?? null),
+    [kpis.resultat_net, previousKpis?.resultat_net]
+  );
+  const tmscvTrend = useMemo(
+    () => buildKpiTrend(displayedTmscv, previousKpis?.tmscv ?? null),
+    [displayedTmscv, previousKpis?.tmscv]
+  );
 
   return (
     <section
@@ -205,6 +228,7 @@ export function ValueCreationTest({ kpis, mappedData }: ValueCreationTestProps) 
           value={caLabel}
           footerLabel={caFooterLabel}
           footerCode="SIG_CA_01"
+          trend={caTrend}
           icon={<Layers className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="Le chiffre d'affaires totalise l'ensemble des ventes de biens et services."
         />
@@ -216,6 +240,7 @@ export function ValueCreationTest({ kpis, mappedData }: ValueCreationTestProps) 
           value={tcamLabel}
           footerLabel="Moy. secteur: 8.2%"
           footerCode="GROWTH_RATE"
+          trend={tcamTrend}
           icon={<Activity className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="Le TCAM mesure la dynamique de croissance moyenne annuelle."
         />
@@ -227,6 +252,7 @@ export function ValueCreationTest({ kpis, mappedData }: ValueCreationTestProps) 
           value={ebeLabel}
           footerLabel="+4.2% vs budget"
           footerCode="EBITDA_M01"
+          trend={ebeTrend}
           icon={<BarChartBig className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="L'EBE indique la richesse générée par l'exploitation."
         />
@@ -255,6 +281,7 @@ export function ValueCreationTest({ kpis, mappedData }: ValueCreationTestProps) 
                 <span className="tech-tag text-sm font-semibold text-white">
                   {formatPercent(kpis.netProfit, 1)}
                 </span>
+                <KpiTrendPill trend={resultatNetTrend} compact />
               </div>
             </div>
           </div>
@@ -286,6 +313,9 @@ export function ValueCreationTest({ kpis, mappedData }: ValueCreationTestProps) 
               <span className="text-[11px] uppercase tracking-wide text-white/50">
                 Taux actuel
               </span>
+            </div>
+            <div className="mt-3">
+              <KpiTrendPill trend={tmscvTrend} compact />
             </div>
           </div>
           <p className="edu-text">
@@ -349,6 +379,7 @@ type MetricCardProps = {
   value: string;
   footerLabel: string;
   footerCode: string;
+  trend?: KpiTrend;
   icon: ReactNode;
   helpText: string;
   delayMs: number;
@@ -361,6 +392,7 @@ function MetricCard({
   value,
   footerLabel,
   footerCode,
+  trend,
   icon,
   helpText,
   delayMs
@@ -387,7 +419,10 @@ function MetricCard({
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
             <span className="text-[11px] text-white/80">{footerLabel}</span>
           </div>
-          <span className="text-[10px] font-mono text-white/35">{footerCode}</span>
+          <div className="flex items-center gap-2">
+            {trend ? <KpiTrendPill trend={trend} /> : null}
+            <span className="text-[10px] font-mono text-white/35">{footerCode}</span>
+          </div>
         </div>
       </div>
       <p className="edu-text">{helpText}</p>
@@ -407,4 +442,3 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 function formatCompactCurrency(value: number): string {
   return `${Math.round(value).toLocaleString("fr-FR")} €`;
 }
-

@@ -43,7 +43,7 @@ export function DashboardLayout({
   scoreCard,
   title = "Cockpit financier",
   subtitle,
-  statusLabel = "Vue d'ensemble - Temps reel",
+  statusLabel = "Vue d'ensemble - Temps réel",
   statusBadgeLabel = "Synchronisation active",
   aiMessage,
   aiCtaLabel = "Ouvrir le simulateur strategique",
@@ -52,12 +52,12 @@ export function DashboardLayout({
   const healthState = getPremiumHealthState(kpis.healthScore);
 
   const resolvedSubtitle =
-    subtitle ?? `Bonjour ${greetingName}, voici la vue d'ensemble de votre sante financiere.`;
+    subtitle ?? `Bonjour ${greetingName}, voici la vue d'ensemble de votre santé financière.`;
 
   const defaultAiMessage =
     kpis.tresorerie !== null && kpis.tresorerie > 0
-      ? `Flux de tresorerie exploitable (${formatMonths(kpis.runway)}). Une projection RH reste soutenable.`
-      : "Priorite liquidite detectee. Revue des decaissements recommandee avant engagement.";
+      ? `Flux de trésorerie disponible (${formatMonths(kpis.runway)}). Une projection RH reste soutenable.`
+      : "Priorité liquidité détectée. Révision des décaissements recommandée avant tout engagement.";
 
   return (
     <section className="premium-analysis-root relative overflow-hidden rounded-2xl p-4 md:p-8">
@@ -73,7 +73,7 @@ export function DashboardLayout({
             <div className="flex flex-col">
               <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white">Quantis</span>
               <span className="text-[10px] font-mono text-quantis-muted">
-                {companyName || "Systeme d'exploitation financier"}
+                {companyName || "Système d'exploitation financier"}
               </span>
             </div>
           </div>
@@ -116,7 +116,7 @@ export function DashboardLayout({
 
           <KPIBlock
             title="Sur le compte"
-            tag="Tresorerie Nette"
+            tag="Trésorerie nette"
             value={kpis.tresorerie}
             format="currency"
             sideLabel={`Runway: ${formatMonths(kpis.runway)}`}
@@ -127,7 +127,7 @@ export function DashboardLayout({
 
           <KPIWide
             title="Ce qu'il reste vraiment"
-            tag="Excedent Brut d'Exploitation"
+            tag="Excédent brut d'exploitation"
             value={kpis.ebe}
             target={50000}
             searchId={searchIds?.ebe}

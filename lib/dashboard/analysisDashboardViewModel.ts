@@ -72,7 +72,7 @@ export function buildAnalysisDashboardViewModel(
     },
     {
       id: "health",
-      label: "Sante globale",
+      label: "Santé globale",
       value: kpis.healthScore,
       format: "percent",
       severity: score.severity
@@ -135,19 +135,19 @@ function buildSections(kpis: CalculatedKpis): DashboardSection[] {
         metric("caf", "CAF", kpis.caf, "currency"),
         metric(
           "capacite_remboursement_annees",
-          "Capacite remboursement",
+          "Capacité de remboursement",
           kpis.capacite_remboursement_annees,
           "years"
         ),
-        metric("fte", "Flux de tresorerie", kpis.fte, "currency"),
-        metric("liq_gen", "Liquidite generale", kpis.liq_gen, "ratio"),
-        metric("liq_red", "Liquidite reduite", kpis.liq_red, "ratio"),
-        metric("liq_imm", "Liquidite immediate", kpis.liq_imm, "ratio")
+        metric("fte", "Flux de trésorerie", kpis.fte, "currency"),
+        metric("liq_gen", "Liquidité générale", kpis.liq_gen, "ratio"),
+        metric("liq_red", "Liquidité réduite", kpis.liq_red, "ratio"),
+        metric("liq_imm", "Liquidité immédiate", kpis.liq_imm, "ratio")
       ]
     },
     {
       id: "rentabilite",
-      title: "Rentabilite",
+      title: "Rentabilité",
       metrics: [
         metric("roe", "ROE", kpis.roe, "percent"),
         metric("roce", "ROCE", kpis.roce, "percent"),
@@ -164,14 +164,14 @@ function buildAlerts(kpis: CalculatedKpis): AnalysisDashboardViewModel["alerts"]
     if (kpis.healthScore < 50) {
       items.push({
         id: "health-score",
-        title: "Sante globale critique",
-        description: "Le score global est inferieur a 50%.",
+        title: "Santé globale critique",
+        description: "Le score global est inférieur à 50%.",
         severity: "red"
       });
     } else if (kpis.healthScore < 70) {
       items.push({
         id: "health-score",
-        title: "Sante globale a surveiller",
+        title: "Santé globale à surveiller",
         description: "Le score global est entre 50% et 69%.",
         severity: "orange"
       });
@@ -182,15 +182,15 @@ function buildAlerts(kpis: CalculatedKpis): AnalysisDashboardViewModel["alerts"]
     if (kpis.liq_imm < 0.5) {
       items.push({
         id: "liq-imm",
-        title: "Faible liquidite immediate",
-        description: "La liquidite immediate est inferieure a 0.5.",
+        title: "Faible liquidité immédiate",
+        description: "La liquidité immédiate est inférieure à 0,5.",
         severity: "red"
       });
     } else if (kpis.liq_imm < 1) {
       items.push({
         id: "liq-imm",
-        title: "Liquidite immediate fragile",
-        description: "La liquidite immediate est comprise entre 0.5 et 1.",
+        title: "Liquidité immédiate fragile",
+        description: "La liquidité immédiate est comprise entre 0,5 et 1.",
         severity: "orange"
       });
     }
@@ -201,13 +201,13 @@ function buildAlerts(kpis: CalculatedKpis): AnalysisDashboardViewModel["alerts"]
       items.push({
         id: "dso",
         title: "Retards clients élevés",
-        description: "Le DSO depasse 90 jours.",
+        description: "Le DSO dépasse 90 jours.",
         severity: "red"
       });
     } else if (kpis.dso > 60) {
       items.push({
         id: "dso",
-        title: "Retards clients a surveiller",
+        title: "Retards clients à surveiller",
         description: "Le DSO est compris entre 61 et 90 jours.",
         severity: "orange"
       });
@@ -220,14 +220,14 @@ function buildAlerts(kpis: CalculatedKpis): AnalysisDashboardViewModel["alerts"]
       items.push({
         id: "cycle-gap",
         title: "Écart cycle clients/fournisseurs critique",
-        description: "L'ecart DSO-DPO depasse 60 jours.",
+        description: "L'écart DSO-DPO dépasse 60 jours.",
         severity: "red"
       });
     } else if (cycleGap > 30) {
       items.push({
         id: "cycle-gap",
         title: "Écart cycle clients/fournisseurs élevé",
-        description: "L'ecart DSO-DPO est entre 31 et 60 jours.",
+        description: "L'écart DSO-DPO est compris entre 31 et 60 jours.",
         severity: "orange"
       });
     }
@@ -238,13 +238,13 @@ function buildAlerts(kpis: CalculatedKpis): AnalysisDashboardViewModel["alerts"]
       items.push({
         id: "rot-bfr",
         title: "BFR élevé",
-        description: "La rotation BFR depasse 180 jours.",
+        description: "La rotation BFR dépasse 180 jours.",
         severity: "red"
       });
     } else if (kpis.rot_bfr > 120) {
       items.push({
         id: "rot-bfr",
-        title: "BFR a surveiller",
+        title: "BFR à surveiller",
         description: "La rotation BFR est comprise entre 121 et 180 jours.",
         severity: "orange"
       });
@@ -357,5 +357,3 @@ function severityWeight(severity: DashboardAlert["severity"]): number {
       return 0;
   }
 }
-
-

@@ -255,15 +255,16 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 ## Fonctionnalites en cours
 
 - Robustification du parsing PDF (cas reels multi-pages / tableaux complexes).
-- Enrichissement du schema des donnees extraites (granularite comptable plus fine).
+- Finalisation d'un passage exhaustif de wording sur l'ensemble des ecrans secondaires.
+- Optimisations de performance front (lissage des animations, reduction des rerenders en mode dashboard).
 
 ## Prochaines etapes
 
-1. Ajouter un filtre dashboard par annee d'exercice.
-2. Brancher un parser PDF plus semantique (ratios + sections bilan/CR).
-3. Ajouter snapshots mensuels pour KPI temporels.
-4. Introduire un module d'alertes proactives (cash stress, argent dormant).
-5. Isoler parsing et KPI engine en microservices (phase suivante).
+1. Brancher un parser PDF plus semantique (ratios + sections bilan/CR).
+2. Ajouter snapshots mensuels pour KPI temporels.
+3. Introduire un module d'alertes proactives (cash stress, argent dormant).
+4. Isoler parsing et KPI engine en microservices (phase suivante).
+5. Stabiliser les performances de rendu sur les ecrans de simulation les plus charges.
 
 ## Decisions techniques importantes
 
@@ -397,3 +398,32 @@ Purge automatique mensuelle des logs sécurité pour maîtriser la volumétrie F
 - Tests ajoutés:
   - `lib/analysis/pendingAnalysis.test.ts`
   - `services/pendingAnalysisSync.test.ts`
+
+## Mise a jour 2026-04-01 (alignement data generator + coherence KPI)
+
+- Mise a niveau du modele de donnees et du mapping:
+  - nouveaux champs utilises cote app: `total_actif_immo_brut`, `total_actif_immo_net`, `total_stocks`, `creances`, `fournisseurs`, `delta_bfr`.
+  - fallback mapping renforce sur les postes manquants (stocks, creances, production vendue, immobilisations net/brut).
+  - extraction de l'exercice fiscal fiabilisee depuis Excel + nom de fichier.
+- Historique multi-annees et calculs transverses:
+  - tri robuste des analyses par exercice (`services/analysisHistory.ts`), y compris si les annees arrivent dans le desordre.
+  - moteur de correction historique applique a la lecture (`services/kpiHistoryEngine.ts`):
+    - `TCAM = ((ca_n / ca_start)^(1/n) - 1) * 100` avec `ca_start` = plus ancienne annee exploitable.
+    - `delta_bfr = bfr_n - bfr_n-1` (fallback `0` si pas d'historique).
+    - `cash reel (fte) = caf - delta_bfr`.
+- Coherence KPI metier:
+  - formule BFR alignee: `bfr = (total_stocks + creances) - fournisseurs`.
+  - formule couverture investissement alignee: `ratio_immo = total_actif_immo_net / total_actif_immo_brut`.
+  - affichage tendances KPI (hausse/baisse/stable/N-D) via composant partage `KpiTrendPill`.
+- Refonte du point mort (sans casser la DA globale):
+  - logique metier centralisee dans `lib/dashboard/tabs/valueCreationData.ts`.
+  - donnees chart: `Mois 1..12 + Cloture`.
+  - intersections CA / couts totaux recalculees proprement.
+  - guide vertical + badge `Point mort` alignes avec le point Recharts.
+  - zones pertes / benefices + tooltip premium + mode plein ecran.
+- Amelioration UX section Investissement:
+  - graphique "Modelisation de l'equilibre du BFR" agrandi et mieux espace verticalement.
+  - rendu responsive renforce (mobile/desktop) avec occupation largeur plus propre.
+- Qualite:
+  - nouveaux tests unitaires ajoutes sur l'historique KPI, les tendances, le parsing Excel/raw et les mappings associes.
+  - cette passe documentation ne relance pas les tests (conforme a la consigne utilisateur).

@@ -174,3 +174,22 @@ Ce document est la source de vérité sécurité.
   - fallback visuel explicite côté `/analysis` pour éviter un écran vide
 - **Risque traité**:
   - écran noir perçu côté utilisateur lors d’une session invalide après inactivité.
+
+### 2026-04-01 — Synchronisation documentation sécurité
+
+#### 1) Périmètre
+
+- **Fichiers touchés**: documentation (`README.md`, `projet.md`, docs de présentation).
+- **Code sécurité**: aucun nouveau mécanisme ajouté dans cette passe.
+
+#### 2) Contrôles toujours actifs (inchangés)
+
+- Headers sécurité globaux via `proxy.ts`.
+- Rate limiting routes sensibles via `lib/server/rateLimit.ts`.
+- Journal d’audit Firestore + purge mensuelle planifiée.
+- Expiration session 24h + redirections explicites quand la session est invalide.
+
+#### 3) Risque / impact
+
+- **Risque traité**: dérive documentaire (écart entre code réel et docs projet).
+- **Impact attendu**: meilleure traçabilité pour les prochaines évolutions sécurité.

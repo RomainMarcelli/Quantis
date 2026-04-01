@@ -53,6 +53,7 @@ import {
   renameUserFolder,
   saveAnalysisDraft
 } from "@/services/analysisStore";
+import { findPreviousAnalysisByFiscalYear } from "@/services/analysisHistory";
 import {
   createUserFolder,
   deleteUserFoldersByName,
@@ -239,6 +240,17 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   );
 
   const hasNoAnalysisForSelectedYear = allAnalyses.length > 0 && analysesFilteredByYear.length === 0;
+  const previousAnalysis = useMemo(
+    () =>
+      analysis
+        ? findPreviousAnalysisByFiscalYear({
+            analyses: allAnalyses,
+            currentAnalysis: analysis,
+            preferSameFolder: true
+          })
+        : null,
+    [allAnalyses, analysis]
+  );
 
   useEffect(() => {
     if (!pendingSearchTarget) {
@@ -471,7 +483,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
       const payload = (await response.json()) as { analysisDraft?: AnalysisDraft; error?: string; detail?: string };
       if (!response.ok || !payload.analysisDraft) {
-        throw new Error(payload.detail ?? payload.error ?? "Le traitement du fichier a echoue.");
+        throw new Error(payload.detail ?? payload.error ?? "Le traitement du fichier a échoué.");
       }
 
       const saved = await saveAnalysisDraft(payload.analysisDraft);
@@ -480,7 +492,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       setCurrentFolder(normalizeFolderName(saved.folderName));
       setKnownFolders(registerKnownFolderName(saved.folderName));
       setAnalysis(saved);
-      setInfoMessage("Fichier traite avec succes. Dashboard mis a jour.");
+      setInfoMessage("Fichier traité avec succès. Dashboard mis à jour.");
       router.replace("/analysis");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Erreur inattendue pendant l'ajout du fichier.");
@@ -526,7 +538,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         isSameFolderName(knownFolderName, normalizedInputName)
       );
       if (alreadyExists) {
-        setErrorMessage("Un dossier avec ce nom existe deja.");
+        setErrorMessage("Un dossier avec ce nom existe déjà.");
         return;
       }
     }
@@ -538,7 +550,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
           isSameFolderName(knownFolderName, normalizedInputName)
       );
       if (alreadyExists) {
-        setErrorMessage("Un dossier avec ce nom existe deja.");
+        setErrorMessage("Un dossier avec ce nom existe déjà.");
         return;
       }
     }
@@ -577,7 +589,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
           setAnalysis(movedAnalyses[0] ?? null);
         }
 
-        setInfoMessage(`Dossier renomme: ${targetFolderName} -> ${normalizedInputName}`);
+        setInfoMessage(`Dossier renommé : ${targetFolderName} -> ${normalizedInputName}`);
       }
 
       if (folderDialogMode === "delete" && targetFolderName) {
@@ -607,16 +619,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         }
 
         if (deletedCount > 0) {
-          setInfoMessage(`Dossier supprime: ${targetFolderName} (${deletedCount} analyses).`);
+          setInfoMessage(`Dossier supprimé : ${targetFolderName} (${deletedCount} analyses).`);
         } else {
-          setInfoMessage(`Dossier vide supprime: ${targetFolderName}.`);
+          setInfoMessage(`Dossier vide supprimé : ${targetFolderName}.`);
         }
       }
 
       closeFolderDialog();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Operation dossier impossible."
+        error instanceof Error ? error.message : "Opération dossier impossible."
       );
     } finally {
       setFolderDialogSubmitting(false);
@@ -686,7 +698,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       }
 
       if (!deletedAnalysisIds.length) {
-        setErrorMessage("Impossible de supprimer les fichiers selectionnes.");
+        setErrorMessage("Impossible de supprimer les fichiers sélectionnés.");
         return;
       }
 
@@ -716,8 +728,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       const deletedAnalysesCount = deletedAnalysisIds.length;
       setInfoMessage(
         deletedFilesCount === 1
-          ? "Fichier source supprime. Les donnees associees ont ete mises a jour."
-          : `${deletedFilesCount} fichiers supprimes (${deletedAnalysesCount} analyses). Les donnees associees ont ete mises a jour.`
+          ? "Fichier source supprimé. Les données associées ont été mises à jour."
+          : `${deletedFilesCount} fichiers supprimés (${deletedAnalysesCount} analyses). Les données associées ont été mises à jour.`
       );
       closeSourceFilesDeletionDialog();
     } catch (error) {
@@ -755,7 +767,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     });
 
     if (!filtered.length) {
-      setErrorMessage("Aucun fichier supporte detecte. Formats: .xlsx .xls .csv .pdf");
+      setErrorMessage("Aucun fichier supporté détecté. Formats : .xlsx .xls .csv .pdf");
       return;
     }
 
@@ -1194,6 +1206,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 activeTab={activeDashboardTab}
                 kpis={analysis.kpis}
                 mappedData={analysis.mappedData}
+                previousKpis={previousAnalysis?.kpis ?? null}
               />
             </>
           ) : (

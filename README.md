@@ -2,11 +2,24 @@
 
 Reconstruction from scratch de Quantis a partir des fichiers Markdown du projet historique.
 
+## Etat du projet (mise a jour 2026-04-01)
+
+- Alignement front/back sur les nouvelles donnees Excel et la logique metier multi-annees.
+- Historisation active des analyses par exercice fiscal avec corrections automatiques:
+  - TCAM recalcule a partir de l'annee la plus ancienne disponible.
+  - `delta_bfr` recalcule entre N et N-1.
+  - cash reel (`fte`) aligne sur `caf - delta_bfr`.
+- Graphique point mort refondu (formules 2033SD, intersection fiable, mode plein ecran, tooltip premium, zones pertes/benefices).
+- Section Investissement amelioree (modélisation BFR plus lisible et responsive, ratio immo net/brut).
+- Indicateurs de tendance (hausse/baisse/stable) affiches sur les KPI majeurs.
+
 ## Stack
 
-- Next.js (App Router)
-- TypeScript
-- Tailwind CSS
+- Next.js 16 (App Router)
+- React 19
+- TypeScript 5
+- Tailwind CSS 3
+- Recharts
 - Firebase SDK:
   - Authentication (email/password)
   - Firestore (stockage des analyses)
@@ -115,6 +128,9 @@ Flux implemente:
 - Parsing Excel/PDF: `services/parsers/`
 - Mapping 2033: `services/mapping/financialDataMapper.ts`
 - Moteur KPI complet (formules Quantis Mapping): `services/kpiEngine.ts`
+- Corrections historiques multi-annees a la lecture:
+  - `services/analysisHistory.ts`
+  - `services/kpiHistoryEngine.ts`
 - Stockage Firestore: `services/analysisStore.ts`
 - Orchestration API parsing/kpi: `app/api/analyses/route.ts`
 - Chaque analyse stocke:
@@ -122,6 +138,12 @@ Flux implemente:
   - `mappedData`
   - `kpis`
   - (et champs legacy dashboard: `financialFacts`, `parsedData`)
+
+Formules metier alignees:
+- `bfr = (total_stocks + creances) - fournisseurs`
+- `ratio_immo = total_actif_immo_net / total_actif_immo_brut`
+- `cash_reel (fte) = caf - delta_bfr`
+- `TCAM = ((ca_n / ca_start)^(1/n) - 1) * 100` avec tri par exercice fiscal
 
 ## Inspection d'une analyse
 
@@ -161,6 +183,14 @@ npm run test:unit
 
 Couvrent la logique metier (auth, parsing, KPI).
 
+Autres commandes qualite:
+
+```bash
+npm run lint
+npm run build
+npm run test:e2e
+```
+
 ## Structure
 
 - `app/`
@@ -172,5 +202,4 @@ Couvrent la logique metier (auth, parsing, KPI).
 ## Suivi projet
 
 Le fichier `projet.md` est la source de verite de pilotage (vision, etat d'avancement, decisions techniques, roadmap)
-
 

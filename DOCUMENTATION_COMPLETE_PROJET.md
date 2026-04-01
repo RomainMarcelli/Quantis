@@ -3,6 +3,26 @@
 
 ---
 
+## Addendum de synchronisation (2026-04-01)
+
+Cette documentation est conservee pour la trame historique et la presentation. L'etat de verite du produit actif est:
+
+- `README.md` (setup, pipeline, commandes)
+- `projet.md` (suivi d'implementation et changelog)
+- le code source (services + composants dashboard)
+
+Mises a jour majeures integrees au produit depuis la version initiale de ce document:
+
+- calcul TCAM multi-annees robuste (tri fiscal, reference annee la plus ancienne);
+- calcul historique `delta_bfr` puis cash reel (`caf - delta_bfr`);
+- formules alignees pour `BFR` et `ratio_immo` (net/brut);
+- refonte du point mort (calculs 2033SD, intersection, zones pertes/benefices, plein ecran);
+- indicateurs de tendance KPI sur les principales sections metier.
+
+En cas de contradiction avec les sections ci-dessous, cet addendum et `projet.md` priment.
+
+---
+
 # TABLE DES MATIÈRES
 
 1. [Vue d'ensemble du projet](#1-vue-densemble-du-projet)
@@ -68,19 +88,20 @@ Le MVP supporte **5 types de décisions stratégiques** :
 
 ```
 Frontend:
-├── Next.js 14 (App Router)
-├── React 18.3.1
-├── TypeScript 5.5.4
-├── Tailwind CSS 3.4.14
+├── Next.js 16 (App Router)
+├── React 19
+├── TypeScript 5
+├── Tailwind CSS 3
 └── Lucide React (icônes)
 
 Backend:
 ├── Next.js API Routes
-├── OpenAI GPT-4o-mini
-└── (PostgreSQL à venir)
+└── Firebase/Firestore (stockage analyses + auth)
 
 Outils:
 ├── ESLint
+├── Vitest
+├── Playwright
 ├── PostCSS
 └── Autoprefixer
 ```
@@ -2068,4 +2089,3 @@ function ComponentRenderer({ component, data }: { component: UIComponent; data: 
 **Document créé pour préparation présentation avec ChatGPT**
 **Date : 2024**
 **Version : 1.0**
-

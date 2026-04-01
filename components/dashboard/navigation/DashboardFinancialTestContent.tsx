@@ -13,23 +13,29 @@ type DashboardFinancialTestContentProps = {
   activeTab: DashboardTestTabId;
   kpis: CalculatedKpis;
   mappedData: MappedFinancialData;
+  previousKpis?: CalculatedKpis | null;
 };
 
-export function DashboardFinancialTestContent({ activeTab, kpis, mappedData }: DashboardFinancialTestContentProps) {
+export function DashboardFinancialTestContent({
+  activeTab,
+  kpis,
+  mappedData,
+  previousKpis = null
+}: DashboardFinancialTestContentProps) {
   if (activeTab === "creation-valeur") {
-    return <ValueCreationTest kpis={kpis} mappedData={mappedData} />;
+    return <ValueCreationTest kpis={kpis} mappedData={mappedData} previousKpis={previousKpis} />;
   }
 
   if (activeTab === "investissement-bfr") {
-    return <InvestmentTest kpis={kpis} />;
+    return <InvestmentTest kpis={kpis} previousKpis={previousKpis} />;
   }
 
   if (activeTab === "financement") {
-    return <FinancingTest kpis={kpis} />;
+    return <FinancingTest kpis={kpis} previousKpis={previousKpis} />;
   }
 
   if (activeTab === "rentabilite") {
-    return <RentabilityTest kpis={kpis} />;
+    return <RentabilityTest kpis={kpis} previousKpis={previousKpis} />;
   }
 
   return (
