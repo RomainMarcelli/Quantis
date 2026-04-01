@@ -1,6 +1,8 @@
 ﻿// File: lib/dashboard/tabs/valueCreationData.ts
 // Role: prépare les jeux de données des graphiques de la section Création de valeur.
 
+import type { MappedFinancialData } from "@/types/analysis";
+
 export const VALUE_CREATION_MONTHS = [
   "Jan",
   "Fév",
@@ -23,17 +25,50 @@ export type ValueCreationMonthlyPoint = {
   netResult: number;
 };
 
+export const BREAK_EVEN_CLOSURE_INDEX = 12.6;
+
 export type BreakEvenPoint = {
-  volume: number;
+  month: string;
+  monthIndex: number;
   ca: number;
-  couts: number;
-  marge: number;
+  fixedCosts: number;
+  totalCosts: number;
+};
+
+export type BreakEvenMetrics = {
+  ca: number | null;
+  chargesFixes: number | null;
+  chargesVariables: number | null;
+  mscv: number | null;
+  tmscv: number | null;
+  pointMort: number | null;
+  pointMortDateDays: number | null;
+  pointMortDateMonths: number | null;
+};
+
+export type BreakEvenIntersection = {
+  monthIndex: number;
+  value: number;
+  dayIndex: number;
+  withinFiscalYear: boolean;
+};
+
+export type BreakEvenSimulation = {
+  adjustedFixedCosts: number;
+  pointMort: number;
+  pointMortDateDays: number;
+  daysGained: number | null;
 };
 
 export type BreakEvenModel = {
   points: BreakEvenPoint[];
-  pointMortVolume: number;
-  pointMortValeur: number;
+  metrics: BreakEvenMetrics;
+  intersection: BreakEvenIntersection | null;
+  simulation: BreakEvenSimulation | null;
+  hasUsableData: boolean;
+  closesAboveBreakEven: boolean | null;
+  closureIndex: number;
+  xTicks: number[];
 };
 
 export type TmscvPieSlice = {
@@ -141,48 +176,128 @@ export function buildTmscvPieData(tmscv: number | null): TmscvPieSlice[] {
   ];
 }
 
-// Modèle du point mort (break-even) avec 3 courbes:
-// - CA (bleu)
-// - Coûts (rouge)
-// - Marge (orange)
-export function buildBreakEvenModel(params: {
-  ca: number | null;
-  chargesFixes: number | null;
-  chargesVariables: number | null;
-  pointMort: number | null;
-}): BreakEvenModel {
-  const annualRevenue = sanitizePositive(params.ca);
-  const chargesFixes = sanitizePositive(params.chargesFixes);
+// Calcule les grandeurs métier du point mort à partir du mapping 2033SD demandé.
+export function computeBreakEvenMetrics(
+  input: Pick<
+    MappedFinancialData,
+    | "ventes_march"
+    | "prod_vendue"
+    | "ace"
+    | "salaires"
+    | "charges_soc"
+    | "dap"
+    | "achats_march"
+    | "achats_mp"
+    | "var_stock_march"
+    | "var_stock_mp"
+  >
+): BreakEvenMetrics {
+  const ca = sumAvailable(input.ventes_march, input.prod_vendue);
+  const chargesFixes = sumAvailable(input.ace, input.salaires, input.charges_soc, input.dap);
+  const chargesVariables = sumAvailable(
+    input.achats_march,
+    input.achats_mp,
+    input.var_stock_march,
+    input.var_stock_mp
+  );
+  const mscv = subtract(ca, chargesVariables);
+  const tmscv = divide(mscv, ca);
+  const pointMort = computeBreakEvenVolume(chargesFixes, tmscv);
+  const pointMortDateDays = computeBreakEvenTiming(pointMort, ca, 365);
+  const pointMortDateMonths = computeBreakEvenTiming(pointMort, ca, 12);
 
-  const variableRateFromKpi =
-    params.chargesVariables === null ? null : clamp(normalizePercentRatio(params.chargesVariables), 0.05, 0.95);
+  return {
+    ca,
+    chargesFixes,
+    chargesVariables,
+    mscv,
+    tmscv,
+    pointMort,
+    pointMortDateDays,
+    pointMortDateMonths
+  };
+}
 
-  const defaultVolume = annualRevenue > 0 ? annualRevenue * 1.2 : 100000;
-  const pointMortVolume = sanitizePositive(params.pointMort) || defaultVolume * 0.55;
+// Génère les points mensuels demandés par le cahier des charges: 12 mois + clôture.
+export function buildBreakEvenChartPoints(metrics: BreakEvenMetrics): BreakEvenPoint[] {
+  const annualRevenue = metrics.ca ?? 0;
+  const chargesFixes = metrics.chargesFixes ?? 0;
+  const chargesVariables = metrics.chargesVariables ?? 0;
 
-  // Si point mort connu, on force un taux variable qui croise la ligne CA au bon endroit.
-  const inferredVariableRate =
-    pointMortVolume > 0 ? clamp(1 - chargesFixes / pointMortVolume, 0.05, 0.95) : 0.65;
+  const monthlyRevenue = annualRevenue / 12;
+  const monthlyVariableCosts = chargesVariables / 12;
 
-  const variableRate = variableRateFromKpi ?? inferredVariableRate;
-  const maxVolume = Math.max(defaultVolume, pointMortVolume * 1.35, 50000);
+  const points = Array.from({ length: 12 }, (_, index) => {
+    const month = index + 1;
 
-  const points: BreakEvenPoint[] = Array.from({ length: 8 }, (_, index) => {
-    const volume = (maxVolume / 7) * index;
-    const ca = volume;
-    const couts = chargesFixes + volume * variableRate;
     return {
-      volume,
-      ca,
-      couts,
-      marge: ca - couts
+      month: `Mois ${month}`,
+      monthIndex: month,
+      ca: monthlyRevenue * month,
+      fixedCosts: chargesFixes,
+      totalCosts: chargesFixes + monthlyVariableCosts * month
     };
   });
 
+  points.push({
+    month: "Clôture",
+    monthIndex: BREAK_EVEN_CLOSURE_INDEX,
+    ca: annualRevenue,
+    fixedCosts: chargesFixes,
+    totalCosts: chargesFixes + chargesVariables
+  });
+
+  return points;
+}
+
+export function buildBreakEvenModel(
+  input: Pick<
+    MappedFinancialData,
+    | "ventes_march"
+    | "prod_vendue"
+    | "ace"
+    | "salaires"
+    | "charges_soc"
+    | "dap"
+    | "achats_march"
+    | "achats_mp"
+    | "var_stock_march"
+    | "var_stock_mp"
+  >
+): BreakEvenModel {
+  const metrics = computeBreakEvenMetrics(input);
+  const points = buildBreakEvenChartPoints(metrics);
+  const hasUsableData = [metrics.ca, metrics.chargesFixes, metrics.chargesVariables].some(
+    (value) => value !== null
+  );
+  const closesAboveBreakEven =
+    metrics.ca === null || metrics.chargesFixes === null || metrics.chargesVariables === null
+      ? null
+      : metrics.ca > metrics.chargesFixes + metrics.chargesVariables;
+
+  const intersection =
+    metrics.pointMort === null ||
+    metrics.pointMortDateDays === null ||
+    metrics.pointMortDateMonths === null
+      ? null
+      : {
+          monthIndex: metrics.pointMortDateMonths,
+          value: metrics.pointMort,
+          dayIndex: metrics.pointMortDateDays,
+          withinFiscalYear: metrics.pointMortDateDays <= 365
+        };
+
+  const simulation = buildBreakEvenSimulation(metrics);
+
   return {
     points,
-    pointMortVolume,
-    pointMortValeur: pointMortVolume
+    metrics,
+    intersection,
+    simulation,
+    hasUsableData,
+    closesAboveBreakEven,
+    closureIndex: BREAK_EVEN_CLOSURE_INDEX,
+    xTicks: [...Array.from({ length: 12 }, (_, index) => index + 1), BREAK_EVEN_CLOSURE_INDEX]
   };
 }
 
@@ -205,4 +320,69 @@ function normalizePercentRatio(value: number | null): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function sumAvailable(...values: Array<number | null>): number | null {
+  const presentValues = values.filter((value): value is number => value !== null && !Number.isNaN(value));
+  if (!presentValues.length) {
+    return null;
+  }
+  return presentValues.reduce((acc, value) => acc + value, 0);
+}
+
+function subtract(left: number | null, right: number | null): number | null {
+  if (left === null || right === null) {
+    return null;
+  }
+  return left - right;
+}
+
+function divide(left: number | null, right: number | null): number | null {
+  if (left === null || right === null || right === 0) {
+    return null;
+  }
+  return left / right;
+}
+
+function computeBreakEvenVolume(chargesFixes: number | null, tmscv: number | null): number | null {
+  if (chargesFixes === null || tmscv === null || tmscv <= 0) {
+    return null;
+  }
+  return chargesFixes / tmscv;
+}
+
+function computeBreakEvenTiming(
+  pointMort: number | null,
+  annualRevenue: number | null,
+  periodUnits: number
+): number | null {
+  if (pointMort === null || annualRevenue === null || annualRevenue <= 0) {
+    return null;
+  }
+
+  return pointMort / (annualRevenue / periodUnits);
+}
+
+function buildBreakEvenSimulation(metrics: BreakEvenMetrics): BreakEvenSimulation | null {
+  if (
+    metrics.ca === null ||
+    metrics.ca <= 0 ||
+    metrics.chargesFixes === null ||
+    metrics.tmscv === null ||
+    metrics.tmscv <= 0
+  ) {
+    return null;
+  }
+
+  const adjustedFixedCosts = metrics.chargesFixes * 0.97;
+  const pointMort = adjustedFixedCosts / metrics.tmscv;
+  const pointMortDateDays = pointMort / (metrics.ca / 365);
+
+  return {
+    adjustedFixedCosts,
+    pointMort,
+    pointMortDateDays,
+    daysGained:
+      metrics.pointMortDateDays === null ? null : Math.max(metrics.pointMortDateDays - pointMortDateDays, 0)
+  };
 }

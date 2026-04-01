@@ -7,16 +7,17 @@ import { InvestmentTest } from "@/components/dashboard/navigation/InvestmentTest
 import { RentabilityTest } from "@/components/dashboard/navigation/RentabilityTest";
 import { ValueCreationTest } from "@/components/dashboard/navigation/ValueCreationTest";
 import type { DashboardTestTabId } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
-import type { CalculatedKpis } from "@/types/analysis";
+import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
 type DashboardFinancialTestContentProps = {
   activeTab: DashboardTestTabId;
   kpis: CalculatedKpis;
+  mappedData: MappedFinancialData;
 };
 
-export function DashboardFinancialTestContent({ activeTab, kpis }: DashboardFinancialTestContentProps) {
+export function DashboardFinancialTestContent({ activeTab, kpis, mappedData }: DashboardFinancialTestContentProps) {
   if (activeTab === "creation-valeur") {
-    return <ValueCreationTest kpis={kpis} />;
+    return <ValueCreationTest kpis={kpis} mappedData={mappedData} />;
   }
 
   if (activeTab === "investissement-bfr") {
@@ -48,4 +49,3 @@ function TestPlaceholderCard({ title, description }: { title: string; descriptio
     </section>
   );
 }
-

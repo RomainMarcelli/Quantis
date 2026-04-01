@@ -2,7 +2,7 @@
 // Role: propose une variante "test" premium de la section Création de valeur avec les KPI réels de l'analyse.
 "use client";
 
-import { type MouseEvent, type ReactNode, useMemo, useState } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef } from "react";
 import {
   Activity,
   ArrowRight,
@@ -14,6 +14,7 @@ import {
   PieChart as PieChartIcon
 } from "lucide-react";
 import { formatPercent } from "@/components/dashboard/formatting";
+import { BreakEvenChart } from "@/components/dashboard/navigation/BreakEvenChart";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import { useTheme } from "@/hooks/useTheme";
 import {
@@ -21,13 +22,14 @@ import {
   buildMonthlyRevenueSeries
 } from "@/lib/dashboard/tabs/valueCreationData";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
-import type { CalculatedKpis } from "@/types/analysis";
+import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
 type ValueCreationTestProps = {
   kpis: CalculatedKpis;
+  mappedData: MappedFinancialData;
 };
 
-export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
+export function ValueCreationTest({ kpis, mappedData }: ValueCreationTestProps) {
   const { isDark } = useTheme();
   // Les séries restent alimentées par les KPI backend: aucun recalcul métier côté UI.
   const monthlySeries = useMemo(
@@ -43,77 +45,66 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
 
   // Modèle de point mort réutilisé pour conserver la même logique que le dashboard principal.
   const breakEvenModel = useMemo(
-    () =>
-      buildBreakEvenModel({
-        ca: kpis.ca,
-        chargesFixes: kpis.charges_fixes,
-        chargesVariables: kpis.charges_var,
-        pointMort: kpis.point_mort
-      }),
-    [kpis.ca, kpis.charges_fixes, kpis.charges_var, kpis.point_mort]
+    () => buildBreakEvenModel(mappedData),
+    [mappedData]
   );
+
+  const displayedTmscv = breakEvenModel.metrics.tmscv ?? kpis.tmscv;
 
   // Compteurs animés pour retrouver l'effet "data-react" sans script DOM global.
   const animatedCa = useAnimatedNumber(kpis.ca, { durationMs: 1400 });
   const animatedTcam = useAnimatedNumber(kpis.tcam, { durationMs: 1300 });
   const animatedEbe = useAnimatedNumber(kpis.ebe, { durationMs: 1350 });
   const animatedResultatNet = useAnimatedNumber(kpis.resultat_net, { durationMs: 1450 });
-  const animatedTmscv = useAnimatedNumber(kpis.tmscv, { durationMs: 1250 });
+  const animatedTmscv = useAnimatedNumber(displayedTmscv, { durationMs: 1250 });
 
-  // Mouse glow local: activé uniquement dans la zone test pour ne pas impacter le reste de la page.
-  const [mouseGlow, setMouseGlow] = useState({ x: 0, y: 0, visible: false });
+  // Glow local rendu en impératif pour éviter un rerender React à chaque mouvement souris.
+  const mouseGlowRef = useRef<HTMLDivElement | null>(null);
+  const mouseGlowRafRef = useRef<number | null>(null);
+  const nextMouseGlowRef = useRef({ x: 0, y: 0, visible: false });
+
+  useEffect(() => {
+    return () => {
+      if (mouseGlowRafRef.current !== null) {
+        cancelAnimationFrame(mouseGlowRafRef.current);
+      }
+    };
+  }, []);
+
+  function flushMouseGlow() {
+    mouseGlowRafRef.current = null;
+    const node = mouseGlowRef.current;
+    if (!node) {
+      return;
+    }
+
+    const next = nextMouseGlowRef.current;
+    node.style.left = `${next.x}px`;
+    node.style.top = `${next.y}px`;
+    node.style.opacity = next.visible ? "1" : "0";
+  }
+
+  function scheduleMouseGlow() {
+    if (mouseGlowRafRef.current !== null) {
+      return;
+    }
+    mouseGlowRafRef.current = requestAnimationFrame(flushMouseGlow);
+  }
 
   function handleMouseMove(event: MouseEvent<HTMLElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
-    setMouseGlow({
+    nextMouseGlowRef.current = {
       x: event.clientX - rect.left,
       y: event.clientY - rect.top,
       visible: true
-    });
+    };
+    scheduleMouseGlow();
   }
 
   function handleMouseLeave() {
-    setMouseGlow((current) => ({ ...current, visible: false }));
+    nextMouseGlowRef.current = { ...nextMouseGlowRef.current, visible: false };
+    scheduleMouseGlow();
   }
-
-  const maxVolume = breakEvenModel.points[breakEvenModel.points.length - 1]?.volume ?? 1;
-  const splitVolume = Math.min(Math.max(breakEvenModel.pointMortVolume, 0), maxVolume);
-  const allY = breakEvenModel.points.flatMap((point) => [point.ca, point.couts, point.marge]);
-  const minY = Math.min(...allY, 0);
-  const maxY = Math.max(...allY, breakEvenModel.pointMortValeur, 1);
-  const yDelta = maxY - minY || 1;
-
-  // Helpers d'échelle pour dessiner le SVG de point mort de façon responsive.
-  const xScale = (volume: number) => (volume / maxVolume) * 1000;
-  const yScale = (value: number) => 250 - ((value - minY) / yDelta) * 250;
-
-  const caLine = `M 0 ${yScale(0)} L 1000 ${yScale(maxVolume)}`;
-  const coutLine = `M 0 ${yScale(breakEvenModel.points[0]?.couts ?? 0)} L 1000 ${yScale(
-    breakEvenModel.points[breakEvenModel.points.length - 1]?.couts ?? 0
-  )}`;
-  const margeLine = `M 0 ${yScale(breakEvenModel.points[0]?.marge ?? 0)} L 1000 ${yScale(
-    breakEvenModel.points[breakEvenModel.points.length - 1]?.marge ?? 0
-  )}`;
-  const pointX = xScale(splitVolume);
-  const pointY = yScale(breakEvenModel.pointMortValeur);
-
-  const chartGridStroke = isDark ? "rgba(255,255,255,0.08)" : "rgba(71,85,105,0.24)";
-  const chartAxisStroke = isDark ? "rgba(255,255,255,0.2)" : "rgba(51,65,85,0.4)";
-  const caStroke = isDark ? "rgba(255,255,255,0.9)" : "#0f172a";
-  const coutStroke = isDark ? "#C5A059" : "#b58427";
-  const margeStroke = isDark ? "#f59e0b" : "#d97706";
-  const lossZoneFill = isDark ? "rgba(239,68,68,0.14)" : "rgba(239,68,68,0.2)";
-  const profitZoneFill = isDark ? "rgba(16,185,129,0.16)" : "rgba(16,185,129,0.22)";
-  const pointCoreFill = isDark ? "#0f0f12" : "#ffffff";
-  const labelNeutralClass = isDark
-    ? "border-quantis-gold/30 bg-black/55 text-quantis-gold"
-    : "border-amber-500/40 bg-white/92 text-amber-700";
-  const labelLossClass = isDark
-    ? "border-rose-400/35 bg-rose-500/15 text-rose-200"
-    : "border-rose-400/55 bg-rose-100/90 text-rose-700";
-  const labelProfitClass = isDark
-    ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-200"
-    : "border-emerald-500/55 bg-emerald-100/95 text-emerald-700";
 
   const startRevenue = monthlySeries[0]?.revenue ?? 0;
   const endRevenue = monthlySeries[monthlySeries.length - 1]?.revenue ?? 0;
@@ -123,9 +114,32 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
   const ebeLabel = kpis.ebe === null ? "N/D" : formatCompactCurrency(animatedEbe);
   const resultatNetLabel =
     kpis.resultat_net === null ? "N/D" : formatCompactCurrency(animatedResultatNet);
-  const tmscvLabel = kpis.tmscv === null ? "N/D" : formatPercent(animatedTmscv);
+  const tmscvLabel = displayedTmscv === null ? "N/D" : formatPercent(animatedTmscv);
   const caFooterLabel =
     kpis.ca === null ? "Donnée indisponible" : growthDelta >= 0 ? "Croissance validée" : "Sous surveillance";
+  const simulationLabel = useMemo(() => {
+    const simulation = breakEvenModel.simulation;
+
+    if (!breakEvenModel.hasUsableData) {
+      return "Le simulateur s'active dès que le CA et les charges du compte de résultat sont disponibles.";
+    }
+
+    if (breakEvenModel.metrics.tmscv === null || breakEvenModel.metrics.tmscv <= 0) {
+      return "Une baisse des charges fixes seule ne suffit pas: il faut d'abord restaurer une marge sur coûts variables positive.";
+    }
+
+    if (simulation?.daysGained !== null && simulation?.daysGained !== undefined && simulation.daysGained > 0) {
+      return `Une baisse des charges fixes de 3% avancerait le point mort de ${Math.round(
+        simulation.daysGained
+      )} jours.`;
+    }
+
+    if (simulation?.pointMortDateDays !== undefined && simulation?.pointMortDateDays > 365) {
+      return "Même avec 3% de charges fixes en moins, le point mort resterait au-delà de la clôture.";
+    }
+
+    return "Le point mort est déjà absorbé dès le démarrage de l'exercice.";
+  }, [breakEvenModel]);
 
   return (
     <section
@@ -134,11 +148,12 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
       onMouseLeave={handleMouseLeave}
     >
       <div
+        ref={mouseGlowRef}
         className="pointer-events-none absolute z-[3] h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(197,160,89,0.12)_0%,transparent_62%)] transition-opacity duration-300"
         style={{
-          left: `${mouseGlow.x}px`,
-          top: `${mouseGlow.y}px`,
-          opacity: mouseGlow.visible ? 1 : 0,
+          left: 0,
+          top: 0,
+          opacity: 0,
           transform: "translate(-50%, -50%)"
         }}
         aria-hidden="true"
@@ -290,58 +305,12 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
             </div>
             <div className={`flex flex-wrap items-center gap-3 text-[10px] uppercase ${isDark ? "text-white/60" : "text-slate-600"}`}>
               <LegendDot color="#f3f4f6" label="CA" />
-              <LegendDot color="#C5A059" label="Coûts" />
-              <LegendDot color="#f59e0b" label="Marge" />
+              <LegendDot color={isDark ? "rgba(255,255,255,0.46)" : "#94a3b8"} label="Coûts fixes" />
+              <LegendDot color="#C5A059" label="Coûts totaux" />
             </div>
           </div>
 
-          <div className="relative h-72 w-full">
-            <svg className="h-full w-full" viewBox="0 0 1000 250" preserveAspectRatio="none">
-              <line x1="0" y1="50" x2="1000" y2="50" stroke={chartGridStroke} strokeDasharray="4 4" />
-              <line x1="0" y1="100" x2="1000" y2="100" stroke={chartGridStroke} strokeDasharray="4 4" />
-              <line x1="0" y1="150" x2="1000" y2="150" stroke={chartGridStroke} strokeDasharray="4 4" />
-              <line x1="0" y1="200" x2="1000" y2="200" stroke={chartGridStroke} strokeDasharray="4 4" />
-
-              <line x1="0" y1="0" x2="0" y2="250" stroke={chartAxisStroke} />
-              <line x1="0" y1="250" x2="1000" y2="250" stroke={chartAxisStroke} />
-
-              {/* Zone de pertes avant point mort. */}
-              <polygon
-                points={`0,250 ${pointX},${pointY} 0,${yScale(breakEvenModel.points[0]?.couts ?? 0)}`}
-                fill={lossZoneFill}
-              />
-              {/* Zone de bénéfices après point mort. */}
-              <polygon
-                points={`${pointX},${pointY} 1000,${yScale(maxVolume)} 1000,${yScale(
-                  breakEvenModel.points[breakEvenModel.points.length - 1]?.couts ?? 0
-                )}`}
-                fill={profitZoneFill}
-              />
-
-              <path d={caLine} stroke={caStroke} strokeWidth="2.5" fill="none" />
-              <path d={coutLine} stroke={coutStroke} strokeWidth="2.5" fill="none" />
-              <path d={margeLine} stroke={margeStroke} strokeWidth="2.5" fill="none" />
-
-              <line x1={pointX} y1={pointY} x2={pointX} y2="250" stroke={chartAxisStroke} strokeDasharray="4 4" />
-              <line x1="0" y1={pointY} x2={pointX} y2={pointY} stroke={chartAxisStroke} strokeDasharray="4 4" />
-              <circle cx={pointX} cy={pointY} r="6" fill={pointCoreFill} stroke={coutStroke} strokeWidth="3" />
-              <circle cx={pointX} cy={pointY} r="13" fill={isDark ? "rgba(197,160,89,0.14)" : "rgba(197,160,89,0.22)"} />
-            </svg>
-
-            <div className={`absolute left-3 top-3 rounded-md border px-2 py-1 text-[11px] font-medium ${labelNeutralClass}`}>
-              Point mort: {formatCompactCurrency(splitVolume)}
-            </div>
-            <div className={`absolute bottom-2 left-3 rounded-md border px-2 py-1 text-[11px] font-medium ${labelLossClass}`}>
-              Avant: pertes
-            </div>
-            <div className={`absolute bottom-2 right-3 rounded-md border px-2 py-1 text-[11px] font-medium ${labelProfitClass}`}>
-              Après: bénéfices
-            </div>
-          </div>
-
-          <p className={`edu-text mt-8 ${isDark ? "" : "!border-slate-300/80 !text-slate-600 group-hover:!text-slate-700"}`}>
-            Le point mort indique le niveau d&apos;activité où le chiffre d&apos;affaires couvre exactement les coûts.
-          </p>
+          <BreakEvenChart model={breakEvenModel} isDark={isDark} />
         </article>
 
         <button
@@ -359,7 +328,7 @@ export function ValueCreationTest({ kpis }: ValueCreationTestProps) {
                   QUANTIS_AGENT {" > "} SIMULATION RENTABILITÉ
                 </span>
                 <p className={`text-[14px] font-medium ${isDark ? "text-white/80" : "text-slate-700"}`}>
-                  Une baisse des charges fixes de 3% avancerait le point mort de 12 jours.
+                  {simulationLabel}
                 </p>
               </div>
             </div>
@@ -438,8 +407,4 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 function formatCompactCurrency(value: number): string {
   return `${Math.round(value).toLocaleString("fr-FR")} €`;
 }
-
-
-
-
 

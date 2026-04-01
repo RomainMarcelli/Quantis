@@ -1190,7 +1190,11 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}
               />
-              <DashboardFinancialTestContent activeTab={activeDashboardTab} kpis={analysis.kpis} />
+              <DashboardFinancialTestContent
+                activeTab={activeDashboardTab}
+                kpis={analysis.kpis}
+                mappedData={analysis.mappedData}
+              />
             </>
           ) : (
             <section className="precision-card rounded-2xl p-5">
@@ -1428,4 +1432,3 @@ function NavRow({
     </button>
   );
 }
-
