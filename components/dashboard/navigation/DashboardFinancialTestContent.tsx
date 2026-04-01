@@ -7,28 +7,35 @@ import { InvestmentTest } from "@/components/dashboard/navigation/InvestmentTest
 import { RentabilityTest } from "@/components/dashboard/navigation/RentabilityTest";
 import { ValueCreationTest } from "@/components/dashboard/navigation/ValueCreationTest";
 import type { DashboardTestTabId } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
-import type { CalculatedKpis } from "@/types/analysis";
+import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
 type DashboardFinancialTestContentProps = {
   activeTab: DashboardTestTabId;
   kpis: CalculatedKpis;
+  mappedData: MappedFinancialData;
+  previousKpis?: CalculatedKpis | null;
 };
 
-export function DashboardFinancialTestContent({ activeTab, kpis }: DashboardFinancialTestContentProps) {
+export function DashboardFinancialTestContent({
+  activeTab,
+  kpis,
+  mappedData,
+  previousKpis = null
+}: DashboardFinancialTestContentProps) {
   if (activeTab === "creation-valeur") {
-    return <ValueCreationTest kpis={kpis} />;
+    return <ValueCreationTest kpis={kpis} mappedData={mappedData} previousKpis={previousKpis} />;
   }
 
   if (activeTab === "investissement-bfr") {
-    return <InvestmentTest kpis={kpis} />;
+    return <InvestmentTest kpis={kpis} previousKpis={previousKpis} />;
   }
 
   if (activeTab === "financement") {
-    return <FinancingTest kpis={kpis} />;
+    return <FinancingTest kpis={kpis} previousKpis={previousKpis} />;
   }
 
   if (activeTab === "rentabilite") {
-    return <RentabilityTest kpis={kpis} />;
+    return <RentabilityTest kpis={kpis} previousKpis={previousKpis} />;
   }
 
   return (
@@ -48,4 +55,3 @@ function TestPlaceholderCard({ title, description }: { title: string; descriptio
     </section>
   );
 }
-

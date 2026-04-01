@@ -39,12 +39,19 @@ test.describe("Critical flow", () => {
     await page.getByRole("button", { name: /se connecter/i }).click();
 
     await expect(page).toHaveURL(/\/synthese/);
-    await expect(page.getByRole("button", { name: "Suivant" })).toBeVisible();
+    const startGuideButton = page.getByRole("button", { name: /c'est parti|suivant/i }).first();
+    await expect(startGuideButton).toBeVisible();
 
-    await page.getByRole("button", { name: "Stop" }).click();
+    const noNeedButton = page.getByRole("button", { name: /pas besoin/i });
+    if ((await noNeedButton.count()) > 0) {
+      await noNeedButton.click();
+    } else {
+      await page.getByRole("button", { name: "Stop" }).click();
+    }
     await page.reload();
 
-    await expect(page.getByRole("button", { name: "Suivant" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /c'est parti|suivant/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /pas besoin|stop/i })).toHaveCount(0);
   });
 
   test("precedent revient correctement de register vers upload", async ({ page }) => {

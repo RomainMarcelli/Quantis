@@ -65,13 +65,12 @@ describe("FinancingTest", () => {
       />
     );
 
-    expect(html).toContain("Banque &amp; financement");
-    expect(html).toContain("Poids de la dette");
+    expect(html).toContain("Financement &amp; solvabilité");
+    expect(html).toContain("Capacité de remboursement");
     expect(html).toContain("Résistance aux imprévus");
     expect(html).toContain("Liquidit");
     expect(html).toContain("Indépendance");
     expect(html).toContain("MODÉLISATION DE FINANCEMENT");
   });
 });
-
 

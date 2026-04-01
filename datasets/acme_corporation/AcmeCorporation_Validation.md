@@ -2,6 +2,9 @@
 
 Date de validation : 21/12/2025 21:09:04
 
+Note (2026-04-01) : rapport conserve comme validation historique du dataset de reference 2023.
+Les evolutions multi-annees de l'application n'invalident pas ce controle; elles l'etendent a des exercices supplementaires.
+
 ## Résumé
 
 - Erreurs : 0
@@ -28,4 +31,3 @@ Date de validation : 21/12/2025 21:09:04
 - [x] Compte de Résultat : Marge brute ≈ 38%
 - [x] Simulation recrutement : Trésorerie suffisante
 - [x] Tous les ratios dans les normes
-

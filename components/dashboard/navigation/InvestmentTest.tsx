@@ -2,7 +2,7 @@
 // Role: propose une variante "test" premium de la section Investissement avec les KPI réels de l'analyse.
 "use client";
 
-import { type MouseEvent, type ReactNode, useMemo, useState } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowRight,
@@ -14,17 +14,19 @@ import {
   Truck,
   Users
 } from "lucide-react";
-import { formatNumber, formatPercent } from "@/components/dashboard/formatting";
+import { formatPercent } from "@/components/dashboard/formatting";
+import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
-import { buildBfrVariationSeries } from "@/lib/dashboard/investment/investmentViewModel";
+import { buildKpiTrend, buildSignedTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis } from "@/types/analysis";
 
 type InvestmentTestProps = {
   kpis: CalculatedKpis;
+  previousKpis?: CalculatedKpis | null;
 };
 
-export function InvestmentTest({ kpis }: InvestmentTestProps) {
+export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProps) {
   // Compteurs animés pour conserver le rendu "data-react" de la maquette source.
   const animatedBfr = useAnimatedNumber(kpis.bfr, { durationMs: 1400 });
   const animatedRatioImmo = useAnimatedNumber(kpis.ratio_immo, { durationMs: 1200 });
@@ -33,26 +35,114 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
   const animatedDio = useAnimatedNumber(kpis.rot_stocks, { durationMs: 1200 });
   const animatedDpo = useAnimatedNumber(kpis.dpo, { durationMs: 1200 });
 
-  // Série mensuelle simulée BFR pour dériver une variation visuelle lisible.
-  const bfrSeries = useMemo(() => buildBfrVariationSeries(kpis.bfr), [kpis.bfr]);
-  const firstBfr = bfrSeries[0]?.value ?? 0;
-  const lastBfr = bfrSeries[bfrSeries.length - 1]?.value ?? 0;
-  const variationPercent = firstBfr !== 0 ? ((lastBfr - firstBfr) / Math.abs(firstBfr)) * 100 : 0;
+  const bfrYearlyVariation = useMemo(
+    () => computeYearlyChangePercent(kpis.bfr, previousKpis?.bfr ?? null),
+    [kpis.bfr, previousKpis?.bfr]
+  );
+
+  const bfrTrend = useMemo(
+    () => buildKpiTrend(kpis.bfr, previousKpis?.bfr ?? null),
+    [kpis.bfr, previousKpis?.bfr]
+  );
+  const bfrVariationTrend = useMemo(
+    () => buildSignedTrend(bfrYearlyVariation),
+    [bfrYearlyVariation]
+  );
+  const ratioImmoTrend = useMemo(
+    () => buildKpiTrend(kpis.ratio_immo, previousKpis?.ratio_immo ?? null),
+    [kpis.ratio_immo, previousKpis?.ratio_immo]
+  );
+  const rotBfrTrend = useMemo(
+    () => buildKpiTrend(kpis.rot_bfr, previousKpis?.rot_bfr ?? null),
+    [kpis.rot_bfr, previousKpis?.rot_bfr]
+  );
+  const dsoTrend = useMemo(
+    () => buildKpiTrend(kpis.dso, previousKpis?.dso ?? null),
+    [kpis.dso, previousKpis?.dso]
+  );
+  const dioTrend = useMemo(
+    () => buildKpiTrend(kpis.rot_stocks, previousKpis?.rot_stocks ?? null),
+    [kpis.rot_stocks, previousKpis?.rot_stocks]
+  );
+  const dpoTrend = useMemo(
+    () => buildKpiTrend(kpis.dpo, previousKpis?.dpo ?? null),
+    [kpis.dpo, previousKpis?.dpo]
+  );
+  const chartViewportRef = useRef<HTMLDivElement | null>(null);
+  const [chartViewportSize, setChartViewportSize] = useState({ width: 1000, height: 260 });
+
+  useEffect(() => {
+    const node = chartViewportRef.current;
+    if (!node || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const syncSize = (width: number, height: number) => {
+      const nextWidth = Math.max(Math.round(width), 320);
+      const nextHeight = Math.max(Math.round(height), 220);
+      setChartViewportSize((current) => {
+        if (current.width === nextWidth && current.height === nextHeight) {
+          return current;
+        }
+        return { width: nextWidth, height: nextHeight };
+      });
+    };
+
+    syncSize(node.clientWidth, node.clientHeight);
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+      syncSize(entry.contentRect.width, entry.contentRect.height);
+    });
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, []);
 
   // Répartition visuelle des segments du cycle d'exploitation (emplois vs ressources).
   const dsoDays = Math.max(kpis.dso ?? 0, 0);
   const dioDays = Math.max(kpis.rot_stocks ?? 0, 0);
   const dpoDays = Math.max(kpis.dpo ?? 0, 0);
   const emploisDays = dsoDays + dioDays;
-  const cycleMax = Math.max(emploisDays, dpoDays, 1);
   const bfrGapDays = kpis.rot_bfr ?? Math.max(emploisDays - dpoDays, 0);
-  const chartScale = 880 / Math.max(emploisDays + 8, dpoDays + Math.max(bfrGapDays, 0) + 8, 1);
-  const stocksRectWidth = Math.max(dioDays * chartScale, 60);
-  const clientsRectX = stocksRectWidth + 5;
-  const clientsRectWidth = Math.max(dsoDays * chartScale, 120);
-  const fournisseursRectWidth = Math.max(dpoDays * chartScale, 140);
-  const bfrRectX = fournisseursRectWidth + 5;
-  const bfrRectWidth = Math.max(Math.max(bfrGapDays, 0) * chartScale, 70);
+  const chartCanvasWidth = chartViewportSize.width;
+  const chartCanvasHeight = chartViewportSize.height;
+  const chartSidePadding = Math.max(Math.round(chartCanvasWidth * 0.025), 24);
+  const chartInnerMaxWidth = Math.max(chartCanvasWidth - chartSidePadding * 2, 1);
+  const chartScale =
+    (chartInnerMaxWidth - 8) / Math.max(emploisDays + 8, dpoDays + Math.max(bfrGapDays, 0) + 8, 1);
+
+  const chartStartX = chartSidePadding;
+  const topGap = 8;
+  const rawStocksRectWidth = Math.max(dioDays * chartScale, 60);
+  const rawClientsRectWidth = Math.max(dsoDays * chartScale, 120);
+  const topTotalWidth = rawStocksRectWidth + topGap + rawClientsRectWidth;
+  const topCompressRatio = topTotalWidth > chartInnerMaxWidth ? chartInnerMaxWidth / topTotalWidth : 1;
+  const stocksRectWidth = rawStocksRectWidth * topCompressRatio;
+  const clientsRectWidth = rawClientsRectWidth * topCompressRatio;
+  const clientsRectX = chartStartX + stocksRectWidth + topGap;
+  const fournisseursRectX = chartStartX;
+  const fournisseursRectWidth = Math.min(Math.max(dpoDays * chartScale, 140), chartInnerMaxWidth);
+  const bfrRectWidth = Math.min(Math.max(Math.max(bfrGapDays, 0) * chartScale, 70), chartInnerMaxWidth);
+  const bfrVisualX = chartStartX + Math.max((chartInnerMaxWidth - bfrRectWidth) / 2, 0);
+
+  const chartTopY = Math.round(chartCanvasHeight * 0.09);
+  const chartMiddleY = Math.round(chartCanvasHeight * 0.41);
+  const chartBottomY = Math.round(chartCanvasHeight * 0.72);
+  const topBarHeight = Math.round(chartCanvasHeight * 0.16);
+  const middleBarHeight = topBarHeight;
+  const bottomBarHeight = Math.round(chartCanvasHeight * 0.18);
+  const labelOffsetY = Math.max(4, Math.round(chartCanvasHeight * 0.02));
+  const topLabelY = chartTopY + topBarHeight / 2 + labelOffsetY;
+  const middleLabelY = chartMiddleY + middleBarHeight / 2 + labelOffsetY;
+  const bottomLabelY = chartBottomY + bottomBarHeight / 2 + labelOffsetY;
+  const topDividerY = Math.round(chartCanvasHeight * 0.34);
+  const bottomDividerY = Math.round(chartCanvasHeight * 0.66);
+  const gridStep = chartInnerMaxWidth / 4;
+  const verticalGridLines = [0, 1, 2, 3, 4].map((index) => chartStartX + index * gridStep);
+  const labelFontSize = chartCanvasWidth < 700 ? 9 : 10;
 
   // Mouse glow local: limité à cette section test pour éviter les effets de bord.
   const [mouseGlow, setMouseGlow] = useState({ x: 0, y: 0, visible: false });
@@ -106,20 +196,21 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
             </div>
           </div>
           <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-            Clients & fournisseurs
+            Investissement & BFR
           </h2>
+          <p className="text-sm text-quantis-muted">Cycle clients-fournisseurs et usure des immobilisations</p>
         </div>
 
         <div className="mt-3 flex flex-col items-end gap-2 md:mt-0">
           <div className="flex items-center gap-2">
             <Layers className="h-3 w-3 text-white/30" />
             <span className="text-[11px] font-mono uppercase text-white/40">
-              Ratios d&apos;investissement & BFR
+              Pilotage du cycle d&apos;exploitation
             </span>
           </div>
           <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">Live sync</span>
+            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">Comparatif N vs N-1</span>
           </div>
         </div>
       </header>
@@ -129,51 +220,62 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
           delayMs={100}
           searchId="analysis-invest-bfr"
           className="md:col-span-4"
-          title="Cash immobilisé"
+          title="BFR net à financer"
           tag="Besoin en fonds de roulement"
           value={kpis.bfr === null ? "N/D" : formatCompactCurrency(animatedBfr)}
-          statusLabel={kpis.bfr === null ? "Donnée indisponible" : "Niveau maîtrisé"}
+          statusLabel={
+            kpis.bfr === null
+              ? "Donnée indisponible"
+              : kpis.bfr <= 0
+                ? "Cycle auto-financé"
+                : "Besoin à financer"
+          }
           code="BFR_NET_01"
+          trend={bfrTrend}
           icon={<Lock className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Argent bloqué dans le cycle d'exploitation (stocks + délais clients - délais fournisseurs)."
+          helper="Montant immobilisé dans le cycle (stocks + créances - fournisseurs)."
         />
 
         <InvestmentMetricCard
           delayMs={150}
           searchId="analysis-invest-variation-bfr"
           className="md:col-span-4"
-          title="Tension de trésorerie"
-          tag="Variation du BFR %"
-          value={kpis.bfr === null ? "N/D" : formatPercent(variationPercent)}
+          title="Variation annuelle"
+          tag="Évolution du BFR (N vs N-1)"
+          value={formatSignedPercent(bfrYearlyVariation)}
           statusLabel={
-            kpis.bfr === null
+            bfrYearlyVariation === null
               ? "Donnée indisponible"
-              : variationPercent <= 0
+              : bfrYearlyVariation <= 0
                 ? "Baisse du besoin"
                 : "Hausse du besoin"
           }
           code="VAR_BFR_YTD"
+          trend={bfrVariationTrend}
           icon={<Activity className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Évolution du besoin de financement du cycle sur l'exercice."
+          helper="Variation du besoin de financement entre l'exercice courant et le précédent."
         />
 
         <InvestmentMetricCard
           delayMs={200}
           searchId="analysis-invest-ratio-immo"
           className="md:col-span-4"
-          title="Couverture invest."
-          tag="Ratio actif / immo nettes"
-          value={kpis.ratio_immo === null ? "N/D" : `${formatNumber(animatedRatioImmo, 2)}x`}
+          title="État des immobilisations"
+          tag="Immobilisations nettes / brutes"
+          value={kpis.ratio_immo === null ? "N/D" : formatPercent(animatedRatioImmo)}
           statusLabel={
             kpis.ratio_immo === null
               ? "Donnée indisponible"
-              : kpis.ratio_immo >= 1
-                ? "Sécurisé (> 1.0)"
-                : "Sous seuil"
+              : kpis.ratio_immo >= 0.7
+                ? "Usure maîtrisée"
+                : kpis.ratio_immo >= 0.4
+                  ? "À surveiller"
+                  : "Usure élevée"
           }
           code="CAPEX_RATIO"
+          trend={ratioImmoTrend}
           icon={<Building2 className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Mesure si les investissements longs sont couverts par des ressources stables."
+          helper="Part des immobilisations encore non amortie (net / brut)."
         />
 
         <article
@@ -184,7 +286,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
           {/* Bloc central: lecture détaillée de la rotation BFR et des trois composantes de délai. */}
           <div className="card-header mb-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-white">Vitesse du cycle d&apos;exploitation</h3>
+              <h3 className="text-sm font-semibold text-white">Pilotage du cycle d&apos;exploitation</h3>
               <div className="mt-2 flex items-center gap-2">
                 <span className="tech-tag text-[10px] font-mono uppercase text-white/60">
                   Ratio de rotation du BFR (jours)
@@ -192,15 +294,19 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
                 <span className="text-[10px] font-mono text-white/35">CYCLE_SPEED</span>
               </div>
             </div>
-            <p className="tnum text-4xl font-semibold tracking-tight text-white">
-              {kpis.rot_bfr === null ? "N/D" : `${Math.round(animatedRotBfr)} jours`}
-            </p>
+            <div className="flex flex-col items-end gap-2">
+              <p className="tnum text-4xl font-semibold tracking-tight text-white">
+                {kpis.rot_bfr === null ? "N/D" : `${Math.round(animatedRotBfr)} jours`}
+              </p>
+              <KpiTrendPill trend={rotBfrTrend} compact />
+            </div>
           </div>
 
           <div className="mb-8 grid grid-cols-1 gap-5 md:grid-cols-3">
             <DelayCard
               title="Délai clients (DSO)"
               value={kpis.dso === null ? "N/D" : `${Math.round(animatedDso)} j`}
+              trend={dsoTrend}
               icon={<Users className="h-4 w-4 text-amber-400/70" />}
               hint="Temps moyen d'encaissement des factures clients."
               badgeLabel="↘ À réduire"
@@ -209,6 +315,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
             <DelayCard
               title="Délai stocks (DIO)"
               value={kpis.rot_stocks === null ? "N/D" : `${Math.round(animatedDio)} j`}
+              trend={dioTrend}
               icon={<Package className="h-4 w-4 text-amber-400/70" />}
               hint="Temps moyen d'écoulement du stock."
               badgeLabel="↘ À réduire"
@@ -217,6 +324,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
             <DelayCard
               title="Délai fournisseurs (DPO)"
               value={kpis.dpo === null ? "N/D" : `${Math.round(animatedDpo)} j`}
+              trend={dpoTrend}
               icon={<Truck className="h-4 w-4 text-emerald-400/70" />}
               hint="Délai moyen accordé par les fournisseurs."
               badgeLabel="↗ À allonger"
@@ -225,51 +333,81 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
           </div>
 
           {/* Modélisation alignée sur la maquette HTML d'origine (bars SVG emplois/ressources + écart BFR). */}
-          <div className="w-full rounded-xl border border-white/5 bg-quantis-base p-6 transition-colors group-hover:border-quantis-gold/10">
-            <h4 className="mb-6 text-center text-[11px] font-semibold uppercase tracking-widest text-white/60 transition-colors group-hover:text-white/80">
+          <div className="w-full rounded-xl border border-white/5 bg-quantis-base p-5 transition-colors group-hover:border-quantis-gold/10 md:p-6">
+            <h4 className="mb-4 text-center text-[11px] font-semibold uppercase tracking-widest text-white/60 transition-colors group-hover:text-white/80 md:mb-5">
               Modélisation de l&apos;équilibre du BFR
             </h4>
 
-            <svg className="h-24 w-full" viewBox="0 0 1000 100" preserveAspectRatio="none">
-              <line x1="0" y1="0" x2="0" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
-              <line x1="250" y1="0" x2="250" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
-              <line x1="500" y1="0" x2="500" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
-              <line x1="750" y1="0" x2="750" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
-              <line x1="1000" y1="0" x2="1000" y2="100" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" strokeDasharray="4 4" />
+            <div
+              ref={chartViewportRef}
+              className="h-[220px] min-h-[180px] md:min-h-[220px] lg:h-[260px] lg:min-h-[260px]"
+            >
+              <svg className="block h-full w-full" viewBox={`0 0 ${chartCanvasWidth} ${chartCanvasHeight}`}>
+                {verticalGridLines.map((x) => (
+                  <line
+                    key={`grid-${x}`}
+                    x1={x}
+                    y1={0}
+                    x2={x}
+                    y2={chartCanvasHeight}
+                    stroke="rgba(255, 255, 255, 0.05)"
+                    strokeWidth="1"
+                    strokeDasharray="4 4"
+                  />
+                ))}
 
-              <g className="bar-segment">
-                <rect x="0" y="10" width={stocksRectWidth} height="24" fill="rgba(245, 158, 11, 0.15)" stroke="#F59E0B" strokeWidth="1" rx="2" />
-                <text x={stocksRectWidth / 2} y="26" fill="#FDBA74" fontSize="10" fontWeight="600" fontFamily="Inter" textAnchor="middle">
-                  STOCKS ({kpis.rot_stocks === null ? "N/D" : `${Math.round(animatedDio)}j`})
-                </text>
-              </g>
-              <g className="bar-segment">
-                <rect x={clientsRectX} y="10" width={clientsRectWidth} height="24" fill="rgba(245, 158, 11, 0.15)" stroke="#F59E0B" strokeWidth="1" rx="2" />
-                <text x={clientsRectX + clientsRectWidth / 2} y="26" fill="#FDBA74" fontSize="10" fontWeight="600" fontFamily="Inter" textAnchor="middle">
-                  CLIENTS ({kpis.dso === null ? "N/D" : `${Math.round(animatedDso)}j`})
-                </text>
-              </g>
+                <line
+                  x1={chartStartX}
+                  y1={topDividerY}
+                  x2={chartStartX + chartInnerMaxWidth}
+                  y2={topDividerY}
+                  stroke="rgba(255,255,255,0.04)"
+                  strokeWidth="1"
+                />
+                <line
+                  x1={chartStartX}
+                  y1={bottomDividerY}
+                  x2={chartStartX + chartInnerMaxWidth}
+                  y2={bottomDividerY}
+                  stroke="rgba(255,255,255,0.04)"
+                  strokeWidth="1"
+                />
 
-              <g className="bar-segment">
-                <rect x="0" y="50" width={fournisseursRectWidth} height="24" fill="rgba(16, 185, 129, 0.15)" stroke="#10B981" strokeWidth="1" rx="2" />
-                <text x={fournisseursRectWidth / 2} y="66" fill="#6EE7B7" fontSize="10" fontWeight="600" fontFamily="Inter" textAnchor="middle">
-                  FOURNISSEURS ({kpis.dpo === null ? "N/D" : `${Math.round(animatedDpo)}j`})
-                </text>
-              </g>
-              <g className="bar-segment">
-                <rect x={bfrRectX} y="50" width={bfrRectWidth} height="24" fill="rgba(239, 68, 68, 0.15)" stroke="#EF4444" strokeWidth="1" strokeDasharray="4 4" rx="2" />
-                <text x={bfrRectX + bfrRectWidth / 2} y="66" fill="#FCA5A5" fontSize="10" fontWeight="700" fontFamily="Inter" textAnchor="middle">
-                  BFR: {kpis.rot_bfr === null ? "N/D" : `${Math.round(animatedRotBfr)}j`}
-                </text>
-              </g>
-            </svg>
+                <g className="bar-segment">
+                  <rect x={chartStartX} y={chartTopY} width={stocksRectWidth} height={topBarHeight} fill="rgba(245, 158, 11, 0.15)" stroke="#F59E0B" strokeWidth="1" rx="2" />
+                  <text x={chartStartX + stocksRectWidth / 2} y={topLabelY} fill="#FDBA74" fontSize={labelFontSize} fontWeight="600" fontFamily="Inter" textAnchor="middle">
+                    STOCKS ({kpis.rot_stocks === null ? "N/D" : `${Math.round(animatedDio)}j`})
+                  </text>
+                </g>
+                <g className="bar-segment">
+                  <rect x={clientsRectX} y={chartTopY} width={clientsRectWidth} height={topBarHeight} fill="rgba(245, 158, 11, 0.15)" stroke="#F59E0B" strokeWidth="1" rx="2" />
+                  <text x={clientsRectX + clientsRectWidth / 2} y={topLabelY} fill="#FDBA74" fontSize={labelFontSize} fontWeight="600" fontFamily="Inter" textAnchor="middle">
+                    CLIENTS ({kpis.dso === null ? "N/D" : `${Math.round(animatedDso)}j`})
+                  </text>
+                </g>
+
+                <g className="bar-segment">
+                  <rect x={fournisseursRectX} y={chartMiddleY} width={fournisseursRectWidth} height={middleBarHeight} fill="rgba(16, 185, 129, 0.15)" stroke="#10B981" strokeWidth="1" rx="2" />
+                  <text x={fournisseursRectX + fournisseursRectWidth / 2} y={middleLabelY} fill="#6EE7B7" fontSize={labelFontSize} fontWeight="600" fontFamily="Inter" textAnchor="middle">
+                    FOURNISSEURS ({kpis.dpo === null ? "N/D" : `${Math.round(animatedDpo)}j`})
+                  </text>
+                </g>
+
+                <g className="bar-segment">
+                  <rect x={bfrVisualX} y={chartBottomY} width={bfrRectWidth} height={bottomBarHeight} fill="rgba(239, 68, 68, 0.15)" stroke="#EF4444" strokeWidth="1" strokeDasharray="4 4" rx="2" />
+                  <text x={bfrVisualX + bfrRectWidth / 2} y={bottomLabelY} fill="#FCA5A5" fontSize={labelFontSize} fontWeight="700" fontFamily="Inter" textAnchor="middle">
+                    BFR: {kpis.rot_bfr === null ? "N/D" : `${Math.round(animatedRotBfr)}j`}
+                  </text>
+                </g>
+              </svg>
+            </div>
           </div>
 
           <p className="edu-text mt-8 text-[13px]">
             <strong className="text-white/60 transition-colors group-hover:text-quantis-gold">Lecture stratégique :</strong>{" "}
-            Le BFR est l&apos;argent immobilisé au quotidien. L&apos;objectif est de réduire les blocs oranges
-            (encaisser plus vite, stocker moins) et d&apos;allonger le bloc vert (payer plus tard) afin de réduire le
-            &quot;trou&quot; rouge que vous devez financer.
+            Le BFR représente le cash mobilisé au quotidien. L&apos;objectif est de réduire les blocs oranges
+            (encaisser plus vite, stocker moins) et d&apos;allonger le bloc vert (payer plus tard) afin de réduire la
+            zone rouge à financer.
           </p>
         </article>
 
@@ -289,7 +427,7 @@ export function InvestmentTest({ kpis }: InvestmentTestProps) {
                   QUANTIS_AGENT {" > "} OPTIMISATION BFR
                 </span>
                 <p className="text-[14px] font-medium agent-message">
-                  Le délai client peut être réduit via une relance automatisée segmentée.
+                  Priorité recommandée: sécuriser les encaissements clients et lisser les niveaux de stock.
                 </p>
               </div>
             </div>
@@ -312,6 +450,7 @@ type InvestmentMetricCardProps = {
   code: string;
   helper: string;
   icon: ReactNode;
+  trend: KpiTrend;
   delayMs: number;
   className?: string;
 };
@@ -325,6 +464,7 @@ function InvestmentMetricCard({
   code,
   helper,
   icon,
+  trend,
   delayMs,
   className
 }: InvestmentMetricCardProps) {
@@ -346,7 +486,10 @@ function InvestmentMetricCard({
         </div>
         <p className="tnum data-react text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
         <div className="mt-5 flex items-center justify-between">
-          <span className="text-[11px] text-white/80">{statusLabel}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-white/80">{statusLabel}</span>
+            <KpiTrendPill trend={trend} compact />
+          </div>
           <span className="text-[10px] font-mono text-white/35">{code}</span>
         </div>
       </div>
@@ -358,13 +501,14 @@ function InvestmentMetricCard({
 type DelayCardProps = {
   title: string;
   value: string;
+  trend: KpiTrend;
   hint: string;
   badgeLabel: string;
   badgeTone: "good" | "warning";
   icon: ReactNode;
 };
 
-function DelayCard({ title, value, hint, badgeLabel, badgeTone, icon }: DelayCardProps) {
+function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, icon }: DelayCardProps) {
   const badgeClass =
     badgeTone === "good"
       ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
@@ -380,6 +524,7 @@ function DelayCard({ title, value, hint, badgeLabel, badgeTone, icon }: DelayCar
         <span className="tnum text-3xl font-medium text-white">{value}</span>
         <span className={`rounded px-2 py-1 text-[9px] uppercase tracking-wide ${badgeClass}`}>{badgeLabel}</span>
       </div>
+      <KpiTrendPill trend={trend} compact className="mb-2" />
       <p className="text-[10px] italic text-white/45">{hint}</p>
     </div>
   );
@@ -389,5 +534,18 @@ function formatCompactCurrency(value: number): string {
   return `${Math.round(value).toLocaleString("fr-FR")} €`;
 }
 
+function computeYearlyChangePercent(current: number | null, previous: number | null): number | null {
+  if (current === null || previous === null || previous === 0) {
+    return null;
+  }
 
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
 
+function formatSignedPercent(value: number | null): string {
+  if (value === null || Number.isNaN(value)) {
+    return "N/D";
+  }
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${value.toFixed(1)}%`;
+}

@@ -219,6 +219,73 @@ describe("analysisStore", () => {
     expect(firestore.where).toHaveBeenCalledWith("userId", "==", "uid-1");
   });
 
+  it("applies historical KPI corrections when listing analyses", async () => {
+    const TimestampCtor = firestore.Timestamp as unknown as new (value: Date) => { toDate: () => Date };
+    const createdAt2024 = new TimestampCtor(new Date("2025-01-10T10:00:00.000Z"));
+    const createdAt2025 = new TimestampCtor(new Date("2026-01-10T10:00:00.000Z"));
+
+    vi.mocked(firestore.getDocs).mockResolvedValue({
+      docs: [
+        {
+          id: "analysis-2025",
+          ref: { id: "analysis-2025" },
+          data: () => ({
+            userId: "uid-1",
+            folderName: "Dossier principal",
+            createdAt: createdAt2025,
+            fiscalYear: 2025,
+            sourceFiles: [],
+            parsedData: [],
+            rawData: createEmptyRawAnalysisData(),
+            mappedData: {
+              ...createEmptyMappedFinancialData(),
+              total_prod_expl: 150000
+            },
+            financialFacts: {},
+            kpis: {
+              ca: 150000,
+              bfr: 15000,
+              caf: 30000
+            }
+          })
+        },
+        {
+          id: "analysis-2024",
+          ref: { id: "analysis-2024" },
+          data: () => ({
+            userId: "uid-1",
+            folderName: "Dossier principal",
+            createdAt: createdAt2024,
+            fiscalYear: 2024,
+            sourceFiles: [],
+            parsedData: [],
+            rawData: createEmptyRawAnalysisData(),
+            mappedData: {
+              ...createEmptyMappedFinancialData(),
+              total_prod_expl: 100000
+            },
+            financialFacts: {},
+            kpis: {
+              ca: 100000,
+              bfr: 10000,
+              caf: 20000
+            }
+          })
+        }
+      ]
+    } as never);
+
+    const result = await listUserAnalyses("uid-1");
+    const analysis2025 = result.find((item) => item.id === "analysis-2025");
+    const analysis2024 = result.find((item) => item.id === "analysis-2024");
+
+    expect(analysis2025?.kpis.tcam).toBe(50);
+    expect(analysis2025?.mappedData.delta_bfr).toBe(5000);
+    expect(analysis2025?.kpis.fte).toBe(25000);
+    expect(analysis2024?.mappedData.delta_bfr).toBe(0);
+    expect(analysis2024?.kpis.fte).toBe(20000);
+  });
+
   it("deletes one analysis by id when it belongs to the user", async () => {
     const TimestampCtor = firestore.Timestamp as unknown as new (value: Date) => { toDate: () => Date };
     vi.mocked(firestore.getDoc).mockResolvedValue({

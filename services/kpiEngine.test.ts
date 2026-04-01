@@ -42,17 +42,17 @@ describe("computeKpis", () => {
     expect(result.ebitda).toBe(-23865.6);
     expect(result.marge_ebitda).toBe(-4.08);
     expect(result.point_mort).toBe(669097.87);
-    expect(result.bfr).toBe(-21777.36);
+    expect(result.bfr).toBe(53836.81);
     expect(result.dso).toBe(45.62);
     expect(result.dpo).toBe(131.41);
     expect(result.caf).toBe(-43753.6);
     expect(result.tn).toBe(-125393.84);
     expect(result.roe).toBe(-1.11);
-    expect(result.roce).toBe(-0.3);
-    expect(result.effet_levier).toBe(-0.81);
+    expect(result.roce).toBe(-0.22);
+    expect(result.effet_levier).toBe(-0.89);
 
     expect(result.netProfit).toBe(-83529.6);
-    expect(result.workingCapital).toBe(-21777.36);
+    expect(result.workingCapital).toBe(53836.81);
     expect(result.monthlyBurnRate).toBe(6960.8);
     expect(result.cashRunwayMonths).toBe(9.14);
     expect(result.disponibilites).toBe(63641.59);
@@ -60,7 +60,7 @@ describe("computeKpis", () => {
     expect(result.ebe).toBe(-23865.6);
     expect(result.resultat_net).toBe(-83529.6);
     expect(result.capacite_remboursement_annees).toBeNull();
-    expect(result.etat_materiel_indice).toBe(49.1);
+    expect(result.etat_materiel_indice).toBeNull();
   });
 
   it("returns null for formulas requiring missing inputs", () => {
@@ -86,5 +86,16 @@ describe("computeKpis", () => {
 
     expect(result.caf).toBe(25000);
     expect(result.capacite_remboursement_annees).toBe(4);
+  });
+
+  it("computes immobilization ratio from explicit net and brut fields", () => {
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      total_actif_immo_net: 396266.85,
+      total_actif_immo_brut: 608223.53
+    });
+
+    expect(result.ratio_immo).toBe(0.65);
+    expect(result.etat_materiel_indice).toBe(65.15);
   });
 });

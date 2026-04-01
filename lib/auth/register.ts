@@ -105,22 +105,32 @@ export async function registerWithEmailPassword(
     };
   }
 
+  const sanitizedCredentials: RegisterCredentials = {
+    ...credentials,
+    lastName: credentials.lastName.trim(),
+    firstName: credentials.firstName.trim(),
+    email: credentials.email.trim(),
+    companyName: credentials.companyName.trim(),
+    siren: credentials.siren.trim(),
+    sector: credentials.sector.trim(),
+    usageObjectives: credentials.usageObjectives.filter((objective) =>
+      isOnboardingObjectiveValue(objective)
+    )
+  };
+
+  let user: AuthenticatedUser;
   try {
-    const sanitizedCredentials: RegisterCredentials = {
-      ...credentials,
-      lastName: credentials.lastName.trim(),
-      firstName: credentials.firstName.trim(),
-      email: credentials.email.trim(),
-      companyName: credentials.companyName.trim(),
-      siren: credentials.siren.trim(),
-      sector: credentials.sector.trim(),
-      usageObjectives: credentials.usageObjectives.filter((objective) =>
-        isOnboardingObjectiveValue(objective)
-      )
+    user = await gateway.register(sanitizedCredentials);
+  } catch (error) {
+    return {
+      success: false,
+      errors: {
+        general: mapFirebaseRegisterError(extractErrorCode(error))
+      }
     };
+  }
 
-    const user = await gateway.register(sanitizedCredentials);
-
+  try {
     await gateway.saveProfile(user.uid, {
       firstName: sanitizedCredentials.firstName,
       lastName: sanitizedCredentials.lastName,
@@ -131,19 +141,15 @@ export async function registerWithEmailPassword(
       sector: sanitizedCredentials.sector,
       usageObjectives: sanitizedCredentials.usageObjectives
     });
-
-    return {
-      success: true,
-      user
-    };
-  } catch (error) {
-    return {
-      success: false,
-      errors: {
-        general: mapFirebaseRegisterError(extractErrorCode(error))
-      }
-    };
+  } catch {
+    // Le compte Firebase existe deja a ce stade; on retourne success
+    // pour eviter le faux negatif "erreur puis email deja utilise".
   }
+
+  return {
+    success: true,
+    user
+  };
 }
 
 function hasValidationErrors(errors: RegisterValidationErrors): boolean {

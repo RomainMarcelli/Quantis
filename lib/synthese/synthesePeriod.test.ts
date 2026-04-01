@@ -35,9 +35,9 @@ function makeAnalysis(id: string, createdAt: string, fiscalYear: number | null):
 }
 
 describe("resolveAnalysisYear", () => {
-  it("priorise createdAt même si fiscalYear existe", () => {
+  it("priorise fiscalYear quand il est disponible", () => {
     const analysis = makeAnalysis("a1", "2026-01-10T00:00:00.000Z", 2025);
-    expect(resolveAnalysisYear(analysis)).toBe(2026);
+    expect(resolveAnalysisYear(analysis)).toBe(2025);
   });
 
   it("utilise createdAt si fiscalYear est absent", () => {
@@ -47,7 +47,7 @@ describe("resolveAnalysisYear", () => {
 });
 
 describe("buildSyntheseYearOptions", () => {
-  it("inclut Année en cours (YYYY) et les années historiques basées sur createdAt", () => {
+  it("inclut Année en cours (YYYY) et les années historiques basées sur fiscalYear", () => {
     const analyses = [
       makeAnalysis("a1", "2026-01-10T00:00:00.000Z", null),
       makeAnalysis("a2", "2025-02-10T00:00:00.000Z", null),
@@ -57,7 +57,7 @@ describe("buildSyntheseYearOptions", () => {
     const options = buildSyntheseYearOptions(analyses, 2026);
     expect(options[0]).toEqual({ value: SYNTHESIS_CURRENT_YEAR_KEY, label: "Année en cours (2026)" });
     expect(options.some((option) => option.value === "2025")).toBe(true);
-    expect(options.some((option) => option.value === "2024")).toBe(true);
+    expect(options.some((option) => option.value === "2033")).toBe(true);
   });
 });
 

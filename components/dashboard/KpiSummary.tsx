@@ -31,7 +31,7 @@ export function KpiSummary({ kpis }: KpiSummaryProps) {
       value: formatCurrency(kpis.monthlyBurnRate)
     },
     {
-      label: "Score de sante",
+      label: "Score de santé",
       value: formatPercent(kpis.healthScore)
     }
   ];

@@ -32,7 +32,7 @@ export async function runAnalysisPipeline(params: {
   const facts = mapMappedDataToFinancialFacts(mappedData);
 
   const candidateYears = parsedData.map((item) => item.fiscalYear).filter((year): year is number => year !== null);
-  const fiscalYear = candidateYears.length > 0 ? candidateYears[0] : null;
+  const fiscalYear = candidateYears.length > 0 ? Math.max(...candidateYears) : null;
 
   const analysisDraft: AnalysisDraft = {
     userId: params.userId,

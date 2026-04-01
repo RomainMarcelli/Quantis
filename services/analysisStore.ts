@@ -14,6 +14,7 @@ import {
   where
 } from "firebase/firestore";
 import { firestoreDb } from "@/lib/firebase";
+import { applyHistoricalKpiCorrections } from "@/services/kpiHistoryEngine";
 import type { AnalysisDraft, AnalysisRecord, MappedFinancialData } from "@/types/analysis";
 
 const COLLECTION = "analyses";
@@ -23,6 +24,8 @@ const EMPTY_MAPPED_DATA: MappedFinancialData = {
   immob_corp: null,
   immob_fin: null,
   total_actif_immo: null,
+  total_actif_immo_brut: null,
+  total_actif_immo_net: null,
   stocks_mp: null,
   stocks_march: null,
   total_stocks: null,
@@ -176,8 +179,8 @@ export async function listUserAnalyses(userId: string, fiscalYear?: number): Pro
 
   const snapshot = await getDocs(query(collectionRef, ...constraints));
   const analyses = snapshot.docs.map((docSnapshot) => toAnalysisRecord(docSnapshot.id, docSnapshot.data()));
-
-  return analyses.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const sortedByCreatedAt = analyses.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return applyHistoricalKpiCorrections(sortedByCreatedAt);
 }
 
 export async function getUserAnalysisById(
@@ -321,7 +324,7 @@ function toAnalysisRecord(id: string, data: Record<string, unknown>): AnalysisRe
           },
     mappedData:
       data.mappedData && typeof data.mappedData === "object"
-        ? (data.mappedData as AnalysisRecord["mappedData"])
+        ? { ...EMPTY_MAPPED_DATA, ...(data.mappedData as Partial<AnalysisRecord["mappedData"]>) }
         : { ...EMPTY_MAPPED_DATA },
     financialFacts:
       data.financialFacts && typeof data.financialFacts === "object"

@@ -1,5 +1,8 @@
 # Configuration CORS pour l'API Python Quantis
 
+> Statut au 2026-04-01: guide valide et inchangé côté implémentation applicative Quantis.
+> Adapter uniquement la liste `allow_origins` selon les domaines réellement déployés.
+
 ## Problème
 
 Erreur dans le navigateur :

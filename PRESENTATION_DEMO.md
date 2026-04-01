@@ -3,6 +3,21 @@
 
 ---
 
+## Mise a jour produit (2026-04-01)
+
+- Stack actuelle: Next.js 16, React 19, TypeScript, Tailwind, Firebase/Firestore, Recharts.
+- Parcours demo recommande:
+  1. Upload d'une liasse Excel/PDF.
+  2. Lecture Synthese avec tendances N vs N-1.
+  3. Onglet Creation de valeur: focus TCAM multi-annees + point mort.
+  4. Onglet Investissement: modele BFR et ratio immobilisations net/brut.
+  5. Onglet Financement: cash reel (`CAF - delta BFR`) et liquidites.
+- Le moteur historique recalcule automatiquement les KPI sensibles a l'ordre des annees (TCAM, delta BFR, cash reel).
+
+> Note: les sections historiques ci-dessous restent utiles pour la narration, mais l'etat de verite est dans `README.md` et `projet.md`.
+
+---
+
 ## 🎯 STRUCTURE DE LA PRÉSENTATION (4 min)
 
 ### **Slide 1 : Vision & Problème (30 sec)**
@@ -21,9 +36,10 @@
 ### **Slide 2 : Architecture Technique (45 sec)**
 
 #### **Stack Technologique**
-- **Frontend :** Next.js 14 + React 18 + TypeScript
+- **Frontend :** Next.js 16 + React 19 + TypeScript
 - **Styling :** Tailwind CSS (design system modulaire)
-- **IA :** OpenAI GPT-4o-mini (extraction paramètres + génération textes)
+- **Data & stockage :** Firebase (Auth + Firestore)
+- **Visualisation :** Recharts
 - **Architecture :** Full-stack monorepo avec API Routes Next.js
 
 #### **Architecture en 3 couches**
@@ -67,7 +83,7 @@
 
 ### **Slide 3 : Choix Techniques & Justifications (45 sec)**
 
-#### **1. Next.js 14 (App Router)**
+#### **1. Next.js (App Router)**
 ✅ **Pourquoi :**
 - API Routes intégrées (pas besoin de backend séparé)
 - Server Components pour performance
@@ -304,4 +320,3 @@
 ---
 
 **Bonne présentation ! 🚀**
-

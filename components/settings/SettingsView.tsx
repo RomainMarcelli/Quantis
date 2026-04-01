@@ -1,4 +1,4 @@
-﻿// File: components/settings/SettingsView.tsx
+// File: components/settings/SettingsView.tsx
 // Role: page de paramètres applicatifs (préférences métier + sécurité session) avec la DA premium de /analysis.
 "use client";
 
@@ -16,7 +16,7 @@ import {
 import { useRouter } from "next/navigation";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { useOnboarding } from "@/hooks/useOnboarding";
+import { useProductTour } from "@/hooks/useProductTour";
 import { useTheme } from "@/hooks/useTheme";
 import {
   type ExportFormat,
@@ -31,7 +31,7 @@ type ToastState = { type: "success" | "error" | "info"; message: string } | null
 export function SettingsView() {
   const router = useRouter();
   const { isDark, setTheme } = useTheme();
-  const { restartTour } = useOnboarding();
+  const { restartTour } = useProductTour();
   const [preferences, setPreferences] = useState<AppPreferences>(() => loadAppPreferences());
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
@@ -100,7 +100,7 @@ export function SettingsView() {
           className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour à l'analyse
+          Retour à l&apos;analyse
         </button>
       </header>
 
@@ -129,11 +129,11 @@ export function SettingsView() {
               className="w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-quantis-gold/60"
               placeholder="Ex: 2026"
             />
-            <p className="text-xs text-white/45">Préselectionne l'année dans les futurs écrans de filtre.</p>
+            <p className="text-xs text-white/45">Préselectionne l&apos;année dans les futurs écrans de filtre.</p>
           </label>
 
           <label className="space-y-1.5">
-            <span className="text-xs uppercase tracking-wide text-white/60">Format d'export préféré</span>
+            <span className="text-xs uppercase tracking-wide text-white/60">Format d&apos;export préféré</span>
             <select
               value={preferences.preferredExportFormat}
               onChange={(event) => updatePreference("preferredExportFormat", event.target.value as ExportFormat)}
@@ -178,7 +178,7 @@ export function SettingsView() {
         <div className="rounded-xl border border-white/10 bg-black/20 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-white/90">Thème d'affichage</p>
+              <p className="text-sm font-medium text-white/90">Thème d&apos;affichage</p>
               <p className="mt-1 text-xs text-white/50">
                 Basculer entre mode sombre et mode clair. Le choix est sauvegardé automatiquement.
               </p>
@@ -202,10 +202,10 @@ export function SettingsView() {
 
         <div className="rounded-xl border border-white/10 bg-black/20 p-4">
           <p className="text-sm text-white/80">
-            Votre session reste active jusqu'à expiration automatique de sécurité.
+            Votre session reste active jusqu&apos;à expiration automatique de sécurité.
           </p>
           <p className="mt-2 text-xs text-white/50">
-            Astuce: la suppression complète du compte reste disponible dans l'onglet Compte.
+            Astuce: la suppression complète du compte reste disponible dans l&apos;onglet Compte.
           </p>
         </div>
 

@@ -3,41 +3,53 @@
 
 ---
 
+## Mise a jour produit (2026-04-01)
+
+- Positionnement actuel: plateforme de pilotage financier multi-onglets avec pipeline Excel/PDF, stockage Firestore et dashboards de decision.
+- Stack courante: Next.js 16 (App Router), React 19, TypeScript, Firebase/Firestore, Recharts.
+- Livrables recents a mettre en avant:
+  - TCAM multi-annees calcule sur l'historique reel (annee la plus ancienne -> annee courante).
+  - Indicateurs de tendance KPI (hausse/baisse/stable) sur Synthese et sections metier.
+  - Point mort premium corrige (intersection exacte, repere aligne, tooltip lisible, plein ecran).
+  - Formules investissement/financement alignees (`BFR`, `ratio_immo`, `cash reel`).
+
+> Note: le reste du document est conserve comme trame de pitch. En cas d'ecart, se referer a `README.md` et `projet.md`.
+
+---
+
 ## 🎯 EN 30 SECONDES
 
 **Quantis = CFO adaptatif pour PME**
-- Question en langage naturel → Analyse financière complète
-- 5 types de décisions : Recrutement, Investissement, Prix, BFR, Stock
-- Stack : Next.js + TypeScript + OpenAI GPT-4o-mini
-- MVP fonctionnel avec dataset test Acme Corporation
+- Upload liasse comptable (Excel/PDF) → mapping 2033 → KPI actionnables
+- Pilotage en 4 onglets metier : Creation de valeur, Investissement, Financement, Rentabilite
+- Historique multi-annees avec TCAM, tendances KPI et cash reel
+- Stack : Next.js 16, TypeScript, Firebase/Firestore, Recharts
 
 ---
 
 ## 🏗️ ARCHITECTURE EN 1 DIAPOSITIVE
 
 ```
-[Question Utilisateur]
+[Upload documents comptables]
         ↓
-[Question Classifier] → 5 types de décision
+[Parsing + extraction]
         ↓
-[Parameter Extractor] → OpenAI GPT-4o-mini
+[Mapping financier 2033]
         ↓
-[Data Requirement Checker] → Gap Analysis
+[Calcul KPI]
         ↓
-[Financial Analyzer] → Calculs métier
+[Corrections historiques multi-annees]
         ↓
-[UI Generator] → Composants React dynamiques
-        ↓
-[Dashboard/Decision Mode] → Résultat visuel
+[Dashboards premium + graphes metier]
 ```
 
-**Stack :** Next.js 14 | TypeScript | Tailwind CSS | OpenAI API
+**Stack :** Next.js 16 | TypeScript | Tailwind CSS | Firebase/Firestore
 
 ---
 
 ## ✅ CHOIX TECHNIQUES (3 points)
 
-1. **Next.js 14** → API Routes intégrées, pas de backend séparé
+1. **Next.js (App Router)** → API Routes intégrées, pas de backend séparé
 2. **TypeScript strict** → Sécurité calculs financiers
 3. **Architecture modulaire** → Extensibilité garantie
 
@@ -45,9 +57,9 @@
 
 ## 🔥 DIFFICULTÉS & SOLUTIONS (3 points)
 
-1. **Extraction PDF/Excel** → Dataset test généré, architecture prête pour OCR
-2. **Classification questions** → Scoring mots-clés + fallback OpenAI
-3. **Gap Analysis** → Formulaire dynamique conversationnel
+1. **Donnees heterogenes Excel** → Mapping renforce + fallback par labels/codes.
+2. **Historique non ordonne** → Tri fiscal robuste + recalcul TCAM multi-annees.
+3. **Lisibilite decisionnelle** → Refonte point mort/BFR (alignment, tooltip, plein ecran, zones visuelles).
 
 ---
 
@@ -55,38 +67,37 @@
 
 | Métrique | Objectif |
 |----------|----------|
-| Taux classification | > 85% |
-| Temps réponse | < 3s |
-| Couverture types | 5/5 |
-| Précision calculs | 100% |
+| Cohérence TCAM multi-années | 100% |
+| Cohérence BFR / cash réel | 100% |
+| Alignement visuel point mort | 100% |
+| Stabilité rendu dashboard | Fluide en desktop et mobile |
 
 ---
 
 ## 🚀 NEXT STEPS (3 priorités)
 
-1. **Extraction PDF/Excel** (OCR + Parser)
-2. **Auth & Multi-tenant** (NextAuth + PostgreSQL)
-3. **Benchmarking sectoriel** (agrégation anonymisée)
+1. **Parser PDF semantique** (cas multi-pages complexes)
+2. **Optimisations perf front** (reduire rerenders et animations couteuses)
+3. **Wording global** (passage exhaustif de tous les libelles)
 
 ---
 
 ## 💬 PHRASES CLÉS POUR LA PRÉSENTATION
 
 - *"Nous transformons la comptabilité en intelligence stratégique"*
-- *"Architecture modulaire = MVP solide + évolutivité garantie"*
-- *"5 types de décision opérationnels, extraction PDF à venir"*
-- *"KPIs mesurables = MVP objectivement évaluable"*
+- *"Les formules financières sont centralisées et testables, pas dupliquées dans l'UI."*
+- *"Le multi-années est robuste: l'ordre d'import des exercices n'impacte plus les KPI."*
+- *"Le point mort est lisible en quelques secondes et mathématiquement cohérent."*
 
 ---
 
 ## 🎬 DÉMO RECOMMANDÉE (30 sec)
 
-1. Question : *"Est-ce que je peux recruter un directeur commercial à 60k€ ?"*
-2. Flux : Classification → Extraction → Analyse → Résultat
-3. Résultat : KPIs + Graphiques + Projections trésorerie
-4. Valeur : Décision éclairée en 3 secondes
+1. Importer une liasse puis ouvrir `Synthese` (KPI + tendances N vs N-1).
+2. Aller dans `Creation de valeur` et montrer le point mort (date, zones, intersection).
+3. Montrer `Investissement` (BFR, ratio immo net/brut) puis `Financement` (cash reel).
+4. Changer l'exercice et visualiser la mise a jour TCAM/tendances.
 
 ---
 
 **Format : 4 minutes = 30s vision + 1min tech + 1min difficultés + 1min KPIs + 30s next steps**
-

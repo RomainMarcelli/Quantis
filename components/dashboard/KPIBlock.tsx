@@ -28,7 +28,7 @@ export function KPIBlock({
   format,
   icon,
   trendValue,
-  trendLabel = "vs periode precedente",
+  trendLabel = "vs période précédente",
   sideLabel,
   searchId
 }: KPIBlockProps) {
@@ -70,7 +70,7 @@ export function KPIBlock({
       </div>
 
       <p className="edu-text">
-        {title} constitue un indicateur prioritaire de pilotage. La dynamique est mise a jour apres chaque analyse.
+        {title} constitue un indicateur prioritaire de pilotage. La dynamique est mise à jour après chaque analyse.
       </p>
     </article>
   );

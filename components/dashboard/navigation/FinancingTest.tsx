@@ -12,6 +12,7 @@ import {
   Waves
 } from "lucide-react";
 import { formatNumber } from "@/components/dashboard/formatting";
+import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
   buildLiquidityIndicators,
@@ -20,14 +21,16 @@ import {
   severityClass,
   type FinancingSeverity
 } from "@/lib/dashboard/financement/financingViewModel";
+import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis } from "@/types/analysis";
 
 type FinancingTestProps = {
   kpis: CalculatedKpis;
+  previousKpis?: CalculatedKpis | null;
 };
 
-export function FinancingTest({ kpis }: FinancingTestProps) {
+export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps) {
   // Les compteurs sont animés côté React pour reproduire l'effet du design HTML source.
   const animatedDebtCapacity = useAnimatedNumber(kpis.capacite_remboursement_annees, { durationMs: 1200 });
   const animatedCaf = useAnimatedNumber(kpis.caf, { durationMs: 1350 });
@@ -51,6 +54,34 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
         liquiditeImmediate: kpis.liq_imm
       }),
     [kpis.liq_gen, kpis.liq_red, kpis.liq_imm]
+  );
+  const debtCapacityTrend = useMemo(
+    () =>
+      buildKpiTrend(
+        kpis.capacite_remboursement_annees,
+        previousKpis?.capacite_remboursement_annees ?? null
+      ),
+    [kpis.capacite_remboursement_annees, previousKpis?.capacite_remboursement_annees]
+  );
+  const cafTrend = useMemo(
+    () => buildKpiTrend(kpis.caf, previousKpis?.caf ?? null),
+    [kpis.caf, previousKpis?.caf]
+  );
+  const fteTrend = useMemo(
+    () => buildKpiTrend(kpis.fte, previousKpis?.fte ?? null),
+    [kpis.fte, previousKpis?.fte]
+  );
+  const leverageTrend = useMemo(
+    () => buildKpiTrend(kpis.effet_levier, previousKpis?.effet_levier ?? null),
+    [kpis.effet_levier, previousKpis?.effet_levier]
+  );
+  const liquidityTrends = useMemo(
+    () => [
+      buildKpiTrend(kpis.liq_gen, previousKpis?.liq_gen ?? null),
+      buildKpiTrend(kpis.liq_red, previousKpis?.liq_red ?? null),
+      buildKpiTrend(kpis.liq_imm, previousKpis?.liq_imm ?? null)
+    ],
+    [kpis.liq_gen, kpis.liq_red, kpis.liq_imm, previousKpis?.liq_gen, previousKpis?.liq_red, previousKpis?.liq_imm]
   );
 
   // Le "score crédit" du badge reste une lecture UI de synthèse, sans recalcul KPI métier.
@@ -121,15 +152,15 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
             </div>
           </div>
           <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-            Banque & financement
+            Financement & solvabilité
           </h2>
-          <p className="text-sm text-quantis-muted">Structure financière, solvabilité et ratios d&apos;emprunt</p>
+          <p className="text-sm text-quantis-muted">Capacité d&apos;emprunt, génération de cash et liquidité court terme</p>
         </div>
 
         <div className="mt-3 flex flex-col items-end gap-2 md:mt-0">
           <div className="flex items-center gap-2">
             <Scale className="h-3 w-3 text-white/30" />
-            <span className="text-[11px] font-mono uppercase text-white/40">Analyse de solvabilité</span>
+            <span className="text-[11px] font-mono uppercase text-white/40">Analyse bilancielle</span>
           </div>
           <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
@@ -145,9 +176,10 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
           delayMs={100}
           searchId="analysis-fin-capacite-remboursement"
           className="md:col-span-4"
-          title="Poids de la dette"
-          tag="Capacité de remboursement"
+          title="Capacité de remboursement"
+          tag="Dette nette / CAF (années)"
           value={kpis.capacite_remboursement_annees === null ? "N/D" : `${animatedDebtCapacity.toFixed(1)} ans`}
+          trend={debtCapacityTrend}
           icon={<ShieldCheck className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper={debtInterpretation.helper}
           statusLabel={debtInterpretation.label}
@@ -159,13 +191,14 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
           delayMs={150}
           searchId="analysis-fin-caf"
           className="md:col-span-4"
-          title="Moteur de trésorerie"
+          title="Autofinancement"
           tag="Capacité d'autofinancement (CAF)"
           value={kpis.caf === null ? "N/D" : formatCompactCurrency(animatedCaf)}
+          trend={cafTrend}
           icon={<Landmark className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Le cash théorique généré par l'activité pour investir et rembourser la dette."
-          statusLabel={kpis.caf === null ? "N/D" : "Solide"}
-          severity={kpis.caf === null ? "na" : "good"}
+          helper="Cash théorique généré par l'exploitation avant variation du BFR."
+          statusLabel={kpis.caf === null ? "N/D" : kpis.caf >= 0 ? "Création de cash" : "Cash négatif"}
+          severity={kpis.caf === null ? "na" : kpis.caf >= 0 ? "good" : "risk"}
           code="CASH_FLOW_GEN"
         />
 
@@ -173,13 +206,14 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
           delayMs={200}
           searchId="analysis-fin-fte"
           className="md:col-span-4"
-          title="Cash réel généré"
-          tag="Flux de trésorerie d'exploit."
+          title="Cash réel d'exploitation"
+          tag="CAF - variation du BFR"
           value={kpis.fte === null ? "N/D" : formatCompactCurrency(animatedFte)}
+          trend={fteTrend}
           icon={<Waves className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="La CAF corrigée de la variation du BFR : le cash réellement disponible."
-          statusLabel={kpis.fte === null ? "N/D" : "CAF - Var. BFR"}
-          severity={kpis.fte === null ? "na" : "good"}
+          helper="Trésorerie réellement dégagée après absorption du besoin en fonds de roulement."
+          statusLabel={kpis.fte === null ? "N/D" : kpis.fte >= 0 ? "Cash disponible" : "Cash consommé"}
+          severity={kpis.fte === null ? "na" : kpis.fte >= 0 ? "good" : "risk"}
           code="OCF_NET"
         />
 
@@ -198,26 +232,38 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
           </div>
 
           <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-            {liquidityIndicators.map((indicator) => (
-              <div
-                key={indicator.label}
-                className="interactive-badge rounded-xl border border-white/5 bg-white/[0.02] p-5 transition-all hover:border-quantis-gold/30 hover:bg-quantis-gold/[0.03]"
-              >
-                <span className="text-[10px] uppercase tracking-widest text-white/55">
-                  Liquidité {indicator.label}
-                </span>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="tnum text-3xl font-medium text-white">
-                    {indicator.value === null ? "N/D" : formatNumber(indicator.value, 2)}
-                    {indicator.value === null ? null : <span className="text-sm text-white/35">x</span>}
+            {liquidityIndicators.map((indicator, index) => {
+              const trend = liquidityTrends[index] ?? {
+                direction: "na",
+                changePercent: null,
+                label: "N/D",
+                tone: "neutral"
+              };
+
+              return (
+                <div
+                  key={indicator.label}
+                  className="interactive-badge rounded-xl border border-white/5 bg-white/[0.02] p-5 transition-all hover:border-quantis-gold/30 hover:bg-quantis-gold/[0.03]"
+                >
+                  <span className="text-[10px] uppercase tracking-widest text-white/55">
+                    Liquidité {indicator.label}
                   </span>
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className="tnum text-3xl font-medium text-white">
+                      {indicator.value === null ? "N/D" : formatNumber(indicator.value, 2)}
+                      {indicator.value === null ? null : <span className="text-sm text-white/35">x</span>}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-white/65">{indicator.helper}</p>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <span className={`inline-flex rounded-md border px-2 py-1 text-[11px] ${severityClass(indicator.severity)}`}>
+                      {interpretLabel(indicator.severity)}
+                    </span>
+                    <KpiTrendPill trend={trend} compact />
+                  </div>
                 </div>
-                <p className="mt-2 text-xs text-white/65">{indicator.helper}</p>
-                <span className={`mt-3 inline-flex rounded-md border px-2 py-1 text-[11px] ${severityClass(indicator.severity)}`}>
-                  {interpretLabel(indicator.severity)}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <p className="edu-text mt-4">
@@ -246,6 +292,9 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
             <p className="tnum data-react text-[2.6rem] font-semibold leading-none tracking-tight text-white">
               {kpis.effet_levier === null ? "N/D" : `${animatedLeverage.toFixed(2)}x`}
             </p>
+            <div className="mt-2">
+              <KpiTrendPill trend={leverageTrend} compact />
+            </div>
 
             <div className="mt-5 rounded-lg border border-white/5 bg-quantis-base p-3">
               <div className="mb-2 flex items-end justify-between">
@@ -277,7 +326,7 @@ export function FinancingTest({ kpis }: FinancingTestProps) {
                   QUANTIS_AGENT {" > "} MODÉLISATION DE FINANCEMENT
                 </span>
                 <p className="text-[14px] font-medium agent-message">
-                  Capacité d&apos;emprunt résiduelle estimée pour la prochaine simulation bancaire.
+                  Capacité d&apos;emprunt résiduelle estimée pour le prochain cycle de financement.
                 </p>
               </div>
             </div>
@@ -296,6 +345,7 @@ type FinancingMetricCardProps = {
   title: string;
   tag: string;
   value: string;
+  trend: KpiTrend;
   statusLabel: string;
   helper: string;
   code: string;
@@ -310,6 +360,7 @@ function FinancingMetricCard({
   title,
   tag,
   value,
+  trend,
   statusLabel,
   helper,
   code,
@@ -335,8 +386,11 @@ function FinancingMetricCard({
           </div>
         </div>
         <p className="tnum data-react text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
-        <div className="mt-5 flex items-center justify-between">
-          <span className={`rounded-md border px-2 py-1 text-[11px] ${severityClass(severity)}`}>{statusLabel}</span>
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className={`rounded-md border px-2 py-1 text-[11px] ${severityClass(severity)}`}>{statusLabel}</span>
+            <KpiTrendPill trend={trend} compact />
+          </div>
           <span className="text-[10px] font-mono text-white/35">{code}</span>
         </div>
       </div>
@@ -365,6 +419,4 @@ function formatCompactCurrency(value: number): string {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
-
-
 

@@ -6,10 +6,12 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, Circle, Eye, EyeOff, Info, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useOnboarding } from "@/hooks/useOnboarding";
+import { useProductTour } from "@/hooks/useProductTour";
 import { getPasswordRuleChecks } from "@/lib/auth/passwordPolicy";
+import { ANONYMOUS_TOUR_STEPS } from "@/lib/onboarding/productTour";
 import {
   ONBOARDING_REGISTER_COMPANY_COMPLETED_EVENT,
+  ONBOARDING_REGISTER_SWITCH_COMPLETED_EVENT,
   ONBOARDING_REGISTER_IDENTITY_COMPLETED_EVENT
 } from "@/lib/onboarding/events";
 import {
@@ -38,6 +40,7 @@ type ToastState = { type: "success" | "error" | "info"; message: string } | null
 
 const EMPTY_LOGIN_ERRORS: LoginValidationErrors = {};
 const EMPTY_REGISTER_ERRORS: RegisterValidationErrors = {};
+const ANONYMOUS_TOUR_STEP_IDS = new Set(ANONYMOUS_TOUR_STEPS.map((step) => step.id));
 
 type LoginFormProps = {
   initialMode?: AuthMode;
@@ -61,9 +64,10 @@ export function LoginForm({
   const router = useRouter();
   // Reference de la carte pour recentrer la vue en haut apres une inscription reussie.
   const cardRef = useRef<HTMLElement | null>(null);
+  const hasDispatchedRegisterSwitchStepRef = useRef(false);
   const hasDispatchedCompanyStepRef = useRef(false);
   const hasDispatchedIdentityStepRef = useRef(false);
-  const { currentStep } = useOnboarding();
+  const { currentStep, isActive: isTourActive, startTour } = useProductTour();
 
   // Etat principal du formulaire auth (connexion / inscription).
   const [mode, setMode] = useState<AuthMode>(initialMode);
@@ -126,8 +130,37 @@ export function LoginForm({
 
   useEffect(() => {
     if (mode !== "register") {
+      hasDispatchedRegisterSwitchStepRef.current = false;
+      return;
+    }
+
+    const isSwitchStepActive = currentStep?.id === "tour-register-switch";
+    const hasStartedIdentity =
+      lastName.trim().length > 0 ||
+      firstName.trim().length > 0 ||
+      email.trim().length > 0 ||
+      password.trim().length > 0;
+
+    if (!isSwitchStepActive || !hasStartedIdentity) {
+      hasDispatchedRegisterSwitchStepRef.current = false;
+      return;
+    }
+
+    if (hasDispatchedRegisterSwitchStepRef.current) {
+      return;
+    }
+
+    hasDispatchedRegisterSwitchStepRef.current = true;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(ONBOARDING_REGISTER_SWITCH_COMPLETED_EVENT));
+    }, 0);
+  }, [currentStep?.id, email, firstName, lastName, mode, password]);
+
+  useEffect(() => {
+    if (mode !== "register") {
       hasDispatchedCompanyStepRef.current = false;
       hasDispatchedIdentityStepRef.current = false;
+      hasDispatchedRegisterSwitchStepRef.current = false;
       return;
     }
 
@@ -161,11 +194,13 @@ export function LoginForm({
     }
 
     const isIdentityStepActive = currentStep?.id === "tour-register-identity";
+    const isPasswordFullyCompliant = passwordRules.every((rule) => rule.isValid);
+    const isEmailSyntacticallyValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
     const isIdentityComplete =
       lastName.trim().length > 0 &&
       firstName.trim().length > 0 &&
-      email.trim().length > 0 &&
-      password.trim().length > 0;
+      isEmailSyntacticallyValid &&
+      isPasswordFullyCompliant;
 
     if (!isIdentityStepActive || !isIdentityComplete) {
       hasDispatchedIdentityStepRef.current = false;
@@ -180,7 +215,7 @@ export function LoginForm({
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent(ONBOARDING_REGISTER_IDENTITY_COMPLETED_EVENT));
     }, 0);
-  }, [currentStep?.id, email, firstName, lastName, mode, password]);
+  }, [currentStep?.id, email, firstName, lastName, mode, passwordRules]);
 
   useEffect(() => {
     if (!toast) {
@@ -235,6 +270,9 @@ export function LoginForm({
         userId: result.user.uid,
         message: "Connexion utilisateur réussie."
       });
+      if (isTourActive && currentStep && ANONYMOUS_TOUR_STEP_IDS.has(currentStep.id)) {
+        startTour("authenticated");
+      }
       router.push(safePostLoginRedirect);
       return;
     }

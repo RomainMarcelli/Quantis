@@ -14,7 +14,7 @@
   --quantis-gold: #f0c949;
   --quantis-emerald: #2dd4bf;
   --quantis-crimson: #fb7185;
-  --quantis-premium-root-bg: #09090b;
+  --quantis-premium-root-bg: #0f1115;
   --quantis-premium-root-fg: #e4e4e7;
   --quantis-card-bg: #0f0f12;
   --quantis-card-bg-hover: #131318;
@@ -40,7 +40,7 @@
   --quantis-gold: #d4af37;
   --quantis-emerald: #0f766e;
   --quantis-crimson: #9f1239;
-  --quantis-premium-root-bg: #f2f4f8;
+  --quantis-premium-root-bg: #f4f5f7;
   --quantis-premium-root-fg: #111827;
   --quantis-card-bg: #ffffff;
   --quantis-card-bg-hover: #f8fafc;
@@ -288,7 +288,7 @@ body {
 
 /* Theme premium /analysis: surface sombre independante du reste de l'app. */
 .premium-analysis-root {
-  background-color: var(--quantis-premium-root-bg);
+  background: transparent;
   color: var(--quantis-premium-root-fg);
   -webkit-font-smoothing: antialiased;
 }
@@ -541,22 +541,24 @@ body {
 
 @keyframes quantis-tour-focus-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+    box-shadow: 0 0 12px 2px rgb(224 190 74 / 15%);
   }
-  45% {
-    box-shadow:
-      0 0 0 4px rgb(224 190 74 / 16%),
-      0 0 24px 6px rgb(224 190 74 / 22%);
+  50% {
+    box-shadow: 0 0 26px 8px rgb(224 190 74 / 34%);
   }
   100% {
-    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+    box-shadow: 0 0 12px 2px rgb(224 190 74 / 15%);
   }
 }
 
 .quantis-tour-target-active {
-  outline: 1px solid rgb(224 190 74 / 22%);
-  outline-offset: 1px;
-  animation: none;
+  position: relative;
+  z-index: 135 !important;
+}
+
+.quantis-tour-spotlight-ring {
+  box-shadow: 0 0 0 1px rgb(224 190 74 / 24%);
+  animation: quantis-tour-focus-pulse 1.9s ease-in-out infinite;
 }
 
 .edu-text {

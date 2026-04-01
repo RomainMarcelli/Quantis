@@ -2,18 +2,11 @@
 // Role: transforme les KPI d'analyse en données de synthèse lisibles (score, tendances, actions, alertes).
 import type { CalculatedKpis } from "@/types/analysis";
 import { calculateQuantisScore } from "@/lib/quantisScore";
+import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import { buildSectorBenchmark } from "@/lib/synthese/sectorBenchmark";
 
-export type TrendDirection = "up" | "down" | "flat" | "na";
-
-export type TrendInfo = {
-  direction: TrendDirection;
-  // Variation en pourcentage vs période précédente (null si non calculable).
-  changePercent: number | null;
-  // Libellé humain directement affichable dans l'UI.
-  label: string;
-  tone: "positive" | "negative" | "neutral";
-};
+export type TrendDirection = KpiTrend["direction"];
+export type TrendInfo = KpiTrend;
 
 export type SyntheseMetric = {
   id: "ca" | "ebe" | "cash";
@@ -200,58 +193,7 @@ function resolveMetricStatus(
 
 // Fonction pure de tendance: compare valeur courante et précédente avec gestion des cas limites.
 export function buildTrend(current: number | null, previous: number | null): TrendInfo {
-  if (current === null || previous === null) {
-    return {
-      direction: "na",
-      changePercent: null,
-      label: "N/D",
-      tone: "neutral"
-    };
-  }
-
-  if (previous === 0) {
-    if (current === 0) {
-      return {
-        direction: "flat",
-        changePercent: 0,
-        label: "Stable",
-        tone: "neutral"
-      };
-    }
-
-    return {
-      direction: current > 0 ? "up" : "down",
-      changePercent: null,
-      label: "Base 0",
-      tone: current > 0 ? "positive" : "negative"
-    };
-  }
-
-  const changePercent = ((current - previous) / Math.abs(previous)) * 100;
-  if (Math.abs(changePercent) < 0.1) {
-    return {
-      direction: "flat",
-      changePercent: 0,
-      label: "Stable",
-      tone: "neutral"
-    };
-  }
-
-  if (changePercent > 0) {
-    return {
-      direction: "up",
-      changePercent,
-      label: `+${Math.abs(changePercent).toFixed(1)}%`,
-      tone: "positive"
-    };
-  }
-
-  return {
-    direction: "down",
-    changePercent,
-    label: `-${Math.abs(changePercent).toFixed(1)}%`,
-    tone: "negative"
-  };
+  return buildKpiTrend(current, previous);
 }
 
 function resolveScoreLabel(score: number | null): string {

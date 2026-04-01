@@ -33,27 +33,70 @@ export function parseExcelBuffer(buffer: Buffer, fileName: string): ParsedFileDa
     fileName,
     fileType: "excel",
     extractedAt: new Date().toISOString(),
-    fiscalYear: inferFiscalYear(rows),
+    fiscalYear: inferFiscalYear(rows, fileName),
     metrics,
     previewRows: previewRows.length > 0 ? previewRows : [factsToPreviewRow(facts)],
     rawData: mergeRawDataForSheets(rawDataBySheet)
   };
 }
 
-function inferFiscalYear(rows: Record<string, unknown>[]): number | null {
-  const yearRegex = /(20\d{2})/;
+function inferFiscalYear(rows: Record<string, unknown>[], fileName: string): number | null {
+  const detectedYears = new Set<number>();
+
   for (const row of rows.slice(0, 200)) {
-    for (const value of Object.values(row)) {
-      if (typeof value !== "string") {
-        continue;
-      }
-      const match = value.match(yearRegex);
-      if (match?.[1]) {
-        return Number(match[1]);
+    const candidates: unknown[] = [...Object.keys(row), ...Object.values(row)];
+
+    for (const candidate of candidates) {
+      const year = extractYear(candidate);
+      if (year !== null) {
+        detectedYears.add(year);
       }
     }
   }
-  return null;
+
+  const fileNameYear = extractYear(fileName);
+  if (fileNameYear !== null) {
+    detectedYears.add(fileNameYear);
+  }
+
+  if (!detectedYears.size) {
+    return null;
+  }
+
+  return Math.max(...detectedYears);
+}
+
+function extractYear(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const rounded = Math.round(value);
+    if (rounded >= 2000 && rounded <= 2099) {
+      return rounded;
+    }
+    return null;
+  }
+
+  if (value instanceof Date) {
+    const year = value.getUTCFullYear();
+    return Number.isFinite(year) ? year : null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const yearMatches = value.match(/20\d{2}/g);
+  if (!yearMatches?.length) {
+    return null;
+  }
+
+  const parsedYears = yearMatches
+    .map((item) => Number(item))
+    .filter((year) => Number.isFinite(year) && year >= 2000 && year <= 2099);
+  if (!parsedYears.length) {
+    return null;
+  }
+
+  return Math.max(...parsedYears);
 }
 
 function sanitizeRow(row: Record<string, unknown>): Record<string, string | number | null> {

@@ -8,25 +8,24 @@ import {
   Award,
   BriefcaseBusiness,
   Cpu,
-  Minus,
   Scale,
-  TrendingUp
 } from "lucide-react";
 import { formatNumber } from "@/components/dashboard/formatting";
+import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
   buildRentabilitySeries,
-  buildSignTrend,
   interpretLeverage,
   leverageClass,
-  normalizePercentInput,
-  trendClass
+  normalizePercentInput
 } from "@/lib/dashboard/rentabilite/rentabilityViewModel";
+import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import type { CalculatedKpis } from "@/types/analysis";
 
 type RentabilityTestProps = {
   kpis: CalculatedKpis;
+  previousKpis?: CalculatedKpis | null;
 };
 
 type ChartPoint = {
@@ -35,10 +34,12 @@ type ChartPoint = {
   roce: number;
 };
 
-export function RentabilityTest({ kpis }: RentabilityTestProps) {
+export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestProps) {
   // KPI rentabilité normalisés en % pour afficher une lecture homogène.
   const roePercent = normalizePercentInput(kpis.roe);
   const rocePercent = normalizePercentInput(kpis.roce);
+  const previousRoePercent = normalizePercentInput(previousKpis?.roe ?? null);
+  const previousRocePercent = normalizePercentInput(previousKpis?.roce ?? null);
 
   // Séries dérivées du modèle central pour conserver la même logique de projection.
   const roeSeries = useMemo(() => buildRentabilitySeries(kpis.roe, "roe"), [kpis.roe]);
@@ -51,8 +52,18 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
   );
 
   // Les tendances servent à colorer les badges et guider un utilisateur non-financier.
-  const roeTrend = useMemo(() => buildSignTrend(kpis.roe), [kpis.roe]);
-  const roceTrend = useMemo(() => buildSignTrend(kpis.roce), [kpis.roce]);
+  const roeTrend = useMemo(
+    () => buildKpiTrend(kpis.roe, previousKpis?.roe ?? null),
+    [kpis.roe, previousKpis?.roe]
+  );
+  const roceTrend = useMemo(
+    () => buildKpiTrend(kpis.roce, previousKpis?.roce ?? null),
+    [kpis.roce, previousKpis?.roce]
+  );
+  const leverageTrend = useMemo(
+    () => buildKpiTrend(kpis.effet_levier, previousKpis?.effet_levier ?? null),
+    [kpis.effet_levier, previousKpis?.effet_levier]
+  );
   const leverageInterpretation = useMemo(
     () => interpretLeverage(kpis.effet_levier),
     [kpis.effet_levier]
@@ -69,6 +80,16 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
     }
     return round(roePercent - rocePercent, 2);
   }, [roePercent, rocePercent]);
+  const previousSpread = useMemo(() => {
+    if (previousRoePercent === null || previousRocePercent === null) {
+      return null;
+    }
+    return round(previousRoePercent - previousRocePercent, 2);
+  }, [previousRoePercent, previousRocePercent]);
+  const spreadTrend = useMemo(
+    () => buildKpiTrend(spread, previousSpread),
+    [spread, previousSpread]
+  );
 
   const leverageValue = kpis.effet_levier;
   const debtShare =
@@ -133,10 +154,10 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
             </div>
           </div>
           <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-            Profits & rentabilité
+            Rentabilité & valeur actionnariale
           </h2>
           <p className="text-sm text-quantis-muted">
-            Création de richesse, performance du capital et effet de levier.
+            Création de richesse, performance du capital et impact du levier.
           </p>
         </div>
       </header>
@@ -146,13 +167,11 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
           className="md:col-span-6"
           delayMs={100}
           searchId="analysis-rent-roe"
-          title="Gain sur mon capital"
+          title="Rentabilité actionnariale"
           tag="Return on Equity (ROE)"
           value={roePercent === null ? "N/D" : `${formatNumber(animatedRoe, 1)}%`}
+          trend={roeTrend}
           icon={<Award className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          badgeClass={trendClass(roeTrend.direction)}
-          badgeLabel={roeTrend.label}
-          badgeIcon={buildTrendIcon(roeTrend.direction)}
           helper="Rentabilité des fonds propres: mesure ce que l'actionnaire gagne pour chaque euro investi."
         />
 
@@ -160,15 +179,13 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
           className="md:col-span-6"
           delayMs={150}
           searchId="analysis-rent-roce"
-          title="Performance de l'activité"
+          title="Rentabilité opérationnelle"
           tag="Return on Capital Employed (ROCE)"
           value={rocePercent === null ? "N/D" : `${formatNumber(animatedRoce, 1)}%`}
+          trend={roceTrend}
           icon={
             <BriefcaseBusiness className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
           }
-          badgeClass={trendClass(roceTrend.direction)}
-          badgeLabel={roceTrend.label}
-          badgeIcon={buildTrendIcon(roceTrend.direction)}
           helper="Performance économique pure de l'exploitation, indépendamment du mode de financement."
         />
 
@@ -188,6 +205,7 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
             <div className="flex flex-wrap items-center gap-4 text-[10px] uppercase text-white/70">
               <LegendDot color="#ffffff" label="ROCE (activité)" />
               <LegendDot color={spreadColor} label="ROE (actionnaire)" />
+              <KpiTrendPill trend={spreadTrend} compact />
             </div>
           </div>
 
@@ -292,9 +310,12 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
               {kpis.effet_levier === null ? "N/D" : `${formatNumber(animatedLeverage, 2)}x`}
             </p>
             <div className="mt-3 flex justify-end">
-              <span className={`rounded-md border px-2 py-1 text-[11px] ${leverageClass(leverageInterpretation.status)}`}>
-                {leverageInterpretation.label}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className={`rounded-md border px-2 py-1 text-[11px] ${leverageClass(leverageInterpretation.status)}`}>
+                  {leverageInterpretation.label}
+                </span>
+                <KpiTrendPill trend={leverageTrend} compact />
+              </div>
             </div>
 
             <div className="mt-4 rounded-lg border border-white/5 bg-quantis-base p-3">
@@ -326,8 +347,8 @@ export function RentabilityTest({ kpis }: RentabilityTestProps) {
                 </span>
                 <p className="text-[14px] font-medium agent-message">
                   {spread !== null && spread < 0
-                    ? "La dette réduit la valeur actionnariale: privilégier le désendettement et la marge opérationnelle."
-                    : "Le levier est favorable: tester un scénario de croissance financée avec garde-fous sur la liquidité."}
+                    ? "Le levier dégrade la valeur actionnariale: prioriser la marge opérationnelle et le désendettement."
+                    : "Le levier reste favorable: tester une croissance financée avec des garde-fous de liquidité."}
                 </p>
               </div>
             </div>
@@ -347,9 +368,7 @@ type RentabilityMetricCardProps = {
   tag: string;
   value: string;
   helper: string;
-  badgeLabel: string;
-  badgeClass: string;
-  badgeIcon: ReactNode;
+  trend: KpiTrend;
   icon: ReactNode;
   delayMs: number;
   className?: string;
@@ -361,9 +380,7 @@ function RentabilityMetricCard({
   tag,
   value,
   helper,
-  badgeLabel,
-  badgeClass,
-  badgeIcon,
+  trend,
   icon,
   delayMs,
   className
@@ -386,28 +403,12 @@ function RentabilityMetricCard({
         </div>
         <p className="tnum data-react text-[3rem] font-semibold leading-none tracking-tight text-white">{value}</p>
         <div className="mt-5 flex items-center gap-2">
-          <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] ${badgeClass}`}>
-            {badgeIcon}
-            {badgeLabel}
-          </span>
+          <KpiTrendPill trend={trend} compact />
         </div>
       </div>
       <p className="edu-text">{helper}</p>
     </article>
   );
-}
-
-function buildTrendIcon(direction: "up" | "down" | "flat" | "na"): ReactNode {
-  if (direction === "up") {
-    return <TrendingUp className="h-3.5 w-3.5" />;
-  }
-  if (direction === "down") {
-    return <TrendingUp className="h-3.5 w-3.5 rotate-180" />;
-  }
-  if (direction === "flat") {
-    return <Minus className="h-3.5 w-3.5" />;
-  }
-  return <span className="text-[12px] leading-none">•</span>;
 }
 
 function buildComparisonSeries(roeSeries: Array<{ month: string; value: number }>, roceSeries: Array<{ month: string; value: number }>): ChartPoint[] {
@@ -490,6 +491,5 @@ function round(value: number, digits: number): number {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
-
 
 

@@ -64,13 +64,12 @@ describe("InvestmentTest", () => {
       />
     );
 
-    expect(html).toContain("Clients &amp; fournisseurs");
-    expect(html).toContain("Cash immobilisé");
-    expect(html).toContain("Tension de trésorerie");
-    expect(html).toContain("Vitesse du cycle d&#x27;exploitation");
+    expect(html).toContain("Investissement &amp; BFR");
+    expect(html).toContain("BFR net à financer");
+    expect(html).toContain("Variation annuelle");
+    expect(html).toContain("Pilotage du cycle d&#x27;exploitation");
     expect(html).toContain("Délai clients (DSO)");
     expect(html).toContain("OPTIMISATION BFR");
   });
 });
-
 

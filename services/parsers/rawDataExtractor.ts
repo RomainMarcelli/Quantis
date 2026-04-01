@@ -25,27 +25,36 @@ export function extractRawDataFromSheetRows(rows: unknown[][]): RawAnalysisData 
       continue;
     }
 
-    const amount = detectAmount(row, columnIndex.value);
-    if (amount === null) {
+    const netAmount = detectIndexedAmount(row, columnIndex.net);
+    const valueAmount = detectIndexedAmount(row, columnIndex.value);
+    const brutAmount = detectIndexedAmount(row, columnIndex.brut);
+    const amortAmount = detectIndexedAmount(row, columnIndex.amort);
+    const amount = netAmount ?? valueAmount ?? detectAmount(row, columnIndex.value);
+    const amountForRow = amount ?? brutAmount ?? amortAmount;
+
+    if (amountForRow === null) {
       continue;
     }
 
     const variableCandidate = getCellValue(row, columnIndex.variableCode);
     const variableCode = toVariableCode(variableCandidate);
     if (variableCode) {
-      rawData.byVariableCode[variableCode] = amount;
+      rawData.byVariableCode[variableCode] = amountForRow;
+      setIfNumber(rawData.byVariableCode, `${variableCode}_brut`, brutAmount);
+      setIfNumber(rawData.byVariableCode, `${variableCode}_amort`, amortAmount);
+      setIfNumber(rawData.byVariableCode, `${variableCode}_net`, netAmount ?? amount);
     }
 
     const codeCandidate = getCellValue(row, columnIndex.code);
     const lineCodes = extractLineCodes(codeCandidate);
     lineCodes.forEach((lineCode) => {
-      rawData.byLineCode[lineCode] = amount;
+      rawData.byLineCode[lineCode] = amountForRow;
     });
 
     const labelCandidate = getCellValue(row, columnIndex.label) ?? row[0];
     const label = toNormalizedLabel(labelCandidate);
     if (label) {
-      rawData.byLabel[label] = amount;
+      rawData.byLabel[label] = amountForRow;
     }
   }
 
@@ -97,12 +106,18 @@ function detectColumnIndex(headerRow: unknown[]): {
   code?: number;
   variableCode?: number;
   value?: number;
+  brut?: number;
+  amort?: number;
+  net?: number;
 } {
   const index: {
     label?: number;
     code?: number;
     variableCode?: number;
     value?: number;
+    brut?: number;
+    amort?: number;
+    net?: number;
   } = {};
 
   headerRow.forEach((cell, currentIndex) => {
@@ -120,9 +135,25 @@ function detectColumnIndex(headerRow: unknown[]): {
     if (value.includes("valeur") || value.includes("montant") || value.includes("balance")) {
       index.value = currentIndex;
     }
+    if (value.includes("brut")) {
+      index.brut = currentIndex;
+    }
+    if (value.includes("amort")) {
+      index.amort = currentIndex;
+    }
+    if (value === "net" || value.endsWith(" net")) {
+      index.net = currentIndex;
+    }
   });
 
   return index;
+}
+
+function detectIndexedAmount(row: unknown[], valueIndex?: number): number | null {
+  if (typeof valueIndex !== "number") {
+    return null;
+  }
+  return parseAmount(row[valueIndex]);
 }
 
 function detectAmount(row: unknown[], valueIndex?: number): number | null {
@@ -203,6 +234,13 @@ function parseAmount(value: unknown): number | null {
   const normalized = cleaned.replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function setIfNumber(target: Record<string, number>, key: string, value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return;
+  }
+  target[key] = value;
 }
 
 function normalizeText(value: string): string {

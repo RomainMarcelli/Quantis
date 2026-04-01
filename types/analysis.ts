@@ -28,6 +28,8 @@ export type MappedFinancialData = {
   immob_corp: number | null;
   immob_fin: number | null;
   total_actif_immo: number | null;
+  total_actif_immo_brut: number | null;
+  total_actif_immo_net: number | null;
   stocks_mp: number | null;
   stocks_march: number | null;
   total_stocks: number | null;

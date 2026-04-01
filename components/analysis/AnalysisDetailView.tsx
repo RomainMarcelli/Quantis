@@ -15,6 +15,7 @@ import {
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
+  RefreshCcw,
   Settings,
   Sparkles,
   Trash2,
@@ -52,6 +53,7 @@ import {
   renameUserFolder,
   saveAnalysisDraft
 } from "@/services/analysisStore";
+import { findPreviousAnalysisByFiscalYear } from "@/services/analysisHistory";
 import {
   createUserFolder,
   deleteUserFoldersByName,
@@ -126,7 +128,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [fileActionKey, setFileActionKey] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarPreferenceReady, setIsSidebarPreferenceReady] = useState(false);
   const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
 
   useEffect(() => {
@@ -139,8 +142,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   }, [infoMessage]);
 
   useEffect(() => {
+    setIsSidebarCollapsed(readSidebarCollapsedPreference());
+    setIsSidebarPreferenceReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isSidebarPreferenceReady) {
+      return;
+    }
     writeSidebarCollapsedPreference(isSidebarCollapsed);
-  }, [isSidebarCollapsed]);
+  }, [isSidebarCollapsed, isSidebarPreferenceReady]);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
@@ -229,6 +240,17 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   );
 
   const hasNoAnalysisForSelectedYear = allAnalyses.length > 0 && analysesFilteredByYear.length === 0;
+  const previousAnalysis = useMemo(
+    () =>
+      analysis
+        ? findPreviousAnalysisByFiscalYear({
+            analyses: allAnalyses,
+            currentAnalysis: analysis,
+            preferSameFolder: true
+          })
+        : null,
+    [allAnalyses, analysis]
+  );
 
   useEffect(() => {
     if (!pendingSearchTarget) {
@@ -461,7 +483,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
       const payload = (await response.json()) as { analysisDraft?: AnalysisDraft; error?: string; detail?: string };
       if (!response.ok || !payload.analysisDraft) {
-        throw new Error(payload.detail ?? payload.error ?? "Le traitement du fichier a echoue.");
+        throw new Error(payload.detail ?? payload.error ?? "Le traitement du fichier a échoué.");
       }
 
       const saved = await saveAnalysisDraft(payload.analysisDraft);
@@ -470,7 +492,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       setCurrentFolder(normalizeFolderName(saved.folderName));
       setKnownFolders(registerKnownFolderName(saved.folderName));
       setAnalysis(saved);
-      setInfoMessage("Fichier traite avec succes. Dashboard mis a jour.");
+      setInfoMessage("Fichier traité avec succès. Dashboard mis à jour.");
       router.replace("/analysis");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "Erreur inattendue pendant l'ajout du fichier.");
@@ -516,7 +538,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         isSameFolderName(knownFolderName, normalizedInputName)
       );
       if (alreadyExists) {
-        setErrorMessage("Un dossier avec ce nom existe deja.");
+        setErrorMessage("Un dossier avec ce nom existe déjà.");
         return;
       }
     }
@@ -528,7 +550,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
           isSameFolderName(knownFolderName, normalizedInputName)
       );
       if (alreadyExists) {
-        setErrorMessage("Un dossier avec ce nom existe deja.");
+        setErrorMessage("Un dossier avec ce nom existe déjà.");
         return;
       }
     }
@@ -567,7 +589,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
           setAnalysis(movedAnalyses[0] ?? null);
         }
 
-        setInfoMessage(`Dossier renomme: ${targetFolderName} -> ${normalizedInputName}`);
+        setInfoMessage(`Dossier renommé : ${targetFolderName} -> ${normalizedInputName}`);
       }
 
       if (folderDialogMode === "delete" && targetFolderName) {
@@ -597,16 +619,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         }
 
         if (deletedCount > 0) {
-          setInfoMessage(`Dossier supprime: ${targetFolderName} (${deletedCount} analyses).`);
+          setInfoMessage(`Dossier supprimé : ${targetFolderName} (${deletedCount} analyses).`);
         } else {
-          setInfoMessage(`Dossier vide supprime: ${targetFolderName}.`);
+          setInfoMessage(`Dossier vide supprimé : ${targetFolderName}.`);
         }
       }
 
       closeFolderDialog();
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Operation dossier impossible."
+        error instanceof Error ? error.message : "Opération dossier impossible."
       );
     } finally {
       setFolderDialogSubmitting(false);
@@ -676,7 +698,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       }
 
       if (!deletedAnalysisIds.length) {
-        setErrorMessage("Impossible de supprimer les fichiers selectionnes.");
+        setErrorMessage("Impossible de supprimer les fichiers sélectionnés.");
         return;
       }
 
@@ -706,8 +728,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       const deletedAnalysesCount = deletedAnalysisIds.length;
       setInfoMessage(
         deletedFilesCount === 1
-          ? "Fichier source supprime. Les donnees associees ont ete mises a jour."
-          : `${deletedFilesCount} fichiers supprimes (${deletedAnalysesCount} analyses). Les donnees associees ont ete mises a jour.`
+          ? "Fichier source supprimé. Les données associées ont été mises à jour."
+          : `${deletedFilesCount} fichiers supprimés (${deletedAnalysesCount} analyses). Les données associées ont été mises à jour.`
       );
       closeSourceFilesDeletionDialog();
     } catch (error) {
@@ -745,7 +767,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     });
 
     if (!filtered.length) {
-      setErrorMessage("Aucun fichier supporte detecte. Formats: .xlsx .xls .csv .pdf");
+      setErrorMessage("Aucun fichier supporté détecté. Formats : .xlsx .xls .csv .pdf");
       return;
     }
 
@@ -755,6 +777,13 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   async function handleLogout() {
     await firebaseAuthGateway.signOut();
     router.replace("/");
+  }
+
+  async function handleDocumentsRefresh() {
+    if (!user) {
+      return;
+    }
+    await loadDashboardData(user, analysis?.id);
   }
 
   if (loadingAuth) {
@@ -781,7 +810,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   }
 
   return (
-    <section className="space-y-4">
+    <section className="w-full space-y-4">
       {/* Bandeau d'actions globales conserve (settings/offres/compte/logout) avec skin premium dark. */}
       <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
         <div className="flex items-center gap-3">
@@ -1032,7 +1061,12 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 </div>
               </section>
 
-              <section className="precision-card rounded-2xl p-5" data-search-id="documents-files">
+              <section
+                className="precision-card rounded-2xl p-5"
+                id="documents-files"
+                data-search-id="documents-files"
+                data-tour-id="documents-files"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs uppercase tracking-wide text-white/50">Fichiers sources</p>
                   {sourceFiles.length > 0 ? (
@@ -1104,7 +1138,25 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 </div>
               </section>
 
-              <section className="precision-card rounded-2xl p-5" data-search-id="documents-upload">
+              <section
+                className="precision-card rounded-2xl p-5"
+                id="documents-upload"
+                data-search-id="documents-upload"
+                data-tour-id="documents-upload"
+              >
+                <div className="mb-3 flex justify-end">
+                  <button
+                    type="button"
+                    id="documents-update"
+                    data-tour-id="documents-update"
+                    onClick={() => void handleDocumentsRefresh()}
+                    disabled={loadingAnalysis}
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/85 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <RefreshCcw className={`h-3.5 w-3.5 ${loadingAnalysis ? "animate-spin" : ""}`} />
+                    Actualiser l&apos;analyse
+                  </button>
+                </div>
                 <div className="rounded-xl border border-dashed border-white/20 bg-black/15 p-3 text-center">
                   <input
                     ref={fileInputRef}
@@ -1150,7 +1202,12 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}
               />
-              <DashboardFinancialTestContent activeTab={activeDashboardTab} kpis={analysis.kpis} />
+              <DashboardFinancialTestContent
+                activeTab={activeDashboardTab}
+                kpis={analysis.kpis}
+                mappedData={analysis.mappedData}
+                previousKpis={previousAnalysis?.kpis ?? null}
+              />
             </>
           ) : (
             <section className="precision-card rounded-2xl p-5">
@@ -1388,4 +1445,3 @@ function NavRow({
     </button>
   );
 }
-

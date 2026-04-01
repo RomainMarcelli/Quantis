@@ -18,6 +18,16 @@ function buildContentSecurityPolicy(): string {
     "https://www.gstatic.com",
     "https://vercel.live"
   ];
+  const firebaseAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim();
+  const normalizedFirebaseAuthDomain =
+    firebaseAuthDomain && !firebaseAuthDomain.startsWith("http")
+      ? `https://${firebaseAuthDomain}`
+      : firebaseAuthDomain;
+  const frameSources = ["'self'", "https://*.firebaseapp.com", "https://*.web.app"];
+
+  if (normalizedFirebaseAuthDomain) {
+    frameSources.push(normalizedFirebaseAuthDomain);
+  }
 
   return [
     "default-src 'self'",
@@ -31,7 +41,7 @@ function buildContentSecurityPolicy(): string {
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https://fonts.gstatic.com https:",
     "connect-src 'self' https://*.googleapis.com https://*.gstatic.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://vercel.live wss://*.firebaseio.com",
-    "frame-src 'none'"
+    `frame-src ${frameSources.join(" ")}`
   ].join("; ");
 }
 

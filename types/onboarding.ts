@@ -11,7 +11,7 @@ export type ProductTourRoute =
 
 export type ProductTourAudience = "authenticated" | "anonymous";
 
-export type TourTooltipPlacement = "top" | "bottom" | "left" | "right";
+export type TourTooltipPlacement = "top" | "bottom" | "left" | "right" | "center";
 
 export type ProductTourStep = {
   id: string;
@@ -19,7 +19,7 @@ export type ProductTourStep = {
   description: string;
   route: ProductTourRoute;
   targetId: string;
-  section?: SearchSection;
+  section?: SearchSection | "investissements";
   preferredPlacement?: TourTooltipPlacement;
   advanceOnTargetClick?: boolean;
 };

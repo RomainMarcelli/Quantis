@@ -12,7 +12,7 @@ export function ScrollRevealInitializer() {
 
   useEffect(() => {
     // Certaines pages de gestion doivent rester lisibles immediatement (pas d'animation de reveal).
-    const disableRevealOnRoute = pathname === "/account";
+    const disableRevealOnRoute = pathname === "/account" || pathname === "/test-kpi";
 
     // Fallback environnement: si l'API n'existe pas, on n'applique aucun masquage.
     const canUseIntersectionObserver =

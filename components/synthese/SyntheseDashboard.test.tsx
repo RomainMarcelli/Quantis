@@ -84,8 +84,8 @@ describe("SyntheseDashboard", () => {
     );
 
     expect(html).toContain("Chiffre d&#x27;Affaires");
-    expect(html).toContain("Tresorerie Nette");
-    expect(html).toContain("Excedent Brut d&#x27;Exploitation");
+    expect(html).toContain("Trésorerie nette");
+    expect(html).toContain("Excédent brut d&#x27;exploitation");
   });
 
   it("affiche le message de donnée manquante avec actions", () => {
@@ -119,8 +119,8 @@ describe("SyntheseDashboard", () => {
       />
     );
 
-    expect(html).toContain("Certaines donnees sont manquantes");
-    expect(html).toContain("Re-uploader un fichier");
+    expect(html).toContain("Certaines données sont manquantes");
+    expect(html).toContain("Importer un nouveau fichier");
     expect(html).toContain("Saisie manuelle");
   });
 });
