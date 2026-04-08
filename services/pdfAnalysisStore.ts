@@ -1,0 +1,134 @@
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
+import type { QuantisFinancialData } from "@/services/financialMapping";
+import type { DetectedFinancialSections, ParsedFinancialData } from "@/services/pdfAnalysis";
+
+export type SavedPdfAnalysisRawData = {
+  financialData: ParsedFinancialData;
+  detectedSections: DetectedFinancialSections;
+  rawText: string;
+};
+
+export type SavedPdfAnalysisRecord = {
+  id: string;
+  createdAt: string;
+  source: "pdf";
+  quantisData: QuantisFinancialData;
+  rawData: SavedPdfAnalysisRawData;
+};
+
+type PersistedPdfAnalysis = {
+  createdAt: Timestamp | FieldValue;
+  source: "pdf";
+  quantisData: QuantisFinancialData;
+  rawData: SavedPdfAnalysisRawData;
+};
+
+export async function saveAnalysis(
+  userId: string,
+  data: QuantisFinancialData,
+  rawData: SavedPdfAnalysisRawData
+): Promise<{ id: string }> {
+  const firestore = getFirebaseAdminFirestore();
+  const payload: PersistedPdfAnalysis = {
+    createdAt: FieldValue.serverTimestamp(),
+    source: "pdf",
+    quantisData: data,
+    rawData
+  };
+
+  const docRef = await firestore.collection("users").doc(userId).collection("analyses").add(payload);
+  return { id: docRef.id };
+}
+
+export async function getUserAnalyses(userId: string): Promise<SavedPdfAnalysisRecord[]> {
+  const firestore = getFirebaseAdminFirestore();
+  const snapshot = await firestore
+    .collection("users")
+    .doc(userId)
+    .collection("analyses")
+    .orderBy("createdAt", "desc")
+    .get();
+
+  return snapshot.docs.map((docSnapshot) => toSavedPdfAnalysisRecord(docSnapshot.id, docSnapshot.data()));
+}
+
+function toSavedPdfAnalysisRecord(
+  id: string,
+  data: Partial<PersistedPdfAnalysis>
+): SavedPdfAnalysisRecord {
+  const createdAt =
+    data.createdAt instanceof Timestamp ? data.createdAt.toDate().toISOString() : new Date().toISOString();
+
+  return {
+    id,
+    createdAt,
+    source: "pdf",
+    quantisData:
+      data.quantisData && typeof data.quantisData === "object"
+        ? {
+            ca: toNullableNumber(data.quantisData.ca),
+            totalCharges: toNullableNumber(data.quantisData.totalCharges),
+            netResult: toNullableNumber(data.quantisData.netResult),
+            totalAssets: toNullableNumber(data.quantisData.totalAssets),
+            equity: toNullableNumber(data.quantisData.equity),
+            debts: toNullableNumber(data.quantisData.debts)
+          }
+        : {
+            ca: null,
+            totalCharges: null,
+            netResult: null,
+            totalAssets: null,
+            equity: null,
+            debts: null
+          },
+    rawData:
+      data.rawData && typeof data.rawData === "object"
+        ? {
+            financialData:
+              data.rawData.financialData && typeof data.rawData.financialData === "object"
+                ? data.rawData.financialData
+                : createEmptyFinancialData(),
+            detectedSections:
+              data.rawData.detectedSections && typeof data.rawData.detectedSections === "object"
+                ? {
+                    incomeStatement: Boolean(data.rawData.detectedSections.incomeStatement),
+                    balanceSheet: Boolean(data.rawData.detectedSections.balanceSheet)
+                  }
+                : {
+                    incomeStatement: false,
+                    balanceSheet: false
+                  },
+            rawText: typeof data.rawData.rawText === "string" ? data.rawData.rawText : ""
+          }
+        : {
+            financialData: createEmptyFinancialData(),
+            detectedSections: {
+              incomeStatement: false,
+              balanceSheet: false
+            },
+            rawText: ""
+          }
+  };
+}
+
+function createEmptyFinancialData(): ParsedFinancialData {
+  return {
+    incomeStatement: {
+      revenue: null,
+      production: null,
+      totalProducts: null,
+      totalCharges: null,
+      netResult: null
+    },
+    balanceSheet: {
+      totalAssets: null,
+      equity: null,
+      debts: null
+    }
+  };
+}
+
+function toNullableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
