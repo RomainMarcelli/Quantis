@@ -1,5 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ParsedFinancialData } from "@/services/pdfAnalysis";
 
 const {
   addMock,
@@ -72,24 +73,26 @@ describe("pdfAnalysisStore", () => {
       },
       {
         rawText: "raw text",
+        confidenceScore: 0.8,
+        warnings: ["Resultat net non trouve."],
         detectedSections: {
           incomeStatement: true,
           balanceSheet: true
         },
-        financialData: {
+        financialData: createFinancialData({
           incomeStatement: {
-            revenue: 700000,
-            production: 500000,
-            totalProducts: 1200000,
+            netTurnover: 1200000,
             totalCharges: 900000,
-            netResult: 300000
+            netResult: 300000,
+            revenue: 700000,
+            production: 500000
           },
           balanceSheet: {
             totalAssets: 5000000,
             equity: 2000000,
             debts: 3000000
           }
-        }
+        })
       }
     );
 
@@ -110,7 +113,7 @@ describe("pdfAnalysisStore", () => {
     );
   });
 
-  it("getUserAnalyses retourne les analyses triées et normalisees", async () => {
+  it("getUserAnalyses retourne les analyses triees et normalisees", async () => {
     getMock.mockResolvedValueOnce({
       docs: [
         {
@@ -128,24 +131,26 @@ describe("pdfAnalysisStore", () => {
             },
             rawData: {
               rawText: "raw",
+              confidenceScore: 0.75,
+              warnings: ["Bilan incomplet."],
               detectedSections: {
                 incomeStatement: true,
                 balanceSheet: true
               },
-              financialData: {
+              financialData: createFinancialData({
                 incomeStatement: {
-                  revenue: 600,
-                  production: 400,
-                  totalProducts: 1000,
+                  netTurnover: 1000,
                   totalCharges: 700,
-                  netResult: 300
+                  netResult: 300,
+                  revenue: 600,
+                  production: 400
                 },
                 balanceSheet: {
                   totalAssets: 5000,
                   equity: 2000,
                   debts: 3000
                 }
-              }
+              })
             }
           })
         }
@@ -170,26 +175,87 @@ describe("pdfAnalysisStore", () => {
         },
         rawData: {
           rawText: "raw",
+          confidenceScore: 0.75,
+          warnings: ["Bilan incomplet."],
           detectedSections: {
             incomeStatement: true,
             balanceSheet: true
           },
-          financialData: {
-            incomeStatement: {
-              revenue: 600,
-              production: 400,
-              totalProducts: 1000,
+          financialData: expect.objectContaining({
+            incomeStatement: expect.objectContaining({
+              netTurnover: 1000,
               totalCharges: 700,
               netResult: 300
-            },
-            balanceSheet: {
+            }),
+            balanceSheet: expect.objectContaining({
               totalAssets: 5000,
               equity: 2000,
               debts: 3000
-            }
-          }
+            })
+          })
         }
       }
     ]);
   });
 });
+
+function createFinancialData(overrides?: {
+  incomeStatement?: Partial<ParsedFinancialData["incomeStatement"]>;
+  balanceSheet?: Partial<ParsedFinancialData["balanceSheet"]>;
+}): ParsedFinancialData {
+  const base: ParsedFinancialData = {
+    incomeStatement: {
+      salesGoods: null,
+      productionSoldGoods: null,
+      productionSoldServices: null,
+      productionSold: null,
+      netTurnover: null,
+      totalOperatingProducts: null,
+      totalOperatingCharges: null,
+      operatingResult: null,
+      financialResult: null,
+      ordinaryResultBeforeTax: null,
+      exceptionalResult: null,
+      totalProducts: null,
+      totalCharges: null,
+      netResult: null,
+      revenue: null,
+      production: null
+    },
+    balanceSheet: {
+      intangibleAssets: null,
+      tangibleAssets: null,
+      financialAssets: null,
+      totalFixedAssets: null,
+      totalCurrentAssets: null,
+      inventoriesGoods: null,
+      tradeReceivables: null,
+      otherReceivables: null,
+      cashAndCashEquivalents: null,
+      prepaidExpenses: null,
+      totalAssets: null,
+      equity: null,
+      provisions: null,
+      debts: null,
+      tradePayables: null,
+      taxSocialPayables: null,
+      otherDebts: null,
+      deferredIncome: null,
+      totalLiabilities: null,
+      totalAssetDepreciationProvisions: null,
+      shortTermBankDebt: null,
+      longTermBankDebt: null
+    }
+  };
+
+  return {
+    incomeStatement: {
+      ...base.incomeStatement,
+      ...overrides?.incomeStatement
+    },
+    balanceSheet: {
+      ...base.balanceSheet,
+      ...overrides?.balanceSheet
+    }
+  };
+}

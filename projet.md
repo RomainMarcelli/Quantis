@@ -1,5 +1,19 @@
 # Projet Quantis - Suivi Principal
 
+## Mise a jour (2026-04-09)
+
+- Parser PDF Document AI integre de bout en bout:
+  - `POST /api/pdf-parser` pour extraction/analyse/mapping/persistance;
+  - `GET /api/pdf-parser` pour historique utilisateur;
+  - `GET /api/pdf-parser?requestId=...` pour suivi de progression en temps reel.
+- Reponse API PDF stabilisee pour le frontend:
+  - payload standard leger (`quantisData`, `confidenceScore`, `warnings`, `persistence`);
+  - payload lourd expose uniquement en debug (`PDF_PARSER_DEBUG=true`).
+- UX `/pdf-parser-test` amelioree:
+  - progression par phases reelles (upload -> Document AI -> analyse/mapping -> sauvegarde);
+  - timer temps ecoule + estimation dynamique basee sur l'historique local;
+  - affichage limite aux donnees utiles (pas de freeze UI).
+
 ## Vision du projet
 
 Quantis est un copilote financier B2B pour PME.
@@ -84,6 +98,14 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
      - confirmation des actions destructives
 - Pipeline metier MVP:
   - upload de fichiers (Excel/PDF)
+  - parser PDF liasse fiscale dedie:
+    - extraction Google Document AI (`services/documentAI.ts`)
+    - analyse structuree (`services/pdfAnalysis.ts`)
+    - mapping donnees Quantis (`services/financialMapping.ts`)
+    - persistance Firestore (`services/pdfAnalysisStore.ts`)
+    - progression par requete (`services/pdfParserProgressStore.ts`)
+    - endpoint API (`app/api/pdf-parser/route.ts`)
+    - page de test UI (`app/pdf-parser-test/page.tsx`)
   - parsing serveur (`services/parsers/*`)
   - mapping financier 2033 (`services/mapping/financialDataMapper.ts`)
   - calcul KPI complet selon `Quantis_Mapping_2033SD.xlsx` (`services/kpiEngine.ts`)
@@ -254,13 +276,13 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 
 ## Fonctionnalites en cours
 
-- Robustification du parsing PDF (cas reels multi-pages / tableaux complexes).
+- Amelioration de la precision parser PDF (variantes de labels, formats atypiques, cas multi-pages complexes).
 - Finalisation d'un passage exhaustif de wording sur l'ensemble des ecrans secondaires.
 - Optimisations de performance front (lissage des animations, reduction des rerenders en mode dashboard).
 
 ## Prochaines etapes
 
-1. Brancher un parser PDF plus semantique (ratios + sections bilan/CR).
+1. Renforcer la couverture parser PDF sur formats heterogenes (liasses non standard, labels alternatifs).
 2. Ajouter snapshots mensuels pour KPI temporels.
 3. Introduire un module d'alertes proactives (cash stress, argent dormant).
 4. Isoler parsing et KPI engine en microservices (phase suivante).
@@ -304,6 +326,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 - Dossiers cibles: `app/`, `components/`, `services/`, `lib/`, `types/`.
 - Regles Firestore a deployer: `firestore.rules`.
 - Documentation source:
+  - `docs/PDF_PARSER_RUNBOOK.md` (runbook parser PDF)
   - `DOCUMENTATION_COMPLETE_PROJET.md`
   - `PRESENTATION_DEMO.md`
   - `PRESENTATION_EXECUTIVE_SUMMARY.md`

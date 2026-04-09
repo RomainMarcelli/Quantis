@@ -1,111 +1,101 @@
 import { describe, expect, it } from "vitest";
-import { detectFinancialSections, extractFinancialData, type DocumentAIResponse } from "@/services/pdfAnalysis";
+import {
+  analyzeFinancialDocument,
+  computeFinancialExtractionDiagnostics,
+  detectFinancialSections,
+  extractFinancialData,
+  type DocumentAIResponse
+} from "@/services/pdfAnalysis";
 
-describe("extractFinancialData", () => {
-  it("extrait les champs financiers depuis un rawText comptable", () => {
-    const sampleDocument: DocumentAIResponse = {
+describe("pdfAnalysis", () => {
+  it("extrait les champs critiques sur une liasse multi-colonnes", () => {
+    const sample: DocumentAIResponse = {
       rawText: [
         "COMPTE DE RESULTAT",
-        "Ventes de marchandises 1 234 567",
-        "Production vendue 2 345 678",
-        "Total produits 3 580 245",
-        "Total charges 4 123 456",
-        "Resultat net (543 211)",
+        "CHIFFRES D'AFFAIRES NETS 209 10 307 405 3 370 595",
+        "Production vendue de biens 215 250 000 200 000",
+        "Production vendue de services 217 45 000 40 000",
+        "Total des produits d'exploitation 232 10 602 405 3 620 595",
+        "Total des charges d'exploitation (II) 264 11 304 983 7 736 512",
+        "RESULTAT D'EXPLOITATION 270 (702 578) (4 115 917)",
+        "RESULTAT NET 310 6 044 950 (2 657 615)",
         "",
-        "BILAN",
-        "ACTIF",
-        "TOTAL ACTIF 9 876 543",
-        "PASSIF",
-        "Capitaux propres 1 111 222",
-        "Dettes 8 765 321"
+        "BILAN ACTIF",
+        "TOTAL I - ACTIF IMMOBILISE 044 12 345 678 6 100 000 6 245 678",
+        "TOTAL II - ACTIF CIRCULANT 096 4 820 000 1 256 832 3 563 168",
+        "TOTAL GENERAL ACTIF 110 18 483 957 8 675 111 9 808 846 9 124 004",
+        "",
+        "BILAN PASSIF",
+        "TOTAL I - CAPITAUX PROPRES 142 9 057 265 4 002 315",
+        "TOTAL III - EMPRUNTS ET DETTES 176 145 986 5 806 530",
+        "TOTAL GENERAL PASSIF 180 9 808 845"
       ].join("\n"),
       pages: [],
       tables: []
     };
 
-    const sections = detectFinancialSections(sampleDocument);
-    const parsed = extractFinancialData(sampleDocument);
+    const parsed = extractFinancialData(sample);
 
-    expect(sections).toEqual({
+    expect(parsed.incomeStatement.netTurnover).toBe(3370595);
+    expect(parsed.incomeStatement.totalOperatingCharges).toBe(7736512);
+    expect(parsed.incomeStatement.netResult).toBe(-2657615);
+
+    expect(parsed.balanceSheet.totalAssets).toBe(9808846);
+    expect(parsed.balanceSheet.equity).toBe(4002315);
+    expect(parsed.balanceSheet.debts).toBe(5806530);
+  });
+
+  it("detecte les sections correctement", () => {
+    const sample: DocumentAIResponse = {
+      rawText: ["COMPTE DE RESULTAT", "Produits", "Charges", "BILAN", "ACTIF", "PASSIF"].join("\n"),
+      pages: [],
+      tables: []
+    };
+
+    expect(detectFinancialSections(sample)).toEqual({
       incomeStatement: true,
       balanceSheet: true
     });
-    expect(parsed).toEqual({
-      incomeStatement: {
-        revenue: 1234567,
-        production: 2345678,
-        totalProducts: 3580245,
-        totalCharges: 4123456,
-        netResult: -543211
-      },
-      balanceSheet: {
-        totalAssets: 9876543,
-        equity: 1111222,
-        debts: 8765321
-      }
-    });
   });
 
-  it("utilise le fallback pages si rawText est vide", () => {
-    const sampleDocument: DocumentAIResponse = {
-      rawText: "",
-      pages: [
-        {
-          text: "BILAN\nTOTAL ACTIF 1 200 000\nCapitaux propres 700 000\nDettes 500 000"
-        }
-      ],
-      tables: []
-    };
-
-    const parsed = extractFinancialData(sampleDocument);
-
-    expect(parsed.balanceSheet.totalAssets).toBe(1200000);
-    expect(parsed.balanceSheet.equity).toBe(700000);
-    expect(parsed.balanceSheet.debts).toBe(500000);
-  });
-
-  it("retourne null si aucun champ n'est detecte et ne crash pas", () => {
-    const sampleDocument: DocumentAIResponse = {
-      rawText: "Document sans donnees financieres exploitables.",
-      pages: [],
-      tables: []
-    };
-
-    const parsed = extractFinancialData(sampleDocument);
-
-    expect(parsed).toEqual({
-      incomeStatement: {
-        revenue: null,
-        production: null,
-        totalProducts: null,
-        totalCharges: null,
-        netResult: null
-      },
-      balanceSheet: {
-        totalAssets: null,
-        equity: null,
-        debts: null
-      }
-    });
-  });
-
-  it("extrait une valeur quand le montant est sur la ligne suivante", () => {
-    const sampleDocument: DocumentAIResponse = {
+  it("fournit traces + score + checks de coherence", () => {
+    const sample: DocumentAIResponse = {
       rawText: [
         "COMPTE DE RESULTAT",
-        "Resultat net",
-        "(2 657 615)",
+        "CHIFFRES D'AFFAIRES NETS 1 200 000",
+        "TOTAL DES CHARGES D'EXPLOITATION 900 000",
+        "TOTAL DES PRODUITS 1 250 000",
+        "RESULTAT NET 350 000",
         "BILAN",
-        "Capitaux propres",
-        "1 234 000"
+        "TOTAL ACTIF 2 000 000",
+        "CAPITAUX PROPRES 900 000",
+        "EMPRUNTS ET DETTES 1 100 000",
+        "TOTAL PASSIF 2 000 000"
       ].join("\n"),
       pages: [],
       tables: []
     };
 
-    const parsed = extractFinancialData(sampleDocument);
+    const result = analyzeFinancialDocument(sample);
 
-    expect(parsed.incomeStatement.netResult).toBe(-2657615);
-    expect(parsed.balanceSheet.equity).toBe(1234000);
+    expect(result.traces.length).toBeGreaterThan(10);
+    expect(result.diagnostics.confidenceScore).toBeGreaterThan(0.2);
+    expect(result.diagnostics.fieldScores.netTurnover).toBeGreaterThan(0);
+    expect(result.diagnostics.consistencyChecks.some((check) => check.name === "assets_vs_liabilities")).toBe(true);
+  });
+
+  it("retourne des warnings si des champs critiques sont manquants", () => {
+    const sample: DocumentAIResponse = {
+      rawText: ["BILAN", "TOTAL ACTIF 1 500 000"].join("\n"),
+      pages: [],
+      tables: []
+    };
+
+    const parsed = extractFinancialData(sample);
+    const sections = detectFinancialSections(sample);
+    const diagnostics = computeFinancialExtractionDiagnostics(sample, parsed, sections);
+
+    expect(diagnostics.confidenceScore).toBeLessThan(0.5);
+    expect(diagnostics.warnings.some((warning) => warning.includes("Champ critique non trouve"))).toBe(true);
   });
 });

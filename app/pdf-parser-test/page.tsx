@@ -1,61 +1,38 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AnalysisResultPanel } from "@/components/pdf-parser/AnalysisResultPanel";
+import { ProcessingLoader } from "@/components/ProcessingLoader";
+import { useProcessingMetrics } from "@/hooks/useProcessingMetrics";
 import { firebaseAuthGateway } from "@/services/auth";
 import type { AuthenticatedUser } from "@/types/auth";
-
-type ParserSuccessPayload = {
-  success: true;
-  rawText: string;
-  pages: unknown[];
-  entities: unknown[];
-  tables: unknown[];
-  quantisData: {
-    ca: number | null;
-    totalCharges: number | null;
-    netResult: number | null;
-    totalAssets: number | null;
-    equity: number | null;
-    debts: number | null;
-  };
-  persistence: {
-    saved: boolean;
-    analysisId: string | null;
-    warning: string | null;
-  };
-};
-
-type ParserErrorPayload = {
-  success: false;
-  error: string;
-  detail?: string;
-};
-
-type ParserResponse = ParserSuccessPayload | ParserErrorPayload;
+import { fetchParserHistory, fetchProgressSnapshot, uploadPdfWithProgress } from "./parserApiClient";
+import type {
+  ParserErrorPayload,
+  ParserHistoryResponse,
+  ParserProgressPayload,
+  ParserResponse
+} from "./types";
 
 export default function PdfParserTestPage() {
   const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState("En attente");
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [statusCode, setStatusCode] = useState<number | null>(null);
+  const [uploadStatusCode, setUploadStatusCode] = useState<number | null>(null);
   const [responsePayload, setResponsePayload] = useState<ParserResponse | null>(null);
-  const [historyPayload, setHistoryPayload] = useState<unknown>(null);
+  const [historyPayload, setHistoryPayload] = useState<ParserHistoryResponse | null>(null);
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [apiErrorMessage, setApiErrorMessage] = useState<string | null>(null);
+  const { elapsedSeconds, estimatedDurationSeconds, remainingSeconds, startRun, stopRun } =
+    useProcessingMetrics();
 
-  const formattedJson = useMemo(() => {
-    if (!responsePayload) {
-      return "";
-    }
-    return JSON.stringify(responsePayload, null, 2);
-  }, [responsePayload]);
-
-  const formattedHistoryJson = useMemo(() => {
-    if (!historyPayload) {
-      return "";
-    }
-    return JSON.stringify(historyPayload, null, 2);
-  }, [historyPayload]);
+  const latestSuccessPayload = useMemo(
+    () => (responsePayload?.success ? responsePayload : null),
+    [responsePayload]
+  );
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
@@ -71,10 +48,20 @@ export default function PdfParserTestPage() {
       return;
     }
 
+    const startedAt = startRun();
+    const requestId = createRequestId();
+    let progressPollTimerId: number | null = null;
+    let progressPollStartTimeoutId: number | null = null;
+    let isPollingRequestInFlight = false;
+    let shouldStopPolling = false;
+
     setIsSubmitting(true);
-    setStatusCode(null);
+    setUploadStatusCode(null);
     setResponsePayload(null);
     setNetworkError(null);
+    setApiErrorMessage(null);
+    setProgress(0);
+    setCurrentStep("Upload du document...");
 
     try {
       const idToken = await firebaseAuthGateway.getIdToken();
@@ -85,21 +72,107 @@ export default function PdfParserTestPage() {
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("userId", user.uid);
+      formData.append("requestId", requestId);
 
-      const response = await fetch("/api/pdf-parser", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`
-        },
-        body: formData
+      const runProgressPolling = () => {
+        if (shouldStopPolling) {
+          return;
+        }
+
+        progressPollTimerId = window.setInterval(() => {
+          if (isPollingRequestInFlight || shouldStopPolling) {
+            return;
+          }
+
+          isPollingRequestInFlight = true;
+          void fetchProgressSnapshot(idToken, requestId)
+            .then((progressPayload) => {
+              if (!progressPayload || shouldStopPolling) {
+                return;
+              }
+
+              const nextProgress =
+                progressPayload.status === "completed"
+                  ? 99
+                  : Math.min(95, Math.max(20, Math.round(progressPayload.progress)));
+
+              setProgress((previous) => Math.max(previous, nextProgress));
+              setCurrentStep(resolveProgressStepLabel(progressPayload));
+
+              if (progressPayload.status === "failed" && progressPayload.error) {
+                setApiErrorMessage((previous) => previous ?? progressPayload.error);
+                shouldStopPolling = true;
+                if (progressPollTimerId !== null) {
+                  window.clearInterval(progressPollTimerId);
+                  progressPollTimerId = null;
+                }
+              }
+
+              if (progressPayload.status === "completed") {
+                shouldStopPolling = true;
+                if (progressPollTimerId !== null) {
+                  window.clearInterval(progressPollTimerId);
+                  progressPollTimerId = null;
+                }
+              }
+            })
+            .catch(() => {
+              // Non bloquant: le polling peut echouer temporairement.
+            })
+            .finally(() => {
+              isPollingRequestInFlight = false;
+            });
+        }, 1000);
+      };
+
+      progressPollStartTimeoutId = window.setTimeout(runProgressPolling, 900);
+
+      const uploadResult = await uploadPdfWithProgress({
+        idToken,
+        formData,
+        onUploadProgress: (uploadEvent) => {
+          if (!uploadEvent.lengthComputable || uploadEvent.total <= 0) {
+            return;
+          }
+
+          const uploadProgress = Math.round((uploadEvent.loaded / uploadEvent.total) * 20);
+          setProgress((previous) => Math.max(previous, clampProgress(uploadProgress)));
+          setCurrentStep("Upload du document...");
+        }
       });
 
-      const payload = (await response.json()) as ParserResponse;
-      setStatusCode(response.status);
-      setResponsePayload(payload);
+      setUploadStatusCode(uploadResult.statusCode);
+      setResponsePayload(uploadResult.payload);
+
+      if (!uploadResult.payload.success) {
+        setApiErrorMessage(resolveApiErrorMessage(uploadResult.payload));
+      }
+
+      shouldStopPolling = true;
+      if (progressPollTimerId !== null) {
+        window.clearInterval(progressPollTimerId);
+        progressPollTimerId = null;
+      }
+
+      setProgress(100);
+      setCurrentStep(
+        uploadResult.statusCode >= 200 && uploadResult.statusCode < 300
+          ? "Traitement termine."
+          : "Traitement termine avec erreur."
+      );
     } catch (error) {
       setNetworkError(error instanceof Error ? error.message : "Erreur reseau inconnue.");
+      setProgress(100);
+      setCurrentStep("Traitement termine avec erreur.");
     } finally {
+      shouldStopPolling = true;
+      if (progressPollStartTimeoutId !== null) {
+        window.clearTimeout(progressPollStartTimeoutId);
+      }
+      if (progressPollTimerId !== null) {
+        window.clearInterval(progressPollTimerId);
+      }
+      stopRun(startedAt);
       setIsSubmitting(false);
     }
   }
@@ -118,16 +191,8 @@ export default function PdfParserTestPage() {
         throw new Error("Session utilisateur requise pour charger l'historique.");
       }
 
-      const response = await fetch("/api/pdf-parser", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${idToken}`
-        }
-      });
-
-      const payload = (await response.json()) as unknown;
+      const payload = await fetchParserHistory(idToken);
       setHistoryPayload(payload);
-      setStatusCode(response.status);
     } catch (error) {
       setNetworkError(error instanceof Error ? error.message : "Erreur reseau inconnue.");
     } finally {
@@ -147,7 +212,7 @@ export default function PdfParserTestPage() {
             <h1 className="mt-3 text-2xl font-semibold text-white md:text-3xl">Test du parser PDF</h1>
             <p className="mt-3 max-w-3xl text-sm text-white/70">
               Cette page envoie un PDF a <code>/api/pdf-parser</code>, sauvegarde l&apos;analyse Firestore
-              et affiche la reponse JSON brute.
+              et affiche les donnees utiles pour validation.
             </p>
             <p className="mt-2 text-xs text-white/55">
               Session: {user ? `${user.email ?? user.uid}` : "non connecte"}
@@ -164,8 +229,8 @@ export default function PdfParserTestPage() {
                 type="file"
                 accept="application/pdf,.pdf"
                 className="block w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm text-white/85 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white/90 hover:file:bg-white/20"
-                onChange={(event) => {
-                  const file = event.currentTarget.files?.[0] ?? null;
+                onChange={(changeEvent) => {
+                  const file = changeEvent.currentTarget.files?.[0] ?? null;
                   setSelectedFile(file);
                 }}
               />
@@ -193,6 +258,14 @@ export default function PdfParserTestPage() {
             </button>
           </form>
 
+          <ProcessingLoader
+            isVisible={isSubmitting}
+            progress={progress}
+            currentStep={currentStep}
+            elapsedSeconds={elapsedSeconds}
+            remainingSeconds={isSubmitting ? remainingSeconds : null}
+          />
+
           <div className="mt-6 space-y-3">
             {networkError ? (
               <p className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
@@ -200,34 +273,111 @@ export default function PdfParserTestPage() {
               </p>
             ) : null}
 
-            {statusCode !== null ? (
-              <p className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85">
-                Statut HTTP: <span className="font-semibold">{statusCode}</span>
+            {apiErrorMessage ? (
+              <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                Erreur API: {apiErrorMessage}
               </p>
             ) : null}
 
-            {formattedJson ? (
+            {uploadStatusCode !== null ? (
+              <p className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85">
+                Statut HTTP: <span className="font-semibold">{uploadStatusCode}</span>
+              </p>
+            ) : null}
+
+            {latestSuccessPayload ? <AnalysisResultPanel data={latestSuccessPayload} /> : null}
+
+            {historyPayload && historyPayload.success ? (
               <div className="rounded-xl border border-white/10 bg-black/35 p-3">
-                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-white/55">Reponse JSON</p>
-                <pre className="max-h-[62vh] overflow-auto rounded-lg bg-black/35 p-3 text-xs text-emerald-200">
-                  {formattedJson}
-                </pre>
+                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-white/55">Historique PDF</p>
+                {historyPayload.analyses.length === 0 ? (
+                  <p className="text-xs text-white/60">Aucune analyse enregistree.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {historyPayload.analyses.slice(0, 6).map((analysis) => (
+                      <li
+                        key={analysis.id}
+                        className="rounded-lg border border-white/10 bg-black/35 px-3 py-2 text-xs text-white/80"
+                      >
+                        <p className="font-medium text-white/90">
+                          {new Date(analysis.createdAt).toLocaleString("fr-FR")}
+                        </p>
+                        <p>ID: {analysis.id}</p>
+                        <p>Confiance: {analysis.confidenceScore}</p>
+                        <p>
+                          CA: {analysis.quantisData.ca ?? "n/a"} | Resultat net:{" "}
+                          {analysis.quantisData.netResult ?? "n/a"}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ) : null}
 
-            {formattedHistoryJson ? (
-              <div className="rounded-xl border border-white/10 bg-black/35 p-3">
-                <p className="mb-2 text-xs uppercase tracking-[0.16em] text-white/55">
-                  Historique Firestore JSON
+            {isSubmitting ? (
+              <p className="text-xs text-white/50">
+                Temps ecoule reel: {Math.floor(elapsedSeconds)} s
+                {" | "}
+                Temps estime restant:{" "}
+                {remainingSeconds === null ? "calcul en cours..." : `${Math.max(0, Math.floor(remainingSeconds))} s`}
+              </p>
+            ) : (
+              estimatedDurationSeconds !== null ? (
+                <p className="text-xs text-white/50">
+                  Temps estime (moyenne): {formatDuration(estimatedDurationSeconds)}
                 </p>
-                <pre className="max-h-[40vh] overflow-auto rounded-lg bg-black/35 p-3 text-xs text-sky-200">
-                  {formattedHistoryJson}
-                </pre>
-              </div>
-            ) : null}
+              ) : null
+            )}
           </div>
         </article>
       </section>
     </main>
   );
+}
+
+function resolveProgressStepLabel(progressPayload: ParserProgressPayload): string {
+  if (progressPayload.status === "completed") {
+    return "Finalisation de la reponse...";
+  }
+
+  if (progressPayload.status === "failed") {
+    return "Traitement en echec.";
+  }
+
+  return progressPayload.currentStep || "Traitement en cours...";
+}
+
+function createRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `pdf-${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
+}
+
+function clampProgress(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function formatDuration(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remaining = safeSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+}
+
+function resolveApiErrorMessage(payload: ParserErrorPayload): string {
+  if (payload.code === "PDF_PAGE_LIMIT_EXCEEDED") {
+    const pageCount = payload.pageCount;
+    const maxPages = payload.maxPages;
+    if (typeof pageCount === "number" && typeof maxPages === "number") {
+      return `Le PDF contient ${pageCount} pages. La limite actuelle est ${maxPages} pages. Essayez une version reduite ou contactez l'equipe pour activer un traitement asynchrone.`;
+    }
+    return "Le PDF depasse la limite de pages autorisee pour le traitement en ligne. Essayez une version reduite du document.";
+  }
+
+  return payload.detail ?? payload.error;
 }

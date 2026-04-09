@@ -1,12 +1,18 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
 import type { QuantisFinancialData } from "@/services/financialMapping";
-import type { DetectedFinancialSections, ParsedFinancialData } from "@/services/pdfAnalysis";
+import {
+  createEmptyParsedFinancialData,
+  type DetectedFinancialSections,
+  type ParsedFinancialData
+} from "@/services/pdfAnalysis";
 
 export type SavedPdfAnalysisRawData = {
   financialData: ParsedFinancialData;
   detectedSections: DetectedFinancialSections;
   rawText: string;
+  confidenceScore: number;
+  warnings: string[];
 };
 
 export type SavedPdfAnalysisRecord = {
@@ -99,7 +105,11 @@ function toSavedPdfAnalysisRecord(
                     incomeStatement: false,
                     balanceSheet: false
                   },
-            rawText: typeof data.rawData.rawText === "string" ? data.rawData.rawText : ""
+            rawText: typeof data.rawData.rawText === "string" ? data.rawData.rawText : "",
+            confidenceScore: toConfidenceScore(data.rawData.confidenceScore),
+            warnings: Array.isArray(data.rawData.warnings)
+              ? data.rawData.warnings.filter((warning): warning is string => typeof warning === "string")
+              : []
           }
         : {
             financialData: createEmptyFinancialData(),
@@ -107,28 +117,30 @@ function toSavedPdfAnalysisRecord(
               incomeStatement: false,
               balanceSheet: false
             },
-            rawText: ""
+            rawText: "",
+            confidenceScore: 0,
+            warnings: []
           }
   };
 }
 
 function createEmptyFinancialData(): ParsedFinancialData {
-  return {
-    incomeStatement: {
-      revenue: null,
-      production: null,
-      totalProducts: null,
-      totalCharges: null,
-      netResult: null
-    },
-    balanceSheet: {
-      totalAssets: null,
-      equity: null,
-      debts: null
-    }
-  };
+  return createEmptyParsedFinancialData();
 }
 
 function toNullableNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function toConfidenceScore(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return 0;
+  }
+  if (value < 0) {
+    return 0;
+  }
+  if (value > 1) {
+    return 1;
+  }
+  return Number(value.toFixed(2));
 }

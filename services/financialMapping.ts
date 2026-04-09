@@ -10,33 +10,79 @@ export type QuantisFinancialData = {
 };
 
 export function mapToQuantisData(financialData: ParsedFinancialData): QuantisFinancialData {
-  const revenue = safeNumber(financialData.incomeStatement.revenue);
-  const production = safeNumber(financialData.incomeStatement.production);
+  const turnover = safeNumber(financialData.incomeStatement.netTurnover);
+  const salesGoods = safeNumber(financialData.incomeStatement.salesGoods);
+  const productionGoods = safeNumber(financialData.incomeStatement.productionSoldGoods);
+  const productionServices = safeNumber(financialData.incomeStatement.productionSoldServices);
+  const legacyRevenue = safeNumber(financialData.incomeStatement.revenue);
+  const legacyProduction = safeNumber(financialData.incomeStatement.production);
 
   const quantisData: QuantisFinancialData = {
-    ca: computeCa(revenue, production),
-    totalCharges: safeNumber(financialData.incomeStatement.totalCharges),
+    ca: computeCa({
+      turnover,
+      salesGoods,
+      productionGoods,
+      productionServices,
+      legacyRevenue,
+      legacyProduction
+    }),
+    totalCharges: safeNumber(financialData.incomeStatement.totalOperatingCharges) ??
+      safeNumber(financialData.incomeStatement.totalCharges),
     netResult: safeNumber(financialData.incomeStatement.netResult),
     totalAssets: safeNumber(financialData.balanceSheet.totalAssets),
     equity: safeNumber(financialData.balanceSheet.equity),
     debts: safeNumber(financialData.balanceSheet.debts)
   };
 
-  console.info("[financial-mapping] Quantis data computed", quantisData);
+  const missingFieldsCount = Object.values(quantisData).filter((value) => value === null).length;
+  console.info("[financial-mapping] Quantis data computed", {
+    missingFieldsCount,
+    hasCa: quantisData.ca !== null
+  });
+
+  if (isPdfParserDebugEnabled()) {
+    console.info("[financial-mapping] Quantis payload", quantisData);
+  }
 
   return quantisData;
 }
 
-function computeCa(revenue: number | null, production: number | null): number | null {
-  if (revenue !== null && production !== null) {
-    return revenue + production;
+function computeCa(input: {
+  turnover: number | null;
+  salesGoods: number | null;
+  productionGoods: number | null;
+  productionServices: number | null;
+  legacyRevenue: number | null;
+  legacyProduction: number | null;
+}): number | null {
+  const {
+    turnover,
+    salesGoods,
+    productionGoods,
+    productionServices,
+    legacyRevenue,
+    legacyProduction
+  } = input;
+
+  if (turnover !== null) {
+    return turnover;
   }
-  if (revenue !== null) {
-    return revenue;
+
+  const decomposed = sumAvailable(salesGoods, productionGoods, productionServices);
+  if (decomposed !== null) {
+    return decomposed;
   }
-  if (production !== null) {
-    return production;
+
+  if (legacyRevenue !== null && legacyProduction !== null) {
+    return legacyRevenue + legacyProduction;
   }
+  if (legacyRevenue !== null) {
+    return legacyRevenue;
+  }
+  if (legacyProduction !== null) {
+    return legacyProduction;
+  }
+
   return null;
 }
 
@@ -45,4 +91,16 @@ function safeNumber(value: number | null): number | null {
     return null;
   }
   return value;
+}
+
+function sumAvailable(...values: Array<number | null>): number | null {
+  const presentValues = values.filter((value): value is number => value !== null);
+  if (!presentValues.length) {
+    return null;
+  }
+  return presentValues.reduce((sum, value) => sum + value, 0);
+}
+
+function isPdfParserDebugEnabled(): boolean {
+  return process.env.PDF_PARSER_DEBUG === "true";
 }

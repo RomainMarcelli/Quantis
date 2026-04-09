@@ -2,7 +2,7 @@
 
 Reconstruction from scratch de Quantis a partir des fichiers Markdown du projet historique.
 
-## Etat du projet (mise a jour 2026-04-01)
+## Etat du projet (mise a jour 2026-04-09)
 
 - Alignement front/back sur les nouvelles donnees Excel et la logique metier multi-annees.
 - Historisation active des analyses par exercice fiscal avec corrections automatiques:
@@ -12,6 +12,16 @@ Reconstruction from scratch de Quantis a partir des fichiers Markdown du projet 
 - Graphique point mort refondu (formules 2033SD, intersection fiable, mode plein ecran, tooltip premium, zones pertes/benefices).
 - Section Investissement amelioree (modélisation BFR plus lisible et responsive, ratio immo net/brut).
 - Indicateurs de tendance (hausse/baisse/stable) affiches sur les KPI majeurs.
+- Parser PDF Document AI operationnel de bout en bout:
+  - extraction brute (`rawText`, `pages`, `entities`, `tables`) cote serveur;
+  - analyse structuree bilan/compte de resultat (`services/pdfAnalysis.ts`);
+  - mapping donnees Quantis (`services/financialMapping.ts`);
+  - persistance Firestore des analyses PDF (`services/pdfAnalysisStore.ts`);
+  - endpoint `POST /api/pdf-parser` + historique `GET /api/pdf-parser`.
+- UX parser stabilisee sur `/pdf-parser-test`:
+  - progression par phases reelles (upload, traitement Document AI, analyse/mapping, sauvegarde);
+  - timer reel + estimation dynamique (moyenne des derniers traitements);
+  - reponse frontend allegee (pas de payload lourd en prod).
 
 ## Stack
 
@@ -58,6 +68,16 @@ Variables serveur requises pour les emails transactionnels:
 - `APP_BASE_URL` (optionnelle, sinon origin de la requete)
 
 Pour l'envoi d'emails transactionnels custom, des variables serveur Firebase Admin + Resend sont necessaires (voir `.env.example`).
+
+Variables serveur requises pour le parser PDF Document AI:
+
+- `DOCUMENT_AI_PROJECT_ID`
+- `DOCUMENT_AI_LOCATION` (ex: `eu`)
+- `DOCUMENT_AI_PROCESSOR_ID`
+- `DOCUMENT_AI_CLIENT_EMAIL` (si `GOOGLE_APPLICATION_CREDENTIALS` non configure)
+- `DOCUMENT_AI_PRIVATE_KEY` (si `GOOGLE_APPLICATION_CREDENTIALS` non configure)
+- `DOCUMENT_AI_DEBUG_STRUCTURE` (optionnel)
+- `PDF_PARSER_DEBUG` (optionnel, active `debugData` dans la reponse API)
 
 ## Lancer le projet
 
@@ -126,6 +146,12 @@ Flux implemente:
 `Upload -> Parsing -> Mapping -> Calcul KPI -> Stockage Firestore -> Affichage dashboard`
 
 - Parsing Excel/PDF: `services/parsers/`
+- Parsing PDF liasse (Document AI):
+  - `services/documentAI.ts`
+  - `services/pdfAnalysis.ts`
+  - `services/financialMapping.ts`
+  - `services/pdfAnalysisStore.ts`
+  - `app/api/pdf-parser/route.ts`
 - Mapping 2033: `services/mapping/financialDataMapper.ts`
 - Moteur KPI complet (formules Quantis Mapping): `services/kpiEngine.ts`
 - Corrections historiques multi-annees a la lecture:
@@ -133,6 +159,7 @@ Flux implemente:
   - `services/kpiHistoryEngine.ts`
 - Stockage Firestore: `services/analysisStore.ts`
 - Orchestration API parsing/kpi: `app/api/analyses/route.ts`
+- Orchestration API parser PDF: `app/api/pdf-parser/route.ts`
 - Chaque analyse stocke:
   - `rawData`
   - `mappedData`
@@ -144,6 +171,18 @@ Formules metier alignees:
 - `ratio_immo = total_actif_immo_net / total_actif_immo_brut`
 - `cash_reel (fte) = caf - delta_bfr`
 - `TCAM = ((ca_n / ca_start)^(1/n) - 1) * 100` avec tri par exercice fiscal
+
+### Reponse API parser PDF (mode standard)
+
+`POST /api/pdf-parser` retourne:
+
+- `success`
+- `quantisData`
+- `confidenceScore`
+- `warnings`
+- `persistence`
+
+Les donnees lourdes (`rawText`, `pages`, `tables`, `entities`) ne sont renvoyees que si `PDF_PARSER_DEBUG=true`.
 
 ## Inspection d'une analyse
 
@@ -202,4 +241,7 @@ npm run test:e2e
 ## Suivi projet
 
 Le fichier `projet.md` est la source de verite de pilotage (vision, etat d'avancement, decisions techniques, roadmap)
+
+Pour le parser PDF, la documentation operationnelle est centralisee dans:
+- `docs/PDF_PARSER_RUNBOOK.md`
 
