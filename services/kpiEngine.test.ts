@@ -42,17 +42,17 @@ describe("computeKpis", () => {
     expect(result.ebitda).toBe(-23865.6);
     expect(result.marge_ebitda).toBe(-4.08);
     expect(result.point_mort).toBe(669097.87);
-    expect(result.bfr).toBe(53836.81);
+    expect(result.bfr).toBe(-21777.36);
     expect(result.dso).toBe(45.62);
     expect(result.dpo).toBe(131.41);
     expect(result.caf).toBe(-43753.6);
     expect(result.tn).toBe(-125393.84);
     expect(result.roe).toBe(-1.11);
-    expect(result.roce).toBe(-0.22);
-    expect(result.effet_levier).toBe(-0.89);
+    expect(result.roce).toBe(-0.3);
+    expect(result.effet_levier).toBe(-0.81);
 
     expect(result.netProfit).toBe(-83529.6);
-    expect(result.workingCapital).toBe(53836.81);
+    expect(result.workingCapital).toBe(-21777.36);
     expect(result.monthlyBurnRate).toBe(6960.8);
     expect(result.cashRunwayMonths).toBe(9.14);
     expect(result.disponibilites).toBe(63641.59);
@@ -97,5 +97,16 @@ describe("computeKpis", () => {
 
     expect(result.ratio_immo).toBe(0.65);
     expect(result.etat_materiel_indice).toBe(65.15);
+  });
+
+  it("does not fallback to total_prod_expl when CA components are present but invalid", () => {
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      total_prod_expl: 6_598_806,
+      ventes_march: null,
+      prod_vendue: -7_105
+    });
+
+    expect(result.ca).toBeNull();
   });
 });

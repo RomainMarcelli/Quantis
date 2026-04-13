@@ -7,15 +7,30 @@ export type QuantisData = {
   debts: number | null;
 };
 
+export type NumericRecord = Record<string, number | null>;
+
 export type ParserSuccessPayload = {
   success: true;
+  parserVersion?: string;
   quantisData: QuantisData;
+  mappedData?: NumericRecord;
+  kpis?: NumericRecord;
   confidenceScore: number;
   warnings: string[];
   persistence: {
     saved: boolean;
     analysisId: string | null;
     warning: string | null;
+  };
+  debugData?: {
+    financialData?: unknown;
+    mappedData?: NumericRecord;
+    kpis?: NumericRecord;
+    traces?: unknown;
+    diagnostics?: unknown;
+    detectedSections?: unknown;
+    reconstructedRows?: unknown;
+    [key: string]: unknown;
   };
 };
 

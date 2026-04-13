@@ -4,6 +4,8 @@ import {
   processPdfWithDocumentAI
 } from "@/services/documentAI";
 import { mapToQuantisData, type QuantisFinancialData } from "@/services/financialMapping";
+import { computeKpis } from "@/services/kpiEngine";
+import { mapParsedFinancialDataToMappedFinancialData } from "@/services/mapping/parsedFinancialDataBridge";
 import { getFirebaseAdminAuth } from "@/lib/server/firebaseAdmin";
 import {
   analyzeFinancialDocument,
@@ -29,6 +31,8 @@ type PdfParserSuccessResponse = {
   success: true;
   parserVersion: "analysis-engine-v2";
   quantisData: QuantisFinancialData;
+  mappedData: Record<string, number | null>;
+  kpis: Record<string, number | null>;
   confidenceScore: number;
   warnings: string[];
   persistence: {
@@ -65,6 +69,8 @@ type PdfParserSuccessResponse = {
         message: string;
       }>;
     };
+    mappedData: Record<string, number | null>;
+    kpis: Record<string, number | null>;
   };
 };
 
@@ -264,6 +270,8 @@ export async function POST(request: NextRequest) {
     const analysis = analyzeFinancialDocument(extraction);
     const detectedSections = analysis.detectedSections;
     const financialData = analysis.parsedFinancialData;
+    const mappedData = mapParsedFinancialDataToMappedFinancialData(financialData);
+    const kpis = computeKpis(mappedData);
     const quantisData = mapToQuantisData(financialData);
     const diagnostics = analysis.diagnostics;
     const warnings = [...diagnostics.warnings];
@@ -285,6 +293,8 @@ export async function POST(request: NextRequest) {
     try {
       const saved = await saveAnalysis(userId, quantisData, {
         financialData,
+        mappedData,
+        kpis,
         detectedSections,
         rawText: extraction.rawText,
         confidenceScore: diagnostics.confidenceScore,
@@ -313,6 +323,8 @@ export async function POST(request: NextRequest) {
       success: true,
       parserVersion: "analysis-engine-v2",
       quantisData,
+      mappedData,
+      kpis,
       confidenceScore: diagnostics.confidenceScore,
       warnings,
       persistence
@@ -343,7 +355,9 @@ export async function POST(request: NextRequest) {
         diagnostics: {
           fieldScores: analysis.diagnostics.fieldScores,
           consistencyChecks: analysis.diagnostics.consistencyChecks
-        }
+        },
+        mappedData,
+        kpis
       };
     }
 

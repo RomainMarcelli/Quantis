@@ -25,7 +25,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     regexAliases: regex(/\bproduction\s+vendue\s+de\s+biens\b/),
     excludes: alias("stockee", "immobilisee"),
     expectedLineCodes: ["215"],
-    minAbs: 1000
+    minAbs: 1000,
+    allowNegative: false
   },
   {
     key: "productionSoldServices",
@@ -36,7 +37,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     regexAliases: regex(/\bproduction\s+vendue\s+de\s+services\b/),
     excludes: alias("stockee", "immobilisee"),
     expectedLineCodes: ["217"],
-    minAbs: 1000
+    minAbs: 1000,
+    allowNegative: false
   },
   {
     key: "productionSold",
@@ -45,7 +47,208 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     columnStrategy: "nCurrent",
     aliases: alias("production vendue"),
     regexAliases: regex(/\bproduction\s+vendue\b/),
-    excludes: alias("stockee", "immobilisee")
+    excludes: alias("stockee", "immobilisee"),
+    allowNegative: false
+  },
+  {
+    key: "purchasesGoods",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("achat de marchandises", "achats de marchandises"),
+    regexAliases: regex(/\bachats?\s+de\s+marchandises?\b/),
+    excludes: alias("variation"),
+    expectedLineCodes: ["234"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "stockVariationGoods",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "signedRightmost",
+    aliases: alias("variation de stocks (marchandises)", "variation de stock marchandises"),
+    regexAliases: regex(/\bvariation\s+de\s+stocks?\b.*\bmarchandises?\b/),
+    excludes: alias("matieres"),
+    expectedLineCodes: ["236"]
+  },
+  {
+    key: "rawMaterialPurchases",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias(
+      "achats de matieres premieres et autres approvisionnements",
+      "achats de matieres premieres",
+      "achats mp"
+    ),
+    regexAliases: regex(/\bachats?\s+de\s+matieres?\s+premieres?\b/),
+    excludes: alias("variation"),
+    expectedLineCodes: ["238"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "stockVariationRawMaterials",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "signedRightmost",
+    aliases: alias("variation de stock matieres premieres", "variation de stock"),
+    regexAliases: regex(/\bvariation\s+de\s+stocks?\b/),
+    excludes: alias("marchandises"),
+    expectedLineCodes: ["240"]
+  },
+  {
+    key: "externalCharges",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("autres charges externes", "autres achats et charges externes"),
+    regexAliases: regex(/\bautres?\s+charges?\s+externes?\b/, /\bautres?\s+achats?\s+et\s+charges?\s+externes?\b/),
+    excludes: alias("exceptionnelles"),
+    expectedLineCodes: ["242"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "taxesAndLevies",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("impots, taxes et versements assimiles", "impots et taxes", "impots taxes"),
+    regexAliases: regex(/\bimpots?\b.*\btaxes?\b/),
+    excludes: alias("benefices"),
+    expectedLineCodes: ["244"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "wages",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("remunerations du personnel", "salaires et traitements"),
+    regexAliases: regex(/\bremunerations?\s+du\s+personnel\b/, /\bsalaires?\b/),
+    excludes: alias("charges"),
+    expectedLineCodes: ["250"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "socialCharges",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("charges sociales"),
+    regexAliases: regex(/\bcharges?\s+sociales?\b/),
+    excludes: alias("financieres", "exceptionnelles"),
+    expectedLineCodes: ["252"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "depreciationAllocations",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("dotations aux amortissements", "dotations amortissements"),
+    regexAliases: regex(/\bdotations?\b.*\bamortissements?\b/),
+    excludes: alias("provisions"),
+    expectedLineCodes: ["254"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "provisionsAllocations",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("dotations aux provisions", "dotations provisions"),
+    regexAliases: regex(/\bdotations?\b.*\bprovisions?\b/),
+    excludes: alias("actif circulant", "bilan"),
+    expectedLineCodes: ["256"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "otherOperatingIncome",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("autres produits d'exploitation", "autres produits"),
+    regexAliases: regex(/\bautres?\s+produits?\s+d[' ]?exploitation\b/, /\bautres?\s+produits?\b/),
+    excludes: alias("financiers", "exceptionnels"),
+    expectedLineCodes: ["230"],
+    minAbs: 1000
+  },
+  {
+    key: "otherOperatingCharges",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("autres charges d'exploitation", "autres charges"),
+    regexAliases: regex(/\bautres?\s+charges?\s+d[' ]?exploitation\b/, /\bautres?\s+charges?\b/),
+    excludes: alias("financieres", "exceptionnelles", "externes"),
+    expectedLineCodes: ["262"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "financialProducts",
+    section: "incomeStatement",
+    kind: "total",
+    columnStrategy: "nCurrent",
+    aliases: alias("total des produits financiers", "produits financiers"),
+    regexAliases: regex(/\btotal\s+des?\s+produits?\s+financiers?\b/, /\bproduits?\s+financiers?\b/),
+    excludes: alias("resultat"),
+    expectedLineCodes: ["280"],
+    minAbs: 1000
+  },
+  {
+    key: "financialCharges",
+    section: "incomeStatement",
+    kind: "total",
+    columnStrategy: "nCurrent",
+    aliases: alias("total des charges financieres", "charges financieres"),
+    regexAliases: regex(/\btotal\s+des?\s+charges?\s+financieres?\b/, /\bcharges?\s+financieres?\b/),
+    excludes: alias("resultat"),
+    expectedLineCodes: ["294"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "exceptionalProducts",
+    section: "incomeStatement",
+    kind: "total",
+    columnStrategy: "nCurrent",
+    aliases: alias("total des produits exceptionnels", "produits exceptionnels"),
+    regexAliases: regex(/\btotal\s+des?\s+produits?\s+exceptionnels?\b/, /\bproduits?\s+exceptionnels?\b/),
+    excludes: alias("resultat"),
+    expectedLineCodes: ["290"],
+    minAbs: 1000
+  },
+  {
+    key: "exceptionalCharges",
+    section: "incomeStatement",
+    kind: "total",
+    columnStrategy: "nCurrent",
+    aliases: alias("total des charges exceptionnelles", "charges exceptionnelles"),
+    regexAliases: regex(/\btotal\s+des?\s+charges?\s+exceptionnelles?\b/, /\bcharges?\s+exceptionnelles?\b/),
+    excludes: alias("resultat"),
+    expectedLineCodes: ["300"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "incomeTax",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("impot sur les benefices", "impots sur les benefices"),
+    regexAliases: regex(/\bimpots?\s+sur\s+les\s+benefices\b/, /\bimpot\s+sur\s+les\s+benefices\b/),
+    excludes: alias("dettes", "etat"),
+    expectedLineCodes: ["306"],
+    minAbs: 1000
   },
   {
     key: "netTurnover",
@@ -80,7 +283,10 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     kind: "total",
     columnStrategy: "nCurrent",
     aliases: alias("total des charges d'exploitation", "total charges d'exploitation"),
-    regexAliases: regex(/\btotal\s+des?\s+charges?\s+d[' ]?exploitation\b/),
+    regexAliases: regex(
+      /\btotal\s+des?\s+charges?\s+d[' ]?exploitation\b/,
+      /\btotal\s+des?\s+charges?\b.*\bexploitation\b/
+    ),
     excludes: alias("financieres", "exceptionnelles"),
     expectedLineCodes: ["264"],
     minAbs: 1000,
@@ -193,6 +399,17 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     expectedLineCodes: ["040"]
   },
   {
+    key: "totalFixedAssetsGross",
+    section: "balanceSheet",
+    kind: "total",
+    columnStrategy: "leftmost",
+    aliases: alias("total actif immobilise"),
+    regexAliases: regex(/\btotal\s+actif\s+immobilise\b/),
+    excludes: alias("passif"),
+    expectedLineCodes: ["044", "045"],
+    minAbs: 1000
+  },
+  {
     key: "totalFixedAssets",
     section: "balanceSheet",
     kind: "total",
@@ -213,6 +430,27 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     excludes: alias("passif"),
     expectedLineCodes: ["096"],
     minAbs: 1000
+  },
+  {
+    key: "rawMaterialInventories",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "netPriority",
+    aliases: alias("matieres premieres, approvisionnements, en cours de production", "matieres premieres"),
+    regexAliases: regex(/\bmatieres?\s+premieres?\b/, /\bapprovisionnements?\b/),
+    excludes: alias("passif"),
+    expectedLineCodes: ["050"],
+    allowNegative: false
+  },
+  {
+    key: "advancesAndPrepaymentsAssets",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "netPriority",
+    aliases: alias("avances et acomptes verses sur commandes", "avances et acomptes verses"),
+    regexAliases: regex(/\bavances?\s+et\s+acomptes?\s+verses?\b/),
+    excludes: alias("passif"),
+    expectedLineCodes: ["064"]
   },
   {
     key: "inventoriesGoods",
@@ -243,6 +481,16 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     regexAliases: regex(/\bautres\s+creances?\b/),
     excludes: alias("passif"),
     expectedLineCodes: ["072"]
+  },
+  {
+    key: "marketableSecurities",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "netPriority",
+    aliases: alias("valeurs mobilieres de placement", "vmp"),
+    regexAliases: regex(/\bvaleurs?\s+mobilieres?\s+de\s+placement\b/, /\bvmp\b/),
+    excludes: alias("passif"),
+    expectedLineCodes: ["080"]
   },
   {
     key: "cashAndCashEquivalents",
@@ -298,6 +546,17 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     expectedLineCodes: ["154"]
   },
   {
+    key: "borrowings",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("emprunts et dettes assimilees", "emprunts"),
+    regexAliases: regex(/\bemprunts?\s+et\s+dettes?\s+assimilees?\b/, /\bemprunts?\b/),
+    excludes: alias("total", "fournisseurs", "fiscales", "sociales"),
+    expectedLineCodes: ["156"],
+    allowNegative: false
+  },
+  {
     key: "debts",
     section: "balanceSheet",
     kind: "total",
@@ -318,6 +577,16 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     regexAliases: regex(/\bdettes?\s+fournisseurs?\b/),
     excludes: alias("total"),
     expectedLineCodes: ["166"]
+  },
+  {
+    key: "advancesAndPrepaymentsLiabilities",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("avances et acomptes recus sur commandes en cours", "avances et acomptes recus"),
+    regexAliases: regex(/\bavances?\s+et\s+acomptes?\s+recus?\b/),
+    excludes: alias("total"),
+    expectedLineCodes: ["164"]
   },
   {
     key: "taxSocialPayables",

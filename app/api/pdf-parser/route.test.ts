@@ -160,7 +160,7 @@ describe("POST /api/pdf-parser", () => {
     };
 
     expect(response.status).toBe(200);
-    expect(payload).toEqual({
+    expect(payload).toMatchObject({
       success: true,
       parserVersion: "analysis-engine-v2",
       quantisData: {
@@ -171,6 +171,8 @@ describe("POST /api/pdf-parser", () => {
         equity: 600,
         debts: 400
       },
+      mappedData: expect.any(Object),
+      kpis: expect.any(Object),
       confidenceScore: 0.75,
       warnings: ["Resultat net non trouve."],
       persistence: {
@@ -197,7 +199,9 @@ describe("POST /api/pdf-parser", () => {
       expect.objectContaining({
         rawText: "Extracted text",
         confidenceScore: 0.75,
-        warnings: ["Resultat net non trouve."]
+        warnings: ["Resultat net non trouve."],
+        mappedData: expect.any(Object),
+        kpis: expect.any(Object)
       })
     );
     expect(processPdfWithDocumentAIMock).toHaveBeenCalledWith(

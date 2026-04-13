@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { AnalysisResultPanel } from "@/components/pdf-parser/AnalysisResultPanel";
 import { ProcessingLoader } from "@/components/ProcessingLoader";
 import { useProcessingMetrics } from "@/hooks/useProcessingMetrics";
@@ -28,11 +28,6 @@ export default function PdfParserTestPage() {
   const [apiErrorMessage, setApiErrorMessage] = useState<string | null>(null);
   const { elapsedSeconds, estimatedDurationSeconds, remainingSeconds, startRun, stopRun } =
     useProcessingMetrics();
-
-  const latestSuccessPayload = useMemo(
-    () => (responsePayload?.success ? responsePayload : null),
-    [responsePayload]
-  );
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
@@ -267,25 +262,15 @@ export default function PdfParserTestPage() {
           />
 
           <div className="mt-6 space-y-3">
-            {networkError ? (
-              <p className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
-                Erreur reseau: {networkError}
-              </p>
-            ) : null}
-
-            {apiErrorMessage ? (
-              <p className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
-                Erreur API: {apiErrorMessage}
-              </p>
-            ) : null}
-
-            {uploadStatusCode !== null ? (
-              <p className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85">
-                Statut HTTP: <span className="font-semibold">{uploadStatusCode}</span>
-              </p>
-            ) : null}
-
-            {latestSuccessPayload ? <AnalysisResultPanel data={latestSuccessPayload} /> : null}
+            <AnalysisResultPanel
+              responsePayload={responsePayload}
+              statusCode={uploadStatusCode}
+              networkError={networkError}
+              apiErrorMessage={apiErrorMessage}
+              elapsedSeconds={elapsedSeconds}
+              estimatedDurationSeconds={estimatedDurationSeconds}
+              remainingSeconds={isSubmitting ? remainingSeconds : null}
+            />
 
             {historyPayload && historyPayload.success ? (
               <div className="rounded-xl border border-white/10 bg-black/35 p-3">
@@ -314,21 +299,6 @@ export default function PdfParserTestPage() {
                 )}
               </div>
             ) : null}
-
-            {isSubmitting ? (
-              <p className="text-xs text-white/50">
-                Temps ecoule reel: {Math.floor(elapsedSeconds)} s
-                {" | "}
-                Temps estime restant:{" "}
-                {remainingSeconds === null ? "calcul en cours..." : `${Math.max(0, Math.floor(remainingSeconds))} s`}
-              </p>
-            ) : (
-              estimatedDurationSeconds !== null ? (
-                <p className="text-xs text-white/50">
-                  Temps estime (moyenne): {formatDuration(estimatedDurationSeconds)}
-                </p>
-              ) : null
-            )}
           </div>
         </article>
       </section>
@@ -360,13 +330,6 @@ function clampProgress(value: number): number {
     return 0;
   }
   return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function formatDuration(seconds: number): string {
-  const safeSeconds = Math.max(0, Math.floor(seconds));
-  const minutes = Math.floor(safeSeconds / 60);
-  const remaining = safeSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
 }
 
 function resolveApiErrorMessage(payload: ParserErrorPayload): string {

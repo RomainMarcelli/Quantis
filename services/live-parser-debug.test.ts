@@ -71,7 +71,10 @@ describe("live parser debug", () => {
       ]);
 
       console.log("rerunPath", entry.path);
-      const lines = rawText.split(/\r?\n/g).map((line) => line.trim()).filter((line) => line.length > 0);
+      const lines = rawText
+        .split(/\r?\n/g)
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0);
       console.log("rawTextStats", {
         length: rawText.length,
         lines: lines.length,

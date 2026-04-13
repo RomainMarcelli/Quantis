@@ -50,6 +50,18 @@ describe("mapToQuantisData", () => {
     expect(mapToQuantisData(sampleFinancialData).totalCharges).toBe(650000);
   });
 
+  it("evite un fallback ambigu sur totalCharges global trop eleve", () => {
+    const sampleFinancialData = createFinancialData({
+      incomeStatement: {
+        totalOperatingCharges: null,
+        totalCharges: 9_020_949,
+        totalOperatingProducts: 6_598_806
+      }
+    });
+
+    expect(mapToQuantisData(sampleFinancialData).totalCharges).toBeNull();
+  });
+
   it("retourne null sur les champs absents", () => {
     const sampleFinancialData = createFinancialData();
 
@@ -76,7 +88,24 @@ function createFinancialData(
       productionSoldGoods: null,
       productionSoldServices: null,
       productionSold: null,
+      purchasesGoods: null,
+      stockVariationGoods: null,
+      rawMaterialPurchases: null,
+      stockVariationRawMaterials: null,
+      externalCharges: null,
+      taxesAndLevies: null,
+      wages: null,
+      socialCharges: null,
+      depreciationAllocations: null,
+      provisionsAllocations: null,
       netTurnover: null,
+      otherOperatingIncome: null,
+      otherOperatingCharges: null,
+      financialProducts: null,
+      financialCharges: null,
+      exceptionalProducts: null,
+      exceptionalCharges: null,
+      incomeTax: null,
       totalOperatingProducts: null,
       totalOperatingCharges: null,
       operatingResult: null,
@@ -93,17 +122,23 @@ function createFinancialData(
       intangibleAssets: null,
       tangibleAssets: null,
       financialAssets: null,
+      totalFixedAssetsGross: null,
       totalFixedAssets: null,
       totalCurrentAssets: null,
+      rawMaterialInventories: null,
       inventoriesGoods: null,
+      advancesAndPrepaymentsAssets: null,
       tradeReceivables: null,
       otherReceivables: null,
+      marketableSecurities: null,
       cashAndCashEquivalents: null,
       prepaidExpenses: null,
       totalAssets: null,
       equity: null,
       provisions: null,
+      borrowings: null,
       debts: null,
+      advancesAndPrepaymentsLiabilities: null,
       tradePayables: null,
       taxSocialPayables: null,
       otherDebts: null,

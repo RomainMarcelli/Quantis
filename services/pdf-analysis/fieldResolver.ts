@@ -49,16 +49,32 @@ function collectCandidatesForField(rows: ReconstructedRow[], definition: FieldDe
   const candidates: ScoredCandidate[] = [];
 
   rows.forEach((row, rowIndex) => {
+    const contextualBoost = computeContextualBoost({ rows, rowIndex, row, definition });
     const labelMatch = getLabelMatchScore({
       normalizedLabel: row.normalizedLabel,
       definition
     });
+    const hasExpectedLineCode = definition.expectedLineCodes?.includes(row.lineCode ?? "") ?? false;
+    const fallbackByLineCode = labelMatch <= 0 && hasExpectedLineCode;
+    const fallbackBySectionContext =
+      labelMatch <= 0 &&
+      !fallbackByLineCode &&
+      contextualBoost >= 80 &&
+      /^total\s*\((i|ii|1|2)\)/.test(row.normalizedLabel);
 
-    if (labelMatch <= 0) {
+    if (labelMatch <= 0 && !fallbackByLineCode && !fallbackBySectionContext) {
       return;
     }
 
-    if (isExcluded(row.normalizedLabel, definition.excludes)) {
+    if (
+      (fallbackByLineCode || fallbackBySectionContext) &&
+      row.section !== definition.section &&
+      row.section !== "unknown"
+    ) {
+      return;
+    }
+
+    if (!fallbackByLineCode && !fallbackBySectionContext && isExcluded(row.normalizedLabel, definition.excludes)) {
       return;
     }
 
@@ -87,8 +103,8 @@ function collectCandidatesForField(rows: ReconstructedRow[], definition: FieldDe
       row,
       definition,
       amountCandidate: selectedAmount,
-      labelMatch
-    }) + computeContextualBoost({ rows, rowIndex, row, definition });
+      labelMatch: fallbackByLineCode || fallbackBySectionContext ? 100 : labelMatch
+    }) + contextualBoost;
 
     if (score <= 0) {
       return;
@@ -143,6 +159,35 @@ function computeContextualBoost(input: {
       rowNumber: row.rowNumber,
       maxRowDistance: 120,
       keywords: ["emprunts et dettes"]
+    })) {
+      return 95;
+    }
+  }
+
+  if (
+    (definition.key === "totalFixedAssets" || definition.key === "totalFixedAssetsGross") &&
+    /^total\s*\((i|1)\)/.test(normalizedLabel)
+  ) {
+    if (hasContextBefore({
+      rows,
+      rowIndex,
+      page: row.page,
+      rowNumber: row.rowNumber,
+      maxRowDistance: 120,
+      keywords: ["actif immobilise", "bilan actif"]
+    })) {
+      return 95;
+    }
+  }
+
+  if (definition.key === "totalCurrentAssets" && /^total\s*\((ii|2)\)/.test(normalizedLabel)) {
+    if (hasContextBefore({
+      rows,
+      rowIndex,
+      page: row.page,
+      rowNumber: row.rowNumber,
+      maxRowDistance: 120,
+      keywords: ["actif circulant", "bilan actif"]
     })) {
       return 95;
     }
@@ -313,6 +358,11 @@ function selectAmountCandidate(input: {
     return amountCandidates[amountCandidates.length - 1] ?? null;
   }
 
+  if (strategy === "leftmost") {
+    const ordered = [...amountCandidates].sort((left, right) => left.columnIndex - right.columnIndex);
+    return ordered[0] ?? null;
+  }
+
   if (strategy === "nCurrent") {
     const withCurrentHeader = amountCandidates.find((candidate) => isCurrentYearHeader(candidate.headerHint ?? ""));
     if (withCurrentHeader) {
@@ -373,6 +423,25 @@ function chooseLikelyIncomeStatementCurrentCandidate(candidates: AmountCandidate
   }
 
   const ordered = [...candidates].sort((left, right) => left.columnIndex - right.columnIndex);
+  if (ordered.length >= 3) {
+    const first = ordered[0];
+    const second = ordered[1];
+    const third = ordered[2];
+    if (first && second && third) {
+      const firstAsCurrentDelta = first.value - second.value;
+      const secondAsCurrentDelta = second.value - first.value;
+      const tolerance = computeVariationTolerance(first.value, second.value, third.value);
+
+      if (Math.abs(third.value - firstAsCurrentDelta) <= tolerance) {
+        return first;
+      }
+
+      if (Math.abs(third.value - secondAsCurrentDelta) <= tolerance) {
+        return second;
+      }
+    }
+  }
+
   if (ordered.length === 1) {
     return ordered[0] ?? null;
   }
@@ -391,6 +460,11 @@ function chooseLikelyIncomeStatementCurrentCandidate(candidates: AmountCandidate
   }
 
   return second;
+}
+
+function computeVariationTolerance(left: number, right: number, delta: number): number {
+  const magnitude = Math.max(Math.abs(left), Math.abs(right), Math.abs(delta), 1);
+  return Math.max(2_000, magnitude * 0.02);
 }
 
 function isExcluded(normalizedLabel: string, excludes: readonly string[]): boolean {

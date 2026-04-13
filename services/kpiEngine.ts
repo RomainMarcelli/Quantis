@@ -1,7 +1,7 @@
 import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
 export function computeKpis(data: MappedFinancialData): CalculatedKpis {
-  const ca = firstNonNull(sum(data.ventes_march, data.prod_vendue), data.total_prod_expl);
+  const ca = computeCa(data);
   const tcam = percent(powMinusOne(div(ca, data.ca_n_minus_1), inv(data.n)));
   const va = sub(data.total_prod_expl, sum(data.achats_march, data.achats_mp, data.ace));
   const ebitda = sub(va, sum(data.impots_taxes, data.salaires, data.charges_soc));
@@ -17,7 +17,10 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
     totalActifImmoBrut: data.total_actif_immo_brut,
     totalActifImmo: data.total_actif_immo
   });
-  const bfr = sub(sum(data.total_stocks, data.creances), data.fournisseurs);
+  const bfr = sub(
+    sum(data.total_stocks, data.creances),
+    sum(data.fournisseurs, data.dettes_fisc_soc)
+  );
   const rot_bfr = mul(div(bfr, mul(data.total_prod_expl, 1.2)), 365);
   const dso = div(mul(data.clients, 365), mul(data.total_prod_expl, 1.2));
   const dpo = div(mul(data.fournisseurs, 365), mul(sum(data.achats_march, data.ace), 1.2));
@@ -129,8 +132,40 @@ function scoreHealth({
   return round((score / weights) * 100);
 }
 
-function firstNonNull(primary: number | null, fallback: number | null): number | null {
-  return primary ?? fallback;
+function computeCa(data: MappedFinancialData): number | null {
+  const salesGoods = sanitizeTurnoverComponent(data.ventes_march);
+  const soldProduction = sanitizeTurnoverComponent(data.prod_vendue);
+  const hasAtLeastOneSource = data.ventes_march !== null || data.prod_vendue !== null;
+
+  if (salesGoods !== null && soldProduction !== null) {
+    return salesGoods + soldProduction;
+  }
+
+  if (salesGoods !== null) {
+    return salesGoods;
+  }
+
+  if (soldProduction !== null) {
+    return soldProduction;
+  }
+
+  if (!hasAtLeastOneSource) {
+    return data.total_prod_expl;
+  }
+
+  return null;
+}
+
+function sanitizeTurnoverComponent(value: number | null): number | null {
+  if (value === null) {
+    return null;
+  }
+
+  if (value < 0) {
+    return null;
+  }
+
+  return value;
 }
 
 function normalize(value: number, low: number, high: number): number {

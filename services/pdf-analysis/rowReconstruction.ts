@@ -509,13 +509,50 @@ function splitPages(text: string): string[] {
 }
 
 function extractLineCode(text: string): string | null {
-  const match = text.match(/\b\d{3}\b/);
-  return match?.[0] ?? null;
+  const directMatch = text.match(/\b\d{3}\b/);
+  if (directMatch?.[0]) {
+    return directMatch[0];
+  }
+
+  const compactTokens = text.match(/\b[0-9A-Za-z]{3}\b/g) ?? [];
+  for (const token of compactTokens) {
+    const normalized = normalizePotentialOcrLineCode(token);
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  const splitDigits = text.match(
+    /\b([0-9OQDISBZGlI])[\s\u00A0\u202F]+([0-9OQDISBZGlI])[\s\u00A0\u202F]+([0-9OQDISBZGlI])\b/
+  );
+  if (splitDigits) {
+    const merged = `${splitDigits[1]}${splitDigits[2]}${splitDigits[3]}`;
+    return normalizePotentialOcrLineCode(merged);
+  }
+
+  return null;
 }
 
 function looksLikeLineCode(text: string): boolean {
   const compact = text.replace(/\s+/g, "");
   return /^\d{2,4}$/.test(compact);
+}
+
+function normalizePotentialOcrLineCode(token: string): string | null {
+  if (!/\d/.test(token)) {
+    return null;
+  }
+
+  const normalized = token
+    .toUpperCase()
+    .replace(/[OQD]/g, "0")
+    .replace(/[IL]/g, "1")
+    .replace(/Z/g, "2")
+    .replace(/S/g, "5")
+    .replace(/B/g, "8")
+    .replace(/G/g, "6");
+
+  return /^\d{3}$/.test(normalized) ? normalized : null;
 }
 
 function isAmountOnlyLine(text: string): boolean {
@@ -562,7 +599,7 @@ function sanitizeAmountCandidatesWithLineCode(
     return candidates;
   }
 
-  const lineCodePrefix = new RegExp(`^${lineCode}[\\s\\u00A0\\u202F]+`);
+  const lineCodePrefix = buildLineCodePrefixPattern(lineCode);
   if (!lineCodePrefix.test(first.raw)) {
     return candidates;
   }
@@ -580,6 +617,32 @@ function sanitizeAmountCandidatesWithLineCode(
   };
 
   return [sanitizedFirst, ...candidates.slice(1)];
+}
+
+function buildLineCodePrefixPattern(lineCode: string): RegExp {
+  const ocrSafeDigits = lineCode
+    .split("")
+    .map((digit) => {
+      switch (digit) {
+        case "0":
+          return "[0OQDoqd]";
+        case "1":
+          return "[1ILil]";
+        case "2":
+          return "[2Zz]";
+        case "5":
+          return "[5Ss]";
+        case "6":
+          return "[6Gg]";
+        case "8":
+          return "[8Bb]";
+        default:
+          return digit.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }
+    })
+    .join("[\\s\\u00A0\\u202F]*");
+
+  return new RegExp(`^${ocrSafeDigits}[\\s\\u00A0\\u202F]+`);
 }
 
 function buildSectionContextKey(page: number, section: SectionKey): string {

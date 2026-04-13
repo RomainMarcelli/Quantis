@@ -8,7 +8,24 @@ export type ParsedFinancialData = {
     productionSoldGoods: number | null;
     productionSoldServices: number | null;
     productionSold: number | null;
+    purchasesGoods: number | null;
+    stockVariationGoods: number | null;
+    rawMaterialPurchases: number | null;
+    stockVariationRawMaterials: number | null;
+    externalCharges: number | null;
+    taxesAndLevies: number | null;
+    wages: number | null;
+    socialCharges: number | null;
+    depreciationAllocations: number | null;
+    provisionsAllocations: number | null;
     netTurnover: number | null;
+    otherOperatingIncome: number | null;
+    otherOperatingCharges: number | null;
+    financialProducts: number | null;
+    financialCharges: number | null;
+    exceptionalProducts: number | null;
+    exceptionalCharges: number | null;
+    incomeTax: number | null;
     totalOperatingProducts: number | null;
     totalOperatingCharges: number | null;
     operatingResult: number | null;
@@ -25,17 +42,23 @@ export type ParsedFinancialData = {
     intangibleAssets: number | null;
     tangibleAssets: number | null;
     financialAssets: number | null;
+    totalFixedAssetsGross: number | null;
     totalFixedAssets: number | null;
     totalCurrentAssets: number | null;
+    rawMaterialInventories: number | null;
     inventoriesGoods: number | null;
+    advancesAndPrepaymentsAssets: number | null;
     tradeReceivables: number | null;
     otherReceivables: number | null;
+    marketableSecurities: number | null;
     cashAndCashEquivalents: number | null;
     prepaidExpenses: number | null;
     totalAssets: number | null;
     equity: number | null;
     provisions: number | null;
+    borrowings: number | null;
     debts: number | null;
+    advancesAndPrepaymentsLiabilities: number | null;
     tradePayables: number | null;
     taxSocialPayables: number | null;
     otherDebts: number | null;
@@ -91,6 +114,7 @@ export type FieldColumnStrategy =
   | "nCurrent"
   | "nMinus1"
   | "netPriority"
+  | "leftmost"
   | "rightmost"
   | "signedRightmost";
 
@@ -101,7 +125,24 @@ export type FinancialFieldKey =
   | "productionSoldGoods"
   | "productionSoldServices"
   | "productionSold"
+  | "purchasesGoods"
+  | "stockVariationGoods"
+  | "rawMaterialPurchases"
+  | "stockVariationRawMaterials"
+  | "externalCharges"
+  | "taxesAndLevies"
+  | "wages"
+  | "socialCharges"
+  | "depreciationAllocations"
+  | "provisionsAllocations"
   | "netTurnover"
+  | "otherOperatingIncome"
+  | "otherOperatingCharges"
+  | "financialProducts"
+  | "financialCharges"
+  | "exceptionalProducts"
+  | "exceptionalCharges"
+  | "incomeTax"
   | "totalOperatingProducts"
   | "totalOperatingCharges"
   | "operatingResult"
@@ -114,17 +155,23 @@ export type FinancialFieldKey =
   | "intangibleAssets"
   | "tangibleAssets"
   | "financialAssets"
+  | "totalFixedAssetsGross"
   | "totalFixedAssets"
   | "totalCurrentAssets"
+  | "rawMaterialInventories"
   | "inventoriesGoods"
+  | "advancesAndPrepaymentsAssets"
   | "tradeReceivables"
   | "otherReceivables"
+  | "marketableSecurities"
   | "cashAndCashEquivalents"
   | "prepaidExpenses"
   | "totalAssets"
   | "equity"
   | "provisions"
+  | "borrowings"
   | "debts"
+  | "advancesAndPrepaymentsLiabilities"
   | "tradePayables"
   | "taxSocialPayables"
   | "otherDebts"
@@ -179,7 +226,24 @@ export function createEmptyParsedFinancialData(): ParsedFinancialData {
       productionSoldGoods: null,
       productionSoldServices: null,
       productionSold: null,
+      purchasesGoods: null,
+      stockVariationGoods: null,
+      rawMaterialPurchases: null,
+      stockVariationRawMaterials: null,
+      externalCharges: null,
+      taxesAndLevies: null,
+      wages: null,
+      socialCharges: null,
+      depreciationAllocations: null,
+      provisionsAllocations: null,
       netTurnover: null,
+      otherOperatingIncome: null,
+      otherOperatingCharges: null,
+      financialProducts: null,
+      financialCharges: null,
+      exceptionalProducts: null,
+      exceptionalCharges: null,
+      incomeTax: null,
       totalOperatingProducts: null,
       totalOperatingCharges: null,
       operatingResult: null,
@@ -196,17 +260,23 @@ export function createEmptyParsedFinancialData(): ParsedFinancialData {
       intangibleAssets: null,
       tangibleAssets: null,
       financialAssets: null,
+      totalFixedAssetsGross: null,
       totalFixedAssets: null,
       totalCurrentAssets: null,
+      rawMaterialInventories: null,
       inventoriesGoods: null,
+      advancesAndPrepaymentsAssets: null,
       tradeReceivables: null,
       otherReceivables: null,
+      marketableSecurities: null,
       cashAndCashEquivalents: null,
       prepaidExpenses: null,
       totalAssets: null,
       equity: null,
       provisions: null,
+      borrowings: null,
       debts: null,
+      advancesAndPrepaymentsLiabilities: null,
       tradePayables: null,
       taxSocialPayables: null,
       otherDebts: null,

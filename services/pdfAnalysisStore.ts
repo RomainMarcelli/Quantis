@@ -6,9 +6,15 @@ import {
   type DetectedFinancialSections,
   type ParsedFinancialData
 } from "@/services/pdfAnalysis";
+import {
+  createEmptyMappedFinancialData
+} from "@/services/mapping/financialDataMapper";
+import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
 export type SavedPdfAnalysisRawData = {
   financialData: ParsedFinancialData;
+  mappedData?: MappedFinancialData;
+  kpis?: CalculatedKpis;
   detectedSections: DetectedFinancialSections;
   rawText: string;
   confidenceScore: number;
@@ -95,6 +101,14 @@ function toSavedPdfAnalysisRecord(
               data.rawData.financialData && typeof data.rawData.financialData === "object"
                 ? data.rawData.financialData
                 : createEmptyFinancialData(),
+            mappedData:
+              data.rawData.mappedData && typeof data.rawData.mappedData === "object"
+                ? { ...createEmptyMappedFinancialData(), ...data.rawData.mappedData }
+                : createEmptyMappedFinancialData(),
+            kpis:
+              data.rawData.kpis && typeof data.rawData.kpis === "object"
+                ? data.rawData.kpis
+                : undefined,
             detectedSections:
               data.rawData.detectedSections && typeof data.rawData.detectedSections === "object"
                 ? {
@@ -113,6 +127,7 @@ function toSavedPdfAnalysisRecord(
           }
         : {
             financialData: createEmptyFinancialData(),
+            mappedData: createEmptyMappedFinancialData(),
             detectedSections: {
               incomeStatement: false,
               balanceSheet: false

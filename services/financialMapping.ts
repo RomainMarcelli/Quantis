@@ -26,8 +26,7 @@ export function mapToQuantisData(financialData: ParsedFinancialData): QuantisFin
       legacyRevenue,
       legacyProduction
     }),
-    totalCharges: safeNumber(financialData.incomeStatement.totalOperatingCharges) ??
-      safeNumber(financialData.incomeStatement.totalCharges),
+    totalCharges: selectQuantisTotalCharges(financialData),
     netResult: safeNumber(financialData.incomeStatement.netResult),
     totalAssets: safeNumber(financialData.balanceSheet.totalAssets),
     equity: safeNumber(financialData.balanceSheet.equity),
@@ -45,6 +44,26 @@ export function mapToQuantisData(financialData: ParsedFinancialData): QuantisFin
   }
 
   return quantisData;
+}
+
+function selectQuantisTotalCharges(financialData: ParsedFinancialData): number | null {
+  const operatingCharges = safeNumber(financialData.incomeStatement.totalOperatingCharges);
+  if (operatingCharges !== null) {
+    return operatingCharges;
+  }
+
+  const totalCharges = safeNumber(financialData.incomeStatement.totalCharges);
+  if (totalCharges === null) {
+    return null;
+  }
+
+  const operatingProducts = safeNumber(financialData.incomeStatement.totalOperatingProducts);
+  // Guard against selecting a global/ambiguous total when operating charges are missing.
+  if (operatingProducts !== null && totalCharges > operatingProducts * 1.25) {
+    return null;
+  }
+
+  return totalCharges;
 }
 
 function computeCa(input: {

@@ -256,7 +256,9 @@ function isParserSuccessPayload(value: unknown): value is ParserSuccessPayload {
     isRecord(persistence) &&
     typeof persistence.saved === "boolean" &&
     (typeof persistence.analysisId === "string" || persistence.analysisId === null) &&
-    (typeof persistence.warning === "string" || persistence.warning === null)
+    (typeof persistence.warning === "string" || persistence.warning === null) &&
+    (value.mappedData === undefined || isNullableNumberRecord(value.mappedData)) &&
+    (value.kpis === undefined || isNullableNumberRecord(value.kpis))
   );
 }
 
@@ -326,6 +328,14 @@ function isNullableNumber(value: unknown): value is number | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isNullableNumberRecord(value: unknown): value is Record<string, number | null> {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return Object.values(value).every((item) => isNullableNumber(item));
 }
 
 function debugLog(message: string, data: Record<string, unknown>) {
