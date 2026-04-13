@@ -339,7 +339,7 @@ export async function POST(request: NextRequest) {
         detectedSections,
         financialData,
         traces: analysis.traces,
-        reconstructedRows: analysis.rows.slice(0, 80).map((row) => ({
+        reconstructedRows: analysis.rows.slice(0, 150).map((row) => ({
           source: row.source,
           page: row.page,
           rowNumber: row.rowNumber,

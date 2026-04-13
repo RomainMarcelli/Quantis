@@ -112,14 +112,21 @@ function buildTextRows(rawLines: RawLine[]): ReconstructedRow[] {
       sectionContexts.set(sectionKey, nextContext);
     }
 
+    const isCdrDebugRow = isCdrLabel(normalizedLabel);
+    if (isCdrDebugRow) {
+      console.log(`[CDR-DEBUG text] label="${contextualLabel}" | rawText="${line.text}" | inlineAmounts=${JSON.stringify(inlineAmounts)}`);
+    }
+
     const lookaheadAmounts: AmountCandidate[] = [];
     let lookaheadIndex = index + 1;
     while (lookaheadIndex < rawLines.length) {
       const nextLine = rawLines[lookaheadIndex];
       if (!nextLine || nextLine.page !== line.page) {
+        if (isCdrDebugRow) console.log(`[CDR-DEBUG text]   lookahead break: page change`);
         break;
       }
       if (!isAmountOnlyLine(nextLine.text)) {
+        if (isCdrDebugRow) console.log(`[CDR-DEBUG text]   lookahead break: not amount-only: "${nextLine.text}"`);
         break;
       }
 
@@ -138,6 +145,9 @@ function buildTextRows(rawLines: RawLine[]): ReconstructedRow[] {
       if (lookaheadAmounts.length >= inferMaxLookaheadCandidates(contextualLabel)) {
         break;
       }
+    }
+    if (isCdrDebugRow) {
+      console.log(`[CDR-DEBUG text]   → ${inlineAmounts.length} inline + ${lookaheadAmounts.length} lookahead candidates`);
     }
 
     const lineCode = extractLineCode(line.text);
@@ -194,6 +204,9 @@ function buildTableRows(document: DocumentAIResponse, rawLines: RawLine[]): Reco
       const label = (cellTexts[labelCellIndex] ?? "").trim() || fullText;
       const normalizedLabel = normalizeText(label);
       const amountCandidates = extractAmountCandidatesFromCells(cellTexts, headerMap, labelCellIndex);
+      if (isCdrLabel(normalizedLabel)) {
+        console.log(`[CDR-DEBUG table] p${pageNumber} label="${label}" | cells=${JSON.stringify(cellTexts)} | labelCellIdx=${labelCellIndex} | candidates=${JSON.stringify(amountCandidates.map(c => ({ v: c.value, col: c.columnIndex, h: c.headerHint })))}`);
+      }
       if (!amountCandidates.length) {
         return;
       }
@@ -797,4 +810,22 @@ function readNumericValue(value: unknown): number | null {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+// DEBUG CDR — à retirer après investigation BEL AIR
+const CDR_DEBUG_KEYWORDS = [
+  "ventes de marchandises",
+  "production vendue",
+  "produits financiers",
+  "charges financieres",
+  "produits exceptionnels",
+  "charges exceptionnelles",
+  "charges de personnel",
+  "salaires",
+  "charges sociales",
+  "autres charges d exploitation",
+  "autres charges exploitation"
+];
+function isCdrLabel(normalizedLabel: string): boolean {
+  return CDR_DEBUG_KEYWORDS.some((kw) => normalizedLabel.includes(kw));
 }

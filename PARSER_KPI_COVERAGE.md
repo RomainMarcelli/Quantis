@@ -1,6 +1,6 @@
 # PARSER_KPI_COVERAGE.md — Couverture KPIs Quantis
 
-> Dernière mise à jour : 2026-04-13
+> Dernière mise à jour : 2026-04-13 (Lot 2)
 
 ---
 
@@ -52,7 +52,7 @@
 | `cashRunwayMonths` | dispo / monthlyBurnRate | `dispo`, `monthlyBurnRate` | ✅ Débloqué |
 | `capacite_remboursement_annees` | emprunts / caf | `emprunts`, `caf` | ✅ Débloqué |
 | `etat_materiel_indice` | ratio_immo × 100 | `ratio_immo` | ⚠️ Partiel — dépend de ratio_immo |
-| `tcam` | taux croissance annuel moyen | `ca`, `ca_n_minus_1`, `n` | ❌ Bloqué — `ca_n_minus_1` non alimenté |
+| `tcam` | taux croissance annuel moyen | `ca`, `ca_n_minus_1`, `n` | ✅ Débloqué (Lot 2) — `ca_n_minus_1` extrait via nMinus1 |
 | `healthScore` | score composite | `grossMarginRate`, `netProfit`, `workingCapital`, `cashRunwayMonths` | ✅ Débloqué |
 
 ---
@@ -61,17 +61,13 @@
 
 | Statut | Nombre |
 |---|---|
-| ✅ Débloqué | 29 |
+| ✅ Débloqué | 30 |
 | ⚠️ Partiel | 3 (`fte`, `ratio_immo`, `etat_materiel_indice`) |
-| ❌ Bloqué | 1 (`tcam`) |
+| ❌ Bloqué | 0 |
 
 ---
 
-## Actions pour débloquer les KPIs partiels / bloqués
-
-### `tcam` (bloqué)
-**Besoin** : extraire `ca_n_minus_1` depuis la colonne N-1 du compte de résultat.  
-**Approche** : ajouter un champ `netTurnoverPreviousYear` dans `FinancialFieldKey` avec `columnStrategy: "nMinus1"`, puis le mapper dans le bridge.
+## Actions pour débloquer les KPIs partiels
 
 ### `ratio_immo` (partiel)
 **Besoin** : distinguer `total_actif_immo_brut` (colonne brut) et `total_actif_immo_net` (colonne net) depuis le bilan actif.  

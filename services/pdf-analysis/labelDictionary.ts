@@ -25,8 +25,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     regexAliases: regex(/\bproduction\s+vendue\s+de\s+biens\b/),
     excludes: alias("stockee", "immobilisee"),
     expectedLineCodes: ["215"],
-    minAbs: 1000,
-    allowNegative: false
+    minAbs: 1000
+    // allowNegative retiré en Lot 3 : prod_vendue biens peut être légitimement négatif (BEL AIR : -7 031). Voir DBG-007.
   },
   {
     key: "productionSoldServices",
@@ -47,8 +47,10 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     columnStrategy: "nCurrent",
     aliases: alias("production vendue"),
     regexAliases: regex(/\bproduction\s+vendue\b/),
-    excludes: alias("stockee", "immobilisee"),
-    allowNegative: false
+    // Exclure les sous-lignes "biens" et "services" pour ne matcher que le total agrégé.
+    // Sans cette exclusion, la ligne "production vendue de biens" absorbe le champ au lieu du total.
+    // allowNegative retiré en Lot 3 : prod_vendue peut être légitimement négatif. Voir DBG-007.
+    excludes: alias("stockee", "immobilisee", "biens", "services")
   },
   {
     key: "purchasesGoods",
@@ -480,7 +482,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     aliases: alias("autres creances"),
     regexAliases: regex(/\bautres\s+creances?\b/),
     excludes: alias("passif"),
-    expectedLineCodes: ["072"]
+    expectedLineCodes: ["072"],
+    sublineStrategy: "sum"
   },
   {
     key: "marketableSecurities",
@@ -593,10 +596,18 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     section: "balanceSheet",
     kind: "detail",
     columnStrategy: "nCurrent",
-    aliases: alias("dettes fiscales et sociales"),
-    regexAliases: regex(/\bdettes?\s+fiscales?\s+et\s+sociales?\b/),
+    aliases: alias("dettes fiscales et sociales", "dettes fiscales", "dettes fisc"),
+    regexAliases: regex(/\bdettes?\s+fiscales?\s+(?:et\s+sociales?)?\b/),
     excludes: alias("total"),
-    expectedLineCodes: ["172"]
+    expectedLineCodes: ["172"],
+    sublineStrategy: "sum",
+    sublinePatterns: [
+      /\bpersonnel\b/,
+      /\borganismes?\s+sociaux\b/,
+      /\betat\b.*\btaxe/,
+      /\bautres\s+imp[oô]ts?\b/,
+      /\bdettes?\s+fiscales?/
+    ]
   },
   {
     key: "otherDebts",
@@ -656,6 +667,159 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     aliases: alias("emprunts obligataires", "dettes bancaires long terme"),
     regexAliases: regex(/\blong\s+terme\b.*\bbanc/, /\bemprunts?\b/),
     excludes: alias("court terme")
+  },
+
+  // ── Lot 2 : CA N-1 ────────────────────────────────────────────────────────
+  {
+    key: "netTurnoverPreviousYear",
+    section: "incomeStatement",
+    kind: "total",
+    columnStrategy: "nMinus1",
+    aliases: alias("chiffres d'affaires nets", "chiffre d'affaires net", "ca net", "chiffre d'affaires"),
+    regexAliases: regex(
+      /\bchiffres?\s+d[' ]?affaires?\s+nets?\b/,
+      /\bchiffres?\s+d[' ]?affaires?\b/
+    ),
+    excludes: alias("variation", "stockee", "capitaux", "charges", "dettes", "passif", "actif"),
+    expectedLineCodes: ["210", "209"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+
+  // ── Lot 2 : Compte de résultat — lignes manquantes ────────────────────────
+  {
+    key: "productionStored",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "signedRightmost",
+    aliases: alias("production stockee", "variation de production stockee"),
+    regexAliases: regex(/\bproduction\s+stockee\b/),
+    excludes: alias("vendue", "immobilisee"),
+    expectedLineCodes: ["222"]
+  },
+  {
+    key: "productionCapitalized",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("production immobilisee"),
+    regexAliases: regex(/\bproduction\s+immobilisee\b/),
+    excludes: alias("vendue", "stockee"),
+    expectedLineCodes: ["224"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "operatingSubsidies",
+    section: "incomeStatement",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("subventions d'exploitation", "subventions exploitation"),
+    regexAliases: regex(/\bsubventions?\s+d[' ]?exploitation\b/),
+    excludes: alias("investissement"),
+    expectedLineCodes: ["226"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+
+  // ── Lot 2 : Bilan passif — détail capitaux propres ────────────────────────
+  {
+    key: "shareCapital",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("capital social ou individuel", "capital social", "capital"),
+    regexAliases: regex(/\bcapital\s+social\b/, /\bcapital\b/),
+    excludes: alias("total", "propres", "actif"),
+    expectedLineCodes: ["120"],
+    minAbs: 1000,
+    allowNegative: false
+  },
+  {
+    key: "revaluationDifferences",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("ecarts de reevaluation"),
+    regexAliases: regex(/\becarts?\s+de\s+reevaluation\b/),
+    excludes: alias("total"),
+    expectedLineCodes: ["124"]
+  },
+  {
+    key: "legalReserves",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("reserve legale"),
+    regexAliases: regex(/\breserve\s+legale\b/),
+    excludes: alias("total", "reglementees"),
+    expectedLineCodes: ["126"],
+    allowNegative: false
+  },
+  {
+    key: "regulatoryReserves",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("reserves reglementees"),
+    regexAliases: regex(/\breserves?\s+reglementees?\b/),
+    excludes: alias("total"),
+    expectedLineCodes: ["130"],
+    allowNegative: false
+  },
+  {
+    key: "otherReserves",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("autres reserves"),
+    regexAliases: regex(/\bautres\s+reserves?\b/),
+    excludes: alias("total", "reglementees"),
+    expectedLineCodes: ["132"]
+  },
+  {
+    key: "retainedEarnings",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("report a nouveau"),
+    regexAliases: regex(/\breport\s+a\s+nouveau\b/),
+    excludes: alias("total"),
+    expectedLineCodes: ["134"]
+  },
+  {
+    key: "investmentSubsidies",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("subventions d'investissement", "subventions investissement"),
+    regexAliases: regex(/\bsubventions?\s+d[' ]?investissement\b/),
+    excludes: alias("exploitation"),
+    expectedLineCodes: ["137"],
+    allowNegative: false
+  },
+  {
+    key: "regulatoryProvisions",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("provisions reglementees"),
+    regexAliases: regex(/\bprovisions?\s+reglementees?\b/),
+    excludes: alias("risques", "total"),
+    expectedLineCodes: ["140"],
+    allowNegative: false
+  },
+
+  // ── Lot 2 : Bilan passif — comptes courants d'associés ────────────────────
+  {
+    key: "associatesCurrentAccounts",
+    section: "balanceSheet",
+    kind: "detail",
+    columnStrategy: "nCurrent",
+    aliases: alias("comptes courants d'associes", "comptes courants associes"),
+    regexAliases: regex(/\bcomptes?\s+courants?\s+d[' ]?associes?\b/),
+    excludes: alias("total"),
+    expectedLineCodes: ["173"]
   }
 ];
 

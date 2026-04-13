@@ -89,7 +89,9 @@ describe("parsedFinancialDataBridge", () => {
     expect(mapped.total_actif_immo_net).toBe(690_000);
   });
 
-  it("derive ventes_march from netTurnover and drops noisy negative prod_vendue", () => {
+  it("accepte un prod_vendue negatif de faible amplitude et derive ventes_march correctement", () => {
+    // Bug 5 (Lot 3) : prod_vendue négatif de faible amplitude (ex : -7 031 sur BEL AIR)
+    // doit être conservé — ventes_march = netTurnover - prod_vendue
     const parsed = createParsedFinancialData({
       incomeStatement: {
         netTurnover: 3_370_595,
@@ -101,8 +103,8 @@ describe("parsedFinancialDataBridge", () => {
     });
 
     const mapped = mapParsedFinancialDataToMappedFinancialData(parsed);
-    expect(mapped.prod_vendue).toBeNull();
-    expect(mapped.ventes_march).toBe(3_370_595);
+    expect(mapped.prod_vendue).toBe(-7_105);
+    expect(mapped.ventes_march).toBe(3_377_700); // 3_370_595 - (-7_105)
   });
 });
 

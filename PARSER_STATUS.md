@@ -1,6 +1,6 @@
 # PARSER_STATUS.md — Quantis PDF Parser
 
-> Dernière mise à jour : 2026-04-13
+> Dernière mise à jour : 2026-04-13 (Lot 2)
 > Branche active : `feature/parser`
 
 ---
@@ -95,6 +95,10 @@ Ces 6 champs sont les plus importants pour Quantis :
 | `totalProducts` | Total produits | ✅ Couvert | |
 | `totalCharges` | Total charges | ✅ Couvert | |
 | `netResult` | Résultat net | ✅ Couvert — critique | |
+| `netTurnoverPreviousYear` | CA N-1 | ✅ Couvert (Lot 2) | Stratégie nMinus1 — débloque tcam |
+| `productionStored` | Production stockée | ✅ Couvert (Lot 2) | Stratégie signedRightmost |
+| `productionCapitalized` | Production immobilisée | ✅ Couvert (Lot 2) | |
+| `operatingSubsidies` | Subventions d'exploitation | ✅ Couvert (Lot 2) | |
 
 ### Bilan Actif
 
@@ -121,12 +125,21 @@ Ces 6 champs sont les plus importants pour Quantis :
 | Clé `FinancialFieldKey` | Champ métier | Statut | Notes |
 |---|---|---|---|
 | `equity` | Capitaux propres | ✅ Couvert — critique | |
+| `shareCapital` | Capital social | ✅ Couvert (Lot 2) | Code ligne 120 |
+| `revaluationDifferences` | Écarts de réévaluation | ✅ Couvert (Lot 2) | Code ligne 124 |
+| `legalReserves` | Réserve légale | ✅ Couvert (Lot 2) | Code ligne 126 |
+| `regulatoryReserves` | Réserves réglementées | ✅ Couvert (Lot 2) | Code ligne 130 |
+| `otherReserves` | Autres réserves | ✅ Couvert (Lot 2) | Code ligne 132 |
+| `retainedEarnings` | Report à nouveau | ✅ Couvert (Lot 2) | Code ligne 134 — peut être négatif |
+| `investmentSubsidies` | Subventions d'investissement | ✅ Couvert (Lot 2) | Code ligne 137 |
+| `regulatoryProvisions` | Provisions réglementées | ✅ Couvert (Lot 2) | Code ligne 140 |
 | `provisions` | Provisions risques/charges | ✅ Couvert | |
 | `borrowings` | Emprunts | ✅ Couvert | |
 | `debts` | Total dettes | ✅ Couvert — critique | |
 | `advancesAndPrepaymentsLiabilities` | Avances reçues passif | ✅ Couvert | |
 | `tradePayables` | Dettes fournisseurs | ✅ Couvert | |
-| `taxSocialPayables` | Dettes fiscales et sociales | ✅ Couvert | Récemment validé Lot 1 |
+| `taxSocialPayables` | Dettes fiscales et sociales | ✅ Couvert | Validé Lot 1 |
+| `associatesCurrentAccounts` | Comptes courants d'associés | ✅ Couvert (Lot 2) | Code ligne 173 |
 | `otherDebts` | Autres dettes | ✅ Couvert | |
 | `deferredIncome` | Produits constatés d'avance | ✅ Couvert | |
 | `totalLiabilities` | Total passif | ✅ Couvert | |
@@ -142,20 +155,9 @@ Ces champs existent dans `MappedFinancialData` mais ne sont pas mappés depuis `
 
 | Champ | Raison |
 |---|---|
-| `capital` | Sous-détail capitaux propres — non extrait |
-| `ecarts_reeval` | Sous-détail capitaux propres — non extrait |
-| `reserve_legale` | Sous-détail capitaux propres — non extrait |
-| `reserves_reglem` | Sous-détail capitaux propres — non extrait |
-| `autres_reserves` | Sous-détail capitaux propres — non extrait |
-| `ran` | Report à nouveau — non extrait |
-| `subv_invest` | Subventions d'investissement — non extrait |
-| `prov_reglem` | Provisions réglementées — non extrait |
-| `prod_stockee` | Production stockée — non extrait |
-| `prod_immo` | Production immobilisée — non extrait |
-| `subv_expl` | Subventions d'exploitation — non extrait |
-| `ca_n_minus_1` | CA N-1 — nécessite stratégie nMinus1 explicite |
-| `delta_bfr` | Variation BFR — nécessite 2 exercices |
-| `cca_passif` | Charges constatées d'avance passif — non extrait |
+| `delta_bfr` | Variation BFR — nécessite 2 exercices (calculé par kpiHistoryEngine) |
+
+> **Lot 2 terminé** : tous les sous-détails des capitaux propres (`capital`, `ecarts_reeval`, `reserve_legale`, `reserves_reglem`, `autres_reserves`, `ran`, `subv_invest`, `prov_reglem`), les lignes compte de résultat manquantes (`prod_stockee`, `prod_immo`, `subv_expl`), le CA N-1 (`ca_n_minus_1`) et les comptes courants d'associés (`cca_passif`) sont maintenant extraits.
 
 ---
 
@@ -191,3 +193,4 @@ Voir `PARSER_KPI_COVERAGE.md` pour le détail.
 | `services/financialMapping.test.ts` | Unitaire | financialMapping |
 | `services/kpiEngine.test.ts` | Unitaire | kpiEngine |
 | `services/mapping/parsedFinancialDataBridge.test.ts` | Unitaire | bridge |
+| `services/pdfParserLot2Consolidation.test.ts` | Unitaire (Lot 2) | CA N-1 + tcam, capitaux propres sub-fields, compte de résultat manquants |

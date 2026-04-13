@@ -17,9 +17,12 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
     totalActifImmoBrut: data.total_actif_immo_brut,
     totalActifImmo: data.total_actif_immo
   });
+  // sumPartial : dettes_fisc_soc peut être null (absent du bilan) → traité comme 0 pour le BFR
+  // et les ratios de liquidité, sans invalider tout le calcul.
+  const dettesCirculantes = sumPartial(data.fournisseurs, data.dettes_fisc_soc);
   const bfr = sub(
-    sum(data.total_stocks, data.creances),
-    sum(data.fournisseurs, data.dettes_fisc_soc)
+    sumPartial(data.total_stocks, data.creances),
+    dettesCirculantes
   );
   const rot_bfr = mul(div(bfr, mul(data.total_prod_expl, 1.2)), 365);
   const dso = div(mul(data.clients, 365), mul(data.total_prod_expl, 1.2));
@@ -30,9 +33,9 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const tn = sub(data.dispo, data.emprunts);
   const solvabilite = div(data.total_cp, data.total_passif);
   const gearing = div(sub(data.emprunts, data.dispo), ebitda);
-  const liq_gen = div(data.total_actif_circ, sum(data.fournisseurs, data.dettes_fisc_soc));
-  const liq_red = div(sum(data.creances, data.dispo), sum(data.fournisseurs, data.dettes_fisc_soc));
-  const liq_imm = div(data.dispo, sum(data.fournisseurs, data.dettes_fisc_soc));
+  const liq_gen = div(data.total_actif_circ, dettesCirculantes);
+  const liq_red = div(sum(data.creances, data.dispo), dettesCirculantes);
+  const liq_imm = div(data.dispo, dettesCirculantes);
   const disponibilites = data.dispo;
   const roce = div(mul(data.ebit, 0.75), sum(data.total_actif_immo, bfr));
   const roe = div(data.res_net, data.total_cp);
@@ -186,6 +189,13 @@ function sum(...values: Array<number | null>): number | null {
   return strictValues.reduce((acc, value) => acc + value, 0);
 }
 
+/** Somme partielle : ignore les null (traités comme 0). Retourne null seulement si TOUS les arguments sont null. */
+function sumPartial(...values: Array<number | null>): number | null {
+  const present = values.filter((v): v is number => v !== null);
+  if (!present.length) return null;
+  return present.reduce((acc, v) => acc + v, 0);
+}
+
 function sub(left: number | null, right: number | null): number | null {
   if (left === null || right === null) {
     return null;
@@ -256,7 +266,8 @@ function computeImmobilizationRatio(input: {
 }): number | null {
   const { totalActifImmoNet, totalActifImmoBrut, totalActifImmo } = input;
 
-  if (totalActifImmoNet !== null && totalActifImmoBrut !== null) {
+  // Le ratio n'a de sens que si brut ≠ net (sinon ils viennent de la même ligne, pas de distinction possible).
+  if (totalActifImmoNet !== null && totalActifImmoBrut !== null && totalActifImmoBrut !== totalActifImmoNet) {
     return div(totalActifImmoNet, totalActifImmoBrut);
   }
 

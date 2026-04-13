@@ -8,6 +8,9 @@ export type ParsedFinancialData = {
     productionSoldGoods: number | null;
     productionSoldServices: number | null;
     productionSold: number | null;
+    productionStored: number | null;
+    productionCapitalized: number | null;
+    operatingSubsidies: number | null;
     purchasesGoods: number | null;
     stockVariationGoods: number | null;
     rawMaterialPurchases: number | null;
@@ -19,6 +22,7 @@ export type ParsedFinancialData = {
     depreciationAllocations: number | null;
     provisionsAllocations: number | null;
     netTurnover: number | null;
+    netTurnoverPreviousYear: number | null;
     otherOperatingIncome: number | null;
     otherOperatingCharges: number | null;
     financialProducts: number | null;
@@ -54,6 +58,14 @@ export type ParsedFinancialData = {
     cashAndCashEquivalents: number | null;
     prepaidExpenses: number | null;
     totalAssets: number | null;
+    shareCapital: number | null;
+    revaluationDifferences: number | null;
+    legalReserves: number | null;
+    regulatoryReserves: number | null;
+    otherReserves: number | null;
+    retainedEarnings: number | null;
+    investmentSubsidies: number | null;
+    regulatoryProvisions: number | null;
     equity: number | null;
     provisions: number | null;
     borrowings: number | null;
@@ -61,6 +73,7 @@ export type ParsedFinancialData = {
     advancesAndPrepaymentsLiabilities: number | null;
     tradePayables: number | null;
     taxSocialPayables: number | null;
+    associatesCurrentAccounts: number | null;
     otherDebts: number | null;
     deferredIncome: number | null;
     totalLiabilities: number | null;
@@ -152,6 +165,10 @@ export type FinancialFieldKey =
   | "totalProducts"
   | "totalCharges"
   | "netResult"
+  | "netTurnoverPreviousYear"
+  | "productionStored"
+  | "productionCapitalized"
+  | "operatingSubsidies"
   | "intangibleAssets"
   | "tangibleAssets"
   | "financialAssets"
@@ -167,6 +184,14 @@ export type FinancialFieldKey =
   | "cashAndCashEquivalents"
   | "prepaidExpenses"
   | "totalAssets"
+  | "shareCapital"
+  | "revaluationDifferences"
+  | "legalReserves"
+  | "regulatoryReserves"
+  | "otherReserves"
+  | "retainedEarnings"
+  | "investmentSubsidies"
+  | "regulatoryProvisions"
   | "equity"
   | "provisions"
   | "borrowings"
@@ -174,6 +199,7 @@ export type FinancialFieldKey =
   | "advancesAndPrepaymentsLiabilities"
   | "tradePayables"
   | "taxSocialPayables"
+  | "associatesCurrentAccounts"
   | "otherDebts"
   | "deferredIncome"
   | "totalLiabilities"
@@ -192,6 +218,10 @@ export type FieldDefinition = {
   expectedLineCodes?: string[];
   minAbs?: number;
   allowNegative?: boolean;
+  /** Quand le label est un en-tête de section sans montant propre, sommer les sous-lignes. */
+  sublineStrategy?: "sum";
+  /** Patterns pour identifier les sous-lignes par contexte (cas où l'en-tête de section est absent du PDF). */
+  sublinePatterns?: RegExp[];
 };
 
 export type CandidateTrace = {
@@ -226,6 +256,9 @@ export function createEmptyParsedFinancialData(): ParsedFinancialData {
       productionSoldGoods: null,
       productionSoldServices: null,
       productionSold: null,
+      productionStored: null,
+      productionCapitalized: null,
+      operatingSubsidies: null,
       purchasesGoods: null,
       stockVariationGoods: null,
       rawMaterialPurchases: null,
@@ -237,6 +270,7 @@ export function createEmptyParsedFinancialData(): ParsedFinancialData {
       depreciationAllocations: null,
       provisionsAllocations: null,
       netTurnover: null,
+      netTurnoverPreviousYear: null,
       otherOperatingIncome: null,
       otherOperatingCharges: null,
       financialProducts: null,
@@ -272,6 +306,14 @@ export function createEmptyParsedFinancialData(): ParsedFinancialData {
       cashAndCashEquivalents: null,
       prepaidExpenses: null,
       totalAssets: null,
+      shareCapital: null,
+      revaluationDifferences: null,
+      legalReserves: null,
+      regulatoryReserves: null,
+      otherReserves: null,
+      retainedEarnings: null,
+      investmentSubsidies: null,
+      regulatoryProvisions: null,
       equity: null,
       provisions: null,
       borrowings: null,
@@ -279,6 +321,7 @@ export function createEmptyParsedFinancialData(): ParsedFinancialData {
       advancesAndPrepaymentsLiabilities: null,
       tradePayables: null,
       taxSocialPayables: null,
+      associatesCurrentAccounts: null,
       otherDebts: null,
       deferredIncome: null,
       totalLiabilities: null,

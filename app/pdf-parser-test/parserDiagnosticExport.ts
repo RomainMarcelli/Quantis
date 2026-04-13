@@ -166,6 +166,10 @@ const IMPORTANT_KPI_FIELDS = [
 
 const TRACE_FIELDS_BY_MAPPED: Record<string, string[]> = {
   ace: ["externalCharges"],
+  stocks_march: ["inventoriesGoods"],
+  avances_vers_actif: ["advancesAndPrepaymentsAssets"],
+  clients: ["tradeReceivables"],
+  dispo: ["cashAndCashEquivalents"],
   autres_creances: ["otherReceivables"],
   dettes_fisc_soc: ["taxSocialPayables"],
   prod_stockee: [],
@@ -514,6 +518,22 @@ function extractTargetRows(
   }
 
   const keywords = new Set<string>();
+  // Toujours exposer ces lignes pour débogage (champs remplis mais potentiellement erronés).
+  keywords.add("marchandises");
+  keywords.add("charges externes");
+  keywords.add("autres charges externes");
+  keywords.add("avances et acomptes verses");
+  keywords.add("clients");
+  keywords.add("disponibilites");
+  // CDR : toujours exposer pour détecter mauvaise sélection de colonne N vs N-1 (BEL AIR / DEC-009).
+  keywords.add("production vendue");
+  keywords.add("produits financiers");
+  keywords.add("charges financieres");
+  keywords.add("produits exceptionnels");
+  keywords.add("charges exceptionnelles");
+  keywords.add("autres creances");
+  keywords.add("dettes fiscales");
+
   missingMappedFields.forEach((field) => {
     switch (field) {
       case "ace":
@@ -593,7 +613,9 @@ function extractTargetRows(
         ? item.amountCandidates
             .filter((candidate): candidate is Record<string, unknown> => isRecord(candidate))
             .map((candidate) => ({
-              value: toNullableNumber(candidate.value)
+              value: toNullableNumber(candidate.value),
+              columnIndex: toNullableNumber(candidate.columnIndex),
+              headerHint: typeof candidate.headerHint === "string" ? candidate.headerHint : null
             }))
         : []
     }))

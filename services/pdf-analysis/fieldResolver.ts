@@ -6,7 +6,7 @@ import type {
   FieldDefinition,
   FieldSelectionTrace,
   FinancialFieldKey,
-  ReconstructedRow
+  ReconstructedRow,
 } from "@/services/pdf-analysis/types";
 
 type ScoredCandidate = {
@@ -38,6 +38,37 @@ export function resolveFieldValues(rows: ReconstructedRow[]): {
       alternatives: scored.slice(1, 6).map(toCandidateTrace)
     });
   });
+
+  // Post-processing : si un champ avec sublineStrategy "sum" n'a pas été résolu via l'ancre,
+  // tenter une sommation par contexte (scan de patterns connus dans la section — Bug 4).
+  for (const definition of FIELD_DEFINITIONS) {
+    if (
+      definition.sublineStrategy === "sum" &&
+      definition.sublinePatterns &&
+      values[definition.key] === null
+    ) {
+      const sum = collectSublineSumByContext(rows, definition);
+      if (sum !== null) {
+        values[definition.key] = sum;
+        const traceIndex = traces.findIndex((t) => t.field === definition.key);
+        const contextTrace = {
+          value: sum,
+          score: 150,
+          rowText: "subline-context-scan",
+          page: 0,
+          rowNumber: 0,
+          columnIndex: 0,
+          headerHint: null,
+          reason: "subline_context_sum"
+        };
+        if (traceIndex >= 0) {
+          traces[traceIndex] = { field: definition.key, selected: contextTrace, alternatives: [] };
+        } else {
+          traces.push({ field: definition.key, selected: contextTrace, alternatives: [] });
+        }
+      }
+    }
+  }
 
   return {
     values,
@@ -86,6 +117,36 @@ function collectCandidatesForField(rows: ReconstructedRow[], definition: FieldDe
     });
 
     if (!selectedAmount) {
+      // Bug 3 : label trouvé (ancre), pas de montant propre → sommer les sous-lignes.
+      if (definition.sublineStrategy === "sum" && row.amountCandidates.length === 0) {
+        const sublineSum = collectSublineSum(rows, rowIndex, definition);
+        if (sublineSum !== null) {
+          const syntheticCandidate: AmountCandidate = {
+            raw: String(sublineSum),
+            value: sublineSum,
+            columnIndex: 0,
+            headerHint: null,
+            charIndex: 0
+          };
+          const score =
+            computeCandidateScore({
+              row,
+              definition,
+              amountCandidate: syntheticCandidate,
+              labelMatch: fallbackByLineCode || fallbackBySectionContext ? 100 : labelMatch
+            }) + contextualBoost;
+          if (score > 0) {
+            candidates.push({
+              field: definition.key,
+              value: sublineSum,
+              score,
+              reason: `subline_sum;score=${score}`,
+              row,
+              amountCandidate: syntheticCandidate
+            });
+          }
+        }
+      }
       return;
     }
 
@@ -235,6 +296,15 @@ function computeCandidateScore(input: {
   const { row, definition, amountCandidate, labelMatch } = input;
   let score = labelMatch;
 
+  // Les lignes issues du parsing structuré de tableau (table rows) bénéficient d'un léger bonus :
+  // leurs candidats ont des indices de colonnes réels (cell positions), ce qui permet aux heuristiques
+  // de sélection (both-≥2, netPriority) de fonctionner correctement. Les lignes texte (text rows) ont
+  // des indices séquentiels (1, 2, 3…) qui déjouent ces heuristiques, notamment DEC-009 qui retourne
+  // le candidat le plus à droite — i.e. N-1 au lieu de N pour un CDR multi-colonnes (BEL AIR).
+  if (row.source === "table") {
+    score += 10;
+  }
+
   if (row.section === definition.section) {
     score += 55;
   } else if (row.section === "unknown") {
@@ -351,11 +421,40 @@ function selectAmountCandidate(input: {
       return withNetHeader;
     }
 
-    if (amountCandidates.length >= 4) {
-      return amountCandidates[amountCandidates.length - 2] ?? null;
+    // Les cellules tableau peuvent contenir des codes lignes (ex: "060" → valeur=60) comme
+    // artefacts. On filtre les candidats dont le raw a ≤ 3 chiffres (codes lignes) pour éviter
+    // qu'ils décalent la sélection brut/amort/net vers la mauvaise colonne.
+    const meaningful = amountCandidates.filter((candidate) => candidate.raw.replace(/\D/g, "").length > 3);
+    const pool = meaningful.length >= 2 ? meaningful : amountCandidates;
+
+    if (pool.length >= 4) {
+      return pool[pool.length - 2] ?? null;
     }
 
-    return amountCandidates[amountCandidates.length - 1] ?? null;
+    // Cas 2 candidats sans en-tête "net" détecté : le bilan actif BEL AIR a 3 colonnes
+    // (Brut / Amort / Net) mais Document AI n'aligne pas toujours la colonne Net sur la bonne ligne.
+    // → Deux patterns distincts :
+    if (pool.length === 2) {
+      const c0 = pool[0]; // colonne la plus à gauche (typiquement Brut)
+      const c1 = pool[1]; // colonne suivante
+
+      if (c0 && c1) {
+        // Pattern "valeur fugace" : c1 est disproportionnée par rapport à c0 (> 20x).
+        // C'est la valeur Net de la ligne précédente qui a glissé dans cette ligne. Retourner c0.
+        if (c0.value > 0 && c1.value > c0.value * 20) {
+          return c0;
+        }
+
+        // Pattern "Brut / Amortissements" : c0 > c1 > 0 avec un ratio cohérent (Amort ≥ 5% du Brut).
+        // Net = Brut − Amort. On retourne un candidat synthétique.
+        if (c0.value > 0 && c1.value > 0 && c0.value > c1.value && c1.value >= c0.value * 0.05) {
+          const computedNet = c0.value - c1.value;
+          return { ...c0, raw: String(computedNet), value: computedNet, headerHint: "computed_net" };
+        }
+      }
+    }
+
+    return pool[pool.length - 1] ?? null;
   }
 
   if (strategy === "leftmost") {
@@ -423,48 +522,9 @@ function chooseLikelyIncomeStatementCurrentCandidate(candidates: AmountCandidate
   }
 
   const ordered = [...candidates].sort((left, right) => left.columnIndex - right.columnIndex);
-  if (ordered.length >= 3) {
-    const first = ordered[0];
-    const second = ordered[1];
-    const third = ordered[2];
-    if (first && second && third) {
-      const firstAsCurrentDelta = first.value - second.value;
-      const secondAsCurrentDelta = second.value - first.value;
-      const tolerance = computeVariationTolerance(first.value, second.value, third.value);
 
-      if (Math.abs(third.value - firstAsCurrentDelta) <= tolerance) {
-        return first;
-      }
-
-      if (Math.abs(third.value - secondAsCurrentDelta) <= tolerance) {
-        return second;
-      }
-    }
-  }
-
-  if (ordered.length === 1) {
-    return ordered[0] ?? null;
-  }
-
-  const first = ordered[0];
-  const second = ordered[1];
-  if (!first || !second) {
-    return ordered[0] ?? null;
-  }
-
-  const firstAbs = Math.abs(first.value);
-  const secondAbs = Math.abs(second.value);
-  const firstLooksLikeNoise = firstAbs > 0 && firstAbs < 100_000 && secondAbs > firstAbs * 5;
-  if (firstLooksLikeNoise) {
-    return second;
-  }
-
-  return second;
-}
-
-function computeVariationTolerance(left: number, right: number, delta: number): number {
-  const magnitude = Math.max(Math.abs(left), Math.abs(right), Math.abs(delta), 1);
-  return Math.max(2_000, magnitude * 0.02);
+  // DEC-009 : fallback vers le candidat le plus à droite (col N dans une liasse 2 colonnes).
+  return ordered[ordered.length - 1] ?? null;
 }
 
 function isExcluded(normalizedLabel: string, excludes: readonly string[]): boolean {
@@ -492,6 +552,126 @@ function normalize(value: string): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Sélectionne le montant d'une sous-ligne selon la stratégie du champ parent. */
+function pickSublineAmount(row: ReconstructedRow, strategy: FieldColumnStrategy): number | null {
+  const meaningful = row.amountCandidates.filter(
+    (c) => c.raw.replace(/\D/g, "").length > 3
+  );
+  const pool = meaningful.length >= 1 ? meaningful : row.amountCandidates;
+  if (pool.length === 0) return null;
+
+  if (strategy === "netPriority" || strategy === "nMinus1") {
+    return pool[pool.length - 1]?.value ?? null;
+  }
+  // nCurrent / leftmost / signedRightmost : colonne la plus à gauche = valeur N
+  const ordered = [...pool].sort((a, b) => a.columnIndex - b.columnIndex);
+  return ordered[0]?.value ?? null;
+}
+
+/**
+ * Bug 3 — Ancre trouvée sans montant : scanner les sous-lignes en avant jusqu'à un total ou
+ * un changement de section, et sommer leurs montants.
+ */
+function collectSublineSum(
+  rows: ReconstructedRow[],
+  anchorIndex: number,
+  definition: FieldDefinition
+): number | null {
+  const MAX_SCAN = 15;
+  let total = 0;
+  let count = 0;
+
+  console.log(`[SUBLINE-DEBUG] collectSublineSum field="${definition.key}" section="${definition.section}" anchorIdx=${anchorIndex} anchorLabel="${rows[anchorIndex]?.normalizedLabel}"`);
+
+  for (let i = anchorIndex + 1; i < rows.length && i <= anchorIndex + MAX_SCAN; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    if (row.section !== definition.section && row.section !== "unknown") {
+      console.log(`[SUBLINE-DEBUG]   STOP section mismatch: row="${row.normalizedLabel}" rowSection="${row.section}" defSection="${definition.section}"`);
+      break;
+    }
+    // Arrêter uniquement sur les totaux de section majeurs (Total I, Total actif, Total général…).
+    // Les sous-totaux intermédiaires (Total créances, Total dettes…) ne doivent pas couper le scan.
+    const isMajorSectionTotal =
+      /\btotal\s*\((?:i{1,3}v?|vi{0,3}|[1-9])\)/.test(row.normalizedLabel) ||
+      /\btotal\s+(?:actif|passif|g[eé]n[eé]ral|dettes|emprunts|capitaux)/.test(row.normalizedLabel) ||
+      /\btotal\s+(?:i{1,3}|iv)\b/.test(row.normalizedLabel);
+    if (isMajorSectionTotal) {
+      console.log(`[SUBLINE-DEBUG]   STOP majorTotal: row="${row.normalizedLabel}"`);
+      break;
+    }
+    if (row.amountCandidates.length === 0) {
+      console.log(`[SUBLINE-DEBUG]   SKIP no-candidates: row="${row.normalizedLabel}"`);
+      continue;
+    }
+
+    const amount = pickSublineAmount(row, definition.columnStrategy);
+    console.log(`[SUBLINE-DEBUG]   row="${row.normalizedLabel}" amount=${amount} candidates=${JSON.stringify(row.amountCandidates.map(c => ({ v: c.value, col: c.columnIndex })))}`);
+    if (amount !== null && Math.abs(amount) > 0) {
+      total += amount;
+      count++;
+    }
+  }
+
+  console.log(`[SUBLINE-DEBUG]   → total=${total} count=${count} result=${count >= 1 ? total : null}`);
+  return count >= 1 ? total : null;
+}
+
+/**
+ * Bug 4 — Ancre absente du PDF : identifier les sous-lignes par leurs propres patterns
+ * et sommer leurs montants. Nécessite ≥2 lignes correspondantes pour la confiance.
+ */
+function collectSublineSumByContext(
+  rows: ReconstructedRow[],
+  definition: FieldDefinition
+): number | null {
+  if (!definition.sublinePatterns || definition.sublinePatterns.length === 0) return null;
+
+  console.log(`[SUBLINE-DEBUG] collectSublineSumByContext field="${definition.key}" patterns=${JSON.stringify(definition.sublinePatterns.map(p => p.source))}`);
+
+  // Tentative 1 : filtre strict de section (definition.section + "unknown")
+  let matchingRows = findRowsBySublinePatterns(rows, definition, /* strictSection */ true);
+  console.log(`[SUBLINE-DEBUG]   strict match count=${matchingRows.length}`);
+
+  // Tentative 2 : si moins de 2 matchs, relâcher le filtre de section (sous-lignes parfois mal
+  // classifiées dans le parser — notamment dans les PDFs avec des sections mixtes).
+  if (matchingRows.length < 2) {
+    matchingRows = findRowsBySublinePatterns(rows, definition, /* strictSection */ false);
+    console.log(`[SUBLINE-DEBUG]   relaxed match count=${matchingRows.length}`);
+  }
+
+  if (matchingRows.length < 2) {
+    console.log(`[SUBLINE-DEBUG]   → null (insufficient matches)`);
+    return null;
+  }
+
+  let total = 0;
+  for (const row of matchingRows) {
+    const amount = pickSublineAmount(row, definition.columnStrategy);
+    console.log(`[SUBLINE-DEBUG]   matched row="${row.normalizedLabel}" amount=${amount} section="${row.section}" candidates=${JSON.stringify(row.amountCandidates.map(c => ({ v: c.value, col: c.columnIndex })))}`);
+    if (amount !== null) total += amount;
+  }
+
+  console.log(`[SUBLINE-DEBUG]   → total=${total}`);
+  return total;
+}
+
+function findRowsBySublinePatterns(
+  rows: ReconstructedRow[],
+  definition: FieldDefinition,
+  strictSection: boolean
+): ReconstructedRow[] {
+  const result: ReconstructedRow[] = [];
+  for (const row of rows) {
+    if (strictSection && row.section !== definition.section && row.section !== "unknown") continue;
+    if (row.amountCandidates.length === 0) continue;
+    if (definition.sublinePatterns?.some((p) => p.test(row.normalizedLabel))) {
+      result.push(row);
+    }
+  }
+  return result;
 }
 
 function hasContextBefore(input: {

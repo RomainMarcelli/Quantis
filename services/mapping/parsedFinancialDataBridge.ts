@@ -36,12 +36,21 @@ export function mapParsedFinancialDataToMappedFinancialData(
   mapped.cca = toNumber(balanceSheet.prepaidExpenses);
   mapped.total_actif_circ = toNumber(balanceSheet.totalCurrentAssets);
   mapped.total_actif = toNumber(balanceSheet.totalAssets);
+  mapped.capital = toNumber(balanceSheet.shareCapital);
+  mapped.ecarts_reeval = toNumber(balanceSheet.revaluationDifferences);
+  mapped.reserve_legale = toNumber(balanceSheet.legalReserves);
+  mapped.reserves_reglem = toNumber(balanceSheet.regulatoryReserves);
+  mapped.autres_reserves = toNumber(balanceSheet.otherReserves);
+  mapped.ran = toNumber(balanceSheet.retainedEarnings);
+  mapped.subv_invest = toNumber(balanceSheet.investmentSubsidies);
+  mapped.prov_reglem = toNumber(balanceSheet.regulatoryProvisions);
   mapped.total_cp = toNumber(balanceSheet.equity);
   mapped.total_prov = toNumber(balanceSheet.provisions);
   mapped.emprunts = toNumber(balanceSheet.borrowings);
   mapped.avances_recues_passif = toNumber(balanceSheet.advancesAndPrepaymentsLiabilities);
   mapped.fournisseurs = toNumber(balanceSheet.tradePayables);
   mapped.dettes_fisc_soc = toNumber(balanceSheet.taxSocialPayables);
+  mapped.cca_passif = toNumber(balanceSheet.associatesCurrentAccounts);
   mapped.autres_dettes = toNumber(balanceSheet.otherDebts);
   mapped.pca = toNumber(balanceSheet.deferredIncome);
   mapped.total_dettes = toNumber(balanceSheet.debts);
@@ -59,8 +68,12 @@ export function mapParsedFinancialDataToMappedFinancialData(
     mapped.ventes_march,
     deriveSalesGoodsFromNetTurnover(netTurnover, mapped.prod_vendue)
   );
+  mapped.prod_stockee = toNumber(incomeStatement.productionStored);
+  mapped.prod_immo = toNumber(incomeStatement.productionCapitalized);
+  mapped.subv_expl = toNumber(incomeStatement.operatingSubsidies);
   mapped.total_prod_expl = toNumber(incomeStatement.totalOperatingProducts);
   mapped.autres_prod_expl = toNumber(incomeStatement.otherOperatingIncome);
+  mapped.ca_n_minus_1 = toNumber(incomeStatement.netTurnoverPreviousYear);
 
   mapped.achats_march = toNumber(incomeStatement.purchasesGoods);
   mapped.var_stock_march = toNumber(incomeStatement.stockVariationGoods);
@@ -132,15 +145,13 @@ function sanitizeProductionSold(
     return null;
   }
 
-  if (productionSold < 0) {
-    return null;
-  }
-
+  // prod_vendue peut être négatif (ex: retours sur production, entreprises de services).
+  // On garde le check de cohérence sur la valeur absolue pour rejeter les aberrations.
   if (netTurnover === null) {
     return productionSold;
   }
 
-  if (productionSold > netTurnover * 1.15) {
+  if (Math.abs(productionSold) > Math.abs(netTurnover) * 1.15) {
     return null;
   }
 
