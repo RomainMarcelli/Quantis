@@ -189,7 +189,6 @@ const TRACE_FIELDS_BY_MAPPED: Record<string, string[]> = {
   dprov: ["provisionsAllocations"],
   total_actif_circ: ["totalCurrentAssets"],
   total_actif_immo: ["totalFixedAssets"],
-  avances_vers_actif: ["advancesAndPrepaymentsAssets"],
   vmp: ["marketableSecurities"],
   avances_recues_passif: ["advancesAndPrepaymentsLiabilities"],
   total_prov: ["provisions"],

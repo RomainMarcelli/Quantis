@@ -56,7 +56,8 @@ export async function processPdfWithDocumentAI(
       rawDocument: {
         content: pdfBuffer.toString("base64"),
         mimeType
-      }
+      },
+      imagelessMode: true
     });
     responseDocument = response.document;
   } catch (error) {

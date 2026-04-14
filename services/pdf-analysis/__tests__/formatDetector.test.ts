@@ -81,4 +81,9 @@ describe("detectDocumentFormat", () => {
     const rawText = "CHIFFRES D'AFFAIRES NETS 209 10 307 405 3 370 595";
     expect(detectDocumentFormat(rawText)).toBe("2033-sd");
   });
+
+  it("détecte 'regnology' via la mention Regnology en pied de page", () => {
+    const rawText = "Bilan Actif\nVente de marchandises\n© Regnology\nFin du document";
+    expect(detectDocumentFormat(rawText)).toBe("regnology");
+  });
 });

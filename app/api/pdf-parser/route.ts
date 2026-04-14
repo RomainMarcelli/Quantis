@@ -13,6 +13,11 @@ import {
   type DetectedFinancialSections,
   type ParsedFinancialData
 } from "@/services/pdfAnalysis";
+import { extractFinancialPages } from "@/services/pdf-analysis/pdfPageExtractor";
+import {
+  deleteReducedPdf,
+  storeReducedPdf
+} from "@/services/pdf-analysis/reducedPdfStore";
 import {
   getUserAnalyses,
   saveAnalysis
@@ -27,14 +32,21 @@ import {
 
 export const runtime = "nodejs";
 
+type PdfExtractionSummary = {
+  originalPages: number;
+  extractedPages: number;
+};
+
 type PdfParserSuccessResponse = {
   success: true;
   parserVersion: "analysis-engine-v2";
+  requestId: string | null;
   quantisData: QuantisFinancialData;
   mappedData: Record<string, number | null>;
   kpis: Record<string, number | null>;
   confidenceScore: number;
   warnings: string[];
+  pdfExtraction: PdfExtractionSummary | null;
   persistence: {
     saved: boolean;
     analysisId: string | null;
@@ -241,20 +253,48 @@ export async function POST(request: NextRequest) {
     }
 
     const arrayBuffer = await file.arrayBuffer();
-    const pdfBuffer = Buffer.from(arrayBuffer);
+    const originalPdfBuffer = Buffer.from(arrayBuffer);
     const mimeType = file.type || "application/pdf";
-    if (progressRequestId) {
-      updatePdfParserProgress(progressRequestId, {
-        progress: 20,
-        currentStep: "Traitement Document AI..."
-      });
-    }
 
     console.info("[api/pdf-parser] PDF upload received", {
       fileName: file.name,
       mimeType,
       fileSizeBytes: file.size
     });
+
+    if (progressRequestId) {
+      updatePdfParserProgress(progressRequestId, {
+        progress: 10,
+        currentStep: "Pré-traitement PDF (pages financières)..."
+      });
+    }
+
+    const pageExtraction = await extractFinancialPages(originalPdfBuffer);
+    const pdfBuffer = pageExtraction.buffer;
+    const pdfExtractionSummary: PdfExtractionSummary | null =
+      pageExtraction.originalPages > 0
+        ? {
+            originalPages: pageExtraction.originalPages,
+            extractedPages: pageExtraction.extractedPages
+          }
+        : null;
+    if (pdfExtractionSummary) {
+      console.info("[api/pdf-parser] PDF page extraction", pdfExtractionSummary);
+    }
+
+    const hasReduction =
+      pdfExtractionSummary !== null &&
+      pdfExtractionSummary.extractedPages < pdfExtractionSummary.originalPages;
+    if (hasReduction && progressRequestId) {
+      storeReducedPdf(progressRequestId, pdfBuffer);
+    }
+
+    if (progressRequestId) {
+      updatePdfParserProgress(progressRequestId, {
+        progress: 20,
+        currentStep: "Traitement Document AI..."
+      });
+    }
 
     const extraction = await processPdfWithDocumentAI({
       pdfBuffer,
@@ -322,11 +362,13 @@ export async function POST(request: NextRequest) {
     const responseBody: PdfParserSuccessResponse = {
       success: true,
       parserVersion: "analysis-engine-v2",
+      requestId: progressRequestId,
       quantisData,
       mappedData,
       kpis,
       confidenceScore: diagnostics.confidenceScore,
       warnings,
+      pdfExtraction: pdfExtractionSummary,
       persistence
     };
 
@@ -380,6 +422,7 @@ export async function POST(request: NextRequest) {
         currentStep: "Echec du traitement.",
         error: mappedError.detail ?? mappedError.error
       });
+      deleteReducedPdf(progressRequestId);
     }
     console.error("[api/pdf-parser] Processing failed", {
       detail: mappedError.detail,

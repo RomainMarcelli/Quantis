@@ -1,4 +1,4 @@
-export type DocumentFormat = "2033-sd" | "dgfip-2050" | "sage" | "unknown";
+export type DocumentFormat = "2033-sd" | "dgfip-2050" | "sage" | "regnology" | "unknown";
 
 // ---- DGFiP 2050 ----
 //
@@ -29,6 +29,13 @@ const FORMAT_SAGE_COPYRIGHT_PATTERN = /©\s*Sage/i;
 const FORMAT_SAGE_CDR_TITLE_PATTERN = /Compte de R[ée]sultat \(Premi[èe]re Partie\)/i;
 const FORMAT_SAGE_IMMOB_TOTAL_PATTERN = /TOTAL\s+immobilisations\s+incorporelles/i;
 
+// ---- Regnology (logiciel comptable — layout 4 colonnes Brut/Amort/Net/N-1) ----
+//
+// Signature simple : mention "Regnology" en pied de page (présente sur toutes
+// les pages exportées). Placé en fin de détection pour ne pas hijacker un
+// document DGFiP 2050 ou Sage qui citerait accidentellement Regnology.
+const FORMAT_REGNOLOGY_PATTERN = /Regnology/i;
+
 export function detectDocumentFormat(rawText: string): DocumentFormat {
   if (!rawText || rawText.trim().length === 0) {
     return "unknown";
@@ -49,6 +56,10 @@ export function detectDocumentFormat(rawText: string): DocumentFormat {
 
   if (countSageSignals(rawText) >= 2) {
     return "sage";
+  }
+
+  if (FORMAT_REGNOLOGY_PATTERN.test(rawText)) {
+    return "regnology";
   }
 
   return "2033-sd";

@@ -177,6 +177,7 @@ export function AnalysisResultPanel(props: AnalysisResultPanelProps) {
         {remainingSeconds !== null ? (
           <p className="mt-2 text-xs text-white/55">Temps estime restant: {Math.max(0, Math.floor(remainingSeconds))} s</p>
         ) : null}
+        <ReducedPdfInfo payload={successPayload} />
       </div>
 
       <MessagePanel networkError={networkError} apiErrorMessage={apiErrorMessage} warnings={warnings} />
@@ -347,6 +348,38 @@ function MessagePanel(props: {
         </p>
       ))}
     </section>
+  );
+}
+
+function ReducedPdfInfo({ payload }: { payload: ParserSuccessPayload | null }) {
+  if (!payload) return null;
+  const extraction = payload.pdfExtraction;
+  if (!extraction) return null;
+  const { originalPages, extractedPages } = extraction;
+  const hasReduction = extractedPages < originalPages;
+  const requestId = payload.requestId ?? null;
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-white/70">
+      <span>
+        Pages analysees: {extractedPages} / {originalPages}
+        {hasReduction ? " (reduction automatique)" : ""}
+      </span>
+      {hasReduction && requestId ? (
+        <button
+          type="button"
+          onClick={() => {
+            window.open(
+              `/api/pdf-parser/reduced-pdf?requestId=${encodeURIComponent(requestId)}`,
+              "_blank"
+            );
+          }}
+          className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-white/85 transition hover:bg-white/15"
+        >
+          {`📄 Voir le PDF analyse (${extractedPages} pages sur ${originalPages})`}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

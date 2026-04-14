@@ -1,4 +1,5 @@
 import { analyzeDocument2050 } from "@/services/pdf-analysis/analysisEngine2050";
+import { analyzeDocumentRegnology } from "@/services/pdf-analysis/analysisEngineRegnology";
 import { analyzeDocumentSage } from "@/services/pdf-analysis/analysisEngineSage";
 import { buildDiagnostics } from "@/services/pdf-analysis/diagnostics";
 import { resolveFieldValues } from "@/services/pdf-analysis/fieldResolver";
@@ -26,6 +27,9 @@ export function analyzeFinancialDocument(document: DocumentAIResponse): Analysis
   }
   if (format === "sage") {
     return analyzeDocumentSage(document);
+  }
+  if (format === "regnology") {
+    return analyzeDocumentRegnology(document);
   }
 
   const rows = buildReconstructedRows(document);

@@ -9,14 +9,21 @@ export type QuantisData = {
 
 export type NumericRecord = Record<string, number | null>;
 
+export type PdfExtractionSummary = {
+  originalPages: number;
+  extractedPages: number;
+};
+
 export type ParserSuccessPayload = {
   success: true;
   parserVersion?: string;
+  requestId?: string | null;
   quantisData: QuantisData;
   mappedData?: NumericRecord;
   kpis?: NumericRecord;
   confidenceScore: number;
   warnings: string[];
+  pdfExtraction?: PdfExtractionSummary | null;
   persistence: {
     saved: boolean;
     analysisId: string | null;
