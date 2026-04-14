@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { describe, it } from "vitest";
 import { loadEnvConfig } from "@next/env";
 
@@ -86,6 +86,30 @@ describe.skipIf(!RUN_DIAGNOSTIC)("BEL AIR CDR diagnostic", () => {
 
     console.log(`\n========== BEL AIR DIAGNOSTIC ==========`);
     console.log(`PDF utilisé : ${usedPath}`);
+
+    if (process.env.SAVE_BELAIR_FIXTURE === "true") {
+      const fixturePath = join(
+        process.cwd(),
+        "services/pdf-analysis/fixtures/belair-docai.json"
+      );
+      mkdirSync(dirname(fixturePath), { recursive: true });
+      // On ne garde que les `tables` de chaque page (le reste — tokens, bounding boxes,
+      // layout pixel — pèse ~16 MB et n'est pas utilisé par le parser). Pour BEL AIR,
+      // `tables` est vide, donc on produit une fixture minimale.
+      const trimmedPages = documentAiResponse.pages.map((page) => {
+        const record = page as Record<string, unknown>;
+        return {
+          tables: Array.isArray(record.tables) ? record.tables : []
+        };
+      });
+      const payload = {
+        rawText: documentAiResponse.rawText,
+        pages: trimmedPages,
+        tables: documentAiResponse.tables
+      };
+      writeFileSync(fixturePath, JSON.stringify(payload, null, 2));
+      console.log(`[FIXTURE] écrit : ${fixturePath} (${JSON.stringify(payload).length} octets)`);
+    }
 
     console.log(`rawText length: ${documentAiResponse.rawText.length}`);
     console.log(`pages: ${documentAiResponse.pages.length}`);

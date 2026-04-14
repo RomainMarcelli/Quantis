@@ -1,5 +1,7 @@
+import { analyzeDocument2050 } from "@/services/pdf-analysis/analysisEngine2050";
 import { buildDiagnostics } from "@/services/pdf-analysis/diagnostics";
 import { resolveFieldValues } from "@/services/pdf-analysis/fieldResolver";
+import { detectDocumentFormat } from "@/services/pdf-analysis/formatDetector";
 import {
   buildReconstructedRows,
   detectCdrLayout,
@@ -17,6 +19,11 @@ import type {
 import { mapFieldValuesToParsedData } from "@/services/pdf-analysis/valueMapping";
 
 export function analyzeFinancialDocument(document: DocumentAIResponse): AnalysisResult {
+  const format = detectDocumentFormat(document.rawText ?? "");
+  if (format === "dgfip-2050") {
+    return analyzeDocument2050(document);
+  }
+
   const rows = buildReconstructedRows(document);
   const detectedSections = detectSectionsFromRows(rows);
   const cdrLayout = detectCdrLayout(rows);
