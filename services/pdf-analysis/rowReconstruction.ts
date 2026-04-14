@@ -165,7 +165,14 @@ function buildTextRows(rawLines: RawLine[]): ReconstructedRow[] {
         break;
       }
 
-      const extracted = extractAmountCandidatesFromText({ text: nextLine.text });
+      // La ligne est déjà validée comme amount-only pure (isAmountOnlyLine ci-dessus),
+      // donc aucun risque de confondre un montant avec un code de ligne : on lève le
+      // filtre `digitsOnly.length <= 3` pour capturer les petits montants légitimes
+      // (ex : BEL AIR "Production vendue services" = 74 €).
+      const extracted = extractAmountCandidatesFromText({
+        text: nextLine.text,
+        allowSmallValues: true
+      });
       if (extracted.length > 0) {
         const first = extracted[0];
         if (first) {

@@ -6,8 +6,9 @@ const AMOUNT_PATTERN =
 export function extractAmountCandidatesFromText(input: {
   text: string;
   headersByColumn?: Record<number, string>;
+  allowSmallValues?: boolean;
 }): AmountCandidate[] {
-  const { text, headersByColumn = {} } = input;
+  const { text, headersByColumn = {}, allowSmallValues = false } = input;
   const candidates: AmountCandidate[] = [];
 
   for (const match of text.matchAll(AMOUNT_PATTERN)) {
@@ -18,7 +19,10 @@ export function extractAmountCandidatesFromText(input: {
     }
 
     const digitsOnly = raw.replace(/\D/g, "");
-    if (digitsOnly.length <= 3 || looksLikeYear(digitsOnly)) {
+    if (looksLikeYear(digitsOnly)) {
+      continue;
+    }
+    if (!allowSmallValues && digitsOnly.length <= 3) {
       continue;
     }
 

@@ -1,3 +1,4 @@
+import { parseFinancialAmount } from "@/services/pdf-analysis/amountParsing";
 import { FIELD_DEFINITIONS } from "@/services/pdf-analysis/labelDictionary";
 import type {
   AmountCandidate,
@@ -21,7 +22,8 @@ type ScoredCandidate = {
 
 export function resolveFieldValues(
   rows: ReconstructedRow[],
-  cdrLayout: CdrLayout = "unknown"
+  cdrLayout: CdrLayout = "unknown",
+  rawText: string = ""
 ): {
   values: Record<FinancialFieldKey, number | null>;
   traces: FieldSelectionTrace[];
@@ -30,7 +32,7 @@ export function resolveFieldValues(
   const traces: FieldSelectionTrace[] = [];
 
   FIELD_DEFINITIONS.forEach((definition) => {
-    const scored = collectCandidatesForField(rows, definition, cdrLayout)
+    const scored = collectCandidatesForField(rows, definition, cdrLayout, rawText)
       .sort((left, right) => right.score - left.score || Math.abs(right.value) - Math.abs(left.value));
 
     const selected = scored[0] ?? null;
@@ -51,7 +53,7 @@ export function resolveFieldValues(
       definition.sublinePatterns &&
       values[definition.key] === null
     ) {
-      const sum = collectSublineSumByContext(rows, definition);
+      const sum = collectSublineSumByContext(rows, definition, rawText);
       if (sum !== null) {
         values[definition.key] = sum;
         const traceIndex = traces.findIndex((t) => t.field === definition.key);
@@ -83,7 +85,8 @@ export function resolveFieldValues(
 function collectCandidatesForField(
   rows: ReconstructedRow[],
   definition: FieldDefinition,
-  cdrLayout: CdrLayout
+  cdrLayout: CdrLayout,
+  rawText: string
 ): ScoredCandidate[] {
   const candidates: ScoredCandidate[] = [];
 
@@ -128,7 +131,7 @@ function collectCandidatesForField(
     if (!selectedAmount) {
       // Bug 3 : label trouvé (ancre), pas de montant propre → sommer les sous-lignes.
       if (definition.sublineStrategy === "sum" && row.amountCandidates.length === 0) {
-        const sublineSum = collectSublineSum(rows, rowIndex, definition);
+        const sublineSum = collectSublineSum(rows, rowIndex, definition, rawText);
         if (sublineSum !== null) {
           const syntheticCandidate: AmountCandidate = {
             raw: String(sublineSum),
@@ -616,8 +619,26 @@ function pickSublineAmount(row: ReconstructedRow, strategy: FieldColumnStrategy)
 function collectSublineSum(
   rows: ReconstructedRow[],
   anchorIndex: number,
-  definition: FieldDefinition
+  definition: FieldDefinition,
+  rawText: string
 ): number | null {
+  // Stratégie raw-text : pour les PDFs où Document AI émet le bilan en column-major
+  // (bloc de labels consécutifs puis bloc d'amounts orphelins, cf. BEL AIR),
+  // les rows reconstruites ont des candidates vides. On scanne directement le rawText,
+  // on détecte des triplets [N, N-1, Variation] validés par |col3| ≈ |col1 − col2|,
+  // puis on mappe ordinalement les labels matchant sublinePatterns aux triplets.
+  const anchorRow = rows[anchorIndex];
+  if (rawText && anchorRow && definition.sublinePatterns && definition.sublinePatterns.length > 0) {
+    const rawResult = collectSublineSumFromRawText({
+      rawText,
+      anchorNormalizedLabel: anchorRow.normalizedLabel,
+      definition
+    });
+    if (rawResult !== null) {
+      return rawResult;
+    }
+  }
+
   const MAX_SCAN = 15;
   let total = 0;
   let count = 0;
@@ -659,12 +680,146 @@ function collectSublineSum(
 }
 
 /**
+ * Scan du rawText brut pour détecter un bloc "labels puis amounts" (column-major OCR).
+ * Détecte des triplets [N, N-1, Variation] validés par |col3| ≈ |col1 − col2|,
+ * puis mappe ordinalement les labels matchant sublinePatterns aux triplets trouvés.
+ * Retourne la somme des col1 des triplets ainsi mappés.
+ */
+function collectSublineSumFromRawText(input: {
+  rawText: string;
+  anchorNormalizedLabel: string;
+  definition: FieldDefinition;
+}): number | null {
+  const { rawText, anchorNormalizedLabel, definition } = input;
+  if (!definition.sublinePatterns || definition.sublinePatterns.length === 0) {
+    return null;
+  }
+
+  const rawLines = rawText
+    .split(/\r?\n/g)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const anchorLineIdx = rawLines.findIndex((line) => {
+    const normalized = normalize(line);
+    return normalized === anchorNormalizedLabel || normalized.startsWith(anchorNormalizedLabel);
+  });
+  if (anchorLineIdx < 0) {
+    return null;
+  }
+
+  const MAX_LABEL_SCAN = 20;
+  const MAX_VALUE_SCAN = 60;
+
+  const labelBlock: string[] = [];
+  let cursor = anchorLineIdx + 1;
+  while (cursor < rawLines.length && labelBlock.length < MAX_LABEL_SCAN) {
+    const line = rawLines[cursor];
+    if (!line) {
+      cursor += 1;
+      continue;
+    }
+    if (isAmountOnlyLineRaw(line)) break;
+    const normalized = normalize(line);
+    if (isMajorSectionTotalPattern(normalized)) {
+      return null;
+    }
+    labelBlock.push(normalized);
+    cursor += 1;
+  }
+
+  if (labelBlock.length === 0) {
+    return null;
+  }
+
+  const valueBlock: number[] = [];
+  while (cursor < rawLines.length && valueBlock.length < MAX_VALUE_SCAN) {
+    const line = rawLines[cursor];
+    if (!line) {
+      cursor += 1;
+      continue;
+    }
+    if (!isAmountOnlyLineRaw(line)) break;
+    const amount = parseFinancialAmount(line);
+    if (amount === null) break;
+    valueBlock.push(amount);
+    cursor += 1;
+  }
+
+  if (valueBlock.length < 3) {
+    console.log(`[SUBLINE-RAW] field=${definition.key} valueBlock too short (${valueBlock.length})`);
+    return null;
+  }
+
+  const tripletCol1Values: number[] = [];
+  for (let i = 0; i + 2 < valueBlock.length; i += 3) {
+    const col1 = valueBlock[i] ?? 0;
+    const col2 = valueBlock[i + 1] ?? 0;
+    const col3 = valueBlock[i + 2] ?? 0;
+    const expected = Math.abs(col1 - col2);
+    const observed = Math.abs(col3);
+    const tolerance = Math.max(2_000, expected * 0.02);
+    if (Math.abs(observed - expected) <= tolerance) {
+      tripletCol1Values.push(col1);
+    } else {
+      break;
+    }
+  }
+
+  if (tripletCol1Values.length === 0) {
+    console.log(`[SUBLINE-RAW] field=${definition.key} no valid triplets in valueBlock=${JSON.stringify(valueBlock.slice(0, 15))}`);
+    return null;
+  }
+
+  const matchedLabelIndices: number[] = [];
+  for (let i = 0; i < labelBlock.length; i += 1) {
+    const label = labelBlock[i] ?? "";
+    if (definition.sublinePatterns.some((pattern) => pattern.test(label))) {
+      matchedLabelIndices.push(i);
+    }
+  }
+
+  if (matchedLabelIndices.length === 0) {
+    console.log(`[SUBLINE-RAW] field=${definition.key} no sublinePattern match in labelBlock=${JSON.stringify(labelBlock)}`);
+    return null;
+  }
+
+  const mappedCount = Math.min(matchedLabelIndices.length, tripletCol1Values.length);
+  let total = 0;
+  for (let i = 0; i < mappedCount; i += 1) {
+    total += tripletCol1Values[i] ?? 0;
+  }
+
+  console.log(
+    `[SUBLINE-RAW] field=${definition.key} anchor="${anchorNormalizedLabel}" triplets=${tripletCol1Values.length} matchedLabels=${matchedLabelIndices.length} mapped=${mappedCount} total=${total}`
+  );
+  return total;
+}
+
+function isAmountOnlyLineRaw(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (/[A-Za-zÀ-ÿ]/.test(trimmed)) return false;
+  const compact = trimmed.replace(/[\s\u00A0\u202F]/g, "");
+  return /^-?\(?\d[\d.,]*\)?$/.test(compact);
+}
+
+function isMajorSectionTotalPattern(normalized: string): boolean {
+  return (
+    /\btotal\s*\((?:i{1,3}v?|vi{0,3}|[1-9])\)/.test(normalized) ||
+    /\btotal\s+(?:actif|passif|g[eé]n[eé]ral|dettes|emprunts|capitaux)/.test(normalized) ||
+    /\btotal\s+(?:i{1,3}|iv)\b/.test(normalized)
+  );
+}
+
+/**
  * Bug 4 — Ancre absente du PDF : identifier les sous-lignes par leurs propres patterns
  * et sommer leurs montants. Nécessite ≥2 lignes correspondantes pour la confiance.
  */
 function collectSublineSumByContext(
   rows: ReconstructedRow[],
-  definition: FieldDefinition
+  definition: FieldDefinition,
+  _rawText: string
 ): number | null {
   if (!definition.sublinePatterns || definition.sublinePatterns.length === 0) return null;
 

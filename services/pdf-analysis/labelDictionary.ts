@@ -483,7 +483,12 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     regexAliases: regex(/\bautres\s+creances?\b/),
     excludes: alias("passif"),
     expectedLineCodes: ["072"],
-    sublineStrategy: "sum"
+    sublineStrategy: "sum",
+    sublinePatterns: [
+      /\bpersonnel\b/,
+      /\borganismes?\s+sociaux\b/,
+      /^autres$/
+    ]
   },
   {
     key: "marketableSecurities",

@@ -20,7 +20,7 @@ export function analyzeFinancialDocument(document: DocumentAIResponse): Analysis
   const rows = buildReconstructedRows(document);
   const detectedSections = detectSectionsFromRows(rows);
   const cdrLayout = detectCdrLayout(rows);
-  const { values, traces } = resolveFieldValues(rows, cdrLayout);
+  const { values, traces } = resolveFieldValues(rows, cdrLayout, document.rawText);
   const parsedFinancialData = mapFieldValuesToParsedData(values);
   const diagnostics = buildDiagnostics({
     parsedFinancialData,

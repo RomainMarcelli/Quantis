@@ -183,6 +183,50 @@ Nouveau champ `sublineStrategy: "sum"` et `sublinePatterns?: RegExp[]` dans `Fie
 
 ---
 
+## DBG-008 — autres_creances BEL AIR : bilan actif column-major sans cohésion exploitable
+
+### Problème
+
+Sur BEL AIR, le bilan actif autour de l'ancre `Autres créances` présente un pattern column-major : 9 labels consécutifs sans montants, puis un bloc de 24 valeurs amount-only, puis label suivant. Le parser actuel (post-Lot 5) tente une stratégie rawText avec détection de triplets `[N, N-1, Variation]` validés par `|col3| ≈ |col1 − col2|` (qui fonctionne sur le passif), mais cette stratégie échoue pour l'actif.
+
+### Analyse
+
+Le bilan actif BEL AIR suit vraisemblablement un layout `(Brut, Amortissements, Net)` (3 colonnes, confirmé par `TOTAL (II) = [5 275 349, 2 454 213, 2 821 136]` où `5 275 349 − 2 454 213 = 2 821 136` ✓). **Sans colonne Variation, il n'y a aucun signal mathématique de cohésion** pour détecter automatiquement la structure.
+
+Les 24 valeurs observées ne matchent aucune règle simple :
+- Ni triplets `[N, N-1, Var]` (cohésion échoue dès le premier triplet)
+- Ni doublets `[Net, N-1]` avec mapping positionnel (les positions attendues 0, 4, 12 pour Personnel/OS/Autres ne suivent pas de stride régulier)
+- Ni quadruplets `[Brut, Amort, Net, N-1]` (aucune row ne valide `Brut − Amort = Net`)
+
+`document.tables` retourne `0` → pas de fallback structurel.
+
+### Valeurs attendues (depuis inspection manuelle)
+
+```
+Personnel          = 16 458
+Organismes sociaux = 16 025
+Autres             = 726 707
+Total              = 759 190
+```
+
+Ces valeurs **existent** dans le rawText aux positions 0, 4, 12 du valueBlock, mais sans règle déterministe pour les extraire automatiquement.
+
+### Statut
+
+**Différé, hors périmètre rawText scan.** Le fix nécessite l'une de :
+
+1. **`document.tables` structuré** — tester avec un processeur Document AI qui extrait les tables (actuel retourne `tables: 0` sur BEL AIR)
+2. **Re-OCR ciblé** — appliquer un OCR avec layout zone-based sur la région du bilan actif
+3. **Inspection manuelle du PDF** — documenter le layout réel page par page pour construire une heuristique field-specific
+
+Dans l'intervalle, `otherReceivables` retombe sur le fallback `collectSublineSum` row-based qui retourne une valeur erronée (30 768 = somme de lignes non pertinentes). Impact : `autres_creances` sous-évalué → `creances` sous-évalué → `bfr` et `dso` biaisés.
+
+### Mitigation en place
+
+Aucune. Le champ est marqué comme fragile dans les tests de cohérence et devrait être inspecté manuellement après chaque parsing BEL AIR.
+
+---
+
 ## DBG-007 — prod_vendue négatif refusé à tort
 
 ### Problème

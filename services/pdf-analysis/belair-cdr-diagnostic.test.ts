@@ -19,7 +19,11 @@ const TARGET_FIELDS = new Set([
   "exceptionalProducts",
   "exceptionalCharges",
   "totalOperatingProducts",
-  "totalOperatingCharges"
+  "totalOperatingCharges",
+  "productionSoldGoods",
+  "productionSoldServices",
+  "productionSold",
+  "netTurnover"
 ]);
 
 const CDR_LABEL_PATTERNS = [
@@ -171,7 +175,12 @@ describe.skipIf(!RUN_DIAGNOSTIC)("BEL AIR CDR diagnostic", () => {
           total_prod_expl: mapped.total_prod_expl,
           total_charges_expl: mapped.total_charges_expl,
           ca: mapped.ca,
-          resultat_exercice: mapped.resultat_exercice
+          resultat_exercice: mapped.resultat_exercice,
+          autres_creances: mapped.autres_creances,
+          dettes_fisc_soc: mapped.dettes_fisc_soc,
+          dispo: mapped.dispo,
+          clients: mapped.clients,
+          prod_vendue: mapped.prod_vendue
         },
         null,
         2
@@ -208,6 +217,68 @@ describe.skipIf(!RUN_DIAGNOSTIC)("BEL AIR CDR diagnostic", () => {
         2
       )
     );
+
+    console.log(`\n========== DUMP ROWS AUTOUR DES ANCRES BILAN / CDR ==========`);
+    const ANCHOR_PATTERNS: Array<{ label: string; pattern: RegExp; before?: number; after?: number }> = [
+      { label: "otherReceivables (autres creances)", pattern: /^autres\s+creances?\b/ },
+      { label: "taxSocialPayables (dettes fiscales et sociales)", pattern: /^dettes?\s+fiscales?\s+et\s+sociales?\b/ },
+      { label: "productionSoldServices (production vendue services)", pattern: /production\s+vendue.*services?/, before: 5, after: 5 }
+    ];
+
+    for (const { label, pattern, before = 20, after = 20 } of ANCHOR_PATTERNS) {
+      const anchorIndex = analysis.rows.findIndex((row) => pattern.test(row.normalizedLabel));
+      console.log(`\n--- ${label} ---`);
+      if (anchorIndex < 0) {
+        console.log(`  (ancre introuvable)`);
+        continue;
+      }
+      console.log(`  anchorIndex=${anchorIndex}`);
+      const start = Math.max(0, anchorIndex - before);
+      const end = Math.min(analysis.rows.length, anchorIndex + after + 1);
+      for (let i = start; i < end; i++) {
+        const row = analysis.rows[i];
+        if (!row) continue;
+        const marker = i === anchorIndex ? " <== ANCHOR" : "";
+        console.log(
+          JSON.stringify(
+            {
+              idx: i,
+              rowNumber: row.rowNumber,
+              page: row.page,
+              source: row.source,
+              section: row.section,
+              label: row.label,
+              fullText: row.fullText.slice(0, 120),
+              lineCode: row.lineCode,
+              candidates: row.amountCandidates.map((c) => ({
+                value: c.value,
+                columnIndex: c.columnIndex,
+                raw: c.raw
+              }))
+            }
+          ) + marker
+        );
+      }
+    }
+
+    console.log(`\n========== DUMP RAW TEXT BRUT (extraits pertinents) ==========`);
+    const rawText = documentAiResponse.rawText;
+    const RAW_MARKERS = [
+      { label: "autres creances", pattern: /autres\s+cr[eé]ances/i },
+      { label: "dettes fiscales et sociales", pattern: /dettes?\s+fiscales?\s+et\s+sociales?/i },
+      { label: "production vendue services", pattern: /production\s+vendue[^\n]*services?/i }
+    ];
+    for (const { label, pattern } of RAW_MARKERS) {
+      const match = pattern.exec(rawText);
+      if (!match) {
+        console.log(`\n--- raw ${label} : introuvable ---`);
+        continue;
+      }
+      const start = Math.max(0, match.index - 200);
+      const end = Math.min(rawText.length, match.index + 3000);
+      console.log(`\n--- raw ${label} (pos ${match.index}) ---`);
+      console.log(rawText.slice(start, end));
+    }
 
     console.log(`\n========== FIN DIAGNOSTIC ==========\n`);
   }, 120_000);
