@@ -67,9 +67,23 @@
 
 ---
 
-## DEC-009 — Colonne N = colonne la plus à droite dans le fallback 2 colonnes sans en-tête
-**Date** : 2026-04-13 (Lot 2)
-**Décision** : quand `chooseLikelyIncomeStatementCurrentCandidate` ne peut pas identifier la colonne N via les en-têtes ni via la logique de delta à 3 colonnes, elle retourne la valeur la plus à droite (`return second`).
-**Raison** : comportement validé sur les liasses réelles traitées (certains logiciels comptables — e.g. Cegid — placent N-1 à gauche et N à droite dans un format 2 colonnes sans en-tête). Changer ce comportement a provoqué des régressions sur les tests pdfAnalysis.test.ts qui modélisent ce format.
-**Impact** : les tests Lot 2 utilisant le format 2 colonnes N à gauche / N-1 à droite (format standard 2033-SD) doivent soit (a) placer la valeur N en colonne droite, soit (b) utiliser des en-têtes explicites, soit (c) utiliser une ligne à colonne unique pour le champ N.
-**Voir** : `PARSER_DEBUG_NOTES.md` pour l'analyse détaillée.
+## DEC-009 — Détection automatique du layout CDR depuis l'en-tête
+**Date** : 2026-04-14 (Lot 4 — révision de la décision initiale du Lot 2)
+**Décision** : le layout du CDR est détecté automatiquement depuis la présence et l'ordre des ancres textuelles « Exercice clos » et « Exercice précédent » dans la section incomeStatement.
+
+- **Layout standard (2033-SD, ex : BEL AIR)** : « Exercice clos » apparaît avant « Exercice précédent » dans l'ordre de lecture Document AI → `col1 = N`, `col2 = N-1`, `col3 = Variation absolue` (quand présente). Pour 2 candidats comme pour 3 candidats, on retourne `col1`.
+- **Layout inversé (ex : Cegid)** : « Exercice précédent » apparaît avant « Exercice clos » → `col1 = N-1`, `col2 = N`. Fallback rightmost.
+- **Layout inconnu** : aucune ou une seule des deux ancres détectée → fallback rightmost (comportement pré-Lot 4, préserve les fixtures historiques).
+
+**Raison** : le comportement unique « rightmost » du Lot 2 était correct pour Cegid mais incorrect pour BEL AIR et le format standard 2033-SD où N est à gauche. Les 9 champs CDR (externalCharges, wages, socialCharges, depreciationAllocations, taxesAndLevies, exceptionalProducts, exceptionalCharges, totalOperatingProducts, totalOperatingCharges) retournaient systématiquement N-1 ou la variation absolue au lieu de N sur BEL AIR.
+
+**Implémentation** : `detectCdrLayout(rows)` dans [services/pdf-analysis/rowReconstruction.ts](services/pdf-analysis/rowReconstruction.ts) est appelé par `analyzeFinancialDocument`, puis propagé à `resolveFieldValues` → `selectAmountCandidate` via le paramètre `cdrLayout`. La branche `nCurrent` consulte le layout pour décider entre `ordered[0]` (standard) et `chooseLikelyIncomeStatementCurrentCandidate` (inverted/unknown → rightmost).
+
+**Limite connue** : lorsqu'une ligne « total » a 3 candidats en layout standard `[N, N-1, |Variation|]`, on retourne `col1 = N`. Si un PDF inconnu a une quatrième colonne insérée en tête (e.g. un index ou un code), `col1` serait incorrect. À surveiller en Lot 5 si un cas réel se présente.
+
+**Impact sur les fixtures** :
+- Fixture historique `"extrait les champs critiques sur une liasse multi-colonnes"` : pas d'ancre → layout unknown → rightmost → comportement inchangé.
+- Nouvelle fixture `"applique le layout CDR standard (BEL AIR)"` : structure multi-ligne Document AI avec ancres « Exercice clos » / « Exercice precedent » → layout standard → col1.
+- Nouvelle fixture `"layout CDR unknown ... fallback DEC-009 rightmost"` : documente explicitement le fallback.
+
+**Voir** : `PARSER_DEBUG_NOTES.md` DBG-001 pour l'historique du problème, et les traces de diagnostic BEL AIR dans `services/pdf-analysis/belair-cdr-diagnostic.test.ts` (skipped par défaut, activable via `RUN_BELAIR_DIAGNOSTIC=true`).

@@ -2,6 +2,7 @@ import { extractAmountCandidatesFromText, parseFinancialAmount } from "@/service
 import { SECTION_HEADING_PATTERNS, SECTION_KEYWORDS } from "@/services/pdf-analysis/labelDictionary";
 import type {
   AmountCandidate,
+  CdrLayout,
   DocumentAIResponse,
   ReconstructedRow,
   SectionKey
@@ -43,6 +44,40 @@ export function detectSectionsFromRows(rows: ReconstructedRow[]) {
     incomeStatement: hasIncome,
     balanceSheet: hasBalance
   };
+}
+
+// Détecte l'ordre des colonnes N vs N-1 dans le CDR à partir des ancres textuelles
+// "Exercice clos" / "Exercice précédent". L'ordre de lecture de Document AI (gauche→droite,
+// haut→bas) implique que la première ancre rencontrée correspond à la colonne la plus à gauche.
+export function detectCdrLayout(rows: ReconstructedRow[]): CdrLayout {
+  const closAnchor = findFirstAnchor(rows, /\bexercice\s+clos\b/);
+  const precAnchor = findFirstAnchor(rows, /\bexercice\s+precedent\b/);
+
+  if (!closAnchor || !precAnchor) {
+    return "unknown";
+  }
+
+  if (closAnchor.page !== precAnchor.page) {
+    return closAnchor.page < precAnchor.page ? "standard" : "inverted";
+  }
+
+  if (closAnchor.rowNumber !== precAnchor.rowNumber) {
+    return closAnchor.rowNumber < precAnchor.rowNumber ? "standard" : "inverted";
+  }
+
+  return "unknown";
+}
+
+function findFirstAnchor(rows: ReconstructedRow[], pattern: RegExp): ReconstructedRow | null {
+  for (const row of rows) {
+    if (row.section === "balanceSheet") {
+      continue;
+    }
+    if (pattern.test(row.normalizedLabel)) {
+      return row;
+    }
+  }
+  return null;
 }
 
 function buildRawLines(rawText: string): RawLine[] {

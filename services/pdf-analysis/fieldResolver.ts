@@ -2,6 +2,7 @@ import { FIELD_DEFINITIONS } from "@/services/pdf-analysis/labelDictionary";
 import type {
   AmountCandidate,
   CandidateTrace,
+  CdrLayout,
   FieldColumnStrategy,
   FieldDefinition,
   FieldSelectionTrace,
@@ -18,7 +19,10 @@ type ScoredCandidate = {
   amountCandidate: AmountCandidate;
 };
 
-export function resolveFieldValues(rows: ReconstructedRow[]): {
+export function resolveFieldValues(
+  rows: ReconstructedRow[],
+  cdrLayout: CdrLayout = "unknown"
+): {
   values: Record<FinancialFieldKey, number | null>;
   traces: FieldSelectionTrace[];
 } {
@@ -26,7 +30,7 @@ export function resolveFieldValues(rows: ReconstructedRow[]): {
   const traces: FieldSelectionTrace[] = [];
 
   FIELD_DEFINITIONS.forEach((definition) => {
-    const scored = collectCandidatesForField(rows, definition)
+    const scored = collectCandidatesForField(rows, definition, cdrLayout)
       .sort((left, right) => right.score - left.score || Math.abs(right.value) - Math.abs(left.value));
 
     const selected = scored[0] ?? null;
@@ -76,7 +80,11 @@ export function resolveFieldValues(rows: ReconstructedRow[]): {
   };
 }
 
-function collectCandidatesForField(rows: ReconstructedRow[], definition: FieldDefinition): ScoredCandidate[] {
+function collectCandidatesForField(
+  rows: ReconstructedRow[],
+  definition: FieldDefinition,
+  cdrLayout: CdrLayout
+): ScoredCandidate[] {
   const candidates: ScoredCandidate[] = [];
 
   rows.forEach((row, rowIndex) => {
@@ -113,7 +121,8 @@ function collectCandidatesForField(rows: ReconstructedRow[], definition: FieldDe
       amountCandidates: row.amountCandidates,
       strategy: definition.columnStrategy,
       definition,
-      row
+      row,
+      cdrLayout
     });
 
     if (!selectedAmount) {
@@ -399,8 +408,9 @@ function selectAmountCandidate(input: {
   strategy: FieldColumnStrategy;
   definition: FieldDefinition;
   row: ReconstructedRow;
+  cdrLayout: CdrLayout;
 }): AmountCandidate | null {
-  const { amountCandidates, strategy, definition, row } = input;
+  const { amountCandidates, strategy, definition, row, cdrLayout } = input;
   if (!amountCandidates.length) {
     return null;
   }
@@ -473,6 +483,35 @@ function selectAmountCandidate(input: {
     }
 
     if (definition.section === "incomeStatement") {
+      // Layout standard 2033-SD (ex : BEL AIR) : col1 = N, col2 = N-1, col3 = Variation.
+      // En présence de 3 candidats, on ignore la colonne Variation en prenant col1.
+      if (cdrLayout === "standard") {
+        const ordered = [...amountCandidates].sort((left, right) => left.columnIndex - right.columnIndex);
+
+        // Pour les lignes "total" avec 3 candidats : vérifier la cohérence de la colonne Variation.
+        // Si |col3| ≈ |col2 − col1| → triplet valide [N, N-1, Variation], retourner col1 = N.
+        // Sinon → données OCR corrompues (col1 ou col3 parasite) → retourner le candidat de
+        // plus grande magnitude comme heuristique (un "total" d'exploitation BEL AIR ≫ ses parasites).
+        if (definition.kind === "total" && ordered.length === 3) {
+          const col1 = ordered[0];
+          const col2 = ordered[1];
+          const col3 = ordered[2];
+          if (col1 && col2 && col3) {
+            const expectedVariation = Math.abs(col2.value - col1.value);
+            const observedVariation = Math.abs(col3.value);
+            const tolerance = Math.max(2_000, expectedVariation * 0.02);
+            if (Math.abs(observedVariation - expectedVariation) <= tolerance) {
+              return col1;
+            }
+            const byMagnitude = [col1, col2, col3].slice().sort(
+              (left, right) => Math.abs(right.value) - Math.abs(left.value)
+            );
+            return byMagnitude[0] ?? col1;
+          }
+        }
+
+        return ordered[0] ?? null;
+      }
       return chooseLikelyIncomeStatementCurrentCandidate(amountCandidates);
     }
 

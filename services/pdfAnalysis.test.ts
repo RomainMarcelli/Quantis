@@ -204,4 +204,74 @@ describe("pdfAnalysis", () => {
     expect(parsed.balanceSheet.marketableSecurities).toBe(12500);
     expect(parsed.balanceSheet.advancesAndPrepaymentsLiabilities).toBe(422085);
   });
+
+  it("applique le layout CDR standard (BEL AIR) : col1 = N, col2 = N-1, col3 = Variation", () => {
+    // Structure Document AI réelle BEL AIR : label seul sur une ligne,
+    // puis chaque montant sur une ligne amount-only (collectés par lookahead).
+    const sample: DocumentAIResponse = {
+      rawText: [
+        "COMPTE DE RESULTAT",
+        "Exercice clos le",
+        "Exercice precedent",
+        "Autres achats et charges externes",
+        "2 021 227",
+        "2 475 744",
+        "Salaires et traitements",
+        "1 322 825",
+        "1 841 783",
+        "Charges sociales",
+        "333 335",
+        "537 771",
+        "Dotations aux amortissements",
+        "39 108",
+        "59 972",
+        "Impots, taxes et versements assimiles",
+        "77 597",
+        "110 554",
+        "Total des produits d'exploitation",
+        "6 008 761",
+        "6 598 806",
+        "590 045",
+        "Total des produits exceptionnels",
+        "29 082",
+        "271 780",
+        "242 698",
+        "Total des charges exceptionnelles",
+        "944 845",
+        "1 126 450",
+        "181 605"
+      ].join("\n"),
+      pages: [],
+      tables: []
+    };
+
+    const parsed = extractFinancialData(sample);
+
+    expect(parsed.incomeStatement.externalCharges).toBe(2021227);
+    expect(parsed.incomeStatement.wages).toBe(1322825);
+    expect(parsed.incomeStatement.socialCharges).toBe(333335);
+    expect(parsed.incomeStatement.depreciationAllocations).toBe(39108);
+    expect(parsed.incomeStatement.taxesAndLevies).toBe(77597);
+    expect(parsed.incomeStatement.exceptionalProducts).toBe(29082);
+    expect(parsed.incomeStatement.exceptionalCharges).toBe(944845);
+    expect(parsed.incomeStatement.totalOperatingProducts).toBe(6008761);
+  });
+
+  it("layout CDR unknown (pas d'ancre Exercice clos) : fallback DEC-009 rightmost", () => {
+    // Identique au test Cegid historique mais isolé pour documenter le comportement fallback.
+    const sample: DocumentAIResponse = {
+      rawText: [
+        "COMPTE DE RESULTAT",
+        "CHIFFRES D'AFFAIRES NETS 209 10 307 405 3 370 595",
+        "Total des charges d'exploitation (II) 264 11 304 983 7 736 512"
+      ].join("\n"),
+      pages: [],
+      tables: []
+    };
+
+    const parsed = extractFinancialData(sample);
+    // Pas d'ancre Exercice clos → layout unknown → rightmost (3 370 595 et 7 736 512).
+    expect(parsed.incomeStatement.netTurnover).toBe(3370595);
+    expect(parsed.incomeStatement.totalOperatingCharges).toBe(7736512);
+  });
 });

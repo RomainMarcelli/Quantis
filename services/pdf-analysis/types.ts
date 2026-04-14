@@ -90,6 +90,8 @@ export type DetectedFinancialSections = {
 
 export type SectionKey = "incomeStatement" | "balanceSheet" | "unknown";
 
+export type CdrLayout = "standard" | "inverted" | "unknown";
+
 export type FinancialExtractionDiagnostics = {
   confidenceScore: number;
   warnings: string[];

@@ -1,6 +1,10 @@
 import { buildDiagnostics } from "@/services/pdf-analysis/diagnostics";
 import { resolveFieldValues } from "@/services/pdf-analysis/fieldResolver";
-import { detectSectionsFromRows, buildReconstructedRows } from "@/services/pdf-analysis/rowReconstruction";
+import {
+  buildReconstructedRows,
+  detectCdrLayout,
+  detectSectionsFromRows
+} from "@/services/pdf-analysis/rowReconstruction";
 import type {
   AnalysisResult,
   DetectedFinancialSections,
@@ -15,7 +19,8 @@ import { mapFieldValuesToParsedData } from "@/services/pdf-analysis/valueMapping
 export function analyzeFinancialDocument(document: DocumentAIResponse): AnalysisResult {
   const rows = buildReconstructedRows(document);
   const detectedSections = detectSectionsFromRows(rows);
-  const { values, traces } = resolveFieldValues(rows);
+  const cdrLayout = detectCdrLayout(rows);
+  const { values, traces } = resolveFieldValues(rows, cdrLayout);
   const parsedFinancialData = mapFieldValuesToParsedData(values);
   const diagnostics = buildDiagnostics({
     parsedFinancialData,

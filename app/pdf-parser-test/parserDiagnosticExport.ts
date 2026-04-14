@@ -122,6 +122,10 @@ export type ParserDiagnostic = {
 
 const IMPORTANT_MAPPED_FIELDS = [
   "ace",
+  "salaires",
+  "charges_soc",
+  "dap",
+  "impots_taxes",
   "autres_creances",
   "dettes_fisc_soc",
   "total_actif_circ",
@@ -466,7 +470,17 @@ function buildMappedFamilies(mapped: Record<string, number | null>) {
 
   const actif = byPredicate((key) => key.startsWith("immob_") || key.includes("actif") || key.includes("stocks") || key === "clients" || key === "autres_creances" || key === "creances" || key === "dispo");
   const passif = byPredicate((key) => key.includes("dettes") || key.includes("fournisseurs") || key.includes("emprunts") || key.includes("cp") || key.includes("passif"));
-  const income = byPredicate((key) => key.includes("ventes") || key.includes("prod") || key.includes("charges") || key.includes("achats") || key.includes("resultat") || key === "ace");
+  const income = byPredicate((key) =>
+    key.includes("ventes") ||
+    key.includes("prod") ||
+    key.includes("charges") ||
+    key.includes("achats") ||
+    key.includes("resultat") ||
+    key === "ace" ||
+    key === "salaires" ||
+    key === "dap" ||
+    key === "impots_taxes"
+  );
   const transformations = byPredicate((key) => key === "n" || key.includes("delta") || key.includes("n_minus_1"));
 
   return { actif, passif, income, transformations };
