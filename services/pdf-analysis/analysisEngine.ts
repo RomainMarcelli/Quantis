@@ -1,4 +1,5 @@
 import { analyzeDocument2050 } from "@/services/pdf-analysis/analysisEngine2050";
+import { analyzeDocumentSage } from "@/services/pdf-analysis/analysisEngineSage";
 import { buildDiagnostics } from "@/services/pdf-analysis/diagnostics";
 import { resolveFieldValues } from "@/services/pdf-analysis/fieldResolver";
 import { detectDocumentFormat } from "@/services/pdf-analysis/formatDetector";
@@ -22,6 +23,9 @@ export function analyzeFinancialDocument(document: DocumentAIResponse): Analysis
   const format = detectDocumentFormat(document.rawText ?? "");
   if (format === "dgfip-2050") {
     return analyzeDocument2050(document);
+  }
+  if (format === "sage") {
+    return analyzeDocumentSage(document);
   }
 
   const rows = buildReconstructedRows(document);

@@ -26,6 +26,36 @@ describe("detectDocumentFormat", () => {
     expect(detectDocumentFormat(rawText)).toBe("dgfip-2050");
   });
 
+  it("détecte 'sage' sur la fixture TROIS V", () => {
+    const rawText = loadFixtureRawText("troisv-docai.json");
+    expect(detectDocumentFormat(rawText)).toBe("sage");
+  });
+
+  it("détecte 'sage' via la combinaison © Sage + Compte de Résultat (Première Partie)", () => {
+    const rawText = "Header\n© Sage\nMilieu\nCompte de Résultat (Première Partie)\nFin";
+    expect(detectDocumentFormat(rawText)).toBe("sage");
+  });
+
+  it("détecte 'sage' via © Sage + TOTAL immobilisations incorporelles", () => {
+    const rawText = "© Sage\nBilan Actif\nTOTAL immobilisations incorporelles : 94 394";
+    expect(detectDocumentFormat(rawText)).toBe("sage");
+  });
+
+  it("ne détecte PAS 'sage' avec seulement 1 signal isolé (© Sage seul)", () => {
+    const rawText = "Entête neutre\n© Sage\nRapport commercial sans autre marqueur";
+    expect(detectDocumentFormat(rawText)).toBe("2033-sd");
+  });
+
+  it("ne détecte PAS 'sage' avec seulement 'Compte de Résultat (Première Partie)' isolé", () => {
+    const rawText = "Compte de Résultat (Première Partie)\nAutre texte neutre";
+    expect(detectDocumentFormat(rawText)).toBe("2033-sd");
+  });
+
+  it("DGFiP 2050 gagne sur Sage si les deux marqueurs coexistent", () => {
+    const rawText = "© Sage\nCompte de Résultat (Première Partie)\nDGFiP N° 2050";
+    expect(detectDocumentFormat(rawText)).toBe("dgfip-2050");
+  });
+
   it("détecte 'dgfip-2050' via le titre DGFiP N° 2050", () => {
     const rawText = "Quelques lignes\nDGFiP N° 2050\nFin du document";
     expect(detectDocumentFormat(rawText)).toBe("dgfip-2050");
