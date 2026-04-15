@@ -1,10 +1,9 @@
 import { buildDiagnostics } from "@/services/pdf-analysis/diagnostics";
-import { buildReconstructedRows } from "@/services/pdf-analysis/rowReconstruction";
 import {
-  extractRegnologyBilanActifFromRawText,
-  extractRegnologyBilanPassifValues,
-  extractRegnologyCdrValues
-} from "@/services/pdf-analysis/rowReconstructionRegnology";
+  buildRegnologyVisualLines,
+  extractRegnologyValuesFromVisualLines
+} from "@/services/pdf-analysis/spatialExtractorRegnology";
+import { buildReconstructedRows } from "@/services/pdf-analysis/rowReconstruction";
 import type {
   AnalysisResult,
   DocumentAIResponse,
@@ -28,8 +27,26 @@ import { mapFieldValuesToParsedData } from "@/services/pdf-analysis/valueMapping
 // Debug : définir REGNOLOGY_DEBUG=true pour activer 2 logs d'inspection
 // (pré-extraction : rows + sections ; post-extraction : valeurs par section).
 export function analyzeDocumentRegnology(document: DocumentAIResponse): AnalysisResult {
-  const rawText = document.rawText ?? "";
   const rows = buildReconstructedRows(document);
+  // ---- Extraction spatiale unique (remplace CDR/actif/passif rawText) ----
+  //
+  // Les 3 extracteurs précédents (rows reconstruites + walker rawText) ne
+  // géraient pas correctement la structure column-major 3 passes du rawText
+  // Regnology. Le nouveau pipeline passe par les coordonnées spatiales des
+  // tokens Document AI : reconstitution de lignes visuelles → label + values
+  // sur chaque ligne → match dictionary → sélection colonne.
+  const visualLines = buildRegnologyVisualLines(document);
+  console.log("[regnology-spatial] total visual lines:", visualLines.length);
+  console.log(
+    "[regnology-spatial] sample lines 0-20:",
+    visualLines.slice(0, 20).map((l) => `[${l.orientation}] "${l.text.trim()}"`)
+  );
+
+  const {
+    cdr: cdrValues,
+    bilanActif: bilanActifValues,
+    bilanPassif: bilanPassifValues
+  } = extractRegnologyValuesFromVisualLines(visualLines);
 
   if (isRegnologyDebugEnabled()) {
     logPreExtractionSnapshot(rows);
@@ -39,20 +56,12 @@ export function analyzeDocumentRegnology(document: DocumentAIResponse): Analysis
   const traces: FieldSelectionTrace[] = [];
 
   // ---- CDR Regnology ----
-  const cdrValues = extractRegnologyCdrValues(rows);
   for (const [field, value] of cdrValues) {
     values[field] = value;
     traces.push(buildTrace(field, value, "regnology-cdr", "regnology_cdr_label_match"));
   }
 
   // ---- Bilan actif Regnology ----
-  //
-  // On utilise le walker rawText dédié (extractRegnologyBilanActifFromRawText)
-  // au lieu de l'extracteur basé sur les rows reconstruites, car
-  // buildReconstructedRows ne gère pas correctement les rows détail à 4
-  // colonnes Brut/Amort/Net N/Net N-1 (il ne produit qu'un candidat par row
-  // détail → récupère du Brut au lieu du Net N).
-  const bilanActifValues = extractRegnologyBilanActifFromRawText(rawText);
   for (const [field, value] of bilanActifValues) {
     values[field] = value;
     traces.push(
@@ -61,7 +70,6 @@ export function analyzeDocumentRegnology(document: DocumentAIResponse): Analysis
   }
 
   // ---- Bilan passif Regnology ----
-  const bilanPassifValues = extractRegnologyBilanPassifValues(rows);
   for (const [field, value] of bilanPassifValues) {
     values[field] = value;
     traces.push(

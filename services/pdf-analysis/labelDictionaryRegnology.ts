@@ -29,33 +29,37 @@ type RegnologyLabelEntry = {
 // alternatives (U+0027 vs U+2019) sont tolérées via la classe ['']. Les
 // accents majuscules sont optionnels (BENEFICE/BÉNÉFICE, IMMOBILISE/IMMOBILISÉ).
 export const REGNOLOGY_CDR_LABELS: readonly RegnologyLabelEntry[] = [
-  // Produits d'exploitation
-  { pattern: /^Vente de marchandises$/i, field: "salesGoods" },
-  { pattern: /^Production vendue$/i, field: "productionSold" },
+  // Produits d'exploitation — singulier (Regnology) + pluriel (2033-sd variant)
+  { pattern: /^Vente[s]? de marchandises/i, field: "salesGoods" },
+  { pattern: /^Production vendue/i, field: "productionSold" },
   {
-    pattern: /^Montant net du chiffre d['']affaires$/i,
+    pattern: /^Montant net du chiffre d['']affaires/i,
     field: "netTurnover"
   },
 
   // Charges d'exploitation
-  { pattern: /^Autres achats et charges externes$/i, field: "externalCharges" },
+  { pattern: /^Autres achats et charges externes/i, field: "externalCharges" },
   { pattern: /^Salaires$/i, field: "wages" },
   { pattern: /^Cotisations sociales$/i, field: "socialCharges" },
   // dap : la ligne est souvent imprimée avec un tiret de puce initial et un
   // tiret séparateur interne. Regex tolérante sur les 3 variantes de dash
   // (U+002D, U+2013, U+2014) et le whitespace.
   {
-    pattern: /^\s*[-–—]?\s*Sur immobilisations\s*[-–—]\s*dotations aux amortissements$/i,
+    pattern: /^\s*[-–—]?\s*Sur immobilisations\s*[-–—]\s*dotations aux amortissements/i,
     field: "depreciationAllocations"
   },
   {
-    pattern: /^TOTAL DES CHARGES D['']EXPLOITATION$/i,
+    pattern: /^TOTAL DES CHARGES D['']EXPLOITATION/i,
     field: "totalOperatingCharges"
   },
 
   // Résultat exceptionnel (détail)
-  { pattern: /^Produits exceptionnels$/i, field: "exceptionalProducts" },
-  { pattern: /^Charges exceptionnelles$/i, field: "exceptionalCharges" },
+  // Pas de $ final sur Produits exceptionnels → tolère les suffixes " (VII)"
+  // Charges exceptionnelles : negative lookahead (?!\s*,) pour exclure
+  // "Charges exceptionnelles , dont :" (ligne d'annexe) tout en tolérant
+  // le suffixe " (VIII)" de la ligne totalisatrice du CDR.
+  { pattern: /^Produits exceptionnels/i, field: "exceptionalProducts" },
+  { pattern: /^Charges exceptionnelles(?!\s*,)/i, field: "exceptionalCharges" },
 
   // Résultat net final (ancre bas de CDR)
   { pattern: /^B[ÉE]N[ÉE]FICE OU PERTE$/i, field: "netResult" }
@@ -85,11 +89,12 @@ export const REGNOLOGY_BILAN_ACTIF_LABELS: readonly RegnologyLabelEntry[] = [
   { pattern: /^Autres cr[ée]ances$/i, field: "otherReceivables" },
   { pattern: /^Disponibilit[ée]s$/i, field: "cashAndCashEquivalents" },
 
-  // Totaux
-  { pattern: /^TOTAL ACTIF IMMOBILIS[ÉE]$/i, field: "totalFixedAssets" },
-  { pattern: /^TOTAL ACTIF CIRCULANT$/i, field: "totalCurrentAssets" },
+  // Totaux — pas de $ pour tolérer les suffixes " (III)", " (IV)",
+  // " (I + II + III + IV + V + VI + VII)" etc.
+  { pattern: /^TOTAL ACTIF IMMOBILIS[ÉE]/i, field: "totalFixedAssets" },
+  { pattern: /^TOTAL ACTIF CIRCULANT/i, field: "totalCurrentAssets" },
   {
-    pattern: /^TOTAL G[ÉE]N[ÉE]RAL DE L['']\s*ACTIF$/i,
+    pattern: /^TOTAL G[ÉE]N[ÉE]RAL DE L['']\s*ACTIF/i,
     field: "totalAssets"
   }
 ];
@@ -108,8 +113,9 @@ export function matchRegnologyBilanActifLabel(line: string): FinancialFieldKey |
 // Les targets capitaux propres détail (shareCapital/legalReserves/retainedEarnings)
 // ne sont pas dans la spec RIP CURL → seul le total "equity" est capturé.
 export const REGNOLOGY_BILAN_PASSIF_LABELS: readonly RegnologyLabelEntry[] = [
-  { pattern: /^TOTAL DES CAPITAUX PROPRES$/i, field: "equity" },
-  { pattern: /^TOTAL DES DETTES$/i, field: "debts" },
+  // Totaux — pas de $ pour tolérer les suffixes " (I)", " (III)", etc.
+  { pattern: /^TOTAL DES CAPITAUX PROPRES/i, field: "equity" },
+  { pattern: /^TOTAL DES DETTES/i, field: "debts" },
   {
     pattern: /^Dettes fournisseurs et comptes rattach[ée]s$/i,
     field: "tradePayables"
