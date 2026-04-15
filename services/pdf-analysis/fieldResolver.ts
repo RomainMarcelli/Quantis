@@ -11,6 +11,14 @@ import type {
   ReconstructedRow,
 } from "@/services/pdf-analysis/types";
 
+// Logs de debug internes au resolver (SUBLINE-DEBUG / SUBLINE-RAW).
+// Gated sur PARSER_DEBUG=true pour ne pas polluer le terminal en dev courant.
+function debugLog(message: string, ...args: unknown[]): void {
+  if (process.env.PARSER_DEBUG === "true") {
+    console.log(message, ...args);
+  }
+}
+
 type ScoredCandidate = {
   field: FinancialFieldKey;
   value: number;
@@ -643,13 +651,13 @@ function collectSublineSum(
   let total = 0;
   let count = 0;
 
-  console.log(`[SUBLINE-DEBUG] collectSublineSum field="${definition.key}" section="${definition.section}" anchorIdx=${anchorIndex} anchorLabel="${rows[anchorIndex]?.normalizedLabel}"`);
+  debugLog(`[SUBLINE-DEBUG] collectSublineSum field="${definition.key}" section="${definition.section}" anchorIdx=${anchorIndex} anchorLabel="${rows[anchorIndex]?.normalizedLabel}"`);
 
   for (let i = anchorIndex + 1; i < rows.length && i <= anchorIndex + MAX_SCAN; i++) {
     const row = rows[i];
     if (!row) continue;
     if (row.section !== definition.section && row.section !== "unknown") {
-      console.log(`[SUBLINE-DEBUG]   STOP section mismatch: row="${row.normalizedLabel}" rowSection="${row.section}" defSection="${definition.section}"`);
+      debugLog(`[SUBLINE-DEBUG]   STOP section mismatch: row="${row.normalizedLabel}" rowSection="${row.section}" defSection="${definition.section}"`);
       break;
     }
     // Arrêter uniquement sur les totaux de section majeurs (Total I, Total actif, Total général…).
@@ -659,23 +667,23 @@ function collectSublineSum(
       /\btotal\s+(?:actif|passif|g[eé]n[eé]ral|dettes|emprunts|capitaux)/.test(row.normalizedLabel) ||
       /\btotal\s+(?:i{1,3}|iv)\b/.test(row.normalizedLabel);
     if (isMajorSectionTotal) {
-      console.log(`[SUBLINE-DEBUG]   STOP majorTotal: row="${row.normalizedLabel}"`);
+      debugLog(`[SUBLINE-DEBUG]   STOP majorTotal: row="${row.normalizedLabel}"`);
       break;
     }
     if (row.amountCandidates.length === 0) {
-      console.log(`[SUBLINE-DEBUG]   SKIP no-candidates: row="${row.normalizedLabel}"`);
+      debugLog(`[SUBLINE-DEBUG]   SKIP no-candidates: row="${row.normalizedLabel}"`);
       continue;
     }
 
     const amount = pickSublineAmount(row, definition.columnStrategy);
-    console.log(`[SUBLINE-DEBUG]   row="${row.normalizedLabel}" amount=${amount} candidates=${JSON.stringify(row.amountCandidates.map(c => ({ v: c.value, col: c.columnIndex })))}`);
+    debugLog(`[SUBLINE-DEBUG]   row="${row.normalizedLabel}" amount=${amount} candidates=${JSON.stringify(row.amountCandidates.map(c => ({ v: c.value, col: c.columnIndex })))}`);
     if (amount !== null && Math.abs(amount) > 0) {
       total += amount;
       count++;
     }
   }
 
-  console.log(`[SUBLINE-DEBUG]   → total=${total} count=${count} result=${count >= 1 ? total : null}`);
+  debugLog(`[SUBLINE-DEBUG]   → total=${total} count=${count} result=${count >= 1 ? total : null}`);
   return count >= 1 ? total : null;
 }
 
@@ -747,7 +755,7 @@ function collectSublineSumFromRawText(input: {
   }
 
   if (valueBlock.length < 3) {
-    console.log(`[SUBLINE-RAW] field=${definition.key} valueBlock too short (${valueBlock.length})`);
+    debugLog(`[SUBLINE-RAW] field=${definition.key} valueBlock too short (${valueBlock.length})`);
     return null;
   }
 
@@ -767,7 +775,7 @@ function collectSublineSumFromRawText(input: {
   }
 
   if (tripletCol1Values.length === 0) {
-    console.log(`[SUBLINE-RAW] field=${definition.key} no valid triplets in valueBlock=${JSON.stringify(valueBlock.slice(0, 15))}`);
+    debugLog(`[SUBLINE-RAW] field=${definition.key} no valid triplets in valueBlock=${JSON.stringify(valueBlock.slice(0, 15))}`);
     return null;
   }
 
@@ -780,7 +788,7 @@ function collectSublineSumFromRawText(input: {
   }
 
   if (matchedLabelIndices.length === 0) {
-    console.log(`[SUBLINE-RAW] field=${definition.key} no sublinePattern match in labelBlock=${JSON.stringify(labelBlock)}`);
+    debugLog(`[SUBLINE-RAW] field=${definition.key} no sublinePattern match in labelBlock=${JSON.stringify(labelBlock)}`);
     return null;
   }
 
@@ -790,7 +798,7 @@ function collectSublineSumFromRawText(input: {
     total += tripletCol1Values[i] ?? 0;
   }
 
-  console.log(
+  debugLog(
     `[SUBLINE-RAW] field=${definition.key} anchor="${anchorNormalizedLabel}" triplets=${tripletCol1Values.length} matchedLabels=${matchedLabelIndices.length} mapped=${mappedCount} total=${total}`
   );
   return total;
@@ -823,32 +831,32 @@ function collectSublineSumByContext(
 ): number | null {
   if (!definition.sublinePatterns || definition.sublinePatterns.length === 0) return null;
 
-  console.log(`[SUBLINE-DEBUG] collectSublineSumByContext field="${definition.key}" patterns=${JSON.stringify(definition.sublinePatterns.map(p => p.source))}`);
+  debugLog(`[SUBLINE-DEBUG] collectSublineSumByContext field="${definition.key}" patterns=${JSON.stringify(definition.sublinePatterns.map(p => p.source))}`);
 
   // Tentative 1 : filtre strict de section (definition.section + "unknown")
   let matchingRows = findRowsBySublinePatterns(rows, definition, /* strictSection */ true);
-  console.log(`[SUBLINE-DEBUG]   strict match count=${matchingRows.length}`);
+  debugLog(`[SUBLINE-DEBUG]   strict match count=${matchingRows.length}`);
 
   // Tentative 2 : si moins de 2 matchs, relâcher le filtre de section (sous-lignes parfois mal
   // classifiées dans le parser — notamment dans les PDFs avec des sections mixtes).
   if (matchingRows.length < 2) {
     matchingRows = findRowsBySublinePatterns(rows, definition, /* strictSection */ false);
-    console.log(`[SUBLINE-DEBUG]   relaxed match count=${matchingRows.length}`);
+    debugLog(`[SUBLINE-DEBUG]   relaxed match count=${matchingRows.length}`);
   }
 
   if (matchingRows.length < 2) {
-    console.log(`[SUBLINE-DEBUG]   → null (insufficient matches)`);
+    debugLog(`[SUBLINE-DEBUG]   → null (insufficient matches)`);
     return null;
   }
 
   let total = 0;
   for (const row of matchingRows) {
     const amount = pickSublineAmount(row, definition.columnStrategy);
-    console.log(`[SUBLINE-DEBUG]   matched row="${row.normalizedLabel}" amount=${amount} section="${row.section}" candidates=${JSON.stringify(row.amountCandidates.map(c => ({ v: c.value, col: c.columnIndex })))}`);
+    debugLog(`[SUBLINE-DEBUG]   matched row="${row.normalizedLabel}" amount=${amount} section="${row.section}" candidates=${JSON.stringify(row.amountCandidates.map(c => ({ v: c.value, col: c.columnIndex })))}`);
     if (amount !== null) total += amount;
   }
 
-  console.log(`[SUBLINE-DEBUG]   → total=${total}`);
+  debugLog(`[SUBLINE-DEBUG]   → total=${total}`);
   return total;
 }
 

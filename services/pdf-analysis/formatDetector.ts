@@ -1,4 +1,4 @@
-export type DocumentFormat = "2033-sd" | "dgfip-2050" | "sage" | "regnology" | "unknown";
+export type DocumentFormat = "2033-sd" | "dgfip-2050" | "sage" | "regnology" | "fiducial" | "unknown";
 
 // ---- DGFiP 2050 ----
 //
@@ -36,6 +36,21 @@ const FORMAT_SAGE_IMMOB_TOTAL_PATTERN = /TOTAL\s+immobilisations\s+incorporelles
 // document DGFiP 2050 ou Sage qui citerait accidentellement Regnology.
 const FORMAT_REGNOLOGY_PATTERN = /Regnology/i;
 
+// ---- Fiducial Audit (cabinet — layout CDR tri-colonne France/Export/Total) ----
+//
+// Signaux robustes observés sur CRÉATIONS FUSALP (2025) :
+//   1. "Fiducial Audit" — cabinet d'audit signataire (pied de page + rapport CAC)
+//   2. "BILAN AU DD/MM/YYYY" — layout Fiducial spécifique avec date inline
+//      (les 2033-SD standard n'impriment pas la date inline dans le header bilan)
+//   3. "A. Bilan actif" — sous-section libellée "A." (numérotation Fiducial)
+//
+// Aucun de ces 3 patterns ne matche BEL AIR / TROIS V / AG FRANCE / RIP CURL.
+// On exige **au moins 2 signaux sur 3** pour confirmer Fiducial, par cohérence
+// avec la stratégie Sage (robustesse face aux artefacts OCR).
+const FORMAT_FIDUCIAL_AUDIT_PATTERN = /Fiducial\s+Audit/i;
+const FORMAT_FIDUCIAL_BILAN_AU_PATTERN = /BILAN\s+AU\s+\d{2}\/\d{2}\/\d{4}/;
+const FORMAT_FIDUCIAL_SECTIONS_PATTERN = /\bA\.\s*Bilan\s*actif/i;
+
 export function detectDocumentFormat(rawText: string): DocumentFormat {
   if (!rawText || rawText.trim().length === 0) {
     return "unknown";
@@ -62,6 +77,10 @@ export function detectDocumentFormat(rawText: string): DocumentFormat {
     return "regnology";
   }
 
+  if (countFiducialSignals(rawText) >= 2) {
+    return "fiducial";
+  }
+
   return "2033-sd";
 }
 
@@ -81,5 +100,13 @@ function countSageSignals(rawText: string): number {
   if (FORMAT_SAGE_COPYRIGHT_PATTERN.test(rawText)) count += 1;
   if (FORMAT_SAGE_CDR_TITLE_PATTERN.test(rawText)) count += 1;
   if (FORMAT_SAGE_IMMOB_TOTAL_PATTERN.test(rawText)) count += 1;
+  return count;
+}
+
+function countFiducialSignals(rawText: string): number {
+  let count = 0;
+  if (FORMAT_FIDUCIAL_AUDIT_PATTERN.test(rawText)) count += 1;
+  if (FORMAT_FIDUCIAL_BILAN_AU_PATTERN.test(rawText)) count += 1;
+  if (FORMAT_FIDUCIAL_SECTIONS_PATTERN.test(rawText)) count += 1;
   return count;
 }

@@ -1,4 +1,5 @@
 import { analyzeDocument2050 } from "@/services/pdf-analysis/analysisEngine2050";
+import { analyzeDocumentFusalp } from "@/services/pdf-analysis/analysisEngineFusalp";
 import { analyzeDocumentRegnology } from "@/services/pdf-analysis/analysisEngineRegnology";
 import { analyzeDocumentSage } from "@/services/pdf-analysis/analysisEngineSage";
 import { buildDiagnostics } from "@/services/pdf-analysis/diagnostics";
@@ -30,6 +31,9 @@ export function analyzeFinancialDocument(document: DocumentAIResponse): Analysis
   }
   if (format === "regnology") {
     return analyzeDocumentRegnology(document);
+  }
+  if (format === "fiducial") {
+    return analyzeDocumentFusalp(document);
   }
 
   const rows = buildReconstructedRows(document);
@@ -94,7 +98,7 @@ function logDebugSnapshot(input: {
 }
 
 function isDebugEnabled(): boolean {
-  return process.env.PDF_PARSER_DEBUG === "true";
+  return process.env.PARSER_DEBUG === "true";
 }
 
 export function toLegacyOutputs(result: AnalysisResult): {

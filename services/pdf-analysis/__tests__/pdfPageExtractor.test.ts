@@ -69,7 +69,12 @@ describe("pdfPageExtractor — extractFinancialPages", () => {
     expect(result.buffer.length).toBeGreaterThan(0);
   });
 
-  it("fallback sur PDF original si aucune page financière détectée", async () => {
+  it("fallback : rebuild PDF réduit à min(total, 30) pages si aucun marker financier", async () => {
+    // Cas typique : PDF scanné Docusign où pdf-parse ne trouve rien d'exploitable.
+    // L'ancien comportement renvoyait le PDF original entier — devenu bloquant
+    // pour les gros PDFs (60 pages > limite Document AI). Nouveau comportement :
+    // construire un PDF réduit aux 30 premières pages, en laissant Document AI
+    // faire l'OCR sur les images.
     const pdf = await makePdfWithTextPages([
       "Rapport du commissaire aux comptes Opinion sur l audit",
       "Repartition des effectifs"
@@ -78,8 +83,8 @@ describe("pdfPageExtractor — extractFinancialPages", () => {
     const result = await extractFinancialPages(pdf);
 
     expect(result.originalPages).toBe(2);
-    expect(result.extractedPages).toBe(2);
-    expect(result.buffer).toBe(pdf);
+    expect(result.extractedPages).toBe(2); // min(2, 30) = 2
+    expect(result.buffer.length).toBeGreaterThan(0);
   });
 
   it("garde toutes les pages si toutes sont financières", async () => {

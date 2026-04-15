@@ -31,7 +31,14 @@ const POSITIVE_MARKERS: readonly RegExp[] = [
   /total\s+des\s+charges/i,
   /DGFiP\s*N[°o]?\s*205[012]/i,
   /ventes\s+de\s+marchandises/i,
-  /chiffre\s+d['']\s*affaires/i
+  /chiffre\s+d['']\s*affaires/i,
+  // Markers additionnels format Fusalp (Fiducial Audit)
+  /BILAN\s+AU\b/i,
+  /COMPTE\s+DE\s+RESULTAT\s+AU\b/i,
+  /CHIFFRES?\s+D['']\s*AFFAIRES?\s+NETS?/i,
+  /ACTIF\s+IMMOBILIS[ÉE]/i,
+  /CAPITAUX\s+PROPRES/i,
+  /CHARGES\s+D['']\s*EXPLOITATION/i
 ];
 
 const NEGATIVE_MARKERS: readonly RegExp[] = [
@@ -39,7 +46,11 @@ const NEGATIVE_MARKERS: readonly RegExp[] = [
   /tableau\s+de\s+variation\s+des\s+capitaux\s+propres/i,
   /r[ée]partition\s+des\s+effectifs/i,
   /filiales\s+et\s+participations/i,
-  /engagements\s+hors\s+bilan/i
+  /engagements\s+hors\s+bilan/i,
+  // Exclusions format Fusalp : procès-verbal AG + résolutions
+  /proc[èe]s[-\s]*verbal/i,
+  /approbation\s+des\s+comptes\s+sociaux/i,
+  /assembl[ée]e\s+g[ée]n[ée]rale\s+ordinaire/i
 ];
 
 const CODE_2033_TOKENS: readonly string[] = [
@@ -110,6 +121,33 @@ async function extractAllPageTexts(pdfBuffer: Buffer): Promise<string[]> {
   }
 }
 
+// Limite hard en fallback scan : Document AI imageless autorise 30 pages max.
+// On en laisse 30 pour couvrir bilan + CDR + annexes clés sans dépasser la limite.
+const FALLBACK_MAX_PAGES = 30;
+
+function isDocusignScanOnly(pageTexts: readonly string[]): boolean {
+  if (pageTexts.length === 0) return false;
+  const uninformative = pageTexts.filter((text) => {
+    const trimmed = text.trim();
+    return trimmed === "" || /^Docusign Envelope ID/i.test(trimmed);
+  }).length;
+  return uninformative > pageTexts.length * 0.5;
+}
+
+async function buildReducedPdf(
+  pdfBuffer: Buffer,
+  pageIndices: readonly number[]
+): Promise<Buffer> {
+  const srcDoc = await PDFDocument.load(pdfBuffer);
+  const newDoc = await PDFDocument.create();
+  const copied = await newDoc.copyPages(srcDoc, [...pageIndices]);
+  for (const page of copied) {
+    newDoc.addPage(page);
+  }
+  const outBytes = await newDoc.save();
+  return Buffer.from(outBytes);
+}
+
 export async function extractFinancialPages(
   pdfBuffer: Buffer
 ): Promise<ExtractFinancialPagesResult> {
@@ -134,25 +172,32 @@ export async function extractFinancialPages(
     }
 
     if (keepIndices.length === 0) {
+      // Aucun marqueur textuel trouvé — typiquement un PDF scanné Docusign où
+      // pdf-parse ne voit que "Docusign Envelope ID" sur chaque page. Dans ce
+      // cas on envoie quand même les N premières pages à Document AI, qui fera
+      // son propre OCR sur les images. On ne peut pas rejeter le PDF entier.
+      const fallbackCount = Math.min(originalPages, FALLBACK_MAX_PAGES);
+      if (fallbackCount === 0) {
+        console.warn(
+          "[pdfPageExtractor] PDF vide, fallback impossible, retour du buffer original."
+        );
+        return { buffer: pdfBuffer, originalPages, extractedPages: originalPages };
+      }
+      const scanDetected = isDocusignScanOnly(pageTexts);
       console.warn(
-        "[pdfPageExtractor] Aucune page financière détectée, fallback sur le PDF original."
+        `[pdfPageExtractor] Aucune page financière détectée${scanDetected ? " (scan Docusign)" : ""}, fallback pages 1-${fallbackCount}`
       );
+      const fallbackIndices = Array.from({ length: fallbackCount }, (_, i) => i);
+      const fallbackBuffer = await buildReducedPdf(pdfBuffer, fallbackIndices);
       return {
-        buffer: pdfBuffer,
+        buffer: fallbackBuffer,
         originalPages,
-        extractedPages: originalPages
+        extractedPages: fallbackCount
       };
     }
 
-    const srcDoc = await PDFDocument.load(pdfBuffer);
-    const newDoc = await PDFDocument.create();
-    const copied = await newDoc.copyPages(srcDoc, keepIndices);
-    for (const page of copied) {
-      newDoc.addPage(page);
-    }
-
-    const outBytes = await newDoc.save();
     const extractedPages = keepIndices.length;
+    const reducedBuffer = await buildReducedPdf(pdfBuffer, keepIndices);
 
     console.info(
       `[pdfPageExtractor] PDF réduit de ${originalPages} pages à ${extractedPages} pages (pages financières)`
@@ -164,7 +209,7 @@ export async function extractFinancialPages(
     }
 
     return {
-      buffer: Buffer.from(outBytes),
+      buffer: reducedBuffer,
       originalPages,
       extractedPages
     };

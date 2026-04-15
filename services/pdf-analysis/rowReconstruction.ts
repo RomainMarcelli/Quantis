@@ -21,6 +21,14 @@ type SectionContext = {
   priority: number;
 };
 
+// Logs de debug internes à la reconstruction (CDR-DEBUG text/table).
+// Gated sur PARSER_DEBUG=true pour ne pas polluer le terminal en dev courant.
+function debugLog(message: string, ...args: unknown[]): void {
+  if (process.env.PARSER_DEBUG === "true") {
+    console.log(message, ...args);
+  }
+}
+
 export function buildReconstructedRows(document: DocumentAIResponse): ReconstructedRow[] {
   const rawLines = buildRawLines(document.rawText);
   const textRows = buildTextRows(rawLines);
@@ -49,9 +57,19 @@ export function detectSectionsFromRows(rows: ReconstructedRow[]) {
 // Détecte l'ordre des colonnes N vs N-1 dans le CDR à partir des ancres textuelles
 // "Exercice clos" / "Exercice précédent". L'ordre de lecture de Document AI (gauche→droite,
 // haut→bas) implique que la première ancre rencontrée correspond à la colonne la plus à gauche.
+//
+// Ancres strictes : label court (≤ 30 chars) ET section incomeStatement pour éviter que
+// le texte narratif (cover, méthodes comptables, opinion auditeur) ne soit pris pour un
+// header de colonne CDR.
 export function detectCdrLayout(rows: ReconstructedRow[]): CdrLayout {
-  const closAnchor = findFirstAnchor(rows, /\bexercice\s+clos\b/);
-  const precAnchor = findFirstAnchor(rows, /\bexercice\s+precedent\b/);
+  const closAnchor = findFirstAnchor(rows, /\bexercice\s+clos\b/, {
+    maxLabelLength: 30,
+    requiredSection: "incomeStatement"
+  });
+  const precAnchor = findFirstAnchor(rows, /\bexercice\s+precedent\b/, {
+    maxLabelLength: 30,
+    requiredSection: "incomeStatement"
+  });
 
   if (!closAnchor || !precAnchor) {
     return "unknown";
@@ -68,9 +86,30 @@ export function detectCdrLayout(rows: ReconstructedRow[]): CdrLayout {
   return "unknown";
 }
 
-function findFirstAnchor(rows: ReconstructedRow[], pattern: RegExp): ReconstructedRow | null {
+type FindAnchorOptions = {
+  // Si défini, ne matche que les rows dont le label normalisé fait au plus N
+  // caractères. Évite de matcher des phrases longues du texte narratif (ex :
+  // "Le résultat de l'exercice clos au 31/12/2024 s'élève à...") qui sont des
+  // descriptions, pas des headers de colonne.
+  maxLabelLength?: number;
+  // Si défini, ne matche que les rows dont la section vaut exactement cette
+  // valeur. Par défaut, exclut uniquement les rows balanceSheet.
+  requiredSection?: SectionKey;
+};
+
+function findFirstAnchor(
+  rows: ReconstructedRow[],
+  pattern: RegExp,
+  options: FindAnchorOptions = {}
+): ReconstructedRow | null {
+  const { maxLabelLength, requiredSection } = options;
   for (const row of rows) {
-    if (row.section === "balanceSheet") {
+    if (requiredSection !== undefined) {
+      if (row.section !== requiredSection) continue;
+    } else if (row.section === "balanceSheet") {
+      continue;
+    }
+    if (maxLabelLength !== undefined && row.normalizedLabel.length > maxLabelLength) {
       continue;
     }
     if (pattern.test(row.normalizedLabel)) {
@@ -149,7 +188,7 @@ function buildTextRows(rawLines: RawLine[]): ReconstructedRow[] {
 
     const isCdrDebugRow = isCdrLabel(normalizedLabel);
     if (isCdrDebugRow) {
-      console.log(`[CDR-DEBUG text] label="${contextualLabel}" | rawText="${line.text}" | inlineAmounts=${JSON.stringify(inlineAmounts)}`);
+      debugLog(`[CDR-DEBUG text] label="${contextualLabel}" | rawText="${line.text}" | inlineAmounts=${JSON.stringify(inlineAmounts)}`);
     }
 
     const lookaheadAmounts: AmountCandidate[] = [];
@@ -157,11 +196,11 @@ function buildTextRows(rawLines: RawLine[]): ReconstructedRow[] {
     while (lookaheadIndex < rawLines.length) {
       const nextLine = rawLines[lookaheadIndex];
       if (!nextLine || nextLine.page !== line.page) {
-        if (isCdrDebugRow) console.log(`[CDR-DEBUG text]   lookahead break: page change`);
+        if (isCdrDebugRow) debugLog(`[CDR-DEBUG text]   lookahead break: page change`);
         break;
       }
       if (!isAmountOnlyLine(nextLine.text)) {
-        if (isCdrDebugRow) console.log(`[CDR-DEBUG text]   lookahead break: not amount-only: "${nextLine.text}"`);
+        if (isCdrDebugRow) debugLog(`[CDR-DEBUG text]   lookahead break: not amount-only: "${nextLine.text}"`);
         break;
       }
 
@@ -189,7 +228,7 @@ function buildTextRows(rawLines: RawLine[]): ReconstructedRow[] {
       }
     }
     if (isCdrDebugRow) {
-      console.log(`[CDR-DEBUG text]   → ${inlineAmounts.length} inline + ${lookaheadAmounts.length} lookahead candidates`);
+      debugLog(`[CDR-DEBUG text]   → ${inlineAmounts.length} inline + ${lookaheadAmounts.length} lookahead candidates`);
     }
 
     const lineCode = extractLineCode(line.text);
@@ -247,7 +286,7 @@ function buildTableRows(document: DocumentAIResponse, rawLines: RawLine[]): Reco
       const normalizedLabel = normalizeText(label);
       const amountCandidates = extractAmountCandidatesFromCells(cellTexts, headerMap, labelCellIndex);
       if (isCdrLabel(normalizedLabel)) {
-        console.log(`[CDR-DEBUG table] p${pageNumber} label="${label}" | cells=${JSON.stringify(cellTexts)} | labelCellIdx=${labelCellIndex} | candidates=${JSON.stringify(amountCandidates.map(c => ({ v: c.value, col: c.columnIndex, h: c.headerHint })))}`);
+        debugLog(`[CDR-DEBUG table] p${pageNumber} label="${label}" | cells=${JSON.stringify(cellTexts)} | labelCellIdx=${labelCellIndex} | candidates=${JSON.stringify(amountCandidates.map(c => ({ v: c.value, col: c.columnIndex, h: c.headerHint })))}`);
       }
       if (!amountCandidates.length) {
         return;
