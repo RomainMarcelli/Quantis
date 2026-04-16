@@ -74,8 +74,13 @@ export function matchFusalpCdrLabel(line: string): FinancialFieldKey | null {
 //   "Marchandises"
 //   "Créances clients et comptes rattachés"
 //   "Disponibilités"
+//   "ACTIF IMMOBILISE"
 //   "ACTIF CIRCULANT"
 //   "TOTAL GENERAL"  (apparaît aussi sur le bilan passif, handled via first-come first-served)
+//
+// Les totaux (ACTIF IMMOBILISE / ACTIF CIRCULANT / TOTAL GENERAL) sont publiés
+// sur 4 colonnes Brut | Amort | Net N | Net N-1 exactement comme les détails ;
+// selectActifValue sélectionne index 2 = Net N.
 export const FUSALP_BILAN_ACTIF_LABELS: readonly FiducialLabelEntry[] = [
   // Stocks / créances / disponibilités
   { pattern: /^Marchandises$/i, field: "inventoriesGoods" },
@@ -86,6 +91,7 @@ export const FUSALP_BILAN_ACTIF_LABELS: readonly FiducialLabelEntry[] = [
   { pattern: /^Disponibilit[ée]s$/i, field: "cashAndCashEquivalents" },
 
   // Totaux
+  { pattern: /^ACTIF IMMOBILIS[ÉE]/i, field: "totalFixedAssets" },
   { pattern: /^ACTIF CIRCULANT$/i, field: "totalCurrentAssets" },
   { pattern: /^TOTAL GENERAL$/i, field: "totalAssets" }
 ];

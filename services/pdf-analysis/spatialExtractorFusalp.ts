@@ -352,10 +352,16 @@ function normalizeLabelForMatching(label: string): string {
 
 function selectActifValue(values: readonly number[]): number | null {
   // Bilan actif 4 colonnes : Brut | Amort | Net N | Net N-1
+  // Quand l'OCR ne capture que 2 valeurs (Brut, Amort), Net = Brut - Amort.
   const n = values.length;
   if (n >= 4) return values[2] ?? null;
   if (n === 3) return values[1] ?? null;
-  if (n === 2) return values[0] ?? null;
+  if (n === 2) {
+    const brut = values[0] ?? 0;
+    const amort = values[1] ?? 0;
+    if (brut > amort) return brut - amort;
+    return values[0] ?? null;
+  }
   if (n === 1) return values[0] ?? null;
   return null;
 }
