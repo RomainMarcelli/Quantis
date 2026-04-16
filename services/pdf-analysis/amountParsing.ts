@@ -12,7 +12,18 @@ export function extractAmountCandidatesFromText(input: {
   const candidates: AmountCandidate[] = [];
 
   for (const match of text.matchAll(AMOUNT_PATTERN)) {
-    const raw = match[0];
+    let raw = match[0];
+
+    const percentSplit = raw.match(
+      /^(.+[\s\u00A0\u202F])(\d{1,3}[.,]\d{1,2})$/
+    );
+    if (percentSplit) {
+      const pctNum = parseFloat(percentSplit[2].replace(",", "."));
+      if (pctNum <= 200) {
+        raw = percentSplit[1].trim();
+      }
+    }
+
     const value = parseFinancialAmount(raw);
     if (value === null) {
       continue;

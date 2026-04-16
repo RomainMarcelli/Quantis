@@ -255,7 +255,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
   {
     key: "netTurnover",
     section: "incomeStatement",
-    kind: "total",
+    kind: "detail",
     columnStrategy: "nCurrent",
     aliases: alias("chiffres d'affaires nets", "chiffre d'affaires net", "ca net", "chiffre d'affaires"),
     regexAliases: regex(
@@ -526,7 +526,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     kind: "total",
     columnStrategy: "netPriority",
     aliases: alias("total actif", "total general actif"),
-    regexAliases: regex(/\btotal\s+general\s+actif\b/, /\btotal\s+actif\b/),
+    regexAliases: regex(/\btotal\s+general\s+actif\b/, /\btotal\s+actif\b/, /\btotal\s+g[ée]n[ée]ral\b/),
     excludes: alias("passif"),
     expectedLineCodes: ["110"],
     minAbs: 1000,
@@ -640,7 +640,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     kind: "total",
     columnStrategy: "nCurrent",
     aliases: alias("total passif", "total general passif"),
-    regexAliases: regex(/\btotal\s+passif\b/, /\btotal\s+general\s+passif\b/),
+    regexAliases: regex(/\btotal\s+passif\b/, /\btotal\s+general\s+passif\b/, /\btotal\s+g[ée]n[ée]ral\b/),
     excludes: alias("actif"),
     expectedLineCodes: ["180"],
     minAbs: 1000,

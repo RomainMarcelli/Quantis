@@ -1,6 +1,22 @@
 import { parseFinancialAmount } from "@/services/pdf-analysis/amountParsing";
 import { ALPHA_CODE_MAPPING_2050 } from "@/services/pdf-analysis/labelDictionary2050";
 
+const ALPHA_CODE_MAPPING_2050_SET = new Set(Object.keys(ALPHA_CODE_MAPPING_2050));
+
+const FRENCH_NUMBER_PATTERN =
+  /(-?\(?\d{1,3}(?:[\s\u00A0\u202F]\d{3})+(?:[.,]\d+)?\)?|-?\(?\d{2,}(?:[.,]\d+)?\)?)/g;
+
+function parseFrenchNumber(raw: string): number | null {
+  const cleaned = raw
+    .replace(/[\s\u00A0\u202F]/g, "")
+    .replace(/[()]/g, "")
+    .replace(",", ".");
+  const num = parseFloat(cleaned);
+  if (!Number.isFinite(num) || num === 0) return null;
+  const negative = raw.includes("(") || raw.includes(")") || raw.startsWith("-");
+  return negative ? -Math.abs(num) : num;
+}
+
 // Une ligne "alpha-coded" 2050 : un code (ex: FA, FW, HN) associé à sa valeur
 // numérique, extraite du rawText Document AI par proximité séquentielle.
 export type AlphaCodedRow = {
@@ -29,25 +45,41 @@ function tokenize(rawText: string): Token[] {
     const line = lines[lineIdx];
     if (!line) continue;
 
-    const parts = line.split(/[\s|,;()*]+/).filter((part) => part.length > 0);
-
-    for (const part of parts) {
-      if (ALPHA_CODE_PATTERN.test(part)) {
-        tokens.push({ kind: "code", value: part, line: lineIdx });
-        continue;
-      }
-
-      const num = parseFinancialAmount(part);
-      if (num !== null && Number.isFinite(num) && num !== 0) {
-        const digitsOnly = part.replace(/\D/g, "");
-        // Min 2 chiffres : autorise les petites valeurs réelles (ex: EA=38 sur
-        // AG FRANCE bilan passif) tout en rejetant les index de colonne à
-        // 1 chiffre ("1", "2", "3" des en-têtes Brut/Amort/Net).
-        if (digitsOnly.length >= 2 && !looksLikeYear(digitsOnly)) {
-          tokens.push({ kind: "number", value: num, line: lineIdx });
+    // Pass 1 : nombres français complets avec espaces milliers.
+    const numberSpans: Array<{ start: number; end: number; value: number }> = [];
+    for (const m of line.matchAll(FRENCH_NUMBER_PATTERN)) {
+      const num = parseFrenchNumber(m[0]);
+      if (num !== null) {
+        const digits = m[0].replace(/\D/g, "");
+        if (digits.length >= 2 && !looksLikeYear(digits)) {
+          numberSpans.push({ start: m.index!, end: m.index! + m[0].length, value: num });
         }
       }
     }
+
+    // Pass 2 : codes alpha DGFiP dans les zones non couvertes par les nombres.
+    let masked = line;
+    for (const span of numberSpans) {
+      masked =
+        masked.slice(0, span.start) +
+        " ".repeat(span.end - span.start) +
+        masked.slice(span.end);
+    }
+    const codeSpans: Array<{ start: number; value: string }> = [];
+    for (const m of masked.matchAll(/\b(?:[A-Z]{2}|[1-9][A-Z])\b/g)) {
+      codeSpans.push({ start: m.index!, value: m[0] });
+    }
+
+    // Merge par position dans la ligne.
+    const merged: Array<{ pos: number; token: Token }> = [];
+    for (const c of codeSpans) {
+      merged.push({ pos: c.start, token: { kind: "code", value: c.value, line: lineIdx } });
+    }
+    for (const n of numberSpans) {
+      merged.push({ pos: n.start, token: { kind: "number", value: n.value, line: lineIdx } });
+    }
+    merged.sort((a, b) => a.pos - b.pos);
+    for (const entry of merged) tokens.push(entry.token);
   }
 
   return tokens;

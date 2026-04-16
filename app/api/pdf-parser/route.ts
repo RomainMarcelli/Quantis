@@ -14,6 +14,11 @@ import {
   type ParsedFinancialData
 } from "@/services/pdfAnalysis";
 import { extractFinancialPages } from "@/services/pdf-analysis/pdfPageExtractor";
+// VISION LLM DESACTIVE — voir bloc commente plus bas
+// import {
+//   extractWithVision,
+//   mergeVisionWithDocumentAI
+// } from "@/services/pdf-analysis/visionExtractor";
 import {
   deleteReducedPdf,
   storeReducedPdf
@@ -272,6 +277,7 @@ export async function POST(request: NextRequest) {
 
     const pageExtraction = await extractFinancialPages(originalPdfBuffer);
     const pdfBuffer = pageExtraction.buffer;
+    const useImagelessMode = pageExtraction.imagelessMode;
     const pdfExtractionSummary: PdfExtractionSummary | null =
       pageExtraction.originalPages > 0
         ? {
@@ -281,6 +287,9 @@ export async function POST(request: NextRequest) {
         : null;
     if (pdfExtractionSummary) {
       console.info("[api/pdf-parser] PDF page extraction", pdfExtractionSummary);
+    }
+    if (!useImagelessMode) {
+      console.info("[api/pdf-parser] imagelessMode: false (scan détecté)");
     }
 
     const hasReduction =
@@ -293,14 +302,17 @@ export async function POST(request: NextRequest) {
     if (progressRequestId) {
       updatePdfParserProgress(progressRequestId, {
         progress: 20,
-        currentStep: "Traitement Document AI..."
+        currentStep: pageExtraction.isScanned
+          ? "Traitement Document AI (OCR scan)..."
+          : "Traitement Document AI..."
       });
     }
 
     const extraction = await processPdfWithDocumentAI({
       pdfBuffer,
       fileName: file.name,
-      mimeType
+      mimeType,
+      imagelessMode: useImagelessMode
     });
     if (progressRequestId) {
       updatePdfParserProgress(progressRequestId, {
@@ -311,14 +323,35 @@ export async function POST(request: NextRequest) {
     const analysis = analyzeFinancialDocument(extraction);
     const detectedSections = analysis.detectedSections;
     const financialData = analysis.parsedFinancialData;
-    const mappedData = mapParsedFinancialDataToMappedFinancialData(financialData);
-    const kpis = computeKpis(mappedData);
-    const quantisData = mapToQuantisData(financialData);
+    let mappedData = mapParsedFinancialDataToMappedFinancialData(financialData);
+    let kpis = computeKpis(mappedData);
+    let quantisData = mapToQuantisData(financialData);
     const diagnostics = analysis.diagnostics;
     const warnings = [...diagnostics.warnings];
     if (quantisData.ca !== null && quantisData.ca < 0) {
       warnings.push("CA negatif detecte, verification recommandee.");
     }
+
+    // ============================================
+    // VISION LLM TEMPORAIREMENT DESACTIVE
+    // Raison : credits API Anthropic limites ($5)
+    // Reactiver apres recharge credits
+    // Date desactivation : 2026-04-16
+    // ============================================
+    // const useVisionFallback =
+    //   process.env.ANTHROPIC_API_KEY &&
+    //   diagnostics.confidenceScore < 0.80;
+    //
+    // if (useVisionFallback) {
+    //   const visionResult = await extractWithVision(pdfBuffer);
+    //   if (visionResult.success && visionResult.data) {
+    //     mergeVisionWithDocumentAI(financialData, visionResult.data, diagnostics.fieldScores);
+    //     mappedData = mapParsedFinancialDataToMappedFinancialData(financialData);
+    //     kpis = computeKpis(mappedData);
+    //     quantisData = mapToQuantisData(financialData);
+    //   }
+    // }
+
     if (progressRequestId) {
       updatePdfParserProgress(progressRequestId, {
         progress: 90,

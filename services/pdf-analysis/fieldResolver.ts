@@ -99,6 +99,7 @@ function collectCandidatesForField(
   const candidates: ScoredCandidate[] = [];
 
   rows.forEach((row, rowIndex) => {
+    if (row.normalizedLabel.length > 80) return;
     const contextualBoost = computeContextualBoost({ rows, rowIndex, row, definition });
     const labelMatch = getLabelMatchScore({
       normalizedLabel: row.normalizedLabel,
@@ -269,6 +270,32 @@ function computeContextualBoost(input: {
       rowNumber: row.rowNumber,
       maxRowDistance: 120,
       keywords: ["actif circulant", "bilan actif"]
+    })) {
+      return 95;
+    }
+  }
+
+  if (definition.key === "totalAssets" && /\btotal\s+g[ée]n[ée]ral\b/.test(normalizedLabel)) {
+    if (hasContextBefore({
+      rows,
+      rowIndex,
+      page: row.page,
+      rowNumber: row.rowNumber,
+      maxRowDistance: 120,
+      keywords: ["bilan actif", "actif immobilise", "actif immobilisé"]
+    })) {
+      return 95;
+    }
+  }
+
+  if (definition.key === "totalLiabilities" && /\btotal\s+g[ée]n[ée]ral\b/.test(normalizedLabel)) {
+    if (hasContextBefore({
+      rows,
+      rowIndex,
+      page: row.page,
+      rowNumber: row.rowNumber,
+      maxRowDistance: 120,
+      keywords: ["bilan passif", "capitaux propres"]
     })) {
       return 95;
     }

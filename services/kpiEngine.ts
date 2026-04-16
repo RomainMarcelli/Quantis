@@ -3,14 +3,20 @@ import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const ca = computeCa(data);
   const tcam = percent(powMinusOne(div(ca, data.ca_n_minus_1), inv(data.n)));
-  const va = sub(data.total_prod_expl, sum(data.achats_march, data.achats_mp, data.ace));
-  const ebitda = sub(va, sum(data.impots_taxes, data.salaires, data.charges_soc));
+  const achatsTotal = sumPartial(data.achats_march, data.achats_mp, data.ace);
+  const va = data.total_prod_expl !== null && achatsTotal !== null
+    ? data.total_prod_expl - achatsTotal
+    : null;
+  const chargesPersonnel = sumPartial(data.impots_taxes, data.salaires, data.charges_soc);
+  const ebitda = va !== null && chargesPersonnel !== null
+    ? va - chargesPersonnel
+    : null;
   const ebe = ebitda;
   const marge_ebitda = percent(div(ebitda, data.total_prod_expl));
-  const charges_var = sum(data.achats_march, data.achats_mp, data.var_stock_march, data.var_stock_mp);
+  const charges_var = sumPartial(data.achats_march, data.achats_mp, data.var_stock_march, data.var_stock_mp);
   const mscv = sub(ca, charges_var);
   const tmscv = div(mscv, ca);
-  const charges_fixes = sum(data.ace, data.salaires, data.charges_soc, data.dap);
+  const charges_fixes = sumPartial(data.ace, data.salaires, data.charges_soc, data.dap);
   const point_mort = div(charges_fixes, tmscv);
   const ratio_immo = computeImmobilizationRatio({
     totalActifImmoNet: data.total_actif_immo_net,

@@ -12,6 +12,7 @@ type ProcessPdfWithDocumentAIInput = {
   pdfBuffer: Buffer;
   fileName: string;
   mimeType: string;
+  imagelessMode?: boolean;
 };
 
 export type PdfPageLimitExceededError = Error & {
@@ -35,7 +36,7 @@ let cachedDocumentAIClient: DocumentProcessorServiceClient | null = null;
 export async function processPdfWithDocumentAI(
   input: ProcessPdfWithDocumentAIInput
 ): Promise<DocumentAIExtractionResult> {
-  const { pdfBuffer, fileName, mimeType } = input;
+  const { pdfBuffer, fileName, mimeType, imagelessMode = true } = input;
   const processorName = getDocumentAIProcessorName();
   const client = getDocumentAIClient();
   const maxPages = getDocumentAISyncPageLimit();
@@ -57,7 +58,7 @@ export async function processPdfWithDocumentAI(
         content: pdfBuffer.toString("base64"),
         mimeType
       },
-      imagelessMode: true
+      imagelessMode
     });
     responseDocument = response.document;
   } catch (error) {

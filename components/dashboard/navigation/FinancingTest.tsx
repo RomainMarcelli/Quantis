@@ -11,7 +11,7 @@ import {
   ShieldCheck,
   Waves
 } from "lucide-react";
-import { formatNumber } from "@/components/dashboard/formatting";
+import { formatNumber, formatPercent } from "@/components/dashboard/formatting";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
@@ -36,6 +36,9 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
   const animatedCaf = useAnimatedNumber(kpis.caf, { durationMs: 1350 });
   const animatedFte = useAnimatedNumber(kpis.fte, { durationMs: 1400 });
   const animatedLeverage = useAnimatedNumber(kpis.effet_levier, { durationMs: 1300 });
+  const animatedSolvabilite = useAnimatedNumber(kpis.solvabilite, { durationMs: 1250 });
+  const animatedGearing = useAnimatedNumber(kpis.gearing, { durationMs: 1300 });
+  const animatedTn = useAnimatedNumber(kpis.tn, { durationMs: 1350 });
 
   // Interprétations métier centralisées dans le view-model pour garder la cohérence.
   const debtInterpretation = useMemo(
@@ -215,6 +218,51 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           statusLabel={kpis.fte === null ? "N/D" : kpis.fte >= 0 ? "Cash disponible" : "Cash consommé"}
           severity={kpis.fte === null ? "na" : kpis.fte >= 0 ? "good" : "risk"}
           code="OCF_NET"
+        />
+
+        <FinancingMetricCard
+          delayMs={220}
+          searchId="analysis-fin-solvabilite"
+          className="md:col-span-4"
+          title="Solidité du bilan"
+          tag="Capitaux propres / Total passif"
+          value={kpis.solvabilite === null ? "N/D" : formatPercent(animatedSolvabilite * 100)}
+          trend={{ direction: "na", changePercent: null, label: "N/D", tone: "neutral" }}
+          icon={<ShieldCheck className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
+          helper="Mesure la proportion du bilan financée par les fonds propres."
+          statusLabel={kpis.solvabilite === null ? "N/D" : kpis.solvabilite >= 0.3 ? "Bilan solide" : "Sous-capitalisé"}
+          severity={kpis.solvabilite === null ? "na" : kpis.solvabilite >= 0.3 ? "good" : "risk"}
+          code="SOLVENCY"
+        />
+
+        <FinancingMetricCard
+          delayMs={240}
+          searchId="analysis-fin-gearing"
+          className="md:col-span-4"
+          title="Poids de la dette"
+          tag="Ratio d'endettement"
+          value={kpis.gearing === null ? "N/D" : `${formatNumber(animatedGearing, 1)}x`}
+          trend={{ direction: "na", changePercent: null, label: "N/D", tone: "neutral" }}
+          icon={<Scale className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
+          helper="Nombre d'années d'EBITDA pour rembourser la dette nette."
+          statusLabel={kpis.gearing === null ? "N/D" : kpis.gearing <= 3 ? "Endettement maîtrisé" : "Endettement élevé"}
+          severity={kpis.gearing === null ? "na" : kpis.gearing <= 3 ? "good" : "risk"}
+          code="GEARING"
+        />
+
+        <FinancingMetricCard
+          delayMs={260}
+          searchId="analysis-fin-tn"
+          className="md:col-span-4"
+          title="Position nette de trésorerie"
+          tag="Disponibilités - Emprunts"
+          value={kpis.tn === null ? "N/D" : formatCompactCurrency(animatedTn)}
+          trend={{ direction: "na", changePercent: null, label: "N/D", tone: "neutral" }}
+          icon={<Landmark className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
+          helper="Solde net entre la trésorerie disponible et les emprunts bancaires."
+          statusLabel={kpis.tn === null ? "N/D" : kpis.tn >= 0 ? "Trésorerie positive" : "Trésorerie négative"}
+          severity={kpis.tn === null ? "na" : kpis.tn >= 0 ? "good" : "risk"}
+          code="NET_CASH"
         />
 
         <article

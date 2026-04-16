@@ -60,6 +60,9 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
   const animatedEbe = useAnimatedNumber(kpis.ebe, { durationMs: 1350 });
   const animatedResultatNet = useAnimatedNumber(kpis.resultat_net, { durationMs: 1450 });
   const animatedTmscv = useAnimatedNumber(displayedTmscv, { durationMs: 1250 });
+  const animatedVa = useAnimatedNumber(kpis.va, { durationMs: 1300 });
+  const animatedMargeEbitda = useAnimatedNumber(kpis.marge_ebitda, { durationMs: 1250 });
+  const animatedPointMort = useAnimatedNumber(kpis.point_mort, { durationMs: 1350 });
 
   // Glow local rendu en impératif pour éviter un rerender React à chaque mouvement souris.
   const mouseGlowRef = useRef<HTMLDivElement | null>(null);
@@ -118,6 +121,9 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
   const resultatNetLabel =
     kpis.resultat_net === null ? "N/D" : formatCompactCurrency(animatedResultatNet);
   const tmscvLabel = displayedTmscv === null ? "N/D" : formatPercent(animatedTmscv);
+  const vaLabel = kpis.va === null ? "N/D" : formatCompactCurrency(animatedVa);
+  const margeEbitdaLabel = kpis.marge_ebitda === null ? "N/D" : formatPercent(animatedMargeEbitda);
+  const pointMortLabel = kpis.point_mort === null ? "N/D" : formatCompactCurrency(animatedPointMort);
   const caFooterLabel =
     kpis.ca === null ? "Donnée indisponible" : growthDelta >= 0 ? "Croissance validée" : "Sous surveillance";
   const simulationLabel = useMemo(() => {
@@ -255,6 +261,42 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={ebeTrend}
           icon={<BarChartBig className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="L'EBE indique la richesse générée par l'exploitation."
+        />
+        <MetricCard
+          delayMs={220}
+          searchId="analysis-vc-va"
+          title="Richesse créée"
+          tag="Valeur Ajoutée"
+          value={vaLabel}
+          footerLabel="Prod - Conso. intermédiaires"
+          footerCode="SIG_VA_01"
+          trend={undefined}
+          icon={<Layers className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
+          helpText="La valeur ajoutée mesure la richesse réellement créée par l'entreprise."
+        />
+        <MetricCard
+          delayMs={240}
+          searchId="analysis-vc-marge-ebitda"
+          title="Efficacité opérationnelle"
+          tag="Marge EBITDA %"
+          value={margeEbitdaLabel}
+          footerLabel="EBITDA / Production"
+          footerCode="MARGIN_EBITDA"
+          trend={undefined}
+          icon={<PieChartIcon className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
+          helpText="Part de la production transformée en excédent brut d'exploitation."
+        />
+        <MetricCard
+          delayMs={260}
+          searchId="analysis-vc-point-mort-val"
+          title="Seuil de rentabilité"
+          tag="Point mort"
+          value={pointMortLabel}
+          footerLabel="Charges fixes / TMSCV"
+          footerCode="BREAK_EVEN"
+          trend={undefined}
+          icon={<Activity className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
+          helpText="CA minimum pour couvrir l'ensemble des charges fixes."
         />
 
         <article
