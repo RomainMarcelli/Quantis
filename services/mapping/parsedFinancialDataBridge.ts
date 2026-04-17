@@ -56,7 +56,7 @@ export function mapParsedFinancialDataToMappedFinancialData(
   mapped.total_dettes = toNumber(balanceSheet.debts);
   mapped.total_passif = toNumber(balanceSheet.totalLiabilities);
 
-  mapped.ventes_march = toNumber(incomeStatement.salesGoods);
+  mapped.ventes_march = sanitizeSalesGoods(toNumber(incomeStatement.salesGoods), netTurnover);
   mapped.prod_biens = toNumber(incomeStatement.productionSoldGoods);
   mapped.prod_serv = toNumber(incomeStatement.productionSoldServices);
   mapped.prod_vendue = coalesce(
@@ -73,7 +73,10 @@ export function mapParsedFinancialDataToMappedFinancialData(
   mapped.subv_expl = toNumber(incomeStatement.operatingSubsidies);
   mapped.total_prod_expl = toNumber(incomeStatement.totalOperatingProducts);
   mapped.autres_prod_expl = toNumber(incomeStatement.otherOperatingIncome);
-  mapped.ca_n_minus_1 = toNumber(incomeStatement.netTurnoverPreviousYear);
+  mapped.ca_n_minus_1 = sanitizePreviousYearTurnover(
+    toNumber(incomeStatement.netTurnoverPreviousYear),
+    netTurnover
+  );
 
   mapped.achats_march = toNumber(incomeStatement.purchasesGoods);
   mapped.var_stock_march = toNumber(incomeStatement.stockVariationGoods);
@@ -156,6 +159,27 @@ function sanitizeProductionSold(
   }
 
   return productionSold;
+}
+
+function sanitizeSalesGoods(
+  salesGoods: number | null,
+  netTurnover: number | null
+): number | null {
+  if (salesGoods === null) return null;
+  if (netTurnover === null) return salesGoods;
+  if (Math.abs(salesGoods) > Math.abs(netTurnover) * 2) return null;
+  return salesGoods;
+}
+
+function sanitizePreviousYearTurnover(
+  previousTurnover: number | null,
+  currentTurnover: number | null
+): number | null {
+  if (previousTurnover === null) return null;
+  if (currentTurnover === null || currentTurnover === 0) return previousTurnover;
+  const ratio = Math.abs(previousTurnover / currentTurnover);
+  if (ratio < 0.1 || ratio > 10) return null;
+  return previousTurnover;
 }
 
 function deriveSalesGoodsFromNetTurnover(

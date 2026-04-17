@@ -14,11 +14,12 @@ import {
   type ParsedFinancialData
 } from "@/services/pdfAnalysis";
 import { extractFinancialPages } from "@/services/pdf-analysis/pdfPageExtractor";
-// VISION LLM DESACTIVE — voir bloc commente plus bas
-// import {
-//   extractWithVision,
-//   mergeVisionWithDocumentAI
-// } from "@/services/pdf-analysis/visionExtractor";
+import {
+  extractWithVision,
+  mergeVisionWithDocumentAI,
+  buildExistingDataForVision
+} from "@/services/pdf-analysis/visionExtractor";
+import { logVisionCall } from "@/services/pdf-analysis/visionLogger";
 import {
   deleteReducedPdf,
   storeReducedPdf
@@ -332,25 +333,30 @@ export async function POST(request: NextRequest) {
       warnings.push("CA negatif detecte, verification recommandee.");
     }
 
-    // ============================================
-    // VISION LLM TEMPORAIREMENT DESACTIVE
-    // Raison : credits API Anthropic limites ($5)
-    // Reactiver apres recharge credits
-    // Date desactivation : 2026-04-16
-    // ============================================
-    // const useVisionFallback =
-    //   process.env.ANTHROPIC_API_KEY &&
-    //   diagnostics.confidenceScore < 0.80;
-    //
-    // if (useVisionFallback) {
-    //   const visionResult = await extractWithVision(pdfBuffer);
-    //   if (visionResult.success && visionResult.data) {
-    //     mergeVisionWithDocumentAI(financialData, visionResult.data, diagnostics.fieldScores);
-    //     mappedData = mapParsedFinancialDataToMappedFinancialData(financialData);
-    //     kpis = computeKpis(mappedData);
-    //     quantisData = mapToQuantisData(financialData);
-    //   }
-    // }
+    const useVisionFallback =
+      process.env.ANTHROPIC_API_KEY &&
+      diagnostics.confidenceScore < 0.80;
+
+    if (useVisionFallback) {
+      const confidenceBefore = diagnostics.confidenceScore;
+      const existingData = buildExistingDataForVision(financialData);
+      const visionResult = await extractWithVision(pdfBuffer, file.name, existingData);
+      if (visionResult.success && visionResult.data) {
+        mergeVisionWithDocumentAI(financialData, visionResult.data, diagnostics.fieldScores);
+        mappedData = mapParsedFinancialDataToMappedFinancialData(financialData);
+        kpis = computeKpis(mappedData);
+        quantisData = mapToQuantisData(financialData);
+        warnings.push(`Vision LLM appliqué (score avant: ${confidenceBefore}, après: ${visionResult.confidenceScore})`);
+      }
+    } else {
+      logVisionCall({
+        timestamp: new Date().toISOString(),
+        analysisId: "",
+        pdfName: file.name,
+        triggered: false,
+        confidenceScoreBefore: diagnostics.confidenceScore
+      });
+    }
 
     if (progressRequestId) {
       updatePdfParserProgress(progressRequestId, {

@@ -305,6 +305,37 @@ export default function PdfParserTestPage() {
               </button>
             ) : null}
 
+            {process.env.NODE_ENV === "development" ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await fetch("/api/vision-logs");
+                    const data = await res.json();
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `vision-logs-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/10"
+                >
+                  📋 Logs Vision LLM
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await fetch("/api/vision-logs", { method: "DELETE" });
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/60 transition-colors hover:bg-white/10"
+                >
+                  🗑️ Vider les logs
+                </button>
+              </div>
+            ) : null}
+
             {historyPayload && historyPayload.success ? (
               <div className="rounded-xl border border-white/10 bg-black/35 p-3">
                 <p className="mb-2 text-xs uppercase tracking-[0.16em] text-white/55">Historique PDF</p>

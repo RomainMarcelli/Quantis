@@ -735,7 +735,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     columnStrategy: "nCurrent",
     aliases: alias("capital social ou individuel", "capital social", "capital"),
     regexAliases: regex(/\bcapital\s+social\b/, /\bcapital\b/),
-    excludes: alias("total", "propres", "actif"),
+    excludes: alias("total", "propres", "actif", "associes", "associe", "courant", "c/c"),
     expectedLineCodes: ["120"],
     minAbs: 1000,
     allowNegative: false

@@ -541,6 +541,20 @@ function selectAmountCandidate(input: {
     }
 
     if (definition.key === "equity" && row.normalizedLabel.includes("capitaux propres") && amountCandidates.length >= 2) {
+      const ordered = [...amountCandidates].sort((left, right) => left.columnIndex - right.columnIndex);
+      if (ordered.length >= 3) {
+        const col1 = ordered[0];
+        const col2 = ordered[1];
+        const col3 = ordered[2];
+        if (col1 && col2 && col3) {
+          const expectedVariation = Math.abs(col1.value - col2.value);
+          const observedVariation = Math.abs(col3.value);
+          const tolerance = Math.max(2_000, expectedVariation * 0.05);
+          if (Math.abs(observedVariation - expectedVariation) <= tolerance) {
+            return col1;
+          }
+        }
+      }
       return amountCandidates[amountCandidates.length - 1] ?? null;
     }
 
@@ -597,7 +611,16 @@ function chooseLikelyCurrentCandidate(candidates: AmountCandidate[]): AmountCand
     return null;
   }
 
-  const ordered = [...candidates].sort((left, right) => left.columnIndex - right.columnIndex);
+  const hasSmaller = candidates.some((c) => Math.abs(c.value) < 10_000_000);
+  const filtered = candidates.length > 1 && hasSmaller
+    ? candidates.filter((c) => {
+        const abs = Math.abs(c.value);
+        return !(c.value === Math.floor(c.value) && abs >= 10_000_000 && abs.toString().length <= 10);
+      })
+    : candidates;
+  const effective = filtered.length > 0 ? filtered : candidates;
+
+  const ordered = [...effective].sort((left, right) => left.columnIndex - right.columnIndex);
   const first = ordered[0];
   const second = ordered[1];
   if (!first) {

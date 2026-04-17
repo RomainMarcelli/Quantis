@@ -737,3 +737,345 @@ Le rapport est généré par 3 fichiers principaux :
 - Fichier modifié : `lib/synthese/pdfReportModel.ts` (section Formatters)
 
 **Tests** : 353 passed / 0 failed ✅
+
+---
+
+## Fix total_prod_expl Regnology (2026-04-17)
+
+**Problème** : RIP CURL (format Regnology) — `total_prod_expl` est null car le format ne fournit pas de ligne total explicite, alors que les composants sont présents (`ventes_march=49 919 067`, `prod_vendue=156 076`). Conséquence : VA, EBITDA et tous les KPI dépendants sont null.
+
+**Solution** dans `services/kpiEngine.ts` :
+- Variable locale `effectiveTotalProdExpl` qui reconstruit le total depuis ses composants quand `data.total_prod_expl` est null :
+  ```
+  effectiveTotalProdExpl = data.total_prod_expl ??
+    sumPartial(ventes_march, prod_vendue, prod_stockee, prod_immo, subv_expl, autres_prod_expl)
+  ```
+- `data.total_prod_expl` jamais modifié directement (pas d'effet de bord)
+- 5 usages remplacés : va, marge_ebitda, rot_bfr, dso, rot_stocks
+- `computeCa()` conserve `data.total_prod_expl` en fallback (lecture brute correcte)
+
+**Vérification RIP CURL** :
+- effectiveTotalProdExpl = 49 919 067 + 156 076 = **50 075 143** ✅
+- VA = 50 075 143 - 14 763 074 (ace) = **35 312 069** ✅
+- EBITDA = 35 312 069 - 6 599 527 - 2 696 790 - 0 = **26 015 752** ✅
+
+**Tests** : 353 passed / 0 failed ✅
+
+---
+
+## Fixes automatisés post-test (2026-04-17)
+
+3 fixes dans `services/kpiEngine.ts` pour améliorer le taux de KPI sur les PDFs existants.
+
+### Fix 1 — caf et roe utilisent resultat_net avec fallback
+
+**Problème** : `caf = sum(data.res_net, data.dap)` et `roe = div(data.res_net, data.total_cp)` utilisaient `data.res_net` directement, ignorant le fallback `resultat_exercice` (calculé depuis totalProducts - totalCharges). Quand `netResult` est null mais `totalProducts` et `totalCharges` existent, caf et roe restaient null à tort.
+
+**Solution** :
+- `resultat_net = data.res_net ?? data.resultat_exercice` déplacé AVANT caf et roe
+- `caf = sum(resultat_net, data.dap)` au lieu de `sum(data.res_net, data.dap)`
+- `roe = div(resultat_net, data.total_cp)` au lieu de `div(data.res_net, data.total_cp)`
+
+**Impact** : VERACYTE caf résolu (+1 KPI)
+
+### Fix 2 — effectiveEbit pour ROCE
+
+**Problème** : `roce = div(mul(data.ebit, 0.75), sum(data.total_actif_immo, bfr))` utilise `data.ebit` qui vient de `operatingResult`. Quand le parser ne trouve pas la ligne "RÉSULTAT D'EXPLOITATION" mais a `total_prod_expl` et `total_charges_expl`, ROCE reste null.
+
+**Solution** :
+- `effectiveEbit = data.ebit ?? sub(effectiveTotalProdExpl, data.total_charges_expl)`
+- `roce = div(mul(effectiveEbit, 0.75), ...)` utilise le fallback
+
+**Impact** : CREATIONS FUSALP (+1 KPI), RIP CURL (+1 KPI)
+
+### Analyse des 4 PDFs demandés
+
+**EURASIA TOURS** (CA faux : 437K vs 3.4M) :
+- Le parser capture "437010 AG2R REUNICA PREVOYANCE CA" — un numéro de compte analytique, pas le chiffre d'affaires
+- Format balance/trial balance bilingue → nécessite Vision LLM
+- **Infixable sans Vision LLM**
+
+**FIVAL** (netResult) :
+- `netResult = 870 432` correspond à la valeur de référence ✅
+- Le problème est ailleurs : quasi aucun champ bilan/CDR extrait (scan dégradé, 4/17 bilan, 2/16 CDR)
+- **Infixable sans Vision LLM**
+
+**SMI MARILLIER** (netResult null) :
+- CDR tronqué : "RÉSULTAT D'EXPLOITATION" et "RÉSULTAT COURANT AVANT IMPÔTS" existent, mais pas de ligne "BÉNÉFICE OU PERTE" ni "TOTAL DES PRODUITS/CHARGES"
+- Pas de fallback possible
+- **Infixable sans Vision LLM**
+
+**VERACYTE** (netResult null dans raw, OK via fallback) :
+- `incomeStatement.netResult` = null (pas de ligne explicite)
+- Mais `totalProducts = 36 813 982` et `totalCharges = 3 195 046` → `resultat_exercice` calculé par le bridge
+- Le KPI `resultat_net` est résolu via fallback ✅
+- `va/ebitda` restent null car `ace` et `salaires` absents du raw text → **nécessite Vision LLM**
+
+### Tableau récapitulatif final
+
+| PDF | CA | totalAssets | netResult | KPI /10 | Statut |
+|-----|-----|-----|-----|-----|-----|
+| AG FRANCE | 16 064 535 ✅ | 8 117 151 ✅ | 1 173 877 ✅ | **10/10** | ✅ |
+| BEL AIR | N/D | N/D | N/D | **1/10** | ⚪ pas de ref |
+| BI-PLANS | 752 298 ✅ | 454 030 ✅ | 24 219 ✅ | **10/10** | ✅ |
+| CREATIONS FUSALP | 52 945 837 ✅ | 68 396 331 ✅ | 177 197 ✅ | **8/10** | ✅ |
+| EURASIA TOURS | 437 010 ❌ | null | null | **0/10** | ❌ Vision LLM |
+| FIVAL | 187 442 ❌ | null | 870 432 ✅ | **0/10** | ❌ Vision LLM |
+| FUTURE PIPE | 738 197 ✅ | 344 316 ✅ | 25 924 ✅ | **2/10** | ✅ |
+| LCL | 8 145 093 ✅ | 7 773 023 ✅ | 659 391 ✅ | **2/10** | ✅ |
+| LXA | 18 078 362 ✅ | 10 498 434 ✅ | 657 398 ✅ | **4/10** | ✅ |
+| RIP CURL | 50 075 143 ✅ | 66 101 267 ✅ | 1 201 318 ✅ | **8/10** | ✅ |
+| SMI MARILLIER | 948 636 ✅ | 26 356 691 ✅ | null ❌ | **5/10** | ❌ Vision LLM |
+| SRJB | N/D | N/D | N/D | **~3/10** | ⚪ pas de ref |
+| TROISV | 263 118 ✅ | 174 535 ✅ | -8 700 ✅ | **9/10** | ✅ |
+| VERACYTE | 27 209 281 ✅ | 27 311 749 ✅ | null ❌ | **4/10** | ❌ Vision LLM |
+
+**Bilan** : 8 ✅ / 4 ❌ / 2 sans référence
+**Progression KPI** : FUSALP 7→8, RIP CURL 7→8, VERACYTE 3→4 (via fixes kpiEngine)
+**Bloqueurs Vision LLM** : EURASIA (balance bilingue), FIVAL (scan dégradé), SMI (CDR tronqué), VERACYTE (ace/salaires absents)
+
+**Tests** : 353 passed / 0 failed ✅
+
+---
+
+## Fix CA LXA (2026-04-17)
+
+### Problème 1 — ventes_march = 70 710 000 (faux)
+
+**Cause** : le parser capture "VENTES DE MARCHANDISES - FRANCE" (row 1401, annexe détaillée) au lieu du CDR principal. Le vrai CA (netTurnover) = 18 078 362 de "CHIFFRES D'AFFAIRES NETS" (row 266).
+
+**Fix** dans `services/mapping/parsedFinancialDataBridge.ts` :
+- Nouvelle fonction `sanitizeSalesGoods(salesGoods, netTurnover)` : si `|salesGoods| > |netTurnover| × 2` → null
+- Appliquée avant le coalesce, donc le fallback `deriveSalesGoodsFromNetTurnover()` prend le relais
+- LXA : 70 710 000 > 18 078 362 × 2 = 36 156 724 → rejeté ✅
+
+### Problème 2 — ca_n_minus_1 = 1 483 460 (faux)
+
+**Cause** : `netTurnoverPreviousYear` capture "TOTAL CHIFFRES D'AFFAIRES NETS" (row 1415, annexe) colonne 3. Valeur = 8% du CA courant → aberrant pour un N-1.
+
+**Fix** dans `services/mapping/parsedFinancialDataBridge.ts` :
+- Nouvelle fonction `sanitizePreviousYearTurnover(previous, current)` : si ratio `|previous/current|` hors intervalle [0.1, 10] → null
+- LXA : 1 483 460 / 18 078 362 = 0.082 < 0.1 → rejeté ✅
+
+### Vérification
+- LXA : ca = **18 078 362** ✅, KPI 16/38
+- AG FRANCE : ca = **16 064 535** ✅, KPI 36/38 (non-régression)
+- BI-PLANS : non-régression confirmée
+
+**Tests** : 353 passed / 0 failed ✅
+
+---
+
+## Fix LXA passif (2026-04-17)
+
+Trois bugs de parsing sur LXA LAGARDERE (format balance/balance générale avec numéros de compte).
+
+### Bug 2 — total_cp capture la variation au lieu du solde (CORRIGÉ)
+
+**Problème** : equity = -292 602 (variation col3) au lieu de 932 336 (solde N col1).
+La règle spéciale equity dans `fieldResolver.ts` (nCurrent strategy) prenait systématiquement le dernier candidat (rightmost) pour les lignes "capitaux propres" avec 2+ colonnes.
+
+**Fix** dans `services/pdf-analysis/fieldResolver.ts` :
+- Pour equity avec 3+ candidats : détection de triplet [N, N-1, Variation]. Si col3 ≈ col1 - col2 → pick col1 (solde N)
+- Pour equity avec 2 candidats : conserve le comportement original (rightmost, correct pour DGFiP 2033-SD)
+
+**Résultat** : equity = **932 336** ✅
+
+### Bug 3 — capital capture un compte courant d'associés (CORRIGÉ)
+
+**Problème** : shareCapital = 122 500 de "ASSOCIES - C/C CAPITAL" (compte courant) au lieu du capital social (50 000).
+
+**Fix** dans `services/pdf-analysis/labelDictionary.ts` :
+- Ajout excludes pour shareCapital : `"associes", "associe", "courant", "c/c"`
+
+**Résultat** : shareCapital = 50 de "CAPITAL SOCIAL" ✅ (valeur faible car col1 = numéro de compte, valeur réelle dans une autre colonne non capturée — impact nul car total_cp vient de equity total)
+
+### Bug 1 — reserve_legale et ran capturent des numéros de compte (PARTIEL)
+
+**Problème** : legalReserves = 10610100 (numéro de compte PCG 106.101.00) au lieu de 5 000.
+
+**Fix partiel** dans `services/pdf-analysis/fieldResolver.ts` :
+- `chooseLikelyCurrentCandidate()` : filtre les candidats entiers ≥ 10M (8+ digits) quand d'autres candidats plus petits existent sur la même ligne
+- **Non résolu pour LXA** : la ligne "RESERVE LEGALE" n'a qu'un seul candidat numérique (le numéro de compte), la valeur réelle (5 000) n'est pas extraite comme candidat séparé par Document AI
+- **Impact nul** : total_cp vient de la ligne equity total (932 336), pas de la somme des composants
+
+### Vérification
+- LXA : ca = **18 078 362** ✅, total_cp = **932 336** ✅, KPI 16/38
+- AG FRANCE : ca = **16 064 535** ✅, KPI 36/38 (non-régression)
+- BI-PLANS : ca = **752 298** ✅, KPI 35/38 (non-régression)
+
+**Tests** : 353 passed / 0 failed ✅
+
+---
+
+## Vision LLM réactivé + système logs (2026-04-17)
+
+### Action 1 — Réactivation Vision LLM
+
+**`app/api/pdf-parser/route.ts`** :
+- Import décommenté : `extractWithVision`, `mergeVisionWithDocumentAI` (lignes 17-20)
+- Import ajouté : `logVisionCall` (ligne 21)
+- Bloc Vision LLM décommenté et enrichi (lignes 335-353) :
+  - Condition : `ANTHROPIC_API_KEY` présente ET `confidenceScore < 0.80`
+  - Appel `extractWithVision(pdfBuffer, file.name)` avec nom du PDF
+  - Merge + recalcul mappedData/kpis/quantisData si succès
+  - Warning ajouté : "Vision LLM appliqué (score avant: X, après: Y)"
+  - Branche else : log du non-déclenchement
+
+### Action 2 — Système de logs Vision LLM
+
+**`services/pdf-analysis/visionLogger.ts`** (nouveau) :
+- Type `VisionLogEntry` : 14 champs (timestamp, pdfName, triggered, scores, model, tokens, coût, erreur, durée)
+- Stockage mémoire (max 500 entrées, FIFO)
+- Exports : `logVisionCall`, `getVisionLogs`, `clearVisionLogs`, `formatLogsAsText`
+
+### Action 3 — Logs intégrés dans visionExtractor.ts
+
+**`services/pdf-analysis/visionExtractor.ts`** :
+- Constante `VISION_MODEL = "claude-haiku-4-5-20251001"`
+- `callClaude()` retourne `tokensInput`/`tokensOutput` depuis `response.usage`
+- `extractWithVision(pdfBuffer, pdfName)` : logs console + `logVisionCall()` dans les 3 branches
+- Estimation coût : Haiku $0.25/1M input + $1.25/1M output
+
+### Action 4 — Endpoint API logs
+
+**`app/api/vision-logs/route.ts`** (nouveau) :
+- `GET /api/vision-logs` → JSON, `GET ?format=text` → texte lisible, `DELETE` → vide
+
+### Action 5 — Boutons sur /pdf-parser-test
+
+**`app/pdf-parser-test/page.tsx`** :
+- "📋 Logs Vision LLM" + "🗑️ Vider les logs" — visibles uniquement en `development`
+
+### 10 lignes clés
+
+1. `route.ts:18` — `extractWithVision` importé ✅
+2. `route.ts:21` — `logVisionCall` importé ✅
+3. `route.ts:336` — `process.env.ANTHROPIC_API_KEY && confidenceScore < 0.80` ✅
+4. `route.ts:341` — `extractWithVision(pdfBuffer, file.name)` ✅
+5. `route.ts:343` — `mergeVisionWithDocumentAI(financialData, visionResult.data, ...)` ✅
+6. `visionExtractor.ts:3` — `import { logVisionCall }` ✅
+7. `visionExtractor.ts:196` — `VISION_MODEL = "claude-haiku-4-5-20251001"` ✅
+8. `visionExtractor.ts:210` — `process.env.ANTHROPIC_API_KEY` lu ✅
+9. `visionLogger.ts:24` — `export function logVisionCall` ✅
+10. `app/api/vision-logs/route.ts:6` — GET endpoint actif ✅
+
+### Action 6 — Vision LLM dans analysisPipeline.ts (fix upload)
+
+**Problème** : le Vision LLM n'existait que dans `app/api/pdf-parser/route.ts` (page /pdf-parser-test). Le flux upload via `/upload` → `runAnalysisPipeline()` ne l'appelait jamais.
+
+**`services/analysisPipeline.ts`** :
+- Imports ajoutés : `extractWithVision`, `mergeVisionWithDocumentAI`, `logVisionCall`
+- Bloc Vision LLM inséré entre `analyzeFinancialDocument()` et `mapParsedFinancialDataToMappedFinancialData()` :
+  - Condition : `ANTHROPIC_API_KEY` ET `analysis.diagnostics.confidenceScore < 0.80`
+  - Appel `extractWithVision(pageExtraction.buffer, pdfFile.name)`
+  - Merge sur `analysis.parsedFinancialData` (mutations AVANT le mapping)
+  - `logVisionCall()` avec fieldsFilledByVision, durationMs, confidenceBefore/After
+  - Try/catch : erreur Vision LLM non-bloquante (log + continue)
+  - Branche else : log du non-déclenchement
+- `console.log("[VisionLogger] Entry logged:", ...)` ajouté après chaque `logVisionCall()` (3 branches : succès, erreur, skip)
+
+### Action 7 — Fix doublement CA Vision LLM
+
+**Problème** : Vision LLM remplit `ventes_march = 738 197` alors que `prod_vendue = 738 197` est déjà présent → `computeCa()` additionne les deux → CA = 1 476 394 au lieu de 738 197.
+
+**Fix** dans `services/kpiEngine.ts` — `computeCa()` :
+- Si `ventes_march` et `prod_vendue` sont tous deux > 0 ET écart < 1% → doublon Vision LLM → prendre `Math.max()` au lieu d'additionner
+- Cas normal (écart > 1%) : addition standard conservée
+
+```typescript
+if (Math.abs(salesGoods - soldProduction) < soldProduction * 0.01) {
+  return Math.max(salesGoods, soldProduction);
+}
+```
+
+### Diagnostic double appel Vision LLM (2026-04-17)
+
+**Résultat : pas de double appel.** Les deux chemins sont séparés :
+- `/upload` → `POST /api/analyses` → `runAnalysisPipeline()` (analysisPipeline.ts) → Vision LLM
+- `/pdf-parser-test` → `POST /api/pdf-parser` → route.ts → Vision LLM
+
+Ils ne se croisent jamais. 2 entrées de log = 2 uploads distincts.
+
+**Architecture confirmée :**
+```
+/upload → UploadPageView → fetch /api/analyses → runAnalysisPipeline() → Vision LLM
+/pdf-parser-test → XMLHttpRequest /api/pdf-parser → route.ts → Vision LLM
+```
+
+**Tests** : 353 passed / 0 failed ✅
+
+---
+
+## Vision LLM v2 — validateur + extracteur (2026-04-17)
+
+### Fix 1 — Doublement CA VERACYTE
+
+**Problème** : `ventes_march + prod_vendue > total_prod_expl × 1.1` → doublon Vision LLM.
+
+**Fix** dans `services/kpiEngine.ts` — `computeCa()` :
+- Si la somme dépasse `total_prod_expl × 1.1` → prendre `Math.max(ventes, prodVendue)` au lieu d'additionner
+- Complète le garde-fou existant (écart < 1%)
+
+### Fix 2 — Refonte Vision LLM : mode validateur + extracteur
+
+**Avant** : Vision LLM en mode "fill-only" — ne remplissait que les champs null sans vérifier les valeurs Document AI existantes.
+
+**Après** : deux passes dans un seul appel :
+1. **Vérification** : les valeurs Document AI non-null sont envoyées au LLM qui les compare visuellement au PDF. Si écart > 5% → correction retournée. Si correct → null (on garde Document AI).
+2. **Extraction** : les champs null sont extraits depuis le PDF.
+
+#### Fichiers modifiés
+
+**`services/pdf-analysis/visionExtractor.ts`** — réécriture :
+- `buildSystemPrompt(existingData?)` : prompt dynamique avec section "À VÉRIFIER" (valeurs Document AI) et "À EXTRAIRE" (champs null)
+- `callClaude(pdfBuffer, attempt, systemPrompt)` : accepte le prompt dynamique
+- `extractWithVision(pdfBuffer, pdfName, existingDocAIData?)` : nouveau 3e paramètre optionnel
+- `mergeVisionWithDocumentAI()` : nouvelle logique de merge :
+  - Champ null → Vision LLM remplit (fill)
+  - Champ existant + écart > 5% → Vision LLM corrige (correction loggée)
+  - Champ existant + écart ≤ 5% → garde Document AI
+- `buildExistingDataForVision(parsed)` : nouvelle fonction exportée, extrait les valeurs Document AI depuis ParsedFinancialData vers VisionFinancialData
+
+**`services/analysisPipeline.ts`** :
+- Import `buildExistingDataForVision`
+- `const existingData = buildExistingDataForVision(analysis.parsedFinancialData)` avant l'appel
+- `extractWithVision(pageExtraction.buffer, pdfFile.name, existingData)`
+
+**`app/api/pdf-parser/route.ts`** :
+- Import `buildExistingDataForVision`
+- `const existingData = buildExistingDataForVision(financialData)` avant l'appel
+- `extractWithVision(pdfBuffer, file.name, existingData)`
+
+#### Prompt dynamique
+
+Le prompt envoyé au LLM contient maintenant :
+```
+=== VALEURS À VÉRIFIER (N champs) ===
+{ "ca": 16064535, "total_actif": 8117151, ... }
+
+=== CHAMPS À EXTRAIRE (M champs) ===
+["ace", "salaires", "charges_soc", ...]
+```
+
+Le LLM retourne null pour les champs vérifiés et corrects, et une valeur uniquement pour les corrections et nouvelles extractions.
+
+### Corrections prompt N-1 et sous-lignes (2026-04-17)
+
+Erreurs identifiées sur SMI MARILLIER : Vision LLM prenait N-1 au lieu de N, et des sous-lignes au lieu des totaux.
+
+**`services/pdf-analysis/visionExtractor.ts`** — `SYSTEM_PROMPT_BASE` enrichi :
+
+**Section "RÈGLE ABSOLUE SUR LES COLONNES"** :
+- Colonne N = toujours la première colonne de gauche
+- Deux nombres sur la même ligne → toujours prendre le premier (gauche)
+- Exception explicite si "Exercice N-1" est indiqué sur la colonne gauche
+- En cas de doute → valeur la plus grande si cohérente
+
+**Section "RÈGLE ABSOLUE SUR LES TOTAUX"** :
+- Toujours chercher la ligne TOTAL, jamais une sous-ligne
+- Exemples concrets : dettes_fisc_soc, total_dettes, total_cp, fournisseurs
+- Indentation/retrait = sous-ligne
+- Libellés en gras ou commençant par "TOTAL" = ligne de total
+
+**Tests** : 353 passed / 0 failed ✅

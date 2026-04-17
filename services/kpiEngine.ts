@@ -3,16 +3,25 @@ import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const ca = computeCa(data);
   const tcam = percent(powMinusOne(div(ca, data.ca_n_minus_1), inv(data.n)));
+  const effectiveTotalProdExpl = data.total_prod_expl ??
+    sumPartial(
+      data.ventes_march,
+      data.prod_vendue,
+      data.prod_stockee,
+      data.prod_immo,
+      data.subv_expl,
+      data.autres_prod_expl
+    );
   const achatsTotal = sumPartial(data.achats_march, data.achats_mp, data.ace);
-  const va = data.total_prod_expl !== null && achatsTotal !== null
-    ? data.total_prod_expl - achatsTotal
+  const va = effectiveTotalProdExpl !== null && achatsTotal !== null
+    ? effectiveTotalProdExpl - achatsTotal
     : null;
   const chargesPersonnel = sumPartial(data.impots_taxes, data.salaires, data.charges_soc);
   const ebitda = va !== null && chargesPersonnel !== null
     ? va - chargesPersonnel
     : null;
   const ebe = ebitda;
-  const marge_ebitda = percent(div(ebitda, data.total_prod_expl));
+  const marge_ebitda = percent(div(ebitda, effectiveTotalProdExpl));
   const charges_var = sumPartial(data.achats_march, data.achats_mp, data.var_stock_march, data.var_stock_mp);
   const mscv = sub(ca, charges_var);
   const tmscv = div(mscv, ca);
@@ -23,18 +32,17 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
     totalActifImmoBrut: data.total_actif_immo_brut,
     totalActifImmo: data.total_actif_immo
   });
-  // sumPartial : dettes_fisc_soc peut être null (absent du bilan) → traité comme 0 pour le BFR
-  // et les ratios de liquidité, sans invalider tout le calcul.
   const dettesCirculantes = sumPartial(data.fournisseurs, data.dettes_fisc_soc);
   const bfr = sub(
     sumPartial(data.total_stocks, data.creances),
     dettesCirculantes
   );
-  const rot_bfr = mul(div(bfr, mul(data.total_prod_expl, 1.2)), 365);
-  const dso = div(mul(data.clients, 365), mul(data.total_prod_expl, 1.2));
+  const rot_bfr = mul(div(bfr, mul(effectiveTotalProdExpl, 1.2)), 365);
+  const dso = div(mul(data.clients, 365), mul(effectiveTotalProdExpl, 1.2));
   const dpo = div(mul(data.fournisseurs, 365), mul(sum(data.achats_march, data.ace), 1.2));
-  const rot_stocks = div(mul(data.total_stocks, 365), data.total_prod_expl);
-  const caf = sum(data.res_net, data.dap);
+  const rot_stocks = div(mul(data.total_stocks, 365), effectiveTotalProdExpl);
+  const resultat_net = data.res_net ?? data.resultat_exercice;
+  const caf = sum(resultat_net, data.dap);
   const fte = caf === null ? null : caf - (data.delta_bfr ?? 0);
   const tn = sub(data.dispo, data.emprunts);
   const solvabilite = div(data.total_cp, data.total_passif);
@@ -43,10 +51,10 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const liq_red = div(sum(data.creances, data.dispo), dettesCirculantes);
   const liq_imm = div(data.dispo, dettesCirculantes);
   const disponibilites = data.dispo;
-  const roce = div(mul(data.ebit, 0.75), sum(data.total_actif_immo, bfr));
-  const roe = div(data.res_net, data.total_cp);
+  const effectiveEbit = data.ebit ?? sub(effectiveTotalProdExpl, data.total_charges_expl);
+  const roce = div(mul(effectiveEbit, 0.75), sum(data.total_actif_immo, bfr));
+  const roe = div(resultat_net, data.total_cp);
   const effet_levier = sub(roe, roce);
-  const resultat_net = data.res_net ?? data.resultat_exercice;
   const capacite_remboursement_annees = computeDebtRepaymentCapacity(data.emprunts, caf);
   const etat_materiel_indice = percent(ratio_immo);
 
@@ -147,7 +155,14 @@ function computeCa(data: MappedFinancialData): number | null {
   const hasAtLeastOneSource = data.ventes_march !== null || data.prod_vendue !== null;
 
   if (salesGoods !== null && soldProduction !== null) {
-    return salesGoods + soldProduction;
+    if (Math.abs(salesGoods - soldProduction) < soldProduction * 0.01) {
+      return Math.max(salesGoods, soldProduction);
+    }
+    const sum = salesGoods + soldProduction;
+    if (data.total_prod_expl !== null && sum > data.total_prod_expl * 1.1) {
+      return Math.max(salesGoods, soldProduction);
+    }
+    return sum;
   }
 
   if (salesGoods !== null) {

@@ -13,6 +13,8 @@ import { extractFinancialPages } from "@/services/pdf-analysis/pdfPageExtractor"
 import { processPdfWithDocumentAI } from "@/services/documentAI";
 import { analyzeFinancialDocument } from "@/services/pdfAnalysis";
 import { mapParsedFinancialDataToMappedFinancialData } from "@/services/mapping/parsedFinancialDataBridge";
+import { extractWithVision, mergeVisionWithDocumentAI, buildExistingDataForVision } from "@/services/pdf-analysis/visionExtractor";
+import { logVisionCall } from "@/services/pdf-analysis/visionLogger";
 
 export async function runAnalysisPipeline(params: {
   userId: string;
@@ -42,6 +44,57 @@ export async function runAnalysisPipeline(params: {
         imagelessMode: pageExtraction.imagelessMode
       });
       const analysis = analyzeFinancialDocument(extraction);
+
+      if (process.env.ANTHROPIC_API_KEY && analysis.diagnostics.confidenceScore < 0.80) {
+        console.log(`[analysis-pipeline] Vision LLM fallback déclenché — score: ${analysis.diagnostics.confidenceScore}`);
+        const visionStart = Date.now();
+        try {
+          const existingData = buildExistingDataForVision(analysis.parsedFinancialData);
+          const visionResult = await extractWithVision(pageExtraction.buffer, pdfFile.name, existingData);
+          if (visionResult.success && visionResult.data) {
+            mergeVisionWithDocumentAI(analysis.parsedFinancialData, visionResult.data, analysis.diagnostics.fieldScores);
+            const entry = {
+              timestamp: new Date().toISOString(),
+              analysisId: "pipeline",
+              pdfName: pdfFile.name,
+              triggered: true as const,
+              confidenceScoreBefore: analysis.diagnostics.confidenceScore,
+              confidenceScoreAfter: visionResult.confidenceScore,
+              pagesAnalyzed: visionResult.pagesAnalyzed,
+              model: "claude-haiku-4-5-20251001",
+              fieldsFilledByVision: Object.keys(visionResult.data).filter((k) => (visionResult.data as Record<string, unknown>)[k] !== null),
+              durationMs: Date.now() - visionStart
+            };
+            logVisionCall(entry);
+            console.log("[VisionLogger] Entry logged:", entry.pdfName, "— fields:", entry.fieldsFilledByVision?.length);
+          }
+        } catch (visionError) {
+          const errMsg = visionError instanceof Error ? visionError.message : "Unknown error";
+          console.warn("[analysis-pipeline] Vision LLM fallback failed", errMsg);
+          const errEntry = {
+            timestamp: new Date().toISOString(),
+            analysisId: "pipeline",
+            pdfName: pdfFile.name,
+            triggered: true as const,
+            confidenceScoreBefore: analysis.diagnostics.confidenceScore,
+            error: errMsg,
+            durationMs: Date.now() - visionStart
+          };
+          logVisionCall(errEntry);
+          console.log("[VisionLogger] Error entry logged:", errEntry.pdfName);
+        }
+      } else {
+        const skipEntry = {
+          timestamp: new Date().toISOString(),
+          analysisId: "pipeline",
+          pdfName: pdfFile.name,
+          triggered: false as const,
+          confidenceScoreBefore: analysis.diagnostics.confidenceScore
+        };
+        logVisionCall(skipEntry);
+        console.log("[VisionLogger] Skip entry logged:", skipEntry.pdfName, "— score:", skipEntry.confidenceScoreBefore);
+      }
+
       documentAiMappedData = mapParsedFinancialDataToMappedFinancialData(
         analysis.parsedFinancialData
       );
