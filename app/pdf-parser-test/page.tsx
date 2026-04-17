@@ -272,6 +272,39 @@ export default function PdfParserTestPage() {
               remainingSeconds={isSubmitting ? remainingSeconds : null}
             />
 
+            {responsePayload && responsePayload.success ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const diagnostic = {
+                    exportedAt: new Date().toISOString(),
+                    parserVersion: responsePayload.parserVersion ?? null,
+                    confidenceScore: responsePayload.confidenceScore,
+                    warnings: responsePayload.warnings,
+                    principalFinancials: responsePayload.quantisData,
+                    mappedData: responsePayload.mappedData ?? responsePayload.debugData?.mappedData ?? null,
+                    kpis: responsePayload.kpis ?? responsePayload.debugData?.kpis ?? null,
+                    pdfExtraction: responsePayload.pdfExtraction ?? null,
+                    persistence: responsePayload.persistence,
+                    execution: {
+                      elapsedSeconds: Math.round(elapsedSeconds * 10) / 10,
+                      estimatedDurationSeconds
+                    }
+                  };
+                  const blob = new Blob([JSON.stringify(diagnostic, null, 2)], { type: "application/json" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `diagnostic-${Date.now()}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="rounded-xl border border-quantis-gold/30 bg-quantis-gold/10 px-4 py-2 text-sm font-medium text-quantis-gold transition-colors hover:bg-quantis-gold/20"
+              >
+                📥 Exporter diagnostic complet
+              </button>
+            ) : null}
+
             {historyPayload && historyPayload.success ? (
               <div className="rounded-xl border border-white/10 bg-black/35 p-3">
                 <p className="mb-2 text-xs uppercase tracking-[0.16em] text-white/55">Historique PDF</p>

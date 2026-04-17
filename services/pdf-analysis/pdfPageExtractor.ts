@@ -264,6 +264,12 @@ export async function extractFinancialPages(
       }
     }
 
+    if (verbose && keepIndices.length > 0) {
+      console.log(
+        `[pdfPageExtractor] Pages sélectionnées : ${keepIndices.map((i) => i + 1).join(", ")} (${keepIndices.length}/${pageTexts.length})`
+      );
+    }
+
     if (keepIndices.length === 0) {
       // Aucun marqueur textuel trouvé — typiquement un PDF scanné Docusign où
       // pdf-parse ne voit que "Docusign Envelope ID" sur chaque page. Dans ce
@@ -346,8 +352,10 @@ function buildScanFallbackIndices(totalPages: number): {
   }
 
   if (totalPages <= 50) {
-    const start = Math.max(0, Math.floor(totalPages * 0.3));
-    const end = Math.min(totalPages, start + MAX_IMAGELESS);
+    const start = Math.max(0, Math.floor(totalPages * 0.2));
+    const maxEnd = Math.min(totalPages, Math.floor(totalPages * 0.6));
+    const count = Math.min(20, maxEnd - start);
+    const end = start + count;
     return {
       indices: Array.from({ length: end - start }, (_, i) => start + i),
       imagelessMode: true

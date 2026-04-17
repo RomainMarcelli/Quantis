@@ -1,4 +1,4 @@
-﻿// File: lib/synthese/synthesePeriod.ts
+// File: lib/synthese/synthesePeriod.ts
 // Role: gère les options d'année de synthèse et le filtrage des analyses par période.
 import { resolveAnalysisFiscalYear } from "@/services/analysisHistory";
 import type { AnalysisRecord } from "@/types/analysis";
@@ -10,46 +10,34 @@ export type SyntheseYearOption = {
   label: string;
 };
 
-// Extrait l'année d'une analyse en priorisant l'année fiscale détectée dans la liasse.
-// Le fallback sur createdAt reste défensif si aucune année fiscale n'est disponible.
 export function resolveAnalysisYear(analysis: AnalysisRecord): number {
   const fiscalYear = resolveAnalysisFiscalYear(analysis);
   if (fiscalYear !== null) {
     return fiscalYear;
   }
 
-  return new Date().getFullYear();
+  const createdYear = new Date(analysis.createdAt).getFullYear();
+  return Number.isFinite(createdYear) ? createdYear : new Date().getFullYear();
 }
 
-// Construit la liste des périodes: "Année en cours" + années disponibles en historique.
 export function buildSyntheseYearOptions(
   analyses: AnalysisRecord[],
-  currentYear: number
+  _currentYear: number
 ): SyntheseYearOption[] {
   const availableYears = Array.from(
     new Set(analyses.map((analysis) => resolveAnalysisYear(analysis)))
   ).sort((left, right) => right - left);
 
-  const options: SyntheseYearOption[] = [
-    { value: SYNTHESIS_CURRENT_YEAR_KEY, label: `Année en cours (${currentYear})` }
-  ];
+  if (availableYears.length === 0) {
+    return [];
+  }
 
-  availableYears.forEach((year) => {
-    options.push({
-      value: String(year),
-      label: String(year)
-    });
-  });
-
-  // Évite d'avoir deux fois l'année courante (label dédié + année brute).
-  return options.filter(
-    (option, index, list) =>
-      list.findIndex((entry) => entry.value === option.value) === index &&
-      !(option.value === String(currentYear) && options[0]?.value === SYNTHESIS_CURRENT_YEAR_KEY)
-  );
+  return availableYears.map((year) => ({
+    value: String(year),
+    label: String(year)
+  }));
 }
 
-// Filtre les analyses selon l'année choisie dans la synthèse.
 export function filterAnalysesByYear(
   analyses: AnalysisRecord[],
   selectedYearValue: string,

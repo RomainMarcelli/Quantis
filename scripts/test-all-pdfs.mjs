@@ -76,6 +76,23 @@ const REFERENCE_VALUES = {
 // --only=filename pour ne tester qu'un seul PDF
 const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const onlyFilter = onlyArg ? onlyArg.slice(7) : null;
+const detailedMode = process.argv.includes("--detailed");
+
+const BILAN_FIELDS = [
+  "immob_incorp", "immob_corp", "immob_fin", "total_actif_immo",
+  "stocks_mp", "stocks_march", "clients", "autres_creances", "vmp", "dispo",
+  "total_actif_circ", "total_cp", "emprunts", "fournisseurs", "dettes_fisc_soc",
+  "total_dettes", "total_actif"
+];
+const CDR_FIELDS = [
+  "ventes_march", "prod_vendue", "ace", "salaires", "charges_soc",
+  "dap", "dprov", "impots_taxes", "autres_charges_expl", "total_prod_expl",
+  "total_charges_expl", "charges_fin", "prod_excep", "charges_excep", "is_impot",
+  "resultat_exercice"
+];
+const KPI_PRIORITY = [
+  "va", "ebitda", "bfr", "dso", "dpo", "caf", "roe", "roce", "liq_gen", "ratio_immo"
+];
 
 async function testPdf(filename, index, total) {
   const filePath = `docs/docs-compta/${filename}`;
@@ -146,6 +163,8 @@ async function testPdf(filename, index, total) {
     result.confidenceScore = analysis.diagnostics.confidenceScore;
     result.kpiFilledCount = filled;
     result.kpiMissingCount = missing;
+    result.mappedData = mappedData;
+    result.kpis = kpis;
 
     // Compare with reference
     for (const field of ["ca", "totalAssets", "netResult"]) {
@@ -244,6 +263,56 @@ async function main() {
   }
 
   printSummary(results);
+  if (detailedMode) printDetailed(results);
+}
+
+function printDetailed(results) {
+  console.log("\n" + "=".repeat(120));
+  console.log("AUDIT COMPLETUDE CHAMPS");
+  console.log("=".repeat(120));
+
+  const summaryRows = [];
+
+  for (const r of results) {
+    if (r.error || !r.mappedData) continue;
+    const md = r.mappedData;
+    const kp = r.kpis || {};
+    const shortName = r.filename.replace(/ - Comptes sociaux.*/, "");
+
+    const bilanFilled = BILAN_FIELDS.filter(f => md[f] !== null && md[f] !== undefined);
+    const bilanMissing = BILAN_FIELDS.filter(f => md[f] === null || md[f] === undefined);
+    const cdrFilled = CDR_FIELDS.filter(f => md[f] !== null && md[f] !== undefined);
+    const cdrMissing = CDR_FIELDS.filter(f => md[f] === null || md[f] === undefined);
+    const kpiFilled = KPI_PRIORITY.filter(f => kp[f] !== null && kp[f] !== undefined);
+    const kpiMissing = KPI_PRIORITY.filter(f => kp[f] === null || kp[f] === undefined);
+
+    console.log(`\n--- ${shortName} ---`);
+    console.log(`  Bilan: ${bilanFilled.length}/${BILAN_FIELDS.length}  CDR: ${cdrFilled.length}/${CDR_FIELDS.length}  KPI: ${kpiFilled.length}/${KPI_PRIORITY.length}`);
+    if (bilanMissing.length) console.log(`  Bilan ❌: ${bilanMissing.join(", ")}`);
+    if (cdrMissing.length) console.log(`  CDR   ❌: ${cdrMissing.join(", ")}`);
+    if (kpiMissing.length) console.log(`  KPI   ❌: ${kpiMissing.join(", ")}`);
+
+    summaryRows.push({
+      name: shortName,
+      bilan: `${bilanFilled.length}/${BILAN_FIELDS.length}`,
+      cdr: `${cdrFilled.length}/${CDR_FIELDS.length}`,
+      kpi: `${kpiFilled.length}/${KPI_PRIORITY.length}`,
+      criticalMissing: [...bilanMissing.filter(f => ["total_actif", "total_cp", "emprunts", "dispo", "fournisseurs"].includes(f)),
+                         ...cdrMissing.filter(f => ["ace", "salaires", "charges_soc", "dap", "total_prod_expl"].includes(f)),
+                         ...kpiMissing.filter(f => ["va", "ebitda", "bfr", "caf"].includes(f))]
+    });
+  }
+
+  console.log("\n" + "=".repeat(120));
+  console.log("RECAPITULATIF COMPLETUDE");
+  console.log("=".repeat(120));
+  console.log("PDF".padEnd(35) + "Bilan".padEnd(10) + "CDR".padEnd(10) + "KPI".padEnd(10) + "Champs manquants critiques");
+  console.log("-".repeat(120));
+  for (const row of summaryRows) {
+    const missing = row.criticalMissing.length ? row.criticalMissing.join(", ") : "—";
+    console.log(`${row.name.padEnd(35)}${row.bilan.padEnd(10)}${row.cdr.padEnd(10)}${row.kpi.padEnd(10)}${missing}`);
+  }
+  console.log("-".repeat(120));
 }
 
 main().catch((e) => {

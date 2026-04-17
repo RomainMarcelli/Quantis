@@ -19,9 +19,11 @@ import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
 import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
+import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
+  resolveAnalysisYear,
   SYNTHESIS_CURRENT_YEAR_KEY
 } from "@/lib/synthese/synthesePeriod";
 import { buildSyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
@@ -57,7 +59,7 @@ export function SyntheseView() {
   const [companyName, setCompanyName] = useState("Quantis");
   const [sector, setSector] = useState<string | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
-  const [selectedYearValue, setSelectedYearValue] = useState<string>(SYNTHESIS_CURRENT_YEAR_KEY);
+  const [selectedYearValue, setSelectedYearValue] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -167,28 +169,12 @@ export function SyntheseView() {
   }, [analysisPair, sector]);
 
   useEffect(() => {
-    // Si l'option active n'existe plus après reload, on revient sur "Année en cours".
+    if (!yearOptions.length) return;
     const optionExists = yearOptions.some((option) => option.value === selectedYearValue);
-    if (!optionExists) {
-      setSelectedYearValue(SYNTHESIS_CURRENT_YEAR_KEY);
+    if (!optionExists || !selectedYearValue) {
+      setSelectedYearValue(yearOptions[0]!.value);
     }
   }, [yearOptions, selectedYearValue]);
-
-  useEffect(() => {
-    // UX: si "Année en cours" n'a pas de données, on bascule automatiquement
-    // vers la dernière année disponible pour éviter une page vide sans contrôle visible.
-    if (!allAnalyses.length) {
-      return;
-    }
-
-    if (
-      selectedYearValue === SYNTHESIS_CURRENT_YEAR_KEY &&
-      analysesBySelectedYear.length === 0 &&
-      yearOptions.length > 1
-    ) {
-      setSelectedYearValue(yearOptions[1]!.value);
-    }
-  }, [allAnalyses.length, analysesBySelectedYear.length, selectedYearValue, yearOptions]);
 
   useEffect(() => {
     if (!pendingSearchTarget) {
@@ -424,8 +410,14 @@ export function SyntheseView() {
                   greetingName,
                   analysisCreatedAt: analysisPair.current.createdAt,
                   selectedYearLabel,
-                  synthese
+                  synthese,
+                  kpis: analysisPair.current.kpis,
+                  mappedData: analysisPair.current.mappedData
                 });
+              }}
+              onExportData={() => {
+                if (!analysisPair.current) return;
+                exportAnalysisDataAsJson({ analysis: analysisPair.current, companyName });
               }}
               onReupload={() => router.push("/upload")}
               onManualEntry={() => router.push("/upload/manual")}

@@ -42,6 +42,7 @@ export const FUSALP_CDR_LABELS: readonly FiducialLabelEntry[] = [
   },
 
   // Charges d'exploitation détail
+  { pattern: /^Autres achats et charges externes/i, field: "externalCharges" },
   { pattern: /^Salaires et traitements$/i, field: "wages" },
   { pattern: /^Charges sociales$/i, field: "socialCharges" },
   // Ligne spécifique Fiducial pour la dotation aux amortissements :
@@ -52,6 +53,10 @@ export const FUSALP_CDR_LABELS: readonly FiducialLabelEntry[] = [
   },
 
   // Totaux et résultat
+  {
+    pattern: /^PRODUITS D['']EXPLOITATION$/i,
+    field: "totalOperatingProducts"
+  },
   {
     pattern: /^CHARGES D['']EXPLOITATION$/i,
     field: "totalOperatingCharges"

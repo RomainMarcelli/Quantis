@@ -1,4 +1,4 @@
-﻿// File: lib/synthese/synthesePeriod.test.ts
+// File: lib/synthese/synthesePeriod.test.ts
 // Role: valide le filtrage des analyses par année et la génération des options de période UI.
 import { describe, expect, it } from "vitest";
 import type {
@@ -47,22 +47,28 @@ describe("resolveAnalysisYear", () => {
 });
 
 describe("buildSyntheseYearOptions", () => {
-  it("inclut Année en cours (YYYY) et les années historiques basées sur fiscalYear", () => {
+  it("retourne uniquement les années réelles des analyses, triées desc", () => {
     const analyses = [
       makeAnalysis("a1", "2026-01-10T00:00:00.000Z", null),
       makeAnalysis("a2", "2025-02-10T00:00:00.000Z", null),
-      makeAnalysis("a3", "2024-03-10T00:00:00.000Z", 2033)
+      makeAnalysis("a3", "2024-03-10T00:00:00.000Z", 2024)
     ];
 
     const options = buildSyntheseYearOptions(analyses, 2026);
-    expect(options[0]).toEqual({ value: SYNTHESIS_CURRENT_YEAR_KEY, label: "Année en cours (2026)" });
-    expect(options.some((option) => option.value === "2025")).toBe(true);
-    expect(options.some((option) => option.value === "2033")).toBe(true);
+    expect(options[0]).toEqual({ value: "2026", label: "2026" });
+    expect(options[1]).toEqual({ value: "2025", label: "2025" });
+    expect(options[2]).toEqual({ value: "2024", label: "2024" });
+    expect(options.length).toBe(3);
+  });
+
+  it("retourne un tableau vide si aucune analyse", () => {
+    const options = buildSyntheseYearOptions([], 2026);
+    expect(options).toEqual([]);
   });
 });
 
 describe("filterAnalysesByYear", () => {
-  it("filtre sur Année en cours", () => {
+  it("filtre sur SYNTHESIS_CURRENT_YEAR_KEY avec l'année courante", () => {
     const analyses = [
       makeAnalysis("a1", "2026-01-10T00:00:00.000Z", null),
       makeAnalysis("a2", "2025-01-10T00:00:00.000Z", null)

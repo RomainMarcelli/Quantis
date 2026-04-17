@@ -38,6 +38,7 @@ export type VisionFinancialData = {
   dettes_fisc_soc: number | null;
   autres_dettes: number | null;
   total_dettes: number | null;
+  unite?: "euros" | "milliers_euros" | null;
 };
 
 export type VisionExtractionResult = {
@@ -65,16 +66,33 @@ const TOTAL_FIELDS = VISION_FIELDS.length;
 const SYSTEM_PROMPT = `Tu es un expert-comptable français spécialisé dans l'analyse de liasses fiscales.
 Analyse ces pages de document financier et extrais UNIQUEMENT les valeurs numériques demandées.
 
+DÉTECTION UNITÉ MONÉTAIRE (CRITIQUE) :
+- Lis attentivement l'en-tête du document pour détecter l'unité
+- Si tu vois "en milliers d'euros", "en k€", "K€", "montants exprimés en milliers"
+  → multiplier TOUTES les valeurs numériques par 1000 avant de les retourner
+- Si tu vois "en euros", "€" sans mention de milliers → valeurs directes
+- Si non précisé → cherche un indice (ex: CA = 8 145 avec totalAssets = 7 773
+  alors que l'entreprise est grande → probablement en k€)
+- Indique dans le champ "unite": "euros" ou "milliers_euros"
+
+FORMATS RECONNUS :
+- Formulaire 2050-SD (bilan actif) : cherche "TOTAL GÉNÉRAL" ligne 110
+- Formulaire 2051-SD (bilan passif) : cherche "TOTAL GÉNÉRAL" ligne 180
+- Formulaire 2052-SD (CDR) : cherche "BÉNÉFICE OU PERTE" ligne 310
+- Formulaire 2033-SD (simplifié) : cherche totaux lignes 096, 110, 180, 232, 264, 310
+- Format Sage/Cegid : cherche "TOTAL GÉNÉRAL" dans tableau à 4 colonnes (Brut/Amort/Net N/Net N-1)
+- Format Regnology : cherche tableaux avec colonnes N et N-1 séparées
+
 RÈGLES ABSOLUES :
-- Les nombres sont en format français : "752 298" = 752298, "1 173 877" = 1173877
-- Prends TOUJOURS la colonne N (exercice courant), jamais N-1
-- Si un champ est absent ou illisible, retourne null
-- Ne jamais inventer une valeur
-- Les valeurs négatives sont indiquées par un signe - ou entre parenthèses : (10 021) = -10021
+- Prendre TOUJOURS la colonne N (exercice courant), jamais N-1
+- Les valeurs entre parenthèses sont NÉGATIVES : (10 021) = -10021
+- Espaces dans les nombres sont des séparateurs de milliers : "1 173 877" = 1173877
+- Ne jamais inventer une valeur — null si absent ou illisible
 - Retourne UNIQUEMENT un objet JSON valide, sans texte avant ou après
 
 Retourne exactement ce JSON (remplace les valeurs) :
 {
+  "unite": null,
   "ca": null,
   "prod_vendue": null,
   "ventes_march": null,
@@ -139,7 +157,13 @@ function parseVisionResponse(text: string): Partial<VisionFinancialData> | null 
   try {
     const parsed = JSON.parse(jsonMatch[0]);
     if (typeof parsed !== "object" || parsed === null) return null;
-    const result: Record<string, number | null> = {};
+    const result: Record<string, number | string | null> = {};
+    const uniteRaw = parsed.unite;
+    if (uniteRaw === "euros" || uniteRaw === "milliers_euros") {
+      result.unite = uniteRaw;
+    } else {
+      result.unite = null;
+    }
     for (const field of VISION_FIELDS) {
       const val = parsed[field];
       if (val === null || val === undefined) {
@@ -299,6 +323,16 @@ export function mergeVisionWithDocumentAI(
   visionData: Partial<VisionFinancialData>,
   _fieldScores: Record<string, number>
 ): void {
+  if (visionData.unite === "milliers_euros") {
+    console.log("[vision-merge] Détection k€ : multiplication de toutes les valeurs par 1000");
+    for (const key of VISION_FIELDS) {
+      const val = visionData[key];
+      if (typeof val === "number") {
+        (visionData as Record<string, number | null>)[key] = val * 1000;
+      }
+    }
+  }
+
   let filled = 0;
   for (const [visionKey, mapping] of Object.entries(VISION_TO_PARSED_MAP)) {
     const visionValue = visionData[visionKey as keyof VisionFinancialData];

@@ -15,6 +15,7 @@ type SyntheseDashboardProps = {
   companyName: string;
   analysisCreatedAt: string;
   onDownloadReport: () => void;
+  onExportData?: () => void;
   onReupload: () => void;
   onManualEntry: () => void;
   synthese: SyntheseViewModel;
@@ -25,6 +26,7 @@ export function SyntheseDashboard({
   companyName,
   analysisCreatedAt,
   onDownloadReport,
+  onExportData,
   onReupload,
   onManualEntry,
   synthese
@@ -40,14 +42,25 @@ export function SyntheseDashboard({
           <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
           <p className="mt-1 text-sm text-white/70">Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}</p>
         </div>
-        <button
-          type="button"
-          onClick={onDownloadReport}
-          className="inline-flex items-center gap-1.5 self-start rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 md:self-auto"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Télécharger le rapport
-        </button>
+        <div className="flex items-center gap-2 self-start md:self-auto">
+          <button
+            type="button"
+            onClick={onDownloadReport}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Télécharger le rapport
+          </button>
+          {onExportData ? (
+            <button
+              type="button"
+              onClick={onExportData}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
+            >
+              Exporter données
+            </button>
+          ) : null}
+        </div>
       </header>
 
       <DashboardLayout

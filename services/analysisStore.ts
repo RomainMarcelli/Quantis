@@ -11,6 +11,7 @@ import {
   getDocs,
   query,
   serverTimestamp,
+  updateDoc,
   where
 } from "firebase/firestore";
 import { firestoreDb } from "@/lib/firebase";
@@ -372,4 +373,17 @@ function resolveUploadSource(
     return value;
   }
   return "dashboard";
+}
+
+export async function moveAnalysisToFolder(
+  userId: string,
+  analysisId: string,
+  targetFolderName: string
+): Promise<void> {
+  const analysisRef = doc(firestoreDb, COLLECTION, analysisId);
+  const snapshot = await getDoc(analysisRef);
+  if (!snapshot.exists()) return;
+  const data = snapshot.data();
+  if (String(data.userId ?? "") !== userId) return;
+  await updateDoc(analysisRef, { folderName: targetFolderName.trim() });
 }

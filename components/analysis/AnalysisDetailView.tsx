@@ -77,6 +77,9 @@ import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
+import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
+import { buildSyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
+import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
@@ -107,7 +110,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
   // Le select du menu pilote l'année d'analyse affichée dans le dashboard.
-  const [selectedDashboardYear, setSelectedDashboardYear] = useState<string>(SYNTHESIS_CURRENT_YEAR_KEY);
+  const [selectedDashboardYear, setSelectedDashboardYear] = useState<string>("");
   const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
@@ -1197,7 +1200,45 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             </>
           ) : analysis ? (
             <>
-              {/* Navigation principale unique: version design alternative. */}
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!analysis) return;
+                      const synthese = buildSyntheseViewModel(
+                        analysis.kpis,
+                        previousAnalysis?.kpis ?? null,
+                        analysis.uploadContext?.sector ?? null
+                      );
+                      void downloadSyntheseReport({
+                        companyName,
+                        greetingName,
+                        analysisCreatedAt: analysis.createdAt,
+                        selectedYearLabel: selectedDashboardYear,
+                        synthese,
+                        kpis: analysis.kpis,
+                        mappedData: analysis.mappedData
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-2 text-xs font-medium text-quantis-gold transition-colors hover:bg-quantis-gold/20"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Télécharger le rapport
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!analysis) return;
+                      exportAnalysisDataAsJson({ analysis, companyName });
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
+                  >
+                    Exporter données
+                  </button>
+                </div>
+              </div>
               <DashboardFinancialTestMenu
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}

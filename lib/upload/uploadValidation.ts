@@ -4,7 +4,8 @@
 import { isCompanySizeValue } from "@/lib/onboarding/options";
 import type { CompanySizeValue } from "@/lib/onboarding/options";
 
-const EXCEL_EXTENSIONS = [".xlsx", ".xls", ".csv"] as const;
+const ACCEPTED_EXTENSIONS = [".pdf", ".xlsx", ".xls", ".csv"] as const;
+const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
 
 export type UploadContextInput = {
   companySize: CompanySizeValue | "";
@@ -25,9 +26,9 @@ export type UploadValidationResult = {
   };
 };
 
-export function isExcelFileName(fileName: string): boolean {
+export function isAcceptedFileName(fileName: string): boolean {
   const lowerName = fileName.toLowerCase();
-  return EXCEL_EXTENSIONS.some((extension) => lowerName.endsWith(extension));
+  return ACCEPTED_EXTENSIONS.some((extension) => lowerName.endsWith(extension));
 }
 
 export function validateUploadInput(
@@ -39,9 +40,11 @@ export function validateUploadInput(
   const requireContext = options.requireContext ?? true;
 
   if (!files.length) {
-    errors.files = "Ajoutez au moins un fichier Excel pour lancer l'analyse.";
-  } else if (files.some((file) => !isExcelFileName(file.name))) {
-    errors.files = "Seuls les formats Excel (.xlsx, .xls, .csv) sont acceptés sur cette étape.";
+    errors.files = "Ajoutez au moins un fichier pour lancer l'analyse.";
+  } else if (files.some((file) => !isAcceptedFileName(file.name))) {
+    errors.files = "Formats acceptés : .pdf, .xlsx, .xls, .csv";
+  } else if (files.some((file) => file.size > MAX_FILE_SIZE_BYTES)) {
+    errors.files = "La taille maximale par fichier est de 20 Mo.";
   }
 
   if (requireContext) {

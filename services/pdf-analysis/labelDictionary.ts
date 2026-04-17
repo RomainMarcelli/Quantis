@@ -364,8 +364,8 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     section: "incomeStatement",
     kind: "result",
     columnStrategy: "signedRightmost",
-    aliases: alias("resultat net", "resultat de l'exercice", "benefice ou perte"),
-    regexAliases: regex(/\bresultat\s+net\b/, /\bresultat\s+de\s+l'?exercice\b/, /\bbenefice\s+ou\s+perte\b/),
+    aliases: alias("resultat net", "resultat de l'exercice", "benefice ou perte", "resultat comptable"),
+    regexAliases: regex(/\bresultat\s+net\b/, /\bresultat\s+de\s+l'?exercice\b/, /\bbenefice\s+ou\s+perte\b/, /\bresultat\s+comptable\b/),
     excludes: alias("d'exploitation", "financier", "exceptionnel"),
     expectedLineCodes: ["310"],
     minAbs: 1000
@@ -527,7 +527,7 @@ export const FIELD_DEFINITIONS: FieldDefinition[] = [
     columnStrategy: "netPriority",
     aliases: alias("total actif", "total general actif"),
     regexAliases: regex(/\btotal\s+general\s+actif\b/, /\btotal\s+actif\b/, /\btotal\s+g[ée]n[ée]ral\b/),
-    excludes: alias("passif"),
+    excludes: alias("passif", "circulant", "immobilise"),
     expectedLineCodes: ["110"],
     minAbs: 1000,
     allowNegative: false

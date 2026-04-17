@@ -301,6 +301,19 @@ function computeContextualBoost(input: {
     }
   }
 
+  if (definition.key === "netResult" && /\bresultat\s+de\s+l/.test(normalizedLabel)) {
+    if (hasContextBefore({
+      rows,
+      rowIndex,
+      page: row.page,
+      rowNumber: row.rowNumber,
+      maxRowDistance: 60,
+      keywords: ["capitaux propres", "bilan passif", "bilan - passif"]
+    })) {
+      return 100;
+    }
+  }
+
   return 0;
 }
 
@@ -457,6 +470,17 @@ function selectAmountCandidate(input: {
     const negatives = amountCandidates.filter((candidate) => candidate.value < 0);
     if (negatives.length > 0) {
       return chooseLikelyCurrentCandidate(negatives);
+    }
+    const ordered = [...amountCandidates].sort((a, b) => a.columnIndex - b.columnIndex);
+    if (ordered.length >= 3) {
+      const c0 = ordered[0]!;
+      const c1 = ordered[1]!;
+      const c2 = ordered[2]!;
+      const diff = c0.value - c1.value;
+      const tolerance = Math.max(Math.abs(diff) * 0.05, 100);
+      if (Math.abs(c2.value - diff) <= tolerance) {
+        return c2;
+      }
     }
     return chooseLikelyCurrentCandidate(amountCandidates);
   }

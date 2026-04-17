@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   FileSpreadsheet,
+  FileText,
   Plus,
   RefreshCcw,
   Upload,
@@ -14,6 +15,7 @@ import {
 import { useProductTour } from "@/hooks/useProductTour";
 import { QuantisSelect } from "@/components/ui/QuantisSelect";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { UploadProcessingOverlay } from "@/components/upload/UploadProcessingOverlay";
 import {
   ONBOARDING_UPLOAD_CONTEXT_COMPLETED_EVENT,
   ONBOARDING_UPLOAD_FILE_ADDED_EVENT
@@ -51,6 +53,7 @@ export function UploadPageView() {
     {}
   );
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isAnalysisComplete, setIsAnalysisComplete] = useState(false);
   const shouldShowContextFields = !user;
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export function UploadPageView() {
     if (selectedFiles.length === 1) {
       return selectedFiles[0]?.name ?? "1 fichier sélectionné";
     }
-    return `${selectedFiles.length} fichiers Excel sélectionnés`;
+    return `${selectedFiles.length} fichiers sélectionnés`;
   }, [selectedFiles]);
 
   useEffect(() => {
@@ -249,7 +252,9 @@ export function UploadPageView() {
       await saveAnalysisDraft(persistedDraft);
       setActiveFolderName(persistedDraft.folderName);
       setLocalAnalysisHint(true);
+      setIsAnalysisComplete(true);
       setSuccessMessage("Analyse créée avec succès. Redirection vers la synthèse...");
+      await new Promise((r) => setTimeout(r, 1200));
       router.push("/synthese");
     } catch (error) {
       setErrors({
@@ -257,6 +262,7 @@ export function UploadPageView() {
       });
     } finally {
       setIsSubmitting(false);
+      if (!isAnalysisComplete) setIsAnalysisComplete(false);
     }
   }
 
@@ -269,7 +275,7 @@ export function UploadPageView() {
               <QuantisLogo withText={false} size={34} imageClassName="h-8 w-8 object-contain" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-quantis-gold">Import Excel</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-quantis-gold">Analyse financière</p>
               <h1 className="mt-1 text-2xl font-semibold text-white md:text-3xl">
                 Lancez votre <span className="text-quantis-gold">analyse financière</span>
               </h1>
@@ -298,19 +304,20 @@ export function UploadPageView() {
 
       <section className="precision-card rounded-2xl p-5 md:p-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <StepCard step="1" title="Ajoutez vos fichiers" />
+          <StepCard step="1" title="Ajoutez vos fichiers" active={selectedFiles.length === 0} />
           <StepCard
             step="2"
             title={shouldShowContextFields ? "Contexte entreprise (optionnel)" : "Contexte déjà enregistré"}
+            active={selectedFiles.length > 0 && !isSubmitting}
           />
-          <StepCard step="3" title="Lancez l'analyse" />
+          <StepCard step="3" title="Lancez l'analyse" active={isSubmitting} />
         </div>
 
         <input
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".xlsx,.xls,.csv"
+          accept=".pdf,.xlsx,.xls,.csv"
           className="hidden"
           onChange={onFileInput}
         />
@@ -322,19 +329,27 @@ export function UploadPageView() {
           onDragLeave={onDragLeave}
           onDrop={onDrop}
           data-tour-id="upload-dropzone"
-          className={`mt-5 flex w-full items-center gap-3 rounded-xl border border-dashed px-4 py-5 text-left transition-colors ${
+          className={`mt-5 flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors min-h-[200px] ${
             isDragging
               ? "border-quantis-gold/80 bg-quantis-gold/10"
               : "border-white/20 bg-white/5 hover:border-quantis-gold/50 hover:bg-white/10"
           }`}
         >
-          <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/30">
-            <Upload className="h-4 w-4 text-quantis-gold" />
+          <span className="flex h-14 w-14 items-center justify-center rounded-full border border-quantis-gold/30 bg-quantis-gold/10">
+            <Upload className="h-6 w-6 text-quantis-gold" />
           </span>
-          <span className="space-y-1">
-            <span className="block text-sm font-semibold text-white">Déposez vos fichiers Excel ici</span>
-            <span className="block text-xs text-white/65">Formats acceptés : .xlsx, .xls, .csv</span>
+          <span className="text-sm font-semibold text-white">Déposez votre fichier ici</span>
+          <span className="flex items-center gap-4 text-xs text-white/55">
+            <span className="inline-flex items-center gap-1">
+              <FileText className="h-3.5 w-3.5" />
+              PDF
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Excel
+            </span>
           </span>
+          <span className="text-[11px] text-white/40">Formats : .pdf, .xlsx, .xls, .csv — Max 20 Mo</span>
         </button>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/80">
@@ -424,7 +439,7 @@ export function UploadPageView() {
           <button
             type="button"
             onClick={() => void onSubmit()}
-            disabled={isSubmitting}
+            disabled={isSubmitting || selectedFiles.length === 0}
             data-tour-id="upload-submit"
             className="btn-gold-premium rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -456,6 +471,12 @@ export function UploadPageView() {
           </p>
         ) : null}
 
+        <UploadProcessingOverlay
+          isActive={isSubmitting}
+          isComplete={isAnalysisComplete}
+          hasError={Boolean(errors.general)}
+        />
+
         {errors.general ? <InlineError message={errors.general} /> : null}
         {successMessage ? (
           <p className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/15 px-3 py-2 text-sm text-emerald-200">
@@ -467,10 +488,13 @@ export function UploadPageView() {
   );
 }
 
-function StepCard({ step, title }: { step: string; title: string }) {
+function StepCard({ step, title, active = false }: { step: string; title: string; active?: boolean }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
-      <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">Étape {step}</p>
+    <div className={`rounded-xl border p-3 transition-colors ${active ? "border-quantis-gold/40 bg-quantis-gold/5" : "border-white/10 bg-white/[0.04]"}`}>
+      <div className="flex items-center gap-2">
+        <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold ${active ? "bg-quantis-gold text-black" : "border border-white/20 text-white/50"}`}>{step}</span>
+        <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">Étape {step}</p>
+      </div>
       <p className="mt-1 text-sm font-medium text-white">{title}</p>
     </div>
   );
