@@ -204,6 +204,11 @@ function mapParsedDataToFacts(item: ParsedFileData): FinancialFacts {
 }
 
 function inferFiscalYearFromText(rawText: string): number | null {
-  const match = rawText.match(/(20\d{2})/);
-  return match?.[1] ? Number(match[1]) : null;
+  const matches = rawText.match(/20\d{2}/g);
+  if (!matches) return null;
+  const currentYear = new Date().getFullYear();
+  const candidates = [...new Set(matches.map(Number))]
+    .filter((y) => y >= 2015 && y <= currentYear + 1);
+  if (candidates.length === 0) return null;
+  return Math.max(...candidates);
 }

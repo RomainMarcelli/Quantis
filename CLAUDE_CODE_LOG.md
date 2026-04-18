@@ -1079,3 +1079,26 @@ Erreurs identifiées sur SMI MARILLIER : Vision LLM prenait N-1 au lieu de N, et
 - Libellés en gras ou commençant par "TOTAL" = ligne de total
 
 **Tests** : 353 passed / 0 failed ✅
+
+---
+
+## Fix fiscalYear null + ROCE négatif BFR (2026-04-18)
+
+### Fix 1 — fiscalYear = null
+
+**Problème** : `inferFiscalYearFromText()` utilisait `rawText.match(/(20\d{2})/)` qui captait "2050" (code DGFiP) avant "2024" (année réelle). Le filtre `year <= 2030` éliminait 2050 mais l'année réelle n'était jamais capturée.
+
+**Fix** dans `services/analysisPipeline.ts` :
+- `inferFiscalYearFromText()` capture désormais TOUTES les occurrences `20\d{2}` via `match(/20\d{2}/g)`
+- Filtre : `year >= 2015 && year <= currentYear + 1` (exclut codes DGFiP 2050-2055)
+- Retourne `Math.max(...)` des candidats valides
+
+### Fix 2 — ROCE négatif BFR
+
+**Problème** : AG FRANCE — `bfr = -3 981 571`, `total_actif_immo = 2 002 966` → capital employé = -1 978 605 → ROCE inversé (-62%).
+
+**Fix** dans `services/kpiEngine.ts` :
+- Variable `capitalEmploye = sum(total_actif_immo, bfr)`
+- Si `capitalEmploye <= 0` → `roce = null` (capital employé négatif = cas non standard, ROCE non interprétable)
+
+**Tests** : 353 passed / 0 failed ✅

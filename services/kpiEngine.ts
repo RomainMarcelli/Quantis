@@ -52,7 +52,10 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const liq_imm = div(data.dispo, dettesCirculantes);
   const disponibilites = data.dispo;
   const effectiveEbit = data.ebit ?? sub(effectiveTotalProdExpl, data.total_charges_expl);
-  const roce = div(mul(effectiveEbit, 0.75), sum(data.total_actif_immo, bfr));
+  const capitalEmploye = sum(data.total_actif_immo, bfr);
+  const roce = capitalEmploye !== null && capitalEmploye > 0
+    ? div(mul(effectiveEbit, 0.75), capitalEmploye)
+    : null;
   const roe = div(resultat_net, data.total_cp);
   const effet_levier = sub(roe, roce);
   const capacite_remboursement_annees = computeDebtRepaymentCapacity(data.emprunts, caf);
