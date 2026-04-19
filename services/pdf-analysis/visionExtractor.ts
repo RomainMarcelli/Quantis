@@ -235,7 +235,7 @@ type ClaudeCallResult = {
 
 async function callClaude(
   pdfBuffer: Buffer,
-  attempt: number,
+  _attempt: number,
   systemPrompt: string
 ): Promise<ClaudeCallResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -244,7 +244,6 @@ async function callClaude(
   const client = new Anthropic({ apiKey });
   const content = buildPdfContent(pdfBuffer);
 
-  console.log(`[Vision LLM] Appel API Anthropic — modèle: ${VISION_MODEL} — attempt: ${attempt}`);
 
   const response = await client.messages.create({
     model: VISION_MODEL,
@@ -260,10 +259,6 @@ async function callClaude(
 
   const tokensInput = response.usage?.input_tokens ?? 0;
   const tokensOutput = response.usage?.output_tokens ?? 0;
-
-  if (attempt <= 1) {
-    console.log(`[Vision LLM] Réponse: ${rawText.length} chars, tokens: ${tokensInput} in / ${tokensOutput} out`);
-  }
 
   const data = parseVisionResponse(rawText);
   return { data, rawText, tokensInput, tokensOutput };
@@ -289,7 +284,6 @@ export async function extractWithVision(
       result = await callClaude(pdfBuffer, 1, systemPrompt);
 
       if (!result.data) {
-        console.warn("[Vision LLM] Réponse JSON invalide, retry...");
         result = await callClaude(pdfBuffer, 2, systemPrompt);
       }
     } finally {
@@ -410,7 +404,6 @@ export function mergeVisionWithDocumentAI(
   _fieldScores: Record<string, number>
 ): void {
   if (visionData.unite === "milliers_euros") {
-    console.log("[vision-merge] Détection k€ : multiplication de toutes les valeurs par 1000");
     for (const key of VISION_FIELDS) {
       const val = visionData[key];
       if (typeof val === "number") {
@@ -433,17 +426,15 @@ export function mergeVisionWithDocumentAI(
     if (currentValue === null || currentValue === undefined) {
       sectionData[field] = visionValue;
       filled++;
-      console.log(`[vision-merge] ${field}: null → ${visionValue} (fill)`);
     } else {
       const ecart = Math.abs(visionValue - currentValue) / Math.max(Math.abs(currentValue), 1);
       if (ecart > 0.05) {
-        console.log(`[vision-merge] ${field}: ${currentValue} → ${visionValue} (correction, écart ${(ecart * 100).toFixed(1)}%)`);
         sectionData[field] = visionValue;
         corrected++;
       }
     }
   }
-  console.log(`[vision-merge] ${filled} remplis, ${corrected} corrigés par Vision LLM`);
+  console.log(`[Vision LLM] Merge: ${filled} remplis, ${corrected} corrigés`);
 }
 
 export function buildExistingDataForVision(parsed: ParsedFinancialData): Partial<VisionFinancialData> {

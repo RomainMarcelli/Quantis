@@ -21,6 +21,8 @@ export function exportAnalysisDataAsJson(input: {
     generatedAt: new Date().toISOString(),
     entreprise: companyName,
     fiscalYear: analysis.fiscalYear,
+    parserVersion: analysis.parserVersion ?? "v1",
+    pdfType: analysis.pdfType ?? "native_text",
     principalFinancials: {
       ca: analysis.kpis.ca,
       totalAssets: analysis.mappedData.total_actif,

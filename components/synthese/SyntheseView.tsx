@@ -422,6 +422,7 @@ export function SyntheseView() {
               onReupload={() => router.push("/upload")}
               onManualEntry={() => router.push("/upload/manual")}
               synthese={synthese}
+              parserVersion={analysisPair.current.parserVersion}
             />
           ) : (
             <section className="precision-card rounded-2xl p-5">

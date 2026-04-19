@@ -370,3 +370,66 @@ function buildScanFallbackIndices(totalPages: number): {
     imagelessMode: false
   };
 }
+
+const DOCAI_MAX_PAGES_IMAGELESS = 25;
+const DOCAI_MAX_PAGES_OCR = 14;
+
+const FINANCIAL_KEYWORDS = [
+  /bilan/i, /actif/i, /passif/i,
+  /r[ée]sultat/i, /charges/i, /produits/i,
+  /capitaux\s+propres/i, /total\s+g[ée]n[ée]ral/i,
+  /chiffre\s+d['']\s*affaires/i, /dettes/i,
+  /immobilis/i, /exploitation/i
+];
+
+export async function capPdfForDocumentAI(
+  pdfBuffer: Buffer,
+  imagelessMode: boolean = false
+): Promise<Buffer> {
+  const maxPages = imagelessMode ? DOCAI_MAX_PAGES_IMAGELESS : DOCAI_MAX_PAGES_OCR;
+  const srcDoc = await PDFDocument.load(pdfBuffer);
+  const totalPages = srcDoc.getPageCount();
+
+  if (totalPages <= maxPages) return pdfBuffer;
+
+  let pageTexts: string[];
+  try {
+    pageTexts = await extractAllPageTexts(pdfBuffer);
+  } catch {
+    pageTexts = [];
+  }
+
+  let selectedIndices: number[];
+
+  if (pageTexts.length > 0) {
+    const scored = pageTexts.map((text, index) => {
+      const hits = FINANCIAL_KEYWORDS.filter((kw) => kw.test(text)).length;
+      return { index, hits };
+    });
+    scored.sort((a, b) => b.hits - a.hits);
+
+    const keywordPages = new Set<number>();
+    for (const { index, hits } of scored) {
+      if (hits === 0) break;
+      for (let i = Math.max(0, index - 1); i <= Math.min(totalPages - 1, index + 1); i++) {
+        keywordPages.add(i);
+      }
+      if (keywordPages.size >= maxPages) break;
+    }
+
+    if (keywordPages.size >= 3) {
+      selectedIndices = [...keywordPages].sort((a, b) => a - b).slice(0, maxPages);
+    } else {
+      const start = Math.floor(totalPages * 0.15);
+      const end = Math.min(start + maxPages, totalPages);
+      selectedIndices = Array.from({ length: end - start }, (_, i) => start + i);
+    }
+  } else {
+    const start = Math.floor(totalPages * 0.15);
+    const end = Math.min(start + maxPages, totalPages);
+    selectedIndices = Array.from({ length: end - start }, (_, i) => start + i);
+  }
+
+  console.log(`[PageExtractor] PDF ${totalPages}p → ${selectedIndices.length}p (pages ${selectedIndices[0]! + 1}-${selectedIndices[selectedIndices.length - 1]! + 1})`);
+  return buildReducedPdf(pdfBuffer, selectedIndices);
+}

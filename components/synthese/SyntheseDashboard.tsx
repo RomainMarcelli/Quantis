@@ -19,6 +19,7 @@ type SyntheseDashboardProps = {
   onReupload: () => void;
   onManualEntry: () => void;
   synthese: SyntheseViewModel;
+  parserVersion?: "v1" | "v2";
 };
 
 export function SyntheseDashboard({
@@ -29,7 +30,8 @@ export function SyntheseDashboard({
   onExportData,
   onReupload,
   onManualEntry,
-  synthese
+  synthese,
+  parserVersion
 }: SyntheseDashboardProps) {
   const cockpitKpis = useMemo(() => toCockpitKpis(synthese), [synthese]);
   const strategicMessage = synthese.actions[0] ?? "Maintenir la trajectoire actuelle et suivre les KPI chaque semaine.";
@@ -40,7 +42,14 @@ export function SyntheseDashboard({
       <header className="precision-card fade-up relative z-10 flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
-          <p className="mt-1 text-sm text-white/70">Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}</p>
+          <p className="mt-1 text-sm text-white/70">
+            Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}
+            {parserVersion === "v2" && (
+              <span className="ml-2 inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+                Parser V2
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2 self-start md:self-auto">
           <button

@@ -263,11 +263,6 @@ export async function POST(request: NextRequest) {
     const originalPdfBuffer = Buffer.from(arrayBuffer);
     const mimeType = file.type || "application/pdf";
 
-    console.info("[api/pdf-parser] PDF upload received", {
-      fileName: file.name,
-      mimeType,
-      fileSizeBytes: file.size
-    });
 
     if (progressRequestId) {
       updatePdfParserProgress(progressRequestId, {
@@ -286,12 +281,6 @@ export async function POST(request: NextRequest) {
             extractedPages: pageExtraction.extractedPages
           }
         : null;
-    if (pdfExtractionSummary) {
-      console.info("[api/pdf-parser] PDF page extraction", pdfExtractionSummary);
-    }
-    if (!useImagelessMode) {
-      console.info("[api/pdf-parser] imagelessMode: false (scan détecté)");
-    }
 
     const hasReduction =
       pdfExtractionSummary !== null &&

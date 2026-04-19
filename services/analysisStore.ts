@@ -354,7 +354,9 @@ function toAnalysisRecord(id: string, data: Record<string, unknown>): AnalysisRe
             sector: toNullableString((data.uploadContext as { sector?: unknown }).sector),
             source: resolveUploadSource((data.uploadContext as { source?: unknown }).source)
           }
-        : null
+        : null,
+    parserVersion: data.parserVersion === "v2" ? "v2" : "v1",
+    pdfType: (data.pdfType === "scanned_text" || data.pdfType === "image_only") ? data.pdfType : "native_text"
   };
 }
 

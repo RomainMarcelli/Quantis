@@ -1102,3 +1102,491 @@ Erreurs identifiées sur SMI MARILLIER : Vision LLM prenait N-1 au lieu de N, et
 - Si `capitalEmploye <= 0` → `roce = null` (capital employé négatif = cas non standard, ROCE non interprétable)
 
 **Tests** : 353 passed / 0 failed ✅
+
+---
+
+## Parser V2 LLM-First (2026-04-18)
+
+Nouveau pipeline de parsing qui remplace la chaîne manuelle (labelDictionary + fieldResolver + amountParsing) par un LLM qui reçoit le texte brut de Document AI et retourne directement un JSON avec les 62 champs financiers.
+
+### Architecture
+
+```
+PDF → Document AI (texte structuré, gratuit, inchangé)
+    → Parser V2 : llmExtractor.ts (Haiku → Sonnet fallback)
+    → mapLlmDataToMappedFinancialData()
+    → KPI Engine (inchangé)
+    → Dashboard (inchangé)
+
+Fallback : si V2 échoue ou ANTHROPIC_API_KEY absente → V1 complet
+```
+
+### Fichiers créés
+
+**`services/pdf-analysis/llmExtractor.ts`** :
+- `extractWithLlm(rawText, pdfName)` → `LlmExtractionResult`
+- Prompt système complet avec 62 champs, règles colonnes N/N-1, totaux, k€, formats DGFiP
+- Appel Haiku en premier, fallback Sonnet si confidenceScore < 0.75
+- Score de confiance pondéré : champs critiques (70%) + importants (30%)
+- Estimation coût par modèle (Haiku $0.25/$1.25, Sonnet $3/$15 par MTok)
+- Détection et multiplication k€ automatique
+
+**`services/pdf-analysis/llmDataMapper.ts`** :
+- `extractRawTextFromDocumentAI(extraction)` : récupère le texte brut
+- `mapLlmDataToMappedFinancialData(llmData)` : convertit le JSON LLM vers MappedFinancialData
+  - Reconstruction automatique : creances, total_stocks, res_net ↔ resultat_exercice, total_actif_immo_net
+  - Validation bilan équilibré (total_actif ≈ total_passif ± 1%)
+
+### Fichiers modifiés
+
+**`services/analysisPipeline.ts`** — réécriture :
+- V2 en pipeline principal : si `ANTHROPIC_API_KEY` → `extractWithLlm(rawText)` → `mapLlmDataToMappedFinancialData()`
+- V1 en fallback complet : si V2 échoue → `analyzeFinancialDocument()` + Vision LLM optionnel
+- `parserVersion` ("v1" | "v2") tracé et sauvegardé dans l'AnalysisDraft
+- Log Vision LLM unifié pour V1 et V2
+
+**`types/analysis.ts`** :
+- Ajout `parserVersion?: "v1" | "v2"` optionnel dans `AnalysisRecord` (backward compatible)
+
+**`components/synthese/SyntheseDashboard.tsx`** :
+- Prop `parserVersion?` ajoutée
+- Badge vert "Parser V2" affiché à côté de la date d'analyse quand `parserVersion === "v2"`
+
+**`components/synthese/SyntheseView.tsx`** :
+- Passage `parserVersion={analysisPair.current.parserVersion}` au SyntheseDashboard
+
+### Modèles LLM
+
+| Modèle | Rôle | Coût estimé |
+|--------|------|-------------|
+| claude-haiku-4-5 | Parser principal | ~$0.01/PDF |
+| claude-sonnet-4 | Fallback si score < 0.75 | ~$0.10/PDF |
+
+### Fallback V1
+
+Le code V1 (labelDictionary, fieldResolver, amountParsing, visionExtractor) est **intégralement conservé**. Le fallback se déclenche si :
+- `ANTHROPIC_API_KEY` absente (pas de clé API)
+- `extractWithLlm()` lève une exception
+- `llmResult.success === false`
+
+### Vérifications pre-test (2026-04-18)
+
+6 vérifications complétées sans aucun appel API :
+
+1. **Branchement pipeline** ✅ : V2 lignes 49-81, V1 fallback lignes 83-115, `parserVersion` assigné et sauvegardé
+2. **Prompt LLM** ✅ : `buildLlmPrompt()` et `computeConfidenceScore()` exportés et testables
+3. **Mapper** ✅ : k€ ×1000 intégré, validation bilan, reconstruction res_net/creances/total_stocks
+4. **Tests unitaires** ✅ : 7 tests dans `llmDataMapper.test.ts`
+5. **Badge** ✅ : `SyntheseDashboard.tsx:47-51` — uniquement si `parserVersion === "v2"`
+6. **Dry-run** ✅ : `scripts/test-v2-dry-run.mjs` exécuté
+
+**Résultats dry-run** :
+- Coût Haiku : **$0.0012/PDF** — Coût Sonnet : **$0.0147/PDF**
+- Score confiance simulé : **0.87** — Bilan équilibré ✅
+
+**Tests** : 360 passed / 0 failed ✅ (7 nouveaux)
+
+### Diagnostic et corrections (2026-04-18)
+
+Diagnostic sur BEL AIR : V2 accepté avec score 0.08 (3 champs) au lieu de fallback V1.
+
+**3 bugs identifiés et corrigés :**
+
+**Bug 1** — `llmExtractor.ts` : `success` était toujours `true` si `data` non-null, même avec score 0.08
+- **Fix** : `success = confidenceScore >= 0.4` — score minimum pour que V2 soit considéré comme valide
+
+**Bug 2** — `analysisPipeline.ts` : pipeline acceptait V2 si `llmResult.success && llmResult.data` sans vérifier le score
+- **Fix** : condition renforcée `llmResult.success && llmResult.data && llmResult.confidenceScore >= 0.4`
+- Si texte Document AI < 100 chars → skip V2 immédiat (PDF scan sans texte)
+- Logs diagnostiques ajoutés à chaque étape : clé API, longueur texte, score, modèle, erreur
+
+**Bug 3** — `exportAnalysisData.ts` : champ `parserVersion` absent du JSON export
+- **Fix** : ajout `parserVersion: analysis.parserVersion ?? "v1"` dans le payload export
+
+**Logs console attendus :**
+```
+[V2] Démarrage — clé API présente: true
+[V2 Mapper] Texte brut Document AI — longueur: 17564 chars
+[V2] Texte extrait — longueur: 17564 chars
+[V2] Texte brut — premières 300 chars: ...
+[V2] Résultat LLM — success: true — score: 0.87 — modèle: claude-haiku-4-5 — erreur: aucune
+[V2] Adopté — parserVersion: v2
+```
+Ou en cas de rejet :
+```
+[V2] Résultat LLM — success: false — score: 0.08 — modèle: claude-haiku-4-5
+[V2] Rejeté — success: false, score: 0.08 < 0.40 → fallback V1
+[Parser V1] Fallback activé
+```
+
+**Tests** : 360 passed / 0 failed ✅
+
+---
+
+## Support tous types PDF (2026-04-18)
+
+### Architecture pipeline par type de PDF
+
+```
+PDF → extractFinancialPages()
+    → processPdfWithDocumentAI()
+    → detectPdfType()
+    │
+    ├── native_text (tables > 0) → V2 LLM texte → KPI
+    ├── scanned_text (texte > 500, tables = 0) → V2 LLM texte complet
+    │   └── si score < 0.40 → Vision LLM fallback images
+    ├── image_only (texte < 500) → Vision LLM direct images
+    └── Tous → fallback V1 si aucun V2 ne fonctionne
+```
+
+### Fix BEL AIR — PDFs scannés
+
+**Problème** : le sélecteur de pages envoyait les mauvaises pages. Le bilan et CDR de BEL AIR étaient ignorés.
+**Fix** : PDFs scannés (`isScanned`) → buffer PDF complet envoyé à Document AI.
+
+### Fichiers créés
+
+**`services/pdf-analysis/pdfTypeDetector.ts`** + **test** : détecteur 3 types (native_text, scanned_text, image_only), 5 tests unitaires
+
+### Fichiers modifiés
+
+- **`analysisPipeline.ts`** : pipeline branché par type, `pdfType` sauvegardé
+- **`llmDataMapper.ts`** : `mapVisionDataToMappedFinancialData()` pour le chemin image_only
+- **`types/analysis.ts`** : `pdfType?` ajouté
+- **`analysisStore.ts`** : lecture `pdfType` depuis Firestore
+- **`exportAnalysisData.ts`** : `pdfType` dans le JSON export
+
+### Vérifications pre-test (2026-04-18)
+
+8 vérifications complétées sans appel API :
+
+1. **Détecteur** ✅ : 3 seuils — `rawText < 500` → image_only, `tables > 0 || entities > 0` → native_text, sinon → scanned_text
+2. **Branchement** ✅ : `detectPdfType()` ligne 60, 3 branches (image_only/scanned_text+native_text/V1 fallback)
+3. **Pages scannés** ✅ : ligne 49 `needsFullPages = isScanned` → buffer complet si scan, `imagelessMode = false` pour OCR
+4. **Vision→Mapped** ✅ : `mapVisionDataToMappedFinancialData()` via VISION_TO_MAPPED (36 champs) + k€ multiplier
+5. **Firestore** ✅ : `analysisStore.ts:359` lecture + `exportAnalysisData.ts:25` export
+6. **Tests détecteur** ✅ : 5/5 passed (native_text, scanned_text, image_only, entités, métriques)
+7. **Non-régression** ✅ : 365/365 passed
+8. **Simulation** ✅ : `tables=5,text=15K` → native_text, `tables=0,text=20K` → scanned_text, `tables=0,text=200` → image_only
+
+### Fix limite 30 pages Document AI (2026-04-18)
+
+**Problème** : BEL AIR (35 pages scannées) → `Document AI failed: au-delà de la limite synchrone (30 pages)`
+
+**Fix** dans `services/pdf-analysis/pdfPageExtractor.ts` :
+- Nouvelle fonction exportée `capPdfForDocumentAI(pdfBuffer)` : cap à 25 pages max
+- Stratégie intelligente :
+  1. Extraire le texte partiel de chaque page via pdf-parse
+  2. Scorer par mots-clés financiers (bilan, actif, passif, résultat, charges, produits, capitaux propres, etc.)
+  3. Sélectionner les pages avec le plus de hits + ±1 page de contexte
+  4. Si < 3 pages avec mots-clés → fallback milieu du document (15% → 15%+25)
+
+**Fix** dans `services/analysisPipeline.ts` :
+- Ligne 50 : `docAiBuffer = await capPdfForDocumentAI(pdfBuffer)` pour les PDFs scannés (au lieu du buffer brut complet)
+- Les PDFs texte natif utilisent toujours `pageExtraction.buffer` (sélection par marqueurs, inchangé)
+- Limites Document AI corrigées : OCR = 14p max, imageless = 25p max
+- PDFs scannés passent en `imagelessMode = true` (limite 25 au lieu de 14)
+
+---
+
+## Vision LLM sur PDFs scannés (2026-04-19)
+
+### Approche
+
+Les PDFs scannés (BEL AIR) perdent la structure des tableaux via OCR. Au lieu de convertir en images (dépendances système), on envoie un **mini-PDF réduit** (6 pages financières) directement à Claude qui lit les PDFs nativement via le type `document`.
+
+### Pipeline PDFs scannés/images
+
+```
+scanned_text / image_only
+    → buildReducedPdfForVision(pdfBuffer, 6)
+    → selectFinancialPageIndices(totalPages) → pages 10%-40%
+    → extractWithVision(reducedBuffer) → Claude lit le PDF
+    → mapVisionDataToMappedFinancialData()
+    → Si échec → V1 fallback
+```
+
+### Fichiers créés
+
+**`services/pdf-analysis/pdfImageExtractor.ts`** :
+- `selectFinancialPageIndices(totalPages, maxPages)` : sélection pages 10%-40% du document
+- `buildReducedPdfForVision(pdfBuffer, maxPages)` : construit un mini-PDF via pdf-lib (6 pages max)
+
+**`services/pdf-analysis/pdfImageExtractor.test.ts`** : 3 tests (35p→6 indices, 5p→all, 20p→6 indices)
+
+### Fichiers modifiés
+
+**`services/analysisPipeline.ts`** :
+- `scanned_text` et `image_only` → `buildReducedPdfForVision()` → `extractWithVision()` (PDF direct, pas d'images)
+- `native_text` → `extractWithLlm()` sur texte OCR (inchangé)
+- Simplifié : plus de double fallback Vision dans la branche scanned
+
+**Tests** : 368 passed / 0 failed ✅ (3 nouveaux)
+
+---
+
+## Claude Vision — Pipeline unifié (2026-04-19)
+
+### Architecture
+
+```
+PDF → Claude Vision (lit le PDF nativement, type "document")
+    → Haiku extrait 62 champs → JSON
+    → Si score < 0.75 → Sonnet fallback
+    → mapLlmDataToMappedFinancialData()
+    → KPI Engine → Dashboard
+
+Si V2 échoue ou pas d'API key → V1 fallback (Document AI + parser manuel)
+```
+
+### Pourquoi pas de conversion en images
+
+`pdfjs-dist` est nested dans `pdf-parse` (pas importable directement). `canvas`/@napi-rs/canvas` ajoutent des dépendances natives. Claude lit les PDFs nativement via `type: "document"` — même résultat, zéro dépendance, fonctionne sur Vercel.
+
+### Fichier créé
+
+**`services/pdf-analysis/claudeVisionExtractor.ts`** :
+- `extractFinancialsFromPdf(pdfBuffer, pdfName)` → `ClaudeVisionResult`
+- Réduction automatique via pdf-lib : PDF > 15 pages → sélection pages 8%-8%+15
+- Appel Claude Haiku, fallback Sonnet si score < 0.75
+- Prompt système complet : 62 champs, règles colonnes/totaux/k€/formats
+- `computeConfidenceScore()` : critiques (70%) + importants (30%)
+- Estimation coût, logging via `logVisionCall()`
+
+**`services/pdf-analysis/claudeVisionExtractor.test.ts`** : 3 tests confidenceScore
+
+### Pipeline simplifié (`analysisPipeline.ts`)
+
+```
+V2 : extractFinancialsFromPdf(pdfBuffer) → score >= 0.40 → adopté
+V1 : extractFinancialPages → processPdfWithDocumentAI → analyzeFinancialDocument
+Fallback total : si V1 échoue aussi → parseUploadedFile (basic parser)
+```
+
+- Plus de détection de type PDF (native_text/scanned_text/image_only)
+- Plus de branchement conditionnel — V2 traite TOUS les types de PDF
+- `documentAiParsedFileData` créé uniquement si extraction réussie
+- Si V2 et V1 échouent → le PDF passe par `parseUploadedFile` comme fallback
+
+### Code supprimé des imports pipeline
+
+- `extractWithLlm`, `extractWithVision`, `detectPdfType`, `buildReducedPdfForVision`, `capPdfForDocumentAI`
+- Remplacé par `extractFinancialsFromPdf` (seul import V2)
+
+**Tests** : 371 passed / 0 failed ✅ (3 nouveaux)
+
+### Prompt système Claude Vision (2026-04-19)
+
+Prompt complet envoyé à Claude dans `services/pdf-analysis/claudeVisionExtractor.ts` (constante `SYSTEM_PROMPT`) :
+
+```
+Tu es un expert-comptable français spécialisé dans l'analyse de liasses fiscales.
+Tu reçois un document comptable français (bilan, compte de résultat, annexes).
+Tu dois extraire exactement les champs financiers listés et retourner UNIQUEMENT un JSON valide.
+
+RÈGLES ABSOLUES :
+- Retourner UNIQUEMENT du JSON valide, aucun texte avant ou après
+- null si un champ est absent ou illisible — jamais inventer une valeur
+- Prendre TOUJOURS la colonne N (exercice courant, à gauche), jamais N-1 (à droite)
+- Si le document mentionne "en milliers d'euros" ou "k€" → multiplier toutes les valeurs par 1000
+- Les valeurs entre parenthèses sont NÉGATIVES : (10 021) = -10021
+- Les espaces dans les nombres sont des séparateurs : "1 173 877" = 1173877
+- Chercher TOUJOURS la ligne de TOTAL, jamais une sous-ligne
+- Ne jamais confondre un numéro de compte PCG (ex: 10610100) avec une valeur financière
+- Le CA net = ligne "Chiffre d'affaires nets" ou "CHIFFRE D'AFFAIRES NET" — pas une ligne de ventilation
+
+FORMATS RECONNUS :
+- Formulaire 2050-SD (bilan actif) : TOTAL GÉNÉRAL ligne 110
+- Formulaire 2051-SD (bilan passif) : TOTAL GÉNÉRAL ligne 180
+- Formulaire 2052-SD (CDR) : BÉNÉFICE OU PERTE ligne 310
+- Formulaire 2033-SD (simplifié) : totaux lignes 096, 110, 180, 232, 264, 310
+- Format Sage/Cegid : tableau 4 colonnes Brut/Amort/Net N/Net N-1
+- Format Regnology : tableaux N et N-1 séparés
+- Format balance générale : numéros de compte + libellé + montant
+- Format scanné : lire visuellement les tableaux même sans texte structuré
+
+CHAMPS À EXTRAIRE (retourner null si absent) :
+{
+  "fiscal_year": null,         // Année fiscale (ex: 2024)
+  "unite": "euros",            // "euros" ou "milliers_euros"
+
+  // BILAN ACTIF (14 champs)
+  "immob_incorp": null,        // Immobilisations incorporelles nettes
+  "immob_corp": null,          // Immobilisations corporelles nettes
+  "immob_fin": null,           // Immobilisations financières nettes
+  "total_actif_immo": null,    // Total actif immobilisé net
+  "stocks_mp": null,           // Stocks matières premières
+  "stocks_march": null,        // Stocks marchandises
+  "total_stocks": null,        // Total stocks
+  "clients": null,             // Créances clients et comptes rattachés
+  "autres_creances": null,     // Autres créances
+  "vmp": null,                 // Valeurs mobilières de placement
+  "dispo": null,               // Disponibilités
+  "cca": null,                 // Charges constatées d'avance actif
+  "total_actif_circ": null,    // Total actif circulant
+  "total_actif": null,         // Total général actif
+
+  // BILAN PASSIF (13 champs)
+  "capital": null,             // Capital social
+  "reserve_legale": null,      // Réserve légale
+  "autres_reserves": null,     // Autres réserves
+  "ran": null,                 // Report à nouveau
+  "res_net": null,             // Résultat de l'exercice (bilan passif)
+  "total_cp": null,            // Total capitaux propres
+  "total_prov": null,          // Total provisions
+  "emprunts": null,            // Emprunts et dettes établissements crédit
+  "fournisseurs": null,        // Dettes fournisseurs
+  "dettes_fisc_soc": null,     // Dettes fiscales et sociales
+  "autres_dettes": null,       // Autres dettes
+  "total_dettes": null,        // Total dettes
+  "total_passif": null,        // Total général passif
+
+  // CDR PRODUITS (9 champs)
+  "ventes_march": null,        // Ventes de marchandises
+  "prod_vendue": null,         // Production vendue (biens + services)
+  "prod_stockee": null,        // Production stockée
+  "prod_immo": null,           // Production immobilisée
+  "subv_expl": null,           // Subventions d'exploitation
+  "autres_prod_expl": null,    // Autres produits d'exploitation
+  "total_prod_expl": null,     // Total produits d'exploitation
+  "prod_fin": null,            // Produits financiers
+  "prod_excep": null,          // Produits exceptionnels
+
+  // CDR CHARGES (15 champs)
+  "achats_march": null,        // Achats de marchandises
+  "var_stock_march": null,     // Variation stock marchandises
+  "achats_mp": null,           // Achats matières premières
+  "var_stock_mp": null,        // Variation stock matières premières
+  "ace": null,                 // Autres achats et charges externes
+  "impots_taxes": null,        // Impôts, taxes et versements assimilés
+  "salaires": null,            // Salaires et traitements
+  "charges_soc": null,         // Charges sociales
+  "dap": null,                 // Dotations aux amortissements
+  "dprov": null,               // Dotations aux provisions
+  "autres_charges_expl": null, // Autres charges d'exploitation
+  "total_charges_expl": null,  // Total charges d'exploitation
+  "charges_fin": null,         // Charges financières
+  "charges_excep": null,       // Charges exceptionnelles
+  "is_impot": null,            // Impôt sur les bénéfices
+
+  // RÉSULTATS (3 champs)
+  "ebit": null,                // Résultat d'exploitation
+  "resultat_exercice": null,   // Résultat net final
+  "ca_n_minus_1": null         // CA exercice précédent
+}
+```
+
+**Total** : 2 métadonnées + 14 bilan actif + 13 bilan passif + 9 CDR produits + 15 CDR charges + 3 résultats = **56 champs JSON** (62 champs MappedFinancialData après reconstruction creances, total_stocks, etc.)
+
+**Score de confiance** :
+- Champs critiques (poids 70%) : total_actif, total_passif, total_cp, resultat_exercice, total_prod_expl, total_charges_expl
+- Champs importants (poids 30%) : ventes_march, prod_vendue, ace, salaires, charges_soc, dap, fournisseurs, emprunts
+- Seuil Sonnet fallback : score < 0.75
+- Seuil adoption V2 : score >= 0.40
+
+### Refonte prompt système v2 (2026-04-19)
+
+Réécriture complète du `SYSTEM_PROMPT` dans `claudeVisionExtractor.ts` — 7 règles numérotées avec séparateurs visuels, corrections de 5 bugs identifiés sur AG FRANCE et SMI MARILLIER.
+
+**Bugs corrigés** :
+1. **CA 10x trop petit** (AG FRANCE) : Claude coupait "16 047 882" en "16 047" + "882". → RÈGLE 2 renforcée avec exemples explicites et interdiction de couper aux espaces
+2. **Colonne France prise au lieu de Total** (AG FRANCE) : CDR multi-colonnes France|Export|Total. → RÈGLE 4 avec exemple concret France=1 604 788 vs Total=16 047 882
+3. **Milliers d'euros mal gérés** : le LLM multipliait par 1000 dans sa réponse ET le code remultipliait. → RÈGLE 3 : retourner les valeurs telles quelles, le système multiplie
+4. **Année fiscale null** : pas d'instruction pour les exercices décalés. → RÈGLE 6 : extraire depuis "exercice clos le", "au 31/12/AAAA", exercices décalés
+5. **Confusion dap/dprov, dispo/total_actif_circ** : champs mélangés par le LLM. → RÈGLE 7 : correspondance explicite champ → ligne comptable
+
+**Structure du prompt** :
+- RÈGLE 1 — Format de sortie (JSON strict, pas de ```json)
+- RÈGLE 2 — Lecture des nombres (espaces, points, virgules, parenthèses)
+- RÈGLE 3 — Milliers d'euros (détection + pas de multiplication côté LLM)
+- RÈGLE 4 — Colonnes et exercices (N vs N-1, France|Export|Total)
+- RÈGLE 5 — Chiffre d'affaires (ligne CA NET, pas de ventilation, cohérence vs bilan)
+- RÈGLE 6 — Année fiscale (exercice clos, décalé, période du...au...)
+- RÈGLE 7 — Champs spécifiques (dispo, cca, dap, dprov, subv_expl, total_cp)
+- FORMATS RECONNUS (9 formats dont "en milliers")
+- CHAMPS À EXTRAIRE (56 champs JSON)
+
+**Validation ajoutée** dans `llmDataMapper.ts` :
+- `validateCaVsBilan()` : warning si CA / total_actif < 0.05 (ratio suspect)
+
+**Logs diagnostiques** ajoutés dans `claudeVisionExtractor.ts` :
+- `[Vision RAW]` : réponse brute Claude (500 premiers chars)
+- `[Vision]` : pages sélectionnées (start/end/total)
+
+### Fix fiscal_year string (2026-04-19)
+
+**Problème** : Claude retourne `"fiscal_year": "2024"` (string) → `typeof === "number"` échoue → null.
+**Fix** dans `parseResponse()` : accepte number ET string, validation plage [1901, 2099].
+**Tests** : 4 cas ajoutés (number, string, hors plage, invalide)
+
+---
+
+## Audit et corrections complètes (2026-04-19)
+
+### Bugs corrigés
+
+**Bug 1 — fiscal_year chaîne cassée** (CRITIQUE)
+- Claude extrait `fiscal_year` correctement mais `llmDataMapper` le droppait (pas dans `NUMERIC_FIELDS`)
+- `inferFiscalYearFromMappedData(mapped.n)` cherchait le champ `n` qui n'est jamais rempli par V2
+- **Fix** : ajout `fiscalYear: number | null` dans `ClaudeVisionResult`, extraction depuis `data.fiscal_year` dans `extractFinancialsFromPdf()`, variable `v2FiscalYear` dans `analysisPipeline.ts`, priorité `v2FiscalYear ?? inferFiscalYearFromMappedData() ?? inferFiscalYearFromText()`
+
+**Bug 2 — dispo/cca/vmp confusion**
+- **Fix** : RÈGLE 8 ajoutée au prompt — ordre exact des lignes du bilan actif circulant avec correspondance explicite champ → ligne comptable
+
+**Bug 3 — vmp = null**
+- Champ présent dans MAPPED_FIELDS et prompt — le bug est côté Claude qui confond avec dispo
+- **Fix** : RÈGLE 8 spécifie que ces champs sont TOUJOURS distincts
+
+**Bug 4 — ca_n_minus_1 = null**
+- **Fix** : RÈGLE 9 ajoutée — "ca_n_minus_1 = colonne N-1 sur la ligne CA nets, ne jamais retourner null si colonne N-1 visible"
+
+### Fichiers modifiés
+
+**`claudeVisionExtractor.ts`** :
+- `ClaudeVisionResult` : ajout champ `fiscalYear: number | null`
+- `extractFinancialsFromPdf()` : extraction `data.fiscal_year` → `extractedFiscalYear`, ajouté aux 3 return statements
+- `parseResponse()` et `applyUniteMultiplier()` exportés pour les tests
+- Prompt : ajout RÈGLE 8 (bilan actif circulant) et RÈGLE 9 (CA N-1)
+
+**`analysisPipeline.ts`** :
+- Variable `v2FiscalYear` capturée depuis `visionResult.fiscalYear`
+- `ParsedFileData.fiscalYear` : priorité `v2FiscalYear ?? inferFiscalYearFromMappedData() ?? inferFiscalYearFromText()`
+
+### Tests ajoutés
+
+**`claudeVisionExtractor.test.ts`** — 16 tests :
+- applyUniteMultiplier : ×1000, passthrough euros, ne multiplie pas fiscal_year
+- parseResponse : ```json```, espaces, invalide, champs absents, grands nombres, négatifs
+- parseResponse fiscal_year : number, string, hors plage, invalide
+- computeConfidenceScore : 1.0, 0.7, ~0.3, faible, 0
+
+**`llmDataMapper.test.ts`** — 10 tests :
+- Mapping base, k€ ×1000, passthrough euros, champs absents
+- Reconstruction : res_net ↔ resultat_exercice, creances, total_stocks
+- Valeurs négatives
+
+### Résultats
+
+- `npx vitest run` : **389 passed / 0 failed** ✅
+- `npx tsc --noEmit` : erreurs pré-existantes uniquement (test fixtures anciennes, ScoreSection.tsx non importé) — aucune régression introduite
+
+**Tests** : 389 passed / 0 failed ✅
+
+---
+
+## Fix double multiplication k€ — LCL (2026-04-19)
+
+### Symptôme
+`total_actif = 7 773 000 000 000` au lieu de `7 773 000` pour LCL.
+Cause : Sonnet retourne les valeurs déjà multipliées par 1000 malgré la RÈGLE 3 du prompt, puis `applyUniteMultiplier()` remultiplie ×1000.
+
+### Correction
+- **`claudeVisionExtractor.ts`** — `applyUniteMultiplier()` : ajout d'une garde anti-double-multiplication. Si `total_actif > 1 milliard` et `unite === "milliers_euros"`, le ×1000 est ignoré (le LLM a déjà multiplié).
+- **`claudeVisionExtractor.test.ts`** — test unitaire ajouté : vérifie que `total_actif = 7 773 000 000` n'est pas remultiplié.
+
+### Résultats
+
+- `npx vitest run` : **390 passed / 0 failed** ✅
+- `npx tsc --noEmit` : erreurs pré-existantes uniquement — aucune régression introduite
+
+**Tests** : 390 passed / 0 failed ✅

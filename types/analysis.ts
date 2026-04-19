@@ -181,6 +181,8 @@ export type AnalysisRecord = {
     sector: string | null;
     source: "dashboard" | "analysis" | "upload" | "manual";
   } | null;
+  parserVersion?: "v1" | "v2";
+  pdfType?: "native_text" | "scanned_text" | "image_only";
 };
 
 export type NewAnalysisRecord = Omit<AnalysisRecord, "id">;
