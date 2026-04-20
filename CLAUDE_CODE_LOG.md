@@ -1589,4 +1589,61 @@ Cause : Sonnet retourne les valeurs déjà multipliées par 1000 malgré la RÈG
 - `npx vitest run` : **390 passed / 0 failed** ✅
 - `npx tsc --noEmit` : erreurs pré-existantes uniquement — aucune régression introduite
 
+---
+
+## Configuration déploiement (2026-04-20)
+
+### next.config.mjs
+
+```js
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  serverExternalPackages: ["pdf-parse", "pdf-lib"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "50mb"
+    },
+    proxyClientMaxBodySize: 52428800
+  }
+};
+
+export default nextConfig;
+```
+
+Points notables :
+- `serverExternalPackages` : `pdf-parse` et `pdf-lib` sont exclus du bundle serveur (nécessaire pour éviter les conflits avec les bindings natifs)
+- `serverActions.bodySizeLimit: "50mb"` : limite montée à 50 Mo pour l'upload de PDFs
+- `proxyClientMaxBodySize: 52428800` : ~50 Mo côté proxy (cohérent avec la limite ci-dessus)
+- Pas de `output: "standalone"` → déploiement Vercel standard (pas Docker)
+
+### Dockerfile
+
+Absent. Déploiement prévu sur **Vercel** (pas de conteneurisation).
+
+### ecosystem.config.js / pm2.config.js
+
+Absent. Pas de gestion de processus PM2 configurée.
+
+### Scripts package.json
+
+```json
+"dev":      "next dev",
+"build":    "next build",
+"prestart": "npm run build",
+"start":    "next start"
+```
+
+- `prestart` déclenche automatiquement `build` avant `start` → utile pour un déploiement manuel sur VPS
+- Pas de script `export` → pas de génération statique
+
+### Bilan
+
+| Élément | Statut |
+|---|---|
+| next.config.mjs | ✅ Présent — upload 50 Mo, pdf-parse/pdf-lib externalisés |
+| Dockerfile | ❌ Absent |
+| ecosystem/pm2 config | ❌ Absent |
+| Déploiement cible | Vercel (convention Next.js standard) |
+| VPS fallback | `npm run start` (inclut prebuild automatique) |
+
 **Tests** : 390 passed / 0 failed ✅
