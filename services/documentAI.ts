@@ -1,5 +1,4 @@
 import { DocumentProcessorServiceClient } from "@google-cloud/documentai";
-import { PDFParse } from "pdf-parse";
 
 export type DocumentAIExtractionResult = {
   rawText: string;
@@ -177,6 +176,7 @@ function getDocumentAISyncPageLimit(): number {
 }
 
 async function tryGetPdfPageCount(pdfBuffer: Buffer): Promise<number | null> {
+  const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({
     data: new Uint8Array(pdfBuffer)
   });

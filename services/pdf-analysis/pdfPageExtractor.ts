@@ -1,5 +1,4 @@
 import { PDFDocument } from "pdf-lib";
-import { PDFParse } from "pdf-parse";
 
 // Pré-traitement PDF : isole les pages "financièrement utiles" avant envoi
 // à Document AI, qui est limité (~30 pages) et coûteux à appeler sur les
@@ -154,6 +153,7 @@ function countDistinct2033Codes(text: string): number {
 }
 
 async function extractAllPageTexts(pdfBuffer: Buffer): Promise<string[]> {
+  const { PDFParse } = await import("pdf-parse");
   const parser = new PDFParse({ data: new Uint8Array(pdfBuffer) });
   try {
     const result = await parser.getText();
