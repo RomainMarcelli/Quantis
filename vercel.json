@@ -1,4 +1,10 @@
 {
+  "functions": {
+    "api/**/*.ts": {
+      "maxDuration": 300,
+      "memory": 3008
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/security-audit-cleanup",
