@@ -9,11 +9,31 @@ export type PdfKpiItem = {
   interpretation: string;
 };
 
+export type PdfKpiCard = {
+  id: string;
+  title: string;
+  subtitle: string;
+  valueLabel: string;
+  trendTone: "positive" | "negative" | "neutral";
+  trendLabel: string;
+  benchmarkLabel: string;
+};
+
+export type PdfScore = {
+  value: number | null;
+  valueLabel: string;
+  level: PdfScoreLevel;
+  levelLabel: string;
+  description: string;
+};
+
 export type PdfReportData = {
   meta: {
     companyName: string;
     periodLabel: string;
     generatedAtLabel: string;
+    userName?: string;
+    analysisDateLabel?: string;
   };
   cover: {
     scoreValue: number | null;
@@ -34,6 +54,8 @@ export type PdfReportData = {
     alerts: Array<{ label: string; severity: "high" | "medium" | "low" }>;
     recommendations: string[];
   };
+  score: PdfScore;
+  kpis: PdfKpiCard[];
   valueCreation: { items: PdfKpiItem[] };
   investment: { items: PdfKpiItem[] };
   financing: { items: PdfKpiItem[] };
@@ -62,7 +84,11 @@ export function buildPdfReportData(input: BuildPdfReportDataInput): PdfReportDat
     meta: {
       companyName,
       periodLabel: selectedYearLabel,
-      generatedAtLabel: formatDateFr(new Date())
+      generatedAtLabel: formatDateFr(new Date()),
+      userName: input.greetingName || undefined,
+      analysisDateLabel: input.analysisCreatedAt
+        ? formatDateFr(new Date(input.analysisCreatedAt))
+        : undefined
     },
     cover: {
       scoreValue: synthese.score,
@@ -76,7 +102,9 @@ export function buildPdfReportData(input: BuildPdfReportDataInput): PdfReportDat
         buildPillar("efficacite", "Efficacité", synthese.scorePiliers?.efficacite ?? null)
       ]
     },
+    score: buildScore(synthese.score),
     synthese: buildSyntheseSection(synthese, kpis, mappedData),
+    kpis: buildKpiCards(kpis),
     valueCreation: { items: buildValueCreationItems(kpis) },
     investment: { items: buildInvestmentItems(kpis) },
     financing: { items: buildFinancingItems(kpis) },
@@ -146,6 +174,73 @@ function buildSyntheseSection(
     alerts: synthese.alerts.map((a) => ({ label: a.label, severity: a.severity })),
     recommendations: synthese.actions.length ? synthese.actions : ["Aucune recommandation."]
   };
+}
+
+function buildScore(score: number | null): PdfScore {
+  const level = resolveScoreLevel(score);
+  const descriptions: Record<PdfScoreLevel, string> = {
+    excellent: "La situation financière est excellente. L'entreprise présente de solides fondamentaux sur l'ensemble des piliers analysés.",
+    bon: "La situation financière est bonne. Quelques axes d'amélioration peuvent optimiser la performance.",
+    fragile: "La situation financière est fragile. Des vigilances sont à surveiller sur certains indicateurs clés.",
+    critique: "La situation financière est critique. Des actions correctrices sont nécessaires dans les meilleurs délais.",
+    na: "Données insuffisantes pour établir un score global."
+  };
+  return {
+    value: score,
+    valueLabel: score === null ? "N/D" : `${Math.round(score)} / 100`,
+    level,
+    levelLabel: scoreLevelLabel(level),
+    description: descriptions[level]
+  };
+}
+
+function buildKpiCards(kpis?: CalculatedKpis): PdfKpiCard[] {
+  if (!kpis) return [];
+
+  const tone = (v: number | null, good: number, ok: number, invert = false): PdfKpiCard["trendTone"] => {
+    if (v === null) return "neutral";
+    if (invert) return v <= good ? "positive" : v <= ok ? "neutral" : "negative";
+    return v >= good ? "positive" : v >= ok ? "neutral" : "negative";
+  };
+
+  return [
+    {
+      id: "ca",
+      title: "Chiffre d'affaires",
+      subtitle: "Exercice N",
+      valueLabel: fmtCurrency(kpis.ca ?? null),
+      trendTone: "neutral",
+      trendLabel: "—",
+      benchmarkLabel: "Référence sectorielle non disponible"
+    },
+    {
+      id: "marge_ebitda",
+      title: "Marge EBITDA",
+      subtitle: "Rentabilité opérationnelle",
+      valueLabel: fmtPercent(kpis.marge_ebitda ?? null),
+      trendTone: tone(kpis.marge_ebitda ?? null, 0.15, 0.05),
+      trendLabel: (kpis.marge_ebitda ?? null) === null ? "N/D" : (kpis.marge_ebitda! >= 0.15 ? "Solide" : kpis.marge_ebitda! >= 0.05 ? "Correct" : "Faible"),
+      benchmarkLabel: "Seuil PME : > 5 %"
+    },
+    {
+      id: "solvabilite",
+      title: "Solvabilité",
+      subtitle: "Part CP / total actif",
+      valueLabel: fmtPercent(kpis.solvabilite ?? null),
+      trendTone: tone(kpis.solvabilite ?? null, 0.30, 0.15),
+      trendLabel: (kpis.solvabilite ?? null) === null ? "N/D" : (kpis.solvabilite! >= 0.30 ? "Solide" : kpis.solvabilite! >= 0.15 ? "Correct" : "Fragile"),
+      benchmarkLabel: "Seuil recommandé : > 20 %"
+    },
+    {
+      id: "liq_gen",
+      title: "Liquidité générale",
+      subtitle: "Actif CT / Passif CT",
+      valueLabel: fmtRatio(kpis.liq_gen ?? null),
+      trendTone: tone(kpis.liq_gen ?? null, 2, 1),
+      trendLabel: (kpis.liq_gen ?? null) === null ? "N/D" : (kpis.liq_gen! >= 2 ? "Bonne" : kpis.liq_gen! >= 1 ? "Correcte" : "Risquée"),
+      benchmarkLabel: "Ratio cible : > 1"
+    }
+  ];
 }
 
 function buildValueCreationItems(kpis?: CalculatedKpis): PdfKpiItem[] {

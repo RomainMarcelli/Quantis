@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
 });
 
 type KPISectionProps = {
-  pillars: PdfReportData["pillars"];
+  pillars: PdfReportData["cover"]["pillars"];
   kpis: PdfReportData["kpis"];
 };
 

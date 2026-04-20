@@ -42,8 +42,8 @@ const styles = StyleSheet.create({
 });
 
 type AlertsSectionProps = {
-  recommendations: PdfReportData["recommendations"];
-  alerts: PdfReportData["alerts"];
+  recommendations: PdfReportData["synthese"]["recommendations"];
+  alerts: PdfReportData["synthese"]["alerts"];
 };
 
 export function AlertsSection({ recommendations, alerts }: AlertsSectionProps) {

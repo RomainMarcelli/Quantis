@@ -18,7 +18,7 @@ export interface ClaudeVisionResult {
 }
 
 const VISION_MODEL = "claude-haiku-4-5-20251001";
-const VISION_MODEL_FALLBACK = "claude-sonnet-4-5";
+const VISION_MODEL_FALLBACK = "claude-sonnet-4-6";
 const CONFIDENCE_THRESHOLD = 0.75;
 const MAX_PAGES = 15;
 

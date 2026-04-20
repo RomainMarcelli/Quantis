@@ -89,12 +89,16 @@ export function Header({ data, logoSrc }: HeaderProps) {
           <Text style={styles.brand}>Quantis</Text>
           <Text style={styles.title}>Rapport de synthèse financière</Text>
           <Text style={styles.subtitle}>Entreprise : {data.companyName}</Text>
-          <Text style={styles.subtitle}>Utilisateur : {data.userName}</Text>
+          {data.userName && (
+            <Text style={styles.subtitle}>Utilisateur : {data.userName}</Text>
+          )}
         </View>
       </View>
 
       <View style={styles.meta}>
-        <Text style={styles.metaText}>Date de l&apos;analyse : {data.analysisDateLabel}</Text>
+        {data.analysisDateLabel && (
+          <Text style={styles.metaText}>Date de l&apos;analyse : {data.analysisDateLabel}</Text>
+        )}
         <Text style={styles.metaText}>Période : {data.periodLabel}</Text>
         <Text style={styles.metaText}>Généré le : {data.generatedAtLabel}</Text>
       </View>

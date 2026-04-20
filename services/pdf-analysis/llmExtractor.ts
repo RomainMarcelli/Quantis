@@ -15,7 +15,7 @@ export interface LlmExtractionResult {
 }
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
-const SONNET_MODEL = "claude-sonnet-4-5";
+const SONNET_MODEL = "claude-sonnet-4-6";
 const CONFIDENCE_THRESHOLD = 0.75;
 const TIMEOUT_MS = 90_000;
 
