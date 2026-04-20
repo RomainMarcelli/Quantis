@@ -307,7 +307,7 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
               title="Délai clients (DSO)"
               value={kpis.dso === null ? "N/D" : `${Math.round(animatedDso)} j`}
               trend={dsoTrend}
-              icon={<Users className="h-4 w-4 text-amber-400/70" />}
+              icon={<Users className="h-4 w-4 text-amber-400" />}
               hint="Temps moyen d'encaissement des factures clients."
               badgeLabel="↘ À réduire"
               badgeTone="warning"
@@ -316,7 +316,7 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
               title="Délai stocks (DIO)"
               value={kpis.rot_stocks === null ? "N/D" : `${Math.round(animatedDio)} j`}
               trend={dioTrend}
-              icon={<Package className="h-4 w-4 text-amber-400/70" />}
+              icon={<Package className="h-4 w-4 text-amber-400" />}
               hint="Temps moyen d'écoulement du stock."
               badgeLabel="↘ À réduire"
               badgeTone="warning"
@@ -325,7 +325,7 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
               title="Délai fournisseurs (DPO)"
               value={kpis.dpo === null ? "N/D" : `${Math.round(animatedDpo)} j`}
               trend={dpoTrend}
-              icon={<Truck className="h-4 w-4 text-emerald-400/70" />}
+              icon={<Truck className="h-4 w-4 text-emerald-400" />}
               hint="Délai moyen accordé par les fournisseurs."
               badgeLabel="↗ À allonger"
               badgeTone="good"
@@ -511,8 +511,8 @@ type DelayCardProps = {
 function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, icon }: DelayCardProps) {
   const badgeClass =
     badgeTone === "good"
-      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
-      : "border-amber-400/30 bg-amber-500/10 text-amber-300";
+      ? "quantis-delay-badge quantis-delay-badge--good"
+      : "quantis-delay-badge quantis-delay-badge--warning";
 
   return (
     <div className="interactive-badge rounded-xl border border-white/5 bg-white/[0.02] p-5 transition-all hover:border-quantis-gold/30 hover:bg-quantis-gold/[0.03]">
@@ -522,7 +522,7 @@ function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, icon }: D
       </div>
       <div className="mb-3 flex items-end justify-between gap-2">
         <span className="tnum text-3xl font-medium text-white">{value}</span>
-        <span className={`rounded px-2 py-1 text-[9px] uppercase tracking-wide ${badgeClass}`}>{badgeLabel}</span>
+        <span className={badgeClass}>{badgeLabel}</span>
       </div>
       <KpiTrendPill trend={trend} compact className="mb-2" />
       <p className="text-[10px] italic text-white/45">{hint}</p>

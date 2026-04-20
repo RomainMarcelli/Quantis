@@ -40,9 +40,10 @@ import {
 } from "@/lib/folders/activeFolder";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { PremiumStateCard } from "@/components/ui/PremiumStateCard";
 import {
-  buildSyntheseYearOptions,
   filterAnalysesByYear,
+  resolveAnalysisYear,
   SYNTHESIS_CURRENT_YEAR_KEY
 } from "@/lib/synthese/synthesePeriod";
 import {
@@ -221,10 +222,12 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     return () => window.removeEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
   }, []);
 
-  const dashboardYearOptions = useMemo(
-    () => buildSyntheseYearOptions(allAnalyses, currentCalendarYear),
-    [allAnalyses, currentCalendarYear]
-  );
+  const availableDashboardYears = useMemo(() => {
+    const years = Array.from(new Set(allAnalyses.map((analysisItem) => resolveAnalysisYear(analysisItem)))).sort(
+      (left, right) => right - left
+    );
+    return years.map((year) => ({ value: String(year), label: String(year) }));
+  }, [allAnalyses]);
 
   const analysesFilteredByYear = useMemo(
     () => filterAnalysesByYear(allAnalyses, selectedDashboardYear, currentCalendarYear),
@@ -285,15 +288,26 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   }, [pendingSearchTarget, isDocumentsView, activeDashboardTab, analysis?.id, loadingAnalysis]);
 
   useEffect(() => {
-    // Le filtre d'année revient sur une valeur valide quand la liste d'options change.
-    if (!dashboardYearOptions.length) {
+    // Le filtre revient toujours sur une année réellement présente dans les analyses.
+    if (!availableDashboardYears.length) {
       return;
     }
 
-    if (!dashboardYearOptions.some((option) => option.value === selectedDashboardYear)) {
-      setSelectedDashboardYear(dashboardYearOptions[0].value);
+    if (selectedDashboardYear === SYNTHESIS_CURRENT_YEAR_KEY) {
+      const currentYearValue = String(currentCalendarYear);
+      const preferredYear =
+        availableDashboardYears.find((option) => option.value === currentYearValue) ??
+        availableDashboardYears[0];
+      if (preferredYear && preferredYear.value !== selectedDashboardYear) {
+        setSelectedDashboardYear(preferredYear.value);
+      }
+      return;
     }
-  }, [dashboardYearOptions, selectedDashboardYear]);
+
+    if (!availableDashboardYears.some((option) => option.value === selectedDashboardYear)) {
+      setSelectedDashboardYear(availableDashboardYears[0]!.value);
+    }
+  }, [availableDashboardYears, currentCalendarYear, selectedDashboardYear]);
 
   useEffect(() => {
     if (!allAnalyses.length) {
@@ -788,24 +802,46 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
   if (loadingAuth) {
     return (
-      <section className="precision-card rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Chargement de la session...</p>
-      </section>
+      <PremiumStateCard
+        variant="loading"
+        title="Connexion à votre espace"
+        description="Récupération de votre environnement d’analyse en cours."
+        loadingLabel="Chargement de la session..."
+        loaderIntensity="wow"
+        viewportCentered
+      />
     );
   }
 
   if (!user) {
     return (
-      <section className="precision-card rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/80">Votre session est expirée. Reconnectez-vous pour continuer.</p>
-        <button
-          type="button"
-          onClick={() => router.replace("/login")}
-          className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10"
-        >
-          Se connecter
-        </button>
-      </section>
+      <PremiumStateCard
+        variant="error"
+        title="Session expirée"
+        description="Reconnectez-vous pour retrouver vos dossiers, documents et tableaux de bord."
+        viewportCentered
+        actions={[
+          {
+            label: "Se connecter",
+            onClick: () => router.replace("/login"),
+            tone: "gold"
+          }
+        ]}
+      />
+    );
+  }
+
+  if (loadingAnalysis) {
+    return (
+      <PremiumStateCard
+        variant="loading"
+        title="Mise à jour de l'analyse"
+        description="Synchronisation des documents et recalcul des indicateurs en cours."
+        loadingLabel="Chargement de l'analyse..."
+        loaderIntensity="wow"
+        viewportCentered
+        className="relative z-10 mx-auto w-full max-w-3xl"
+      />
     );
   }
 
@@ -869,14 +905,19 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         <GlobalSearchBar placeholder="Rechercher..." />
       </div>
 
-      {loadingAnalysis ? (
-        <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de l&apos;analyse...</div>
-      ) : null}
-
       {errorMessage ? (
-        <div className="precision-card rounded-2xl border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
-          {errorMessage}
-        </div>
+        <PremiumStateCard
+          variant="error"
+          title="Action impossible"
+          description={errorMessage}
+          compact
+          actions={[
+            {
+              label: "Fermer",
+              onClick: () => setErrorMessage(null)
+            }
+          ]}
+        />
       ) : null}
 
       {infoMessage ? (
@@ -942,7 +983,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             </NavRow>
           </nav>
 
-          {!isSidebarCollapsed && !isDocumentsView && dashboardYearOptions.length > 1 ? (
+          {!isSidebarCollapsed && !isDocumentsView && availableDashboardYears.length > 1 ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
               <label htmlFor="sidebar-dashboard-year" className="text-[11px] uppercase tracking-wide text-white/50">
                 Année de synthèse
@@ -953,12 +994,21 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 onChange={(event) => setSelectedDashboardYear(event.target.value)}
                 className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
               >
-                {dashboardYearOptions.map((option) => (
+                {availableDashboardYears.map((option) => (
                   <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
                     {option.label}
                   </option>
                 ))}
               </select>
+            </div>
+          ) : null}
+
+          {!isSidebarCollapsed && !isDocumentsView && availableDashboardYears.length === 1 ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-white/50">Année de synthèse</p>
+              <p className="mt-2 rounded-lg border border-white/15 bg-black/35 px-3 py-2 text-sm font-medium text-white">
+                {availableDashboardYears[0]?.label}
+              </p>
             </div>
           ) : null}
 
@@ -1210,13 +1260,27 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
               />
             </>
           ) : (
-            <section className="precision-card rounded-2xl p-5">
-              <p className="text-sm text-white/70">
-                {hasNoAnalysisForSelectedYear
-                  ? "Aucune analyse disponible pour l'année sélectionnée."
-                  : "Aucune analyse disponible pour le moment. Importez un fichier pour démarrer votre analyse financière."}
-              </p>
-            </section>
+            <PremiumStateCard
+              variant="empty"
+              title={
+                hasNoAnalysisForSelectedYear
+                  ? "Aucune analyse pour cette année"
+                  : "Aucune analyse disponible"
+              }
+              description={
+                hasNoAnalysisForSelectedYear
+                  ? "Changez d'année ou importez un nouveau document pour alimenter le tableau de bord."
+                  : "Importez un fichier pour démarrer votre analyse financière."
+              }
+              compact
+              actions={[
+                {
+                  label: "Importer un fichier",
+                  onClick: () => router.push("/upload"),
+                  tone: "gold"
+                }
+              ]}
+            />
           )}
         </div>
       </div>

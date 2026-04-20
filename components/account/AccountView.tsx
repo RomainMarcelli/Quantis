@@ -6,6 +6,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { AlertTriangle, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
+import { PremiumStateCard } from "@/components/ui/PremiumStateCard";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { QuantisSelect } from "@/components/ui/QuantisSelect";
 import { useTheme } from "@/hooks/useTheme";
@@ -288,9 +289,14 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
   if (loading) {
     return (
-      <section className="precision-card rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Chargement du compte...</p>
-      </section>
+      <PremiumStateCard
+        variant="loading"
+        title="Chargement de votre profil"
+        description="Récupération des paramètres du compte et des préférences."
+        loadingLabel="Chargement du compte..."
+        loaderIntensity="balanced"
+        viewportCentered
+      />
     );
   }
 

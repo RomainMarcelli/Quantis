@@ -316,6 +316,333 @@ body {
   z-index: 1;
 }
 
+/* Halo global de suivi souris: actif sur l'ensemble de l'application. */
+.global-cursor-halo {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  width: 460px;
+  height: 460px;
+  border-radius: 9999px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(-9999px, -9999px, 0) translate(-50%, -50%);
+  background: radial-gradient(
+    circle,
+    rgb(197 160 89 / 13%) 0%,
+    rgb(197 160 89 / 7%) 26%,
+    transparent 64%
+  );
+  filter: blur(2px);
+  transition: opacity 220ms ease-out;
+  will-change: transform, opacity;
+}
+
+:root[data-theme="light"] .global-cursor-halo {
+  background: radial-gradient(
+    circle,
+    rgb(212 175 55 / 18%) 0%,
+    rgb(212 175 55 / 10%) 28%,
+    transparent 66%
+  );
+}
+
+/* Loader premium unifie. */
+.quantis-loader-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.quantis-loader {
+  position: relative;
+  border-radius: 9999px;
+  --ql-gold: 197 160 89;
+  --ql-teal: 45 212 191;
+  --ql-outer-alpha-main: 0.78;
+  --ql-outer-alpha-side: 0.42;
+  --ql-inner-alpha-main: 0.72;
+  --ql-inner-alpha-side: 0.35;
+  --ql-core-main: 0.82;
+  --ql-core-side: 0.2;
+  --ql-core-pulse-min: 0.55;
+  --ql-core-pulse-max: 0.95;
+  --ql-core-scale-min: 0.9;
+  --ql-core-scale-max: 1.05;
+  --ql-orbiter-alpha: 0.78;
+  --ql-orbiter-glow: 0.34;
+  --ql-aura-alpha-main: 0.2;
+  --ql-aura-alpha-side: 0.03;
+  --ql-speed-outer: 1.4s;
+  --ql-speed-inner: 1.9s;
+  --ql-speed-core: 1.6s;
+  --ql-speed-orbit: 1.9s;
+}
+
+.quantis-loader--intensity-subtle {
+  --ql-outer-alpha-main: 0.58;
+  --ql-outer-alpha-side: 0.24;
+  --ql-inner-alpha-main: 0.56;
+  --ql-inner-alpha-side: 0.22;
+  --ql-core-main: 0.66;
+  --ql-core-side: 0.14;
+  --ql-core-pulse-min: 0.45;
+  --ql-core-pulse-max: 0.78;
+  --ql-core-scale-min: 0.93;
+  --ql-core-scale-max: 1.01;
+  --ql-orbiter-alpha: 0.62;
+  --ql-orbiter-glow: 0.2;
+  --ql-aura-alpha-main: 0.12;
+  --ql-aura-alpha-side: 0.015;
+  --ql-speed-outer: 1.8s;
+  --ql-speed-inner: 2.2s;
+  --ql-speed-core: 1.9s;
+  --ql-speed-orbit: 2.3s;
+}
+
+.quantis-loader--intensity-balanced {
+  --ql-outer-alpha-main: 0.78;
+  --ql-outer-alpha-side: 0.42;
+  --ql-inner-alpha-main: 0.72;
+  --ql-inner-alpha-side: 0.35;
+  --ql-core-main: 0.82;
+  --ql-core-side: 0.2;
+  --ql-core-pulse-min: 0.55;
+  --ql-core-pulse-max: 0.95;
+  --ql-core-scale-min: 0.9;
+  --ql-core-scale-max: 1.05;
+  --ql-orbiter-alpha: 0.78;
+  --ql-orbiter-glow: 0.34;
+  --ql-aura-alpha-main: 0.2;
+  --ql-aura-alpha-side: 0.03;
+  --ql-speed-outer: 1.4s;
+  --ql-speed-inner: 1.9s;
+  --ql-speed-core: 1.6s;
+  --ql-speed-orbit: 1.9s;
+}
+
+.quantis-loader--intensity-wow {
+  --ql-outer-alpha-main: 0.9;
+  --ql-outer-alpha-side: 0.55;
+  --ql-inner-alpha-main: 0.84;
+  --ql-inner-alpha-side: 0.46;
+  --ql-core-main: 0.95;
+  --ql-core-side: 0.28;
+  --ql-core-pulse-min: 0.62;
+  --ql-core-pulse-max: 1;
+  --ql-core-scale-min: 0.88;
+  --ql-core-scale-max: 1.08;
+  --ql-orbiter-alpha: 0.92;
+  --ql-orbiter-glow: 0.45;
+  --ql-aura-alpha-main: 0.28;
+  --ql-aura-alpha-side: 0.05;
+  --ql-speed-outer: 1.15s;
+  --ql-speed-inner: 1.45s;
+  --ql-speed-core: 1.35s;
+  --ql-speed-orbit: 1.4s;
+}
+
+.quantis-loader__aura {
+  position: absolute;
+  inset: -18%;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle,
+    rgb(197 160 89 / var(--ql-aura-alpha-main)) 0%,
+    rgb(45 212 191 / var(--ql-aura-alpha-side)) 55%,
+    transparent 72%
+  );
+  filter: blur(8px);
+  animation: quantis-loader-aura var(--ql-speed-core) ease-in-out infinite;
+}
+
+.quantis-loader--sm {
+  width: 58px;
+  height: 58px;
+}
+
+.quantis-loader--md {
+  width: 72px;
+  height: 72px;
+}
+
+.quantis-loader--lg {
+  width: 88px;
+  height: 88px;
+}
+
+.quantis-loader__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid transparent;
+}
+
+.quantis-loader__ring--outer {
+  border-top-color: rgb(var(--ql-gold) / var(--ql-outer-alpha-main));
+  border-right-color: rgb(var(--ql-gold) / var(--ql-outer-alpha-side));
+  animation: quantis-loader-spin var(--ql-speed-outer) linear infinite;
+}
+
+.quantis-loader__ring--inner {
+  inset: 18%;
+  border-top-color: rgb(var(--ql-teal) / var(--ql-inner-alpha-main));
+  border-left-color: rgb(var(--ql-teal) / var(--ql-inner-alpha-side));
+  animation: quantis-loader-spin-reverse var(--ql-speed-inner) linear infinite;
+}
+
+.quantis-loader__core {
+  position: absolute;
+  inset: 36%;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle,
+    rgb(var(--ql-gold) / var(--ql-core-main)) 0%,
+    rgb(var(--ql-gold) / var(--ql-core-side)) 70%,
+    transparent 100%
+  );
+  animation: quantis-loader-core var(--ql-speed-core) ease-in-out infinite;
+}
+
+.quantis-loader__orbiter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14%;
+  height: 14%;
+  border-radius: 9999px;
+  background: rgb(255 255 255 / var(--ql-orbiter-alpha));
+  box-shadow: 0 0 14px rgb(var(--ql-gold) / var(--ql-orbiter-glow));
+  transform-origin: -210% -210%;
+  animation: quantis-loader-orbit var(--ql-speed-orbit) cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.quantis-loader__label {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 58%);
+}
+
+/* Conteneur etat unifie loading/empty/error/info. */
+.quantis-state-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.quantis-state-card__layer {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 12% 0%, rgb(197 160 89 / 11%), transparent 44%),
+    radial-gradient(circle at 90% -8%, rgb(45 212 191 / 7%), transparent 35%);
+  pointer-events: none;
+}
+
+.quantis-state-card__icon {
+  margin-bottom: 0.9rem;
+  display: inline-flex;
+  height: 2.6rem;
+  width: 2.6rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid rgb(197 160 89 / 35%);
+  color: rgb(249 216 129);
+  background: rgb(197 160 89 / 10%);
+  box-shadow: 0 0 18px -10px rgb(197 160 89 / 55%);
+}
+
+.quantis-state-card__icon.is-error {
+  border-color: rgb(251 113 133 / 35%);
+  color: rgb(253 164 175);
+  background: rgb(244 63 94 / 12%);
+  box-shadow: 0 0 18px -10px rgb(244 63 94 / 55%);
+}
+
+:root[data-theme="light"] .quantis-loader {
+  --ql-gold: 180 83 9;
+  --ql-teal: 15 118 110;
+}
+
+:root[data-theme="light"] .quantis-loader__orbiter {
+  background: rgb(15 23 42 / 72%);
+  box-shadow: 0 0 14px rgb(180 83 9 / calc(var(--ql-orbiter-glow) * 0.9));
+}
+
+:root[data-theme="light"] .quantis-loader__label {
+  color: rgb(51 65 85 / 68%);
+}
+
+:root[data-theme="light"] .quantis-state-card__icon {
+  border-color: rgb(180 83 9 / 35%);
+  color: rgb(146 64 14);
+  background: rgb(245 158 11 / 16%);
+  box-shadow: 0 0 18px -10px rgb(180 83 9 / 40%);
+}
+
+:root[data-theme="light"] .quantis-state-card__icon.is-error {
+  border-color: rgb(190 24 93 / 35%);
+  color: rgb(157 23 77);
+  background: rgb(251 113 133 / 15%);
+  box-shadow: 0 0 18px -10px rgb(190 24 93 / 40%);
+}
+
+@keyframes quantis-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes quantis-loader-spin-reverse {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes quantis-loader-core {
+  0% {
+    transform: scale(var(--ql-core-scale-min));
+    opacity: var(--ql-core-pulse-min);
+  }
+  50% {
+    transform: scale(var(--ql-core-scale-max));
+    opacity: var(--ql-core-pulse-max);
+  }
+  100% {
+    transform: scale(var(--ql-core-scale-min));
+    opacity: var(--ql-core-pulse-min);
+  }
+}
+
+@keyframes quantis-loader-aura {
+  0% {
+    opacity: 0.72;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 0.72;
+    transform: scale(0.94);
+  }
+}
+
+@keyframes quantis-loader-orbit {
+  from {
+    transform: rotate(0deg) translateX(180%);
+  }
+  to {
+    transform: rotate(360deg) translateX(180%);
+  }
+}
+
 /* Carte premium commune avec hover or et relief progressif. */
 .precision-card {
   background: var(--quantis-card-bg);
@@ -422,6 +749,31 @@ body {
 
 .interactive-badge:hover {
   transform: translateY(-2px);
+}
+
+/* Badges de pilotage DSO/DIO/DPO: contraste garanti en dark et light. */
+.quantis-delay-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+  padding: 0.25rem 0.5rem;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quantis-delay-badge--warning {
+  border-color: rgb(251 191 36 / 32%);
+  background: rgb(245 158 11 / 12%);
+  color: rgb(252 211 77);
+}
+
+.quantis-delay-badge--good {
+  border-color: rgb(52 211 153 / 34%);
+  background: rgb(16 185 129 / 10%);
+  color: rgb(110 231 183);
 }
 
 /* Styles du cadran de sante SVG (tick, track, progress). */
@@ -649,6 +1001,18 @@ body {
   color: rgb(6 95 70) !important;
 }
 
+:root[data-theme="light"] .quantis-delay-badge--warning {
+  border-color: rgb(217 119 6 / 45%);
+  background: rgb(245 158 11 / 16%);
+  color: rgb(146 64 14);
+}
+
+:root[data-theme="light"] .quantis-delay-badge--good {
+  border-color: rgb(5 150 105 / 38%);
+  background: rgb(16 185 129 / 14%);
+  color: rgb(6 95 70);
+}
+
 :root[data-theme="light"] .quantis-panel [class*="bg-rose-50"] {
   background-color: rgb(254 226 226 / 95%) !important;
 }
@@ -762,6 +1126,20 @@ body {
     transform: none;
     filter: none;
     transition: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .global-cursor-halo {
+    display: none;
+  }
+
+  .quantis-loader__ring--outer,
+  .quantis-loader__ring--inner,
+  .quantis-loader__aura,
+  .quantis-loader__core,
+  .quantis-loader__orbiter {
+    animation: none;
   }
 }
 

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { UploadLanding } from "@/components/dashboard/UploadLanding";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { PremiumStateCard } from "@/components/ui/PremiumStateCard";
 import { hasLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import { ensureFolderName } from "@/lib/folders/activeFolder";
 import { loadAppPreferences } from "@/lib/settings/appPreferences";
@@ -175,24 +176,48 @@ export function DashboardView() {
 
   if (loadingAuth) {
     return (
-      <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Chargement de la session...</p>
-      </section>
+      <PremiumStateCard
+        variant="loading"
+        title="Initialisation de votre espace"
+        description="Connexion sécurisée en cours, vos paramètres et analyses arrivent."
+        loadingLabel="Chargement de la session..."
+        loaderIntensity="wow"
+        viewportCentered
+        className="relative z-10 mx-auto mt-8 w-full max-w-6xl"
+      />
     );
   }
 
   if (!user) {
     return (
-      <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/80">Votre session est expirée. Reconnectez-vous pour continuer.</p>
-        <button
-          type="button"
-          onClick={() => router.replace("/login")}
-          className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10"
-        >
-          Se connecter
-        </button>
-      </section>
+      <PremiumStateCard
+        variant="error"
+        title="Session expirée"
+        description="Reconnectez-vous pour accéder à vos imports et à l’historique des analyses."
+        viewportCentered
+        className="relative z-10 mx-auto mt-8 w-full max-w-6xl"
+        actions={[
+          {
+            label: "Se connecter",
+            onClick: () => router.replace("/login"),
+            tone: "gold"
+          }
+        ]}
+      />
+    );
+  }
+
+  if (loadingAnalyses && recentAnalyses.length === 0) {
+    return (
+      <PremiumStateCard
+        variant="loading"
+        title="Préparation du tableau de bord"
+        description="Récupération de l’historique et synchronisation de vos analyses."
+        loadingLabel="Chargement de l'historique..."
+        loaderIntensity="wow"
+        viewportCentered
+        className="relative z-10 mx-auto w-full max-w-3xl"
+      />
     );
   }
 
@@ -291,9 +316,23 @@ export function DashboardView() {
       <UploadLanding loading={uploading} onUpload={handleUpload} />
 
       {errorMessage ? (
-        <div className="precision-card rounded-xl border-rose-400/35 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-          {errorMessage}
-        </div>
+        <PremiumStateCard
+          variant="error"
+          title="Import interrompu"
+          description={errorMessage}
+          compact
+          actions={[
+            {
+              label: "Relancer l'import",
+              onClick: () => router.push("/upload"),
+              tone: "gold"
+            },
+            {
+              label: "Fermer",
+              onClick: () => setErrorMessage(null)
+            }
+          ]}
+        />
       ) : null}
 
       <section className="precision-card rounded-2xl p-5">
@@ -314,13 +353,30 @@ export function DashboardView() {
         </div>
 
         {loadingAnalyses ? (
-          <p className="mt-3 text-sm text-white/60">Chargement de l&apos;historique...</p>
+          <PremiumStateCard
+            variant="loading"
+            title="Synchronisation de l'historique"
+            loadingLabel="Chargement de l'historique..."
+            compact
+            className="mt-3"
+          />
         ) : null}
 
         {!loadingAnalyses && recentAnalyses.length === 0 ? (
-          <p className="mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/65">
-            Aucune analyse enregistrée pour le moment.
-          </p>
+          <PremiumStateCard
+            variant="empty"
+            title="Aucune analyse enregistrée"
+            description="Importez un fichier pour générer votre premier tableau de bord financier."
+            compact
+            className="mt-3"
+            actions={[
+              {
+                label: "Importer un fichier",
+                onClick: () => router.push("/upload"),
+                tone: "gold"
+              }
+            ]}
+          />
         ) : null}
 
         {recentAnalyses.length > 0 ? (

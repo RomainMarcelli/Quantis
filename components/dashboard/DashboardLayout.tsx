@@ -2,7 +2,7 @@
 // Role: compose la grille premium du dashboard (header, cards KPI, score, insight) avec donnees normalisees.
 "use client";
 
-import type { ReactNode } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useRef } from "react";
 import { Activity, ArrowUpRight, Wallet } from "lucide-react";
 import type { PremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
 import { getPremiumHealthState } from "@/lib/dashboard/premiumDashboardAdapter";
@@ -50,6 +50,9 @@ export function DashboardLayout({
   searchIds
 }: DashboardLayoutProps) {
   const healthState = getPremiumHealthState(kpis.healthScore);
+  const mouseGlowRef = useRef<HTMLDivElement | null>(null);
+  const mouseGlowRafRef = useRef<number | null>(null);
+  const nextMouseGlowRef = useRef({ x: 0, y: 0, visible: false });
 
   const resolvedSubtitle =
     subtitle ?? `Bonjour ${greetingName}, voici la vue d'ensemble de votre santé financière.`;
@@ -59,8 +62,66 @@ export function DashboardLayout({
       ? `Flux de trésorerie disponible (${formatMonths(kpis.runway)}). Une projection RH reste soutenable.`
       : "Priorité liquidité détectée. Révision des décaissements recommandée avant tout engagement.";
 
+  useEffect(() => {
+    return () => {
+      if (mouseGlowRafRef.current !== null) {
+        cancelAnimationFrame(mouseGlowRafRef.current);
+      }
+    };
+  }, []);
+
+  function flushMouseGlow() {
+    mouseGlowRafRef.current = null;
+    const node = mouseGlowRef.current;
+    if (!node) {
+      return;
+    }
+
+    const next = nextMouseGlowRef.current;
+    node.style.left = `${next.x}px`;
+    node.style.top = `${next.y}px`;
+    node.style.opacity = next.visible ? "1" : "0";
+  }
+
+  function scheduleMouseGlow() {
+    if (mouseGlowRafRef.current !== null) {
+      return;
+    }
+    mouseGlowRafRef.current = requestAnimationFrame(flushMouseGlow);
+  }
+
+  function handleMouseMove(event: MouseEvent<HTMLElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    nextMouseGlowRef.current = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      visible: true
+    };
+    scheduleMouseGlow();
+  }
+
+  function handleMouseLeave() {
+    nextMouseGlowRef.current = { ...nextMouseGlowRef.current, visible: false };
+    scheduleMouseGlow();
+  }
+
   return (
-    <section className="premium-analysis-root relative overflow-hidden rounded-2xl p-4 md:p-8">
+    <section
+      className="premium-analysis-root relative overflow-hidden rounded-2xl p-4 md:p-8"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div
+        ref={mouseGlowRef}
+        className="pointer-events-none absolute z-[3] h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(197,160,89,0.12)_0%,transparent_62%)] transition-opacity duration-300"
+        style={{
+          left: 0,
+          top: 0,
+          opacity: 0,
+          transform: "translate(-50%, -50%)"
+        }}
+        aria-hidden="true"
+      />
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 

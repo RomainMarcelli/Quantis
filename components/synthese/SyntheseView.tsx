@@ -17,11 +17,13 @@ import {
 } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { PremiumStateCard } from "@/components/ui/PremiumStateCard";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
 import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
+  resolveAnalysisYear,
   SYNTHESIS_CURRENT_YEAR_KEY
 } from "@/lib/synthese/synthesePeriod";
 import { buildSyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
@@ -128,6 +130,12 @@ export function SyntheseView() {
     () => buildSyntheseYearOptions(allAnalyses, currentCalendarYear),
     [allAnalyses, currentCalendarYear]
   );
+  const availableDocumentYears = useMemo(() => {
+    const years = Array.from(new Set(allAnalyses.map((analysis) => resolveAnalysisYear(analysis)))).sort(
+      (left, right) => right - left
+    );
+    return years.map((year) => ({ value: String(year), label: String(year) }));
+  }, [allAnalyses]);
 
   const analysesBySelectedYear = useMemo(
     () => filterAnalysesByYear(allAnalyses, selectedYearValue, currentCalendarYear),
@@ -173,6 +181,17 @@ export function SyntheseView() {
       setSelectedYearValue(SYNTHESIS_CURRENT_YEAR_KEY);
     }
   }, [yearOptions, selectedYearValue]);
+
+  useEffect(() => {
+    if (availableDocumentYears.length !== 1) {
+      return;
+    }
+
+    const singleYearValue = availableDocumentYears[0]?.value;
+    if (singleYearValue && selectedYearValue !== singleYearValue) {
+      setSelectedYearValue(singleYearValue);
+    }
+  }, [availableDocumentYears, selectedYearValue]);
 
   useEffect(() => {
     // UX: si "Année en cours" n'a pas de données, on bascule automatiquement
@@ -249,6 +268,20 @@ export function SyntheseView() {
     router.replace("/");
   }
 
+  if (loading) {
+    return (
+      <PremiumStateCard
+        variant="loading"
+        title="Préparation de la synthèse"
+        description="Nous consolidons vos données avant affichage."
+        loadingLabel="Chargement de la synthèse..."
+        loaderIntensity="wow"
+        viewportCentered
+        className="relative z-10 mx-auto w-full max-w-3xl"
+      />
+    );
+  }
+
   return (
     <section className="w-full space-y-4">
       <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
@@ -307,14 +340,19 @@ export function SyntheseView() {
         <GlobalSearchBar placeholder="Rechercher..." />
       </div>
 
-      {loading ? (
-        <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de la synthèse...</div>
-      ) : null}
-
       {errorMessage ? (
-        <div className="precision-card rounded-2xl border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
-          {errorMessage}
-        </div>
+        <PremiumStateCard
+          variant="error"
+          title="Synthèse indisponible"
+          description={errorMessage}
+          compact
+          actions={[
+            {
+              label: "Fermer",
+              onClick: () => setErrorMessage(null)
+            }
+          ]}
+        />
       ) : null}
 
       <div
@@ -359,7 +397,7 @@ export function SyntheseView() {
             </NavRow>
           </nav>
 
-          {!isSidebarCollapsed && yearOptions.length > 1 ? (
+          {!isSidebarCollapsed && availableDocumentYears.length > 1 ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
               <label htmlFor="sidebar-synthese-year" className="text-[11px] uppercase tracking-wide text-white/50">
                 Année de synthèse
@@ -376,6 +414,15 @@ export function SyntheseView() {
                   </option>
                 ))}
               </select>
+            </div>
+          ) : null}
+
+          {!isSidebarCollapsed && availableDocumentYears.length === 1 ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-white/50">Année de synthèse</p>
+              <p className="mt-2 rounded-lg border border-white/15 bg-black/35 px-3 py-2 text-sm font-medium text-white">
+                {availableDocumentYears[0]?.label}
+              </p>
             </div>
           ) : null}
 
@@ -432,29 +479,31 @@ export function SyntheseView() {
               synthese={synthese}
             />
           ) : (
-            <section className="precision-card rounded-2xl p-5">
-              <p className="text-sm text-white/70">
-                {allAnalyses.length === 0
+            <PremiumStateCard
+              variant="empty"
+              title={
+                allAnalyses.length === 0
+                  ? "Aucune analyse disponible"
+                  : "Aucune synthèse pour cette année"
+              }
+              description={
+                allAnalyses.length === 0
                   ? "Déposez un fichier dans l'espace dashboard pour débloquer la synthèse."
-                  : "Aucune synthèse disponible pour l'année sélectionnée."}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => router.push("/upload")}
-                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-                >
-                  Ré-uploader un fichier
-                </button>
-                <button
-                  type="button"
-                  onClick={() => router.push("/upload/manual")}
-                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-                >
-                  Saisie manuelle
-                </button>
-              </div>
-            </section>
+                  : "Sélectionnez une autre année ou importez de nouvelles données."
+              }
+              compact
+              actions={[
+                {
+                  label: "Ré-uploader un fichier",
+                  onClick: () => router.push("/upload"),
+                  tone: "gold"
+                },
+                {
+                  label: "Saisie manuelle",
+                  onClick: () => router.push("/upload/manual")
+                }
+              ]}
+            />
           )}
         </div>
       </div>

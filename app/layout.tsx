@@ -2,6 +2,7 @@
 // Role: layout racine Next.js qui applique font, metadata et initialisation du theme global.
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { GlobalCursorHalo } from "@/components/ui/GlobalCursorHalo";
 import { ScrollRevealInitializer } from "@/components/ui/ScrollRevealInitializer";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { ProductTourProvider } from "@/components/product-tour/ProductTourProvider";
@@ -38,6 +39,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ProductTourProvider>
             <ScrollRevealInitializer />
+            <GlobalCursorHalo />
             {children}
           </ProductTourProvider>
         </ThemeProvider>

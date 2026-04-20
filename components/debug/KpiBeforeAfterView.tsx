@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PremiumStateCard } from "@/components/ui/PremiumStateCard";
 import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import { computeKpis } from "@/services/kpiEngine";
@@ -135,35 +136,36 @@ export function KpiBeforeAfterView() {
 
   if (loadingAuth) {
     return (
-      <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Chargement de la session...</p>
-      </section>
+      <PremiumStateCard
+        variant="loading"
+        title="Initialisation du comparateur KPI"
+        loadingLabel="Chargement de la session..."
+        viewportCentered
+        className="relative z-10 mx-auto mt-8 w-full max-w-6xl"
+      />
     );
   }
 
   if (!user) {
     return (
-      <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/75">
-          {errorMessage ?? "Session indisponible. Connectez-vous pour acceder au comparateur KPI."}
-        </p>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/login")}
-            className="btn-gold-premium rounded-xl px-4 py-2 text-sm font-semibold"
-          >
-            Aller a la connexion
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/")}
-            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10"
-          >
-            Retour accueil
-          </button>
-        </div>
-      </section>
+      <PremiumStateCard
+        variant="error"
+        title="Session indisponible"
+        description={errorMessage ?? "Connectez-vous pour accéder au comparateur KPI."}
+        viewportCentered
+        className="relative z-10 mx-auto mt-8 w-full max-w-6xl"
+        actions={[
+          {
+            label: "Aller à la connexion",
+            onClick: () => router.push("/login"),
+            tone: "gold"
+          },
+          {
+            label: "Retour accueil",
+            onClick: () => router.push("/")
+          }
+        ]}
+      />
     );
   }
 
@@ -268,11 +270,19 @@ export function KpiBeforeAfterView() {
       </section>
 
       {!selectedAnalysis ? (
-        <section className="precision-card rounded-2xl p-5">
-          <p className="text-sm text-white/65">
-            Aucune analyse disponible. Depuis le dashboard, envoyez un fichier Excel pour alimenter cette page.
-          </p>
-        </section>
+        <PremiumStateCard
+          variant="empty"
+          title="Aucune analyse disponible"
+          description="Depuis le dashboard, envoyez un fichier Excel pour alimenter cette page."
+          compact
+          actions={[
+            {
+              label: "Aller au dashboard",
+              onClick: () => router.push("/dashboard"),
+              tone: "gold"
+            }
+          ]}
+        />
       ) : (
         <>
       <section className="precision-card rounded-2xl p-5 md:p-6">
