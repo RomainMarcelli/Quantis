@@ -15,7 +15,7 @@ export function KpiSummary({ kpis }: KpiSummaryProps) {
       value: formatPercent(kpis.grossMarginRate)
     },
     {
-      label: "Resultat net",
+      label: "Résultat net",
       value: formatCurrency(kpis.netProfit)
     },
     {
@@ -31,7 +31,7 @@ export function KpiSummary({ kpis }: KpiSummaryProps) {
       value: formatCurrency(kpis.monthlyBurnRate)
     },
     {
-      label: "Score de sante",
+      label: "Score de santé",
       value: formatPercent(kpis.healthScore)
     }
   ];

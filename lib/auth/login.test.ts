@@ -127,7 +127,7 @@ describe("loginWithEmailPassword", () => {
       success: false,
       errors: {
         general:
-          "Email non verifie. Cliquez sur le lien reçu par email (Vérifier les spams) avant de vous connecter."
+          "Email non vérifié. Cliquez sur le lien reçu par email (Vérifiez les spams) avant de vous connecter."
       }
     });
   });

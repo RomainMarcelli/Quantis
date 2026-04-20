@@ -1,15 +1,30 @@
+// File: app/layout.tsx
+// Role: layout racine Next.js qui applique font, metadata et initialisation du theme global.
 import type { Metadata } from "next";
-import { Manrope } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
+import { ScrollRevealInitializer } from "@/components/ui/ScrollRevealInitializer";
+import { ThemeProvider } from "@/components/ui/ThemeProvider";
+import { ProductTourProvider } from "@/components/product-tour/ProductTourProvider";
 import "./globals.css";
 
-const manrope = Manrope({
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-quantis"
 });
 
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-quantis-mono"
+});
+
 export const metadata: Metadata = {
   title: "Quantis",
-  description: "Quantis - Plateforme d'intelligence financiere"
+  description: "Quantis - Plateforme d'intelligence financière",
+  icons: {
+    icon: "/images/LogoV3.png",
+    apple: "/images/LogoV3.png",
+    shortcut: "/images/LogoV3.png"
+  }
 };
 
 export default function RootLayout({
@@ -18,8 +33,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
-      <body className={manrope.variable}>{children}</body>
+    <html lang="fr" className="dark" data-theme="dark">
+      <body id="body" className={`${inter.variable} ${jetBrainsMono.variable} premium-app-shell`}>
+        <ThemeProvider>
+          <ProductTourProvider>
+            <ScrollRevealInitializer />
+            {children}
+          </ProductTourProvider>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

@@ -1,0 +1,542 @@
+﻿// File: components/synthese/SyntheseView.tsx
+// Role: charge les données utilisateur + analyses et affiche la page /synthèse dans la DA premium existante.
+"use client";
+
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  FileText,
+  LayoutDashboard,
+  Lock,
+  LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
+  Sparkles,
+  UserCircle2
+} from "lucide-react";
+import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { getActiveFolderName } from "@/lib/folders/activeFolder";
+import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
+import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
+import {
+  buildSyntheseYearOptions,
+  filterAnalysesByYear,
+  resolveAnalysisYear,
+  SYNTHESIS_CURRENT_YEAR_KEY
+} from "@/lib/synthese/synthesePeriod";
+import { buildSyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
+import { listUserAnalyses } from "@/services/analysisStore";
+import {
+  findPreviousAnalysisByFiscalYear,
+  normalizeAnalysisFolderName,
+  sortAnalysesByFiscalYear
+} from "@/services/analysisHistory";
+import { firebaseAuthGateway } from "@/services/auth";
+import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
+import { getUserProfile } from "@/services/userProfileStore";
+import type { AnalysisRecord } from "@/types/analysis";
+import type { AuthenticatedUser } from "@/types/auth";
+import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
+import {
+  consumeSearchTarget,
+  routeMatchesPath,
+  SEARCH_NAVIGATE_EVENT,
+  scrollToSearchTarget,
+  type SearchNavigationTarget
+} from "@/lib/search/globalSearch";
+import {
+  readSidebarCollapsedPreference,
+  writeSidebarCollapsedPreference
+} from "@/lib/ui/sidebarPreference";
+
+export function SyntheseView() {
+  const router = useRouter();
+
+  const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const [greetingName, setGreetingName] = useState("Utilisateur");
+  const [companyName, setCompanyName] = useState("Quantis");
+  const [sector, setSector] = useState<string | null>(null);
+  const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
+  const [selectedYearValue, setSelectedYearValue] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarPreferenceReady, setIsSidebarPreferenceReady] = useState(false);
+  const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
+
+  // Référence utilisée pour l'option "Année en cours" dans le sélecteur de synthèse.
+  const currentCalendarYear = new Date().getFullYear();
+
+  useEffect(() => {
+    const initialTarget = consumeSearchTarget();
+    if (initialTarget) {
+      setPendingSearchTarget(initialTarget);
+    }
+
+    const onSearchNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<SearchNavigationTarget>).detail;
+      if (!detail) {
+        return;
+      }
+      setPendingSearchTarget(detail);
+    };
+
+    window.addEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
+    return () => window.removeEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
+  }, []);
+
+  useEffect(() => {
+    setIsSidebarCollapsed(readSidebarCollapsedPreference());
+    setIsSidebarPreferenceReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isSidebarPreferenceReady) {
+      return;
+    }
+    writeSidebarCollapsedPreference(isSidebarCollapsed);
+  }, [isSidebarCollapsed, isSidebarPreferenceReady]);
+
+  useEffect(() => {
+    const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
+      if (!nextUser) {
+        router.replace("/");
+        return;
+      }
+
+      if (!nextUser.emailVerified) {
+        void firebaseAuthGateway.signOut();
+        router.replace("/");
+        return;
+      }
+
+      setUser(nextUser);
+    });
+
+    return unsubscribe;
+  }, [router]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    void loadSyntheseData(user);
+  }, [user]);
+
+  const yearOptions = useMemo(
+    () => buildSyntheseYearOptions(allAnalyses, currentCalendarYear),
+    [allAnalyses, currentCalendarYear]
+  );
+
+  const analysesBySelectedYear = useMemo(
+    () => filterAnalysesByYear(allAnalyses, selectedYearValue, currentCalendarYear),
+    [allAnalyses, selectedYearValue, currentCalendarYear]
+  );
+  const selectedYearLabel = useMemo(
+    () =>
+      yearOptions.find((option) => option.value === selectedYearValue)?.label ??
+      `Année en cours (${currentCalendarYear})`,
+    [currentCalendarYear, selectedYearValue, yearOptions]
+  );
+
+  const analysisPair = useMemo(() => {
+    if (!analysesBySelectedYear.length) {
+      return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
+    }
+
+    const current = resolveCurrentAnalysis(analysesBySelectedYear, getActiveFolderName());
+    if (!current) {
+      return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
+    }
+
+    const previous = findPreviousAnalysisByFiscalYear({
+      analyses: allAnalyses,
+      currentAnalysis: current,
+      preferSameFolder: true
+    });
+
+    return { current, previous };
+  }, [allAnalyses, analysesBySelectedYear]);
+
+  const synthese = useMemo(() => {
+    if (!analysisPair.current) {
+      return null;
+    }
+    return buildSyntheseViewModel(analysisPair.current.kpis, analysisPair.previous?.kpis ?? null, sector);
+  }, [analysisPair, sector]);
+
+  useEffect(() => {
+    if (!yearOptions.length) return;
+    const optionExists = yearOptions.some((option) => option.value === selectedYearValue);
+    if (!optionExists || !selectedYearValue) {
+      setSelectedYearValue(yearOptions[0]!.value);
+    }
+  }, [yearOptions, selectedYearValue]);
+
+  useEffect(() => {
+    if (!pendingSearchTarget) {
+      return;
+    }
+    if (!routeMatchesPath("/synthese", pendingSearchTarget.route)) {
+      return;
+    }
+    if (!pendingSearchTarget.refId) {
+      setPendingSearchTarget(null);
+      return;
+    }
+    void scrollToSearchTarget(pendingSearchTarget.refId, pendingSearchTarget.query).finally(() => {
+      setPendingSearchTarget(null);
+    });
+  }, [pendingSearchTarget, analysisPair.current?.id]);
+
+  async function loadSyntheseData(currentUser: AuthenticatedUser) {
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      // Si une analyse "invité" existe, on la rattache d'abord au compte connecté.
+      // Cette étape garantit qu'aucune analyse n'est perdue après inscription.
+      try {
+        await persistPendingAnalysisForUser(currentUser.uid);
+      } catch {
+        // Non bloquant: on conserve la lecture des analyses existantes et
+        // la donnée locale restera disponible pour une prochaine tentative.
+      }
+
+      const [history, profile] = await Promise.all([
+        listUserAnalyses(currentUser.uid),
+        getUserProfile(currentUser.uid)
+      ]);
+
+      setGreetingName(resolveFirstName(currentUser, profile?.firstName));
+      setCompanyName(profile?.companyName?.trim() || "Quantis");
+      setSector(profile?.sector ?? null);
+      setAllAnalyses(history);
+
+      if (!history.length) {
+        setErrorMessage(
+          "Aucune analyse disponible pour le moment. Importez un fichier pour démarrer votre analyse financière."
+        );
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Impossible de charger la synthèse pour le moment."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onLogout() {
+    await firebaseAuthGateway.signOut();
+    router.replace("/");
+  }
+
+  return (
+    <section className="w-full space-y-4">
+      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
+        <div className="flex items-center gap-3">
+          <QuantisLogo withText={false} size={28} />
+          <div>
+            <p className="text-sm font-semibold text-white">{companyName}</p>
+            <p className="text-xs text-white/55">Plateforme financière</p>
+          </div>
+        </div>
+
+        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
+          <GlobalSearchBar placeholder="Rechercher un KPI, une alerte ou une section..." />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/settings")}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+            aria-label="Paramètres"
+            title="Paramètres"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/pricing")}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+            aria-label="Offres"
+            title="Offre Free (verrouillée)"
+          >
+            <Lock className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/account?from=analysis")}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+            aria-label="Compte"
+            title="Compte"
+          >
+            <UserCircle2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void onLogout()}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+            aria-label="Se déconnecter"
+            title="Se déconnecter"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+      <div className="md:hidden">
+        <GlobalSearchBar placeholder="Rechercher..." />
+      </div>
+
+      {loading ? (
+        <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de la synthèse...</div>
+      ) : null}
+
+      {errorMessage ? (
+        <div className="precision-card rounded-2xl border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+          {errorMessage}
+        </div>
+      ) : null}
+
+      <div
+        className={`relative grid gap-6 ${
+          isSidebarCollapsed ? "grid-cols-[88px_minmax(0,1fr)]" : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]"
+        }`}
+      >
+        <aside
+          data-scroll-reveal-ignore
+          className={`precision-card relative h-fit rounded-2xl lg:sticky lg:top-4 ${
+            isSidebarCollapsed ? "p-3" : "p-4"
+          }`}
+        >
+          <div className={`mb-2 flex ${isSidebarCollapsed ? "justify-center" : "justify-end"}`}>
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed((previous) => !previous)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white/85 transition hover:border-quantis-gold/60 hover:bg-black/80"
+              aria-label={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
+              title={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
+            >
+              {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            </button>
+          </div>
+          <nav className="space-y-1 text-sm" data-tour-id="synthese-sidebar-nav">
+            <NavRow icon={<Sparkles className="h-4 w-4" />} active collapsed={isSidebarCollapsed}>
+              Synthèse
+            </NavRow>
+            <NavRow
+              icon={<LayoutDashboard className="h-4 w-4" />}
+              onClick={() => router.push("/analysis")}
+              collapsed={isSidebarCollapsed}
+            >
+              Tableau de bord
+            </NavRow>
+            <NavRow
+              icon={<FileText className="h-4 w-4" />}
+              onClick={() => router.push("/documents")}
+              collapsed={isSidebarCollapsed}
+            >
+              Documents
+            </NavRow>
+          </nav>
+
+          {!isSidebarCollapsed && yearOptions.length > 1 ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
+              <label htmlFor="sidebar-synthese-year" className="text-[11px] uppercase tracking-wide text-white/50">
+                Année de synthèse
+              </label>
+              <select
+                id="sidebar-synthese-year"
+                value={selectedYearValue}
+                onChange={(event) => setSelectedYearValue(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
+              >
+                {yearOptions.map((option) => (
+                  <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={() => router.push("/account?from=analysis")}
+            className={`mt-4 rounded-xl border border-white/10 bg-black/20 transition-colors hover:bg-white/10 ${
+              isSidebarCollapsed ? "flex w-full justify-center p-2" : "w-full p-3 text-left"
+            }`}
+            aria-label="Ouvrir le compte"
+            title="Compte"
+          >
+            {isSidebarCollapsed ? (
+              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
+                {greetingName.charAt(0).toUpperCase()}
+              </span>
+            ) : (
+              <>
+                <p className="text-[11px] uppercase tracking-wide text-white/50">Compte</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
+                    {greetingName.charAt(0).toUpperCase()}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-white">{greetingName}</p>
+                    <p className="text-xs text-white/55">Free</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </button>
+        </aside>
+
+        <div>
+          {analysisPair.current && synthese ? (
+            <SyntheseDashboard
+              greetingName={greetingName}
+              companyName={companyName}
+              analysisCreatedAt={analysisPair.current.createdAt}
+              onDownloadReport={() => {
+                if (!analysisPair.current) {
+                  return;
+                }
+                void downloadSyntheseReport({
+                  companyName,
+                  greetingName,
+                  analysisCreatedAt: analysisPair.current.createdAt,
+                  selectedYearLabel,
+                  synthese,
+                  kpis: analysisPair.current.kpis,
+                  mappedData: analysisPair.current.mappedData
+                });
+              }}
+              onExportData={() => {
+                if (!analysisPair.current) return;
+                exportAnalysisDataAsJson({ analysis: analysisPair.current, companyName });
+              }}
+              onReupload={() => router.push("/upload")}
+              onManualEntry={() => router.push("/upload/manual")}
+              synthese={synthese}
+              parserVersion={analysisPair.current.parserVersion}
+            />
+          ) : (
+            <section className="precision-card rounded-2xl p-5">
+              <p className="text-sm text-white/70">
+                {allAnalyses.length === 0
+                  ? "Déposez un fichier dans l'espace dashboard pour débloquer la synthèse."
+                  : "Aucune synthèse disponible pour l'année sélectionnée."}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => router.push("/upload")}
+                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+                >
+                  Ré-uploader un fichier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/upload/manual")}
+                  className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+                >
+                  Saisie manuelle
+                </button>
+              </div>
+            </section>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Sélectionne l'analyse courante en priorisant le dossier actif.
+function resolveCurrentAnalysis(
+  analyses: AnalysisRecord[],
+  activeFolderName: string | null
+): AnalysisRecord | null {
+  const sorted = sortAnalysesByFiscalYear(analyses, "desc");
+  if (!sorted.length) {
+    return null;
+  }
+
+  const normalizedActiveFolder = normalizeAnalysisFolderName(activeFolderName);
+
+  return (
+    sorted.find(
+      (analysis) => normalizeAnalysisFolderName(analysis.folderName) === normalizedActiveFolder
+    ) ?? sorted[0]
+  );
+}
+
+function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): string {
+  if (profileFirstName && profileFirstName.trim()) {
+    return profileFirstName.trim();
+  }
+
+  if (user.displayName && user.displayName.trim()) {
+    return user.displayName.trim().split(" ")[0] || "Utilisateur";
+  }
+
+  if (user.email) {
+    return user.email.split("@")[0] || "Utilisateur";
+  }
+
+  return "Utilisateur";
+}
+
+function NavRow({
+  children,
+  icon,
+  active,
+  collapsed,
+  disabled,
+  onClick
+}: {
+  children: ReactNode;
+  icon: ReactNode;
+  active?: boolean;
+  collapsed?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  const label = typeof children === "string" ? children : undefined;
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={collapsed ? label : undefined}
+      title={collapsed ? label : undefined}
+      className={`flex w-full items-center rounded-xl transition-colors ${
+        collapsed ? "group justify-center px-2 py-2" : "gap-2 px-3 py-2 text-left"
+      } ${
+        active
+          ? "bg-white/10 text-white"
+          : disabled
+            ? "cursor-not-allowed text-white/40"
+            : "text-white/75 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {collapsed ? (
+        <span
+          className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
+            active
+              ? "border-quantis-gold/60 bg-quantis-gold/15 text-quantis-gold"
+              : "border-white/15 bg-white/5 text-white/80 group-hover:border-white/30 group-hover:bg-white/10 group-hover:text-white"
+          }`}
+        >
+          {icon}
+        </span>
+      ) : (
+        icon
+      )}
+      {!collapsed ? <span>{children}</span> : null}
+    </button>
+  );
+}

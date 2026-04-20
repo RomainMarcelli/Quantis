@@ -55,6 +55,12 @@ describe("computeKpis", () => {
     expect(result.workingCapital).toBe(-21777.36);
     expect(result.monthlyBurnRate).toBe(6960.8);
     expect(result.cashRunwayMonths).toBe(9.14);
+    expect(result.disponibilites).toBe(63641.59);
+    expect(result.ca).toBe(584707.14);
+    expect(result.ebe).toBe(-23865.6);
+    expect(result.resultat_net).toBe(-83529.6);
+    expect(result.capacite_remboursement_annees).toBeNull();
+    expect(result.etat_materiel_indice).toBeNull();
   });
 
   it("returns null for formulas requiring missing inputs", () => {
@@ -66,6 +72,41 @@ describe("computeKpis", () => {
     expect(result.point_mort).toBeNull();
     expect(result.netProfit).toBeNull();
     expect(result.cashRunwayMonths).toBeNull();
+    expect(result.capacite_remboursement_annees).toBeNull();
     expect(result.healthScore).toBeNull();
+  });
+
+  it("computes debt repayment capacity when debt and caf are valid", () => {
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      emprunts: 100000,
+      res_net: 20000,
+      dap: 5000
+    });
+
+    expect(result.caf).toBe(25000);
+    expect(result.capacite_remboursement_annees).toBe(4);
+  });
+
+  it("computes immobilization ratio from explicit net and brut fields", () => {
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      total_actif_immo_net: 396266.85,
+      total_actif_immo_brut: 608223.53
+    });
+
+    expect(result.ratio_immo).toBe(0.65);
+    expect(result.etat_materiel_indice).toBe(65.15);
+  });
+
+  it("does not fallback to total_prod_expl when CA components are present but invalid", () => {
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      total_prod_expl: 6_598_806,
+      ventes_march: null,
+      prod_vendue: -7_105
+    });
+
+    expect(result.ca).toBeNull();
   });
 });

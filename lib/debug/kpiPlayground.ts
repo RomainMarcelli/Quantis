@@ -18,8 +18,8 @@ export function getNonNullKpiEntries(kpis: CalculatedKpis): Array<{ key: string;
 
 export type KpiComparisonEntry = {
   key: keyof CalculatedKpis;
-  stored: number | null;
-  recalculated: number | null;
+  stored: number | null | undefined;
+  recalculated: number | null | undefined;
   matches: boolean;
 };
 
@@ -41,8 +41,8 @@ export function compareStoredAndRecalculatedKpis(
     .sort((a, b) => String(a.key).localeCompare(String(b.key)));
 }
 
-function areClose(left: number | null, right: number | null): boolean {
-  if (left === null || right === null) {
+function areClose(left: number | null | undefined, right: number | null | undefined): boolean {
+  if (left === null || left === undefined || right === null || right === undefined) {
     return left === right;
   }
   return Math.abs(left - right) < 0.01;

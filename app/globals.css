@@ -1,8 +1,36 @@
+/* File: app/globals.css */
+/* Role: definit les tokens de theme globaux et les styles DA premium reutilises dans toute l'application. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  --quantis-smoke: #0f1115;
+  --quantis-paper: #171b22;
+  --quantis-white: #141923;
+  --quantis-carbon: #f4f7fb;
+  --quantis-slate: #a4adbd;
+  --quantis-mist: #2b3442;
+  --quantis-gold: #f0c949;
+  --quantis-emerald: #2dd4bf;
+  --quantis-crimson: #fb7185;
+  --quantis-premium-root-bg: #0f1115;
+  --quantis-premium-root-fg: #e4e4e7;
+  --quantis-card-bg: #0f0f12;
+  --quantis-card-bg-hover: #131318;
+  --quantis-card-border: rgb(255 255 255 / 6%);
+  --quantis-card-border-top: rgb(255 255 255 / 12%);
+  --quantis-card-shadow: 0 4px 20px -2px rgb(0 0 0 / 50%);
+  --quantis-noise-opacity: 0.035;
+  --quantis-spotlight: radial-gradient(ellipse at center, rgb(197 160 89 / 6%) 0%, transparent 60%);
+  --quantis-card-header-border: rgb(255 255 255 / 6%);
+  --quantis-card-header-border-hover: rgb(197 160 89 / 20%);
+  --quantis-edu-text: rgb(255 255 255 / 35%);
+  --quantis-edu-text-hover: rgb(255 255 255 / 60%);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
   --quantis-smoke: #f4f5f7;
   --quantis-paper: #fafafa;
   --quantis-white: #ffffff;
@@ -12,33 +40,71 @@
   --quantis-gold: #d4af37;
   --quantis-emerald: #0f766e;
   --quantis-crimson: #9f1239;
+  --quantis-premium-root-bg: #f4f5f7;
+  --quantis-premium-root-fg: #111827;
+  --quantis-card-bg: #ffffff;
+  --quantis-card-bg-hover: #f8fafc;
+  --quantis-card-border: rgb(15 23 42 / 12%);
+  --quantis-card-border-top: rgb(15 23 42 / 20%);
+  --quantis-card-shadow: 0 8px 24px -12px rgb(15 23 42 / 22%);
+  --quantis-noise-opacity: 0.012;
+  --quantis-spotlight: radial-gradient(ellipse at center, rgb(212 175 55 / 9%) 0%, transparent 62%);
+  --quantis-card-header-border: rgb(15 23 42 / 12%);
+  --quantis-card-header-border-hover: rgb(212 175 55 / 35%);
+  --quantis-edu-text: rgb(30 41 59 / 62%);
+  --quantis-edu-text-hover: rgb(15 23 42 / 82%);
   color-scheme: light;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background: var(--quantis-smoke);
+  background:
+    radial-gradient(circle at 18% -10%, rgb(197 160 89 / 10%), transparent 35%),
+    radial-gradient(circle at 85% -20%, rgb(45 212 191 / 7%), transparent 40%),
+    var(--quantis-smoke);
   color: var(--quantis-carbon);
-  font-family: var(--font-quantis), "Segoe UI", sans-serif;
+  font-family: var(--font-quantis), "Inter", "Segoe UI", sans-serif;
+}
+
+.font-mono {
+  font-family: var(--font-quantis-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.premium-app-shell {
+  position: relative;
+}
+
+.premium-app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilterGlobal'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilterGlobal)'/%3E%3C/svg%3E");
+  opacity: 0.02;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .mesh-gradient {
-  background-image: radial-gradient(circle at 15% 10%, rgb(212 175 55 / 16%), transparent 42%),
-    radial-gradient(circle at 80% 0%, rgb(26 26 26 / 7%), transparent 35%),
-    linear-gradient(140deg, #fff, #f7f8fb 45%, #f2f4f8);
+  background-image:
+    radial-gradient(circle at 15% 10%, rgb(212 175 55 / 16%), transparent 42%),
+    radial-gradient(circle at 80% 0%, rgb(45 212 191 / 10%), transparent 35%),
+    linear-gradient(140deg, #0c0f16, #121722 45%, #0f1115);
 }
 
 .quantis-panel {
-  border: 1px solid var(--quantis-mist);
-  background: var(--quantis-white);
+  border: 1px solid rgb(255 255 255 / 10%);
+  background: color-mix(in srgb, var(--quantis-white) 92%, #000 8%);
   border-radius: 16px;
+  box-shadow:
+    0 8px 24px rgb(0 0 0 / 24%),
+    inset 0 1px 0 rgb(255 255 255 / 3%);
 }
 
 .quantis-input {
-  border: 1px solid #d7dce4;
+  border: 1px solid color-mix(in srgb, var(--quantis-mist) 90%, #000 10%);
   border-radius: 12px;
-  background: var(--quantis-white);
+  background: color-mix(in srgb, var(--quantis-white) 93%, #000 7%);
 }
 
 .quantis-input:focus-within {
@@ -54,6 +120,10 @@ body {
 }
 
 .quantis-primary:hover {
+  background: color-mix(in srgb, var(--quantis-carbon) 84%, #000 16%);
+}
+
+:root[data-theme="light"] .quantis-primary:hover {
   background: #292929;
 }
 
@@ -61,4 +131,657 @@ body {
   height: 1px;
   width: 56px;
   background: var(--quantis-gold);
+}
+
+.quantis-input input,
+.quantis-input select,
+.quantis-input textarea {
+  color: var(--quantis-carbon);
+}
+
+.quantis-input select option {
+  background: #111622;
+  color: #f4f7fb;
+}
+
+.quantis-select-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(255 255 255 / 20%);
+  background: rgb(0 0 0 / 30%);
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  outline: none;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.quantis-select-trigger:hover {
+  border-color: rgb(197 160 89 / 50%);
+  background: rgb(255 255 255 / 8%);
+}
+
+.quantis-select-trigger:focus-visible {
+  border-color: rgb(197 160 89 / 70%);
+  box-shadow: 0 0 0 2px rgb(197 160 89 / 20%);
+}
+
+.quantis-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.quantis-select-menu {
+  z-index: 240;
+  max-height: 18rem;
+  overflow-y: auto;
+  border-radius: 0.9rem;
+  border: 1px solid rgb(255 255 255 / 14%);
+  background: #0d1320;
+  padding: 0.35rem;
+  box-shadow:
+    0 16px 36px -16px rgb(0 0 0 / 75%),
+    0 0 0 1px rgb(197 160 89 / 12%);
+  backdrop-filter: blur(8px);
+  isolation: isolate;
+}
+
+.quantis-select-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: 0.65rem;
+  border: 1px solid transparent;
+  padding: 0.55rem 0.6rem;
+  color: rgb(255 255 255 / 86%);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.quantis-select-option:hover {
+  border-color: rgb(197 160 89 / 35%);
+  background: rgb(197 160 89 / 10%);
+  color: #fff;
+}
+
+.quantis-select-option.is-selected {
+  border-color: rgb(197 160 89 / 42%);
+  background: rgb(197 160 89 / 13%);
+  color: #fff;
+}
+
+:root[data-theme="light"] .quantis-select-trigger {
+  border-color: rgb(15 23 42 / 20%);
+  background: rgb(255 255 255 / 96%);
+}
+
+:root[data-theme="light"] .quantis-select-trigger span,
+:root[data-theme="light"] .quantis-select-trigger svg {
+  color: rgb(30 41 59) !important;
+}
+
+:root[data-theme="light"] .quantis-select-trigger:hover {
+  border-color: rgb(212 175 55 / 62%);
+  background: #fff;
+}
+
+:root[data-theme="light"] .quantis-select-menu {
+  border-color: rgb(15 23 42 / 14%);
+  background: #fff;
+  box-shadow:
+    0 16px 34px -18px rgb(15 23 42 / 30%),
+    0 0 0 1px rgb(15 23 42 / 6%);
+}
+
+:root[data-theme="light"] .quantis-select-option {
+  color: rgb(30 41 59);
+}
+
+:root[data-theme="light"] .quantis-select-option:hover {
+  border-color: rgb(212 175 55 / 45%);
+  background: rgb(212 175 55 / 10%);
+}
+
+:root[data-theme="light"] .quantis-select-option.is-selected {
+  border-color: rgb(212 175 55 / 55%);
+  background: rgb(212 175 55 / 15%);
+}
+
+@keyframes quantis-ring-pop {
+  from {
+    opacity: 0.7;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes quantis-ring-glow {
+  0% {
+    opacity: 0.45;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.45;
+    transform: scale(0.94);
+  }
+}
+
+.quantis-score-ring {
+  animation: quantis-ring-pop 420ms ease-out;
+}
+
+.quantis-score-ring__glow {
+  filter: blur(12px);
+  animation: quantis-ring-glow 2.4s ease-in-out infinite;
+}
+
+/* Theme premium /analysis: surface sombre independante du reste de l'app. */
+.premium-analysis-root {
+  background: transparent;
+  color: var(--quantis-premium-root-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Overlay granulaire subtil pour donner de la profondeur au dashboard. */
+.noise-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: var(--quantis-noise-opacity);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Halo global du hero pour l'identite visuelle premium. */
+.spotlight {
+  position: absolute;
+  top: -20vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80vw;
+  height: 60vh;
+  background: var(--quantis-spotlight);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Carte premium commune avec hover or et relief progressif. */
+.precision-card {
+  background: var(--quantis-card-bg);
+  border: 1px solid var(--quantis-card-border);
+  border-top: 1px solid var(--quantis-card-border-top);
+  box-shadow:
+    var(--quantis-card-shadow),
+    inset 0 0 0 1px rgb(255 255 255 / 2%);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.precision-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, rgb(197 160 89 / 7%), transparent 72%);
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.precision-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: radial-gradient(circle at center, rgb(197 160 89 / 14%), transparent 62%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.precision-card:hover {
+  border-color: rgb(197 160 89 / 30%);
+  background: var(--quantis-card-bg-hover);
+  transform: translateY(-2px);
+  box-shadow:
+    0 20px 34px -15px rgb(0 0 0 / 85%),
+    0 0 28px -10px rgb(197 160 89 / 24%),
+    inset 0 1px 0 rgb(197 160 89 / 15%);
+}
+
+.precision-card:hover::after {
+  opacity: 1;
+}
+
+.precision-card:hover::before {
+  opacity: 1;
+}
+
+.precision-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.card-header {
+  border-bottom: 1px solid var(--quantis-card-header-border);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  transition: border-color 0.4s ease;
+}
+
+.precision-card:hover .card-header {
+  border-bottom-color: var(--quantis-card-header-border-hover);
+}
+
+.data-react {
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: left center;
+}
+
+.precision-card:hover .data-react {
+  transform: scale(1.02);
+  text-shadow: 0 0 15px rgb(255 255 255 / 15%);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+.tech-tag {
+  background: rgb(255 255 255 / 2%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 4px;
+  padding: 2px 6px;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.tech-tag:hover {
+  border-color: rgb(197 160 89 / 50%);
+  color: #fff;
+  background: rgb(197 160 89 / 8%);
+}
+
+.interactive-badge {
+  transition: all 0.3s ease;
+  cursor: default;
+}
+
+.interactive-badge:hover {
+  transform: translateY(-2px);
+}
+
+/* Styles du cadran de sante SVG (tick, track, progress). */
+.dial-ticks {
+  fill: none;
+  stroke: rgb(255 255 255 / 15%);
+  stroke-width: 4;
+  stroke-dasharray: 2 11.6;
+}
+
+.dial-track {
+  fill: none;
+  stroke: rgb(255 255 255 / 3%);
+  stroke-width: 1.5;
+}
+
+.dial-progress {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: square;
+  stroke: var(--health-color, #10b981);
+  transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.5s ease, filter 0.5s ease;
+  filter: drop-shadow(0 0 8px var(--health-color));
+}
+
+.precision-card:hover .dial-progress {
+  filter: drop-shadow(0 0 15px var(--health-color));
+}
+
+/* Animations de rotation pour les anneaux techniques du cadran. */
+@keyframes premium-spin-slow {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes premium-spin-reverse {
+  100% {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes premium-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.premium-spin-slow {
+  animation: premium-spin-slow 40s linear infinite;
+}
+
+.premium-spin-reverse {
+  animation: premium-spin-reverse 25s linear infinite;
+}
+
+.premium-spin-slower {
+  animation: premium-spin-slow 120s linear infinite;
+}
+
+.fade-up {
+  animation: premium-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+@keyframes quantis-search-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+    border-color: rgb(224 190 74 / 20%);
+  }
+  35% {
+    box-shadow:
+      0 0 0 4px rgb(224 190 74 / 14%),
+      0 0 22px 4px rgb(224 190 74 / 22%);
+    border-color: rgb(224 190 74 / 55%);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+    border-color: rgb(224 190 74 / 20%);
+  }
+}
+
+.quantis-search-highlight {
+  animation: quantis-search-pulse 2.4s ease-out;
+  opacity: 1 !important;
+  transform: translate3d(0, 0, 0) !important;
+  filter: none !important;
+}
+
+@keyframes quantis-search-term-glow {
+  0% {
+    background-color: rgb(224 190 74 / 20%);
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+  }
+  45% {
+    background-color: rgb(224 190 74 / 36%);
+    box-shadow: 0 0 0 3px rgb(224 190 74 / 18%);
+  }
+  100% {
+    background-color: rgb(224 190 74 / 20%);
+    box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+  }
+}
+
+.quantis-search-term-highlight {
+  display: inline;
+  margin: 0 0.02em;
+  border-radius: 0.25rem;
+  padding: 0 0.2em;
+  color: #fff5d6;
+  background: rgb(224 190 74 / 20%);
+  box-shadow: 0 0 0 0 rgb(224 190 74 / 0%);
+  animation: quantis-search-term-glow 2.4s ease-out;
+}
+
+@keyframes quantis-tour-focus-pulse {
+  0% {
+    box-shadow: 0 0 12px 2px rgb(224 190 74 / 15%);
+  }
+  50% {
+    box-shadow: 0 0 26px 8px rgb(224 190 74 / 34%);
+  }
+  100% {
+    box-shadow: 0 0 12px 2px rgb(224 190 74 / 15%);
+  }
+}
+
+.quantis-tour-target-active {
+  position: relative;
+  z-index: 135 !important;
+}
+
+.quantis-tour-spotlight-ring {
+  box-shadow: 0 0 0 1px rgb(224 190 74 / 24%);
+  animation: quantis-tour-focus-pulse 1.9s ease-in-out infinite;
+}
+
+.edu-text {
+  font-size: 12px;
+  color: var(--quantis-edu-text);
+  font-style: italic;
+  line-height: 1.6;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgb(255 255 255 / 4%);
+  transition: color 0.3s ease;
+}
+
+.precision-card:hover .edu-text {
+  color: var(--quantis-edu-text-hover);
+}
+
+/* Mode clair premium: harmonise les classes utilitaires sombres existantes sans réécrire tout le JSX. */
+:root[data-theme="light"] .premium-analysis-root [class*="text-white"] {
+  color: rgb(15 23 42 / 86%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="bg-black/"] {
+  background-color: rgb(255 255 255 / 72%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="border-white/"] {
+  border-color: rgb(15 23 42 / 16%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="bg-white/"] {
+  background-color: rgb(15 23 42 / 6%) !important;
+}
+
+:root[data-theme="light"] .precision-card [class*="text-white"] {
+  color: rgb(15 23 42 / 86%) !important;
+}
+
+:root[data-theme="light"] .precision-card [class*="bg-black/"] {
+  background-color: rgb(255 255 255 / 86%) !important;
+}
+
+:root[data-theme="light"] .precision-card [class*="border-white/"] {
+  border-color: rgb(15 23 42 / 18%) !important;
+}
+
+:root[data-theme="light"] .precision-card [class*="bg-rose-500/"] {
+  background-color: rgb(254 226 226 / 92%) !important;
+}
+
+:root[data-theme="light"] .precision-card [class*="text-rose-"] {
+  color: rgb(136 19 55) !important;
+}
+
+:root[data-theme="light"] .precision-card [class*="border-rose-"] {
+  border-color: rgb(190 24 93 / 46%) !important;
+}
+
+:root[data-theme="light"] .precision-card [class*="bg-emerald-500/"] {
+  background-color: rgb(209 250 229 / 92%) !important;
+}
+
+:root[data-theme="light"] .precision-card [class*="text-emerald-"] {
+  color: rgb(6 95 70) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root .bg-quantis-base {
+  background-color: #ffffff !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="bg-rose-500/"] {
+  background-color: rgb(254 226 226 / 92%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="text-rose-"] {
+  color: rgb(159 18 57) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="border-rose-"] {
+  border-color: rgb(159 18 57 / 42%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="bg-emerald-500/"] {
+  background-color: rgb(209 250 229 / 92%) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root [class*="text-emerald-"] {
+  color: rgb(6 95 70) !important;
+}
+
+:root[data-theme="light"] .quantis-panel [class*="bg-rose-50"] {
+  background-color: rgb(254 226 226 / 95%) !important;
+}
+
+:root[data-theme="light"] .quantis-panel [class*="text-rose-700"] {
+  color: rgb(136 19 55) !important;
+}
+
+:root[data-theme="light"] .quantis-panel [class*="bg-emerald-50"] {
+  background-color: rgb(209 250 229 / 95%) !important;
+}
+
+:root[data-theme="light"] .quantis-panel [class*="text-emerald-800"] {
+  color: rgb(6 78 59) !important;
+}
+
+:root[data-theme="light"] input::placeholder,
+:root[data-theme="light"] textarea::placeholder {
+  color: rgb(71 85 105 / 78%) !important;
+}
+
+.agent-kicker {
+  color: var(--quantis-gold);
+  text-shadow: 0 0 0 transparent;
+}
+
+:root[data-theme="light"] .agent-kicker {
+  color: #8b5e00 !important;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 50%);
+}
+
+.agent-panel {
+  background: linear-gradient(to right, var(--quantis-premium-root-bg), #121215);
+}
+
+.agent-icon-shell {
+  border: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(255 255 255 / 5%);
+}
+
+.agent-icon-shell > svg {
+  color: rgb(255 255 255 / 60%);
+}
+
+.agent-arrow-shell {
+  border: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(255 255 255 / 5%);
+}
+
+.agent-message {
+  color: rgb(255 255 255 / 82%);
+}
+
+.agent-arrow-icon {
+  color: rgb(255 255 255 / 92%);
+}
+
+:root[data-theme="light"] .agent-panel {
+  background: #fff;
+  border: 1px solid rgb(15 23 42 / 14%);
+}
+
+:root[data-theme="light"] .agent-icon-shell,
+:root[data-theme="light"] .agent-arrow-shell {
+  border-color: rgb(15 23 42 / 20%);
+  background: rgb(248 250 252 / 95%);
+}
+
+:root[data-theme="light"] .agent-icon-shell > svg {
+  color: rgb(51 65 85) !important;
+}
+
+:root[data-theme="light"] .agent-message {
+  color: rgb(51 65 85) !important;
+}
+
+:root[data-theme="light"] .agent-arrow-icon {
+  color: rgb(51 65 85) !important;
+}
+
+:root[data-theme="light"] .premium-analysis-root .dial-ticks {
+  stroke: rgb(15 23 42 / 22%);
+}
+
+:root[data-theme="light"] .premium-analysis-root .dial-track {
+  stroke: rgb(15 23 42 / 10%);
+}
+
+/* Animation globale au scroll: révèle progressivement les cartes sans casser la DA premium. */
+[data-scroll-reveal] {
+  opacity: 0;
+  transform: translate3d(0, 18px, 0) scale(0.995);
+  filter: blur(1.5px);
+  transition:
+    opacity 460ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 460ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 460ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--scroll-reveal-delay, 0ms);
+  will-change: opacity, transform, filter;
+}
+
+[data-scroll-reveal].is-scroll-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  filter: blur(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-scroll-reveal] {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+}
+
+/* Boutons gold premium (réutilisable sur toute l'application). */
+.btn-gold-premium,
+.cta-gold-pilot {
+  border: 1px solid #f2d782;
+  background-image: linear-gradient(135deg, #f9e08a 0%, #ebc85b 52%, #d8ac2f 100%);
+  color: #111;
+  box-shadow:
+    0 10px 24px rgba(216, 172, 47, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.btn-gold-premium:hover,
+.cta-gold-pilot:hover {
+  border-color: #f7e5ad;
+  background-image: linear-gradient(135deg, #fde89a 0%, #f1cf68 52%, #dfb43c 100%);
+  box-shadow:
+    0 14px 30px rgba(216, 172, 47, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
 }

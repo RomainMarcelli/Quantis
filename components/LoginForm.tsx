@@ -1,56 +1,221 @@
+// components/LoginForm.tsx
+// Formulaire unifie de connexion/inscription avec DA premium alignee sur le cockpit /analysis.
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { CheckCircle2, Circle, Eye, EyeOff, Info } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, CheckCircle2, Circle, Eye, EyeOff, Info, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useProductTour } from "@/hooks/useProductTour";
 import { getPasswordRuleChecks } from "@/lib/auth/passwordPolicy";
-import { COMPANY_SIZE_OPTIONS, SECTOR_OPTIONS } from "@/lib/onboarding/options";
-import type { CompanySizeValue, SectorValue } from "@/lib/onboarding/options";
+import { ANONYMOUS_TOUR_STEPS } from "@/lib/onboarding/productTour";
+import {
+  ONBOARDING_REGISTER_COMPANY_COMPLETED_EVENT,
+  ONBOARDING_REGISTER_SWITCH_COMPLETED_EVENT,
+  ONBOARDING_REGISTER_IDENTITY_COMPLETED_EVENT
+} from "@/lib/onboarding/events";
+import {
+  COMPANY_SIZE_OPTIONS,
+  OTHER_SECTOR_OPTION_VALUE,
+  SECTOR_OPTIONS
+} from "@/lib/onboarding/options";
+import type { CompanySizeValue } from "@/lib/onboarding/options";
+import {
+  ONBOARDING_OBJECTIVE_OPTIONS,
+  type OnboardingObjectiveValue
+} from "@/lib/onboarding/objectives";
 import { loginWithEmailPassword } from "@/lib/auth/login";
 import { registerWithEmailPassword } from "@/lib/auth/register";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
+import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { QuantisSelect } from "@/components/ui/QuantisSelect";
 import { firebaseAuthGateway } from "@/services/auth";
+import { logClientSecurityEvent } from "@/services/securityAuditClient";
 import { markUserEmailAsVerified, saveUserProfile } from "@/services/userProfileStore";
 import type { LoginValidationErrors, RegisterValidationErrors } from "@/types/auth";
 
 type AuthMode = "login" | "register";
 
-const EMPTY_LOGIN_ERRORS: LoginValidationErrors = {};
-const EMPTY_REGISTER_ERRORS: RegisterValidationErrors = {};
 type ToastState = { type: "success" | "error" | "info"; message: string } | null;
 
-export function LoginForm() {
-  const router = useRouter();
+const EMPTY_LOGIN_ERRORS: LoginValidationErrors = {};
+const EMPTY_REGISTER_ERRORS: RegisterValidationErrors = {};
+const ANONYMOUS_TOUR_STEP_IDS = new Set(ANONYMOUS_TOUR_STEPS.map((step) => step.id));
 
-  const [mode, setMode] = useState<AuthMode>("login");
+type LoginFormProps = {
+  initialMode?: AuthMode;
+  lockMode?: boolean;
+  initialCompanySize?: CompanySizeValue | "";
+  initialSector?: string;
+  initialCustomSector?: string;
+  backHref?: string;
+  postLoginRedirect?: string;
+};
+
+export function LoginForm({
+  initialMode = "login",
+  lockMode = false,
+  initialCompanySize = "",
+  initialSector = "",
+  initialCustomSector = "",
+  backHref = "/",
+  postLoginRedirect = "/synthese"
+}: LoginFormProps) {
+  const router = useRouter();
+  // Reference de la carte pour recentrer la vue en haut apres une inscription reussie.
+  const cardRef = useRef<HTMLElement | null>(null);
+  const hasDispatchedRegisterSwitchStepRef = useRef(false);
+  const hasDispatchedCompanyStepRef = useRef(false);
+  const hasDispatchedIdentityStepRef = useRef(false);
+  const { currentStep, isActive: isTourActive, startTour } = useProductTour();
+
+  // Etat principal du formulaire auth (connexion / inscription).
+  const [mode, setMode] = useState<AuthMode>(initialMode);
   const [lastName, setLastName] = useState("");
   const [firstName, setFirstName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [siren, setSiren] = useState("");
-  const [companySize, setCompanySize] = useState<CompanySizeValue | "">("");
-  const [sector, setSector] = useState<SectorValue | "">("");
+  const [companySize, setCompanySize] = useState<CompanySizeValue | "">(initialCompanySize);
+  const [sector, setSector] = useState(initialSector);
+  const [customSector, setCustomSector] = useState(initialCustomSector);
+  const [usageObjectives, setUsageObjectives] = useState<OnboardingObjectiveValue[]>([]);
   const [showPassword, setShowPassword] = useState(false);
 
   const [loginErrors, setLoginErrors] = useState<LoginValidationErrors>(EMPTY_LOGIN_ERRORS);
   const [registerErrors, setRegisterErrors] = useState<RegisterValidationErrors>(EMPTY_REGISTER_ERRORS);
 
+  // Verification immediate d'une session deja active.
   const [isCheckingSession] = useState(() => {
     const currentUser = firebaseAuthGateway.getCurrentUser();
     return Boolean(currentUser?.emailVerified);
   });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [authInfoMessage, setAuthInfoMessage] = useState<string | null>(null);
+
+  const currentErrors = mode === "login" ? loginErrors : registerErrors;
+  const safePostLoginRedirect =
+    postLoginRedirect.trim().startsWith("/") ? postLoginRedirect.trim() : "/synthese";
+  const passwordRules = useMemo(() => getPasswordRuleChecks(password), [password]);
 
   useEffect(() => {
     const currentUser = firebaseAuthGateway.getCurrentUser();
 
     if (currentUser?.emailVerified) {
-      router.replace("/dashboard");
+      router.replace(safePostLoginRedirect);
     }
-  }, [router]);
+  }, [router, safePostLoginRedirect]);
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  useEffect(() => {
+    setCompanySize(initialCompanySize);
+  }, [initialCompanySize]);
+
+  useEffect(() => {
+    setSector(initialSector);
+    setCustomSector(initialCustomSector);
+  }, [initialSector, initialCustomSector]);
+
+  useEffect(() => {
+    if (sector !== OTHER_SECTOR_OPTION_VALUE) {
+      setCustomSector("");
+    }
+  }, [sector]);
+
+  useEffect(() => {
+    if (mode !== "register") {
+      hasDispatchedRegisterSwitchStepRef.current = false;
+      return;
+    }
+
+    const isSwitchStepActive = currentStep?.id === "tour-register-switch";
+    const hasStartedIdentity =
+      lastName.trim().length > 0 ||
+      firstName.trim().length > 0 ||
+      email.trim().length > 0 ||
+      password.trim().length > 0;
+
+    if (!isSwitchStepActive || !hasStartedIdentity) {
+      hasDispatchedRegisterSwitchStepRef.current = false;
+      return;
+    }
+
+    if (hasDispatchedRegisterSwitchStepRef.current) {
+      return;
+    }
+
+    hasDispatchedRegisterSwitchStepRef.current = true;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(ONBOARDING_REGISTER_SWITCH_COMPLETED_EVENT));
+    }, 0);
+  }, [currentStep?.id, email, firstName, lastName, mode, password]);
+
+  useEffect(() => {
+    if (mode !== "register") {
+      hasDispatchedCompanyStepRef.current = false;
+      hasDispatchedIdentityStepRef.current = false;
+      hasDispatchedRegisterSwitchStepRef.current = false;
+      return;
+    }
+
+    const resolvedSector = sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector.trim();
+    const isCompanyContextComplete =
+      companyName.trim().length > 0 &&
+      siren.length === 9 &&
+      Boolean(companySize) &&
+      resolvedSector.length >= 2;
+    const isCompanyTourStepActive = currentStep?.id === "tour-register-company";
+
+    if (!isCompanyContextComplete || !isCompanyTourStepActive) {
+      hasDispatchedCompanyStepRef.current = false;
+      return;
+    }
+
+    if (hasDispatchedCompanyStepRef.current) {
+      return;
+    }
+
+    hasDispatchedCompanyStepRef.current = true;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(ONBOARDING_REGISTER_COMPANY_COMPLETED_EVENT));
+    }, 0);
+  }, [companyName, companySize, currentStep?.id, customSector, mode, sector, siren]);
+
+  useEffect(() => {
+    if (mode !== "register") {
+      hasDispatchedIdentityStepRef.current = false;
+      return;
+    }
+
+    const isIdentityStepActive = currentStep?.id === "tour-register-identity";
+    const isPasswordFullyCompliant = passwordRules.every((rule) => rule.isValid);
+    const isEmailSyntacticallyValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    const isIdentityComplete =
+      lastName.trim().length > 0 &&
+      firstName.trim().length > 0 &&
+      isEmailSyntacticallyValid &&
+      isPasswordFullyCompliant;
+
+    if (!isIdentityStepActive || !isIdentityComplete) {
+      hasDispatchedIdentityStepRef.current = false;
+      return;
+    }
+
+    if (hasDispatchedIdentityStepRef.current) {
+      return;
+    }
+
+    hasDispatchedIdentityStepRef.current = true;
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent(ONBOARDING_REGISTER_IDENTITY_COMPLETED_EVENT));
+    }, 0);
+  }, [currentStep?.id, email, firstName, lastName, mode, passwordRules]);
 
   useEffect(() => {
     if (!toast) {
@@ -76,9 +241,18 @@ export function LoginForm() {
 
       if (!result.success) {
         setLoginErrors(result.errors);
-        setToast({
-          type: "error",
-          message: result.errors.general ?? "Connexion impossible. Verifiez vos informations."
+        // On évite le doublon visuel: l'erreur de connexion est déjà affichée inline dans le formulaire.
+        setToast(null);
+        // Journalisation sécurité: tentative de connexion échouée.
+        void logClientSecurityEvent({
+          eventType: "login_failed",
+          statusCode: 401,
+          userId: null,
+          message: result.errors.general ?? "Échec de connexion.",
+          metadata: {
+            hasEmailValue: Boolean(email.trim())
+          },
+          includeAuthToken: false
         });
         setIsSubmitting(false);
         return;
@@ -87,9 +261,19 @@ export function LoginForm() {
       try {
         await markUserEmailAsVerified(result.user.uid);
       } catch {
-        // User profile document may not exist for legacy accounts.
+        // Le profil peut manquer pour les comptes historiques; on ne bloque pas la navigation.
       }
-      router.push("/dashboard");
+      // Journalisation sécurité: connexion validée.
+      void logClientSecurityEvent({
+        eventType: "login_success",
+        statusCode: 200,
+        userId: result.user.uid,
+        message: "Connexion utilisateur réussie."
+      });
+      if (isTourActive && currentStep && ANONYMOUS_TOUR_STEP_IDS.has(currentStep.id)) {
+        startTour("authenticated");
+      }
+      router.push(safePostLoginRedirect);
       return;
     }
 
@@ -106,7 +290,9 @@ export function LoginForm() {
         companyName,
         siren,
         companySize,
-        sector
+        sector:
+          sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector.trim(),
+        usageObjectives
       }
     );
 
@@ -114,7 +300,7 @@ export function LoginForm() {
       setRegisterErrors(result.errors);
       setToast({
         type: "error",
-        message: result.errors.general ?? "Inscription invalide. Verifiez le formulaire."
+        message: result.errors.general ?? "Inscription invalide. Vérifiez le formulaire."
       });
       setIsSubmitting(false);
       return;
@@ -124,136 +310,231 @@ export function LoginForm() {
     setIsSubmitting(false);
     setMode("login");
     setLoginErrors(EMPTY_LOGIN_ERRORS);
-    setAuthInfoMessage("Compte cree. Verifiez votre email et votre dossier spam avant de vous connecter.");
-    setToast({
-      type: "success",
-      message: "Compte cree avec succes. Verifiez votre boite email et vos spams."
-    });
+    setAuthInfoMessage(
+      "Compte cree. Ouvrez votre email (et le dossier spam), cliquez sur le lien de verification, puis revenez vous connecter."
+    );
+    if (lockMode) {
+      router.replace("/");
+      return;
+    }
+
+    // On recentre la vue en haut pour que le message de confirmation soit visible immediatement.
+    if (typeof window !== "undefined") {
+      requestAnimationFrame(() => {
+        cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
   }
 
   if (isCheckingSession) {
     return (
-      <section className="quantis-panel w-full max-w-xl p-8 text-center">
-        <p className="text-sm text-quantis-slate">Verification de session...</p>
+      <section className="precision-card relative z-10 w-full max-w-xl rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/70">Vérification de session...</p>
       </section>
     );
   }
 
-  const currentErrors = mode === "login" ? loginErrors : registerErrors;
-  const passwordRules = getPasswordRuleChecks(password);
-
   return (
-    <section className="quantis-panel mesh-gradient relative w-full max-w-xl p-8">
+    <section
+      ref={cardRef}
+      className="precision-card relative z-10 w-full max-w-2xl rounded-2xl border-white/10 p-6 md:p-8"
+    >
       {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
-      <p className="text-xs uppercase tracking-wide text-quantis-slate">Quantis</p>
-      <h1 className="mt-2 text-3xl font-semibold leading-tight text-quantis-carbon">
-        Espace financier
-        <span className="ml-2 text-quantis-gold">securise</span>
-      </h1>
-      <div className="quantis-accent-line mt-4" />
-      <p className="mt-4 text-sm text-quantis-slate">
-        {mode === "login"
-          ? "Connectez-vous avec votre compte Firebase."
-          : "Inscrivez-vous pour activer votre espace entreprise."}
-      </p>
       {mode === "login" && authInfoMessage ? (
-        <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+        <p className="mb-4 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
           {authInfoMessage}
         </p>
       ) : null}
 
-      <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+      <div className="space-y-4">
+        {!lockMode ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href={backHref}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/35 text-white/80 transition-colors hover:border-quantis-gold/40 hover:bg-white/10 hover:text-white"
+              aria-label="Retour"
+              title="Retour"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+
+            <div
+              className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1"
+              data-tour-id="auth-mode-switch"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("login");
+                  setRegisterErrors(EMPTY_REGISTER_ERRORS);
+                  setAuthInfoMessage(null);
+                  setPassword("");
+                }}
+                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                  mode === "login"
+                    ? "btn-gold-premium"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                Connexion
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("register");
+                  setLoginErrors(EMPTY_LOGIN_ERRORS);
+                  setAuthInfoMessage(null);
+                  setPassword("");
+                }}
+                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                  mode === "register"
+                    ? "btn-gold-premium"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                Inscription
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex items-center gap-4">
+          <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-transparent p-1.5">
+            <QuantisLogo
+              withText={false}
+              size={56}
+              imageClassName="h-14 w-14 shrink-0 object-contain"
+            />
+          </div>
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-quantis-gold">Quantis</p>
+            <p className="mt-1 text-xs text-white/55">Plateforme financière</p>
+          </div>
+        </div>
+
+        <div>
+          <h1 className="text-3xl font-semibold leading-tight text-white md:text-4xl">
+            {mode === "login" ? "Connexion" : "Création de compte"}
+            <span className="ml-2 text-quantis-gold">Quantis</span>
+          </h1>
+          <p className="mt-3 text-sm text-white/60">
+            {mode === "login"
+              ? "Accédez à votre cockpit financier en quelques secondes."
+              : "Configurez votre compte entreprise pour lancer vos analyses."}
+          </p>
+        </div>
+      </div>
+
+      <div className="card-header mt-6" />
+
+      <form className="space-y-4" onSubmit={onSubmit}>
+        <div data-tour-id={mode === "register" ? "auth-identity-context" : undefined} className="space-y-4">
+
         {mode === "register" ? (
-          <>
+          <div className="grid gap-4 md:grid-cols-2">
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Nom</span>
-              <div className="quantis-input px-3 py-2">
+              <span className="mb-1.5 block text-sm font-medium text-white">Nom</span>
+              <div className="quantis-input bg-white/5 px-3 py-2">
                 <input
                   type="text"
                   value={lastName}
                   onChange={(event) => setLastName(event.target.value)}
                   placeholder="Votre nom"
-                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+                  className="w-full border-0 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
                   autoComplete="family-name"
                   title="Nom de famille de la personne responsable"
                 />
               </div>
-              {registerErrors.lastName ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.lastName}</span> : null}
+              {registerErrors.lastName ? <InlineError message={registerErrors.lastName} /> : null}
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Prenom</span>
-              <div className="quantis-input px-3 py-2">
+              <span className="mb-1.5 block text-sm font-medium text-white">Prénom</span>
+              <div className="quantis-input bg-white/5 px-3 py-2">
                 <input
                   type="text"
                   value={firstName}
                   onChange={(event) => setFirstName(event.target.value)}
-                  placeholder="Votre prenom"
-                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+                  placeholder="Votre prénom"
+                  className="w-full border-0 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
                   autoComplete="given-name"
-                  title="Prenom de la personne responsable"
+                  title="Prénom de la personne responsable"
                 />
               </div>
-              {registerErrors.firstName ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.firstName}</span> : null}
+              {registerErrors.firstName ? <InlineError message={registerErrors.firstName} /> : null}
             </label>
-          </>
+          </div>
         ) : null}
 
         <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Email</span>
-          <div className="quantis-input px-3 py-2">
+          <span className="mb-1.5 block text-sm font-medium text-white">Email</span>
+          <div className="quantis-input bg-white/5 px-3 py-2">
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="email@entreprise.com"
-              className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+              className="w-full border-0 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
               autoComplete="email"
               title="Adresse email professionnelle"
             />
           </div>
-          {currentErrors.email ? <span className="mt-1 block text-sm text-rose-700">{currentErrors.email}</span> : null}
+          {currentErrors.email ? <InlineError message={currentErrors.email} /> : null}
         </label>
 
         <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Mot de passe</span>
-          <div className="quantis-input flex items-center gap-2 px-3 py-2">
+          <span className="mb-1.5 block text-sm font-medium text-white">Mot de passe</span>
+          <div className="quantis-input flex items-center gap-2 bg-white/5 px-3 py-2">
             <input
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Votre mot de passe"
-              className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
+              className="w-full border-0 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
               autoComplete={mode === "login" ? "current-password" : "new-password"}
             />
             <button
               type="button"
               onClick={() => setShowPassword((value) => !value)}
-              className="rounded p-1 text-quantis-slate transition-colors hover:text-quantis-carbon"
+              className="rounded p-1 text-white/60 transition-colors hover:text-white"
               aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
               title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {currentErrors.password ? <span className="mt-1 block text-sm text-rose-700">{currentErrors.password}</span> : null}
+          {currentErrors.password ? <InlineError message={currentErrors.password} /> : null}
+
+          {mode === "login" ? (
+            <div className="mt-2 text-right">
+              <Link
+                href="/forgot-password"
+                className="text-xs font-medium text-quantis-gold underline underline-offset-2 hover:text-yellow-300"
+              >
+                Mot de passe oublie ?
+              </Link>
+            </div>
+          ) : null}
         </label>
+        </div>
 
         {mode === "register" ? (
           <>
-            <div className="rounded-xl border border-quantis-mist bg-white px-3 py-2">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-quantis-slate">
+            {/* Bloc sécurité en chips pour un feedback lisible sans casser la mise en page. */}
+            <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-white/75">
                 <Info className="h-3.5 w-3.5" />
-                Securite mot de passe
+                Sécurité mot de passe
               </p>
-              <ul className="grid grid-cols-3 gap-1.5">
+              <ul className="flex flex-wrap gap-1.5">
                 {passwordRules.map((rule) => (
                   <li
                     key={rule.key}
-                    className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] ${
+                    className={`inline-flex min-w-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] ${
                       rule.isValid
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : "border-rose-200 bg-rose-50 text-rose-700"
+                        ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-200"
+                        : "border-rose-400/35 bg-rose-500/15 text-rose-200"
                     }`}
                     title={rule.label}
                   >
@@ -268,89 +549,143 @@ export function LoginForm() {
               </ul>
             </div>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Nom entreprise</span>
-              <div className="quantis-input px-3 py-2">
-                <input
-                  type="text"
-                  value={companyName}
-                  onChange={(event) => setCompanyName(event.target.value)}
-                  placeholder="Nom legal de l'entreprise"
-                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
-                  autoComplete="organization"
-                  title="Raison sociale / nom legal de l'entreprise"
-                />
-              </div>
-              {registerErrors.companyName ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.companyName}</span> : null}
-            </label>
+            <div className="grid gap-4 md:grid-cols-2" data-tour-id="auth-company-context">
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-white">Nom entreprise</span>
+                <div className="quantis-input bg-white/5 px-3 py-2">
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value)}
+                    placeholder="Nom legal de l'entreprise"
+                    className="w-full border-0 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
+                    autoComplete="organization"
+                    title="Raison sociale / nom legal de l'entreprise"
+                  />
+                </div>
+                {registerErrors.companyName ? <InlineError message={registerErrors.companyName} /> : null}
+              </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Numero SIREN</span>
-              <div className="quantis-input px-3 py-2">
-                <input
-                  type="text"
-                  value={siren}
-                  onChange={(event) => setSiren(event.target.value.replace(/\D/g, "").slice(0, 9))}
-                  placeholder="9 chiffres"
-                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  title="SIREN (9 chiffres)"
-                />
-              </div>
-              {registerErrors.siren ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.siren}</span> : null}
-            </label>
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-white">Numero SIREN</span>
+                <div className="quantis-input bg-white/5 px-3 py-2">
+                  <input
+                    type="text"
+                    value={siren}
+                    onChange={(event) => setSiren(event.target.value.replace(/\D/g, "").slice(0, 9))}
+                    placeholder="9 chiffres"
+                    className="w-full border-0 bg-transparent text-sm text-white placeholder:text-white/35 outline-none"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    title="SIREN (9 chiffres)"
+                  />
+                </div>
+                {registerErrors.siren ? <InlineError message={registerErrors.siren} /> : null}
+              </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Taille d&apos;entreprise</span>
-              <div className="quantis-input px-3 py-2">
-                <select
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-white">Taille d&apos;entreprise</span>
+                <QuantisSelect
                   value={companySize}
-                  onChange={(event) => setCompanySize(event.target.value as CompanySizeValue | "")}
-                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
-                >
-                  <option value="">Choisir une taille</option>
-                  {COMPANY_SIZE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label} - {option.range}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <p className="mt-1 text-xs text-quantis-slate">Selectionnez la categorie de taille correspondant a votre entreprise.</p>
-              {registerErrors.companySize ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.companySize}</span> : null}
-            </label>
+                  onChange={(value) => setCompanySize(value as CompanySizeValue | "")}
+                  placeholder="Choisir une taille"
+                  options={COMPANY_SIZE_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: `${option.label} - ${option.range}`
+                  }))}
+                />
+                {registerErrors.companySize ? <InlineError message={registerErrors.companySize} /> : null}
+              </label>
 
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-quantis-carbon">Secteur</span>
-              <div className="quantis-input px-3 py-2">
-                <select
+              <label className="block">
+                <span className="mb-1.5 block text-sm font-medium text-white">Secteur</span>
+                <QuantisSelect
                   value={sector}
-                  onChange={(event) => setSector(event.target.value as SectorValue | "")}
-                  className="w-full border-0 bg-transparent text-sm text-quantis-carbon outline-none"
-                >
-                  <option value="">Choisir un secteur</option>
-                  {SECTOR_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => setSector(value)}
+                  placeholder="Choisir un secteur"
+                  options={[
+                    ...SECTOR_OPTIONS.map((option) => ({ value: option, label: option })),
+                    { value: OTHER_SECTOR_OPTION_VALUE, label: OTHER_SECTOR_OPTION_VALUE }
+                  ]}
+                />
+                {sector === OTHER_SECTOR_OPTION_VALUE ? (
+                  <div className="quantis-input relative mt-2 bg-white/5 px-3 py-2">
+                    <input
+                      type="text"
+                      value={customSector}
+                      onChange={(event) => setCustomSector(event.target.value)}
+                      placeholder="Précisez votre secteur d'activité"
+                      className="w-full border-0 bg-transparent pr-8 text-sm text-white placeholder:text-white/35 outline-none"
+                    />
+                    {customSector ? (
+                      <button
+                        type="button"
+                        onClick={() => setCustomSector("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-white/60 transition hover:bg-white/10 hover:text-white"
+                        aria-label="Effacer le secteur"
+                        title="Effacer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                {registerErrors.sector ? <InlineError message={registerErrors.sector} /> : null}
+              </label>
+            </div>
+
+            <fieldset className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <legend className="px-1 text-xs uppercase tracking-wide text-white/60">
+                Objectif d&apos;utilisation
+              </legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                {ONBOARDING_OBJECTIVE_OPTIONS.map((option) => {
+                  const checked = usageObjectives.includes(option.value);
+                  return (
+                    <label
+                      key={option.value}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-2 text-xs transition-colors ${
+                        checked
+                          ? "border-quantis-gold/50 bg-quantis-gold/10 text-quantis-gold"
+                          : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 accent-quantis-gold"
+                        checked={checked}
+                        onChange={(event) => {
+                          setUsageObjectives((current) => {
+                            if (event.target.checked) {
+                              return [...current, option.value];
+                            }
+                            return current.filter((value) => value !== option.value);
+                          });
+                        }}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  );
+                })}
               </div>
-              <p className="mt-1 text-xs text-quantis-slate">Choisissez votre secteur principal d&apos;activite.</p>
-              {registerErrors.sector ? <span className="mt-1 block text-sm text-rose-700">{registerErrors.sector}</span> : null}
-            </label>
+              {registerErrors.usageObjectives ? (
+                <InlineError message={registerErrors.usageObjectives} />
+              ) : null}
+            </fieldset>
           </>
         ) : null}
 
         {currentErrors.general ? (
-          <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{currentErrors.general}</p>
+          <p className="rounded-lg border border-rose-400/35 bg-rose-500/15 px-3 py-2 text-sm text-rose-200">
+            {currentErrors.general}
+          </p>
         ) : null}
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="quantis-primary w-full py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+          data-tour-id="auth-submit"
+          className="btn-gold-premium w-full rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting
             ? mode === "login"
@@ -358,17 +693,17 @@ export function LoginForm() {
               : "Inscription..."
             : mode === "login"
               ? "Se connecter"
-              : "Creer mon compte"}
+              : "Créer mon compte"}
         </button>
       </form>
 
-      <div className="mt-5 text-sm text-quantis-slate">
+      {!lockMode ? <div className="mt-5 text-sm text-white/65">
         {mode === "login" ? (
           <>
             Pas encore de compte ?{" "}
             <button
               type="button"
-              className="font-medium text-quantis-carbon underline underline-offset-2"
+              className="font-medium text-quantis-gold underline underline-offset-2 hover:text-yellow-300"
               onClick={() => {
                 setMode("register");
                 setLoginErrors(EMPTY_LOGIN_ERRORS);
@@ -384,7 +719,7 @@ export function LoginForm() {
             Vous avez deja un compte ?{" "}
             <button
               type="button"
-              className="font-medium text-quantis-carbon underline underline-offset-2"
+              className="font-medium text-quantis-gold underline underline-offset-2 hover:text-yellow-300"
               onClick={() => {
                 setMode("login");
                 setRegisterErrors(EMPTY_REGISTER_ERRORS);
@@ -396,7 +731,11 @@ export function LoginForm() {
             </button>
           </>
         )}
-      </div>
+      </div> : null}
     </section>
   );
+}
+
+function InlineError({ message }: { message: string }) {
+  return <span className="mt-1 block text-sm text-rose-300">{message}</span>;
 }

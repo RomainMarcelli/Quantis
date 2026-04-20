@@ -1,43 +1,78 @@
 import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
 export function computeKpis(data: MappedFinancialData): CalculatedKpis {
-  const tcam = percent(powMinusOne(div(data.total_prod_expl, data.ca_n_minus_1), inv(data.n)));
-  const va = sub(data.total_prod_expl, sum(data.achats_march, data.achats_mp, data.ace));
-  const ebitda = sub(va, sum(data.impots_taxes, data.salaires, data.charges_soc));
-  const marge_ebitda = percent(div(ebitda, data.total_prod_expl));
-  const charges_var = sum(data.achats_march, data.achats_mp, data.var_stock_march, data.var_stock_mp);
-  const mscv = sub(data.total_prod_expl, charges_var);
-  const tmscv = div(mscv, data.total_prod_expl);
-  const charges_fixes = sum(data.ace, data.salaires, data.charges_soc, data.dap);
+  const ca = computeCa(data);
+  const tcam = percent(powMinusOne(div(ca, data.ca_n_minus_1), inv(data.n)));
+  const effectiveTotalProdExpl = data.total_prod_expl ??
+    sumPartial(
+      data.ventes_march,
+      data.prod_vendue,
+      data.prod_stockee,
+      data.prod_immo,
+      data.subv_expl,
+      data.autres_prod_expl
+    );
+  const achatsTotal = sumPartial(data.achats_march, data.achats_mp, data.ace);
+  const va = effectiveTotalProdExpl !== null && achatsTotal !== null
+    ? effectiveTotalProdExpl - achatsTotal
+    : null;
+  const chargesPersonnel = sumPartial(data.impots_taxes, data.salaires, data.charges_soc);
+  const ebitda = va !== null && chargesPersonnel !== null
+    ? va - chargesPersonnel
+    : null;
+  const ebe = ebitda;
+  const marge_ebitda = percent(div(ebitda, effectiveTotalProdExpl));
+  const charges_var = sumPartial(data.achats_march, data.achats_mp, data.var_stock_march, data.var_stock_mp);
+  const mscv = sub(ca, charges_var);
+  const tmscv = div(mscv, ca);
+  const charges_fixes = sumPartial(data.ace, data.salaires, data.charges_soc, data.dap);
   const point_mort = div(charges_fixes, tmscv);
-  const ratio_immo = div(data.total_actif_immo, data.total_actif);
-  const bfr = sub(sum(data.total_stocks, data.creances), sum(data.fournisseurs, data.dettes_fisc_soc));
-  const rot_bfr = mul(div(bfr, mul(data.total_prod_expl, 1.2)), 365);
-  const dso = div(mul(data.clients, 365), mul(data.total_prod_expl, 1.2));
+  const ratio_immo = computeImmobilizationRatio({
+    totalActifImmoNet: data.total_actif_immo_net,
+    totalActifImmoBrut: data.total_actif_immo_brut,
+    totalActifImmo: data.total_actif_immo
+  });
+  const dettesCirculantes = sumPartial(data.fournisseurs, data.dettes_fisc_soc);
+  const bfr = sub(
+    sumPartial(data.total_stocks, data.creances),
+    dettesCirculantes
+  );
+  const rot_bfr = mul(div(bfr, mul(effectiveTotalProdExpl, 1.2)), 365);
+  const dso = div(mul(data.clients, 365), mul(effectiveTotalProdExpl, 1.2));
   const dpo = div(mul(data.fournisseurs, 365), mul(sum(data.achats_march, data.ace), 1.2));
-  const rot_stocks = div(mul(data.total_stocks, 365), data.total_prod_expl);
-  const caf = sum(data.res_net, data.dap);
-  const fte = sub(caf, data.delta_bfr);
+  const rot_stocks = div(mul(data.total_stocks, 365), effectiveTotalProdExpl);
+  const resultat_net = data.res_net ?? data.resultat_exercice;
+  const caf = sum(resultat_net, data.dap);
+  const fte = caf === null ? null : caf - (data.delta_bfr ?? 0);
   const tn = sub(data.dispo, data.emprunts);
   const solvabilite = div(data.total_cp, data.total_passif);
   const gearing = div(sub(data.emprunts, data.dispo), ebitda);
-  const liq_gen = div(data.total_actif_circ, sum(data.fournisseurs, data.dettes_fisc_soc));
-  const liq_red = div(sum(data.creances, data.dispo), sum(data.fournisseurs, data.dettes_fisc_soc));
-  const liq_imm = div(data.dispo, sum(data.fournisseurs, data.dettes_fisc_soc));
-  const roce = div(mul(data.ebit, 0.75), sum(data.total_actif_immo, bfr));
-  const roe = div(data.res_net, data.total_cp);
+  const liq_gen = div(data.total_actif_circ, dettesCirculantes);
+  const liq_red = div(sum(data.creances, data.dispo), dettesCirculantes);
+  const liq_imm = div(data.dispo, dettesCirculantes);
+  const disponibilites = data.dispo;
+  const effectiveEbit = data.ebit ?? sub(effectiveTotalProdExpl, data.total_charges_expl);
+  const capitalEmploye = sum(data.total_actif_immo, bfr);
+  const roce = capitalEmploye !== null && capitalEmploye > 0
+    ? div(mul(effectiveEbit, 0.75), capitalEmploye)
+    : null;
+  const roe = div(resultat_net, data.total_cp);
   const effet_levier = sub(roe, roce);
+  const capacite_remboursement_annees = computeDebtRepaymentCapacity(data.emprunts, caf);
+  const etat_materiel_indice = percent(ratio_immo);
 
   const grossMarginRate = percent(tmscv);
-  const netProfit = data.res_net ?? data.resultat_exercice;
+  const netProfit = resultat_net;
   const workingCapital = bfr;
   const monthlyBurnRate = netProfit !== null && netProfit < 0 ? round(Math.abs(netProfit) / 12) : 0;
   const cashRunwayMonths = monthlyBurnRate > 0 ? div(data.dispo, monthlyBurnRate) : null;
 
   return {
     tcam: roundOrNull(tcam),
+    ca: roundOrNull(ca),
     va: roundOrNull(va),
     ebitda: roundOrNull(ebitda),
+    ebe: roundOrNull(ebe),
     marge_ebitda: roundOrNull(marge_ebitda),
     charges_var: roundOrNull(charges_var),
     mscv: roundOrNull(mscv),
@@ -58,14 +93,18 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
     liq_gen: roundOrNull(liq_gen),
     liq_red: roundOrNull(liq_red),
     liq_imm: roundOrNull(liq_imm),
+    disponibilites: roundOrNull(disponibilites),
     roce: roundOrNull(roce),
     roe: roundOrNull(roe),
     effet_levier: roundOrNull(effet_levier),
+    resultat_net: roundOrNull(resultat_net),
     grossMarginRate: roundOrNull(grossMarginRate),
     netProfit: roundOrNull(netProfit),
     workingCapital: roundOrNull(workingCapital),
     monthlyBurnRate: roundOrNull(monthlyBurnRate),
     cashRunwayMonths: roundOrNull(cashRunwayMonths),
+    capacite_remboursement_annees: roundOrNull(capacite_remboursement_annees),
+    etat_materiel_indice: roundOrNull(etat_materiel_indice),
     healthScore: scoreHealth({
       grossMarginRate,
       netProfit,
@@ -113,6 +152,49 @@ function scoreHealth({
   return round((score / weights) * 100);
 }
 
+function computeCa(data: MappedFinancialData): number | null {
+  const salesGoods = sanitizeTurnoverComponent(data.ventes_march);
+  const soldProduction = sanitizeTurnoverComponent(data.prod_vendue);
+  const hasAtLeastOneSource = data.ventes_march !== null || data.prod_vendue !== null;
+
+  if (salesGoods !== null && soldProduction !== null) {
+    if (Math.abs(salesGoods - soldProduction) < soldProduction * 0.01) {
+      return Math.max(salesGoods, soldProduction);
+    }
+    const sum = salesGoods + soldProduction;
+    if (data.total_prod_expl !== null && sum > data.total_prod_expl * 1.1) {
+      return Math.max(salesGoods, soldProduction);
+    }
+    return sum;
+  }
+
+  if (salesGoods !== null) {
+    return salesGoods;
+  }
+
+  if (soldProduction !== null) {
+    return soldProduction;
+  }
+
+  if (!hasAtLeastOneSource) {
+    return data.total_prod_expl;
+  }
+
+  return null;
+}
+
+function sanitizeTurnoverComponent(value: number | null): number | null {
+  if (value === null) {
+    return null;
+  }
+
+  if (value < 0) {
+    return null;
+  }
+
+  return value;
+}
+
 function normalize(value: number, low: number, high: number): number {
   if (value <= low) {
     return 0;
@@ -129,6 +211,13 @@ function sum(...values: Array<number | null>): number | null {
   }
   const strictValues = values as number[];
   return strictValues.reduce((acc, value) => acc + value, 0);
+}
+
+/** Somme partielle : ignore les null (traités comme 0). Retourne null seulement si TOUS les arguments sont null. */
+function sumPartial(...values: Array<number | null>): number | null {
+  const present = values.filter((v): v is number => v !== null);
+  if (!present.length) return null;
+  return present.reduce((acc, v) => acc + v, 0);
 }
 
 function sub(left: number | null, right: number | null): number | null {
@@ -182,4 +271,49 @@ function roundOrNull(value: number | null): number | null {
 
 function round(value: number): number {
   return Number(value.toFixed(2));
+}
+
+function computeDebtRepaymentCapacity(
+  debt: number | null,
+  cashFlowCapacity: number | null
+): number | null {
+  if (debt === null || cashFlowCapacity === null || cashFlowCapacity <= 0) {
+    return null;
+  }
+  return debt / cashFlowCapacity;
+}
+
+function computeImmobilizationRatio(input: {
+  totalActifImmoNet: number | null;
+  totalActifImmoBrut: number | null;
+  totalActifImmo: number | null;
+}): number | null {
+  const { totalActifImmoNet, totalActifImmoBrut, totalActifImmo } = input;
+
+  // Le ratio n'a de sens que si brut ≠ net (sinon ils viennent de la même ligne, pas de distinction possible).
+  if (totalActifImmoNet !== null && totalActifImmoBrut !== null && totalActifImmoBrut !== totalActifImmoNet) {
+    return div(totalActifImmoNet, totalActifImmoBrut);
+  }
+
+  if (
+    totalActifImmoNet !== null &&
+    totalActifImmo !== null &&
+    totalActifImmo > 0 &&
+    totalActifImmo >= totalActifImmoNet &&
+    totalActifImmo !== totalActifImmoNet
+  ) {
+    return div(totalActifImmoNet, totalActifImmo);
+  }
+
+  if (
+    totalActifImmoBrut !== null &&
+    totalActifImmo !== null &&
+    totalActifImmo > 0 &&
+    totalActifImmoBrut >= totalActifImmo &&
+    totalActifImmoBrut !== totalActifImmo
+  ) {
+    return div(totalActifImmo, totalActifImmoBrut);
+  }
+
+  return null;
 }

@@ -42,7 +42,7 @@ export function AnalysisHistory({ analyses, selectedAnalysisId, onSelect }: Anal
               </button>
               <div className="px-5 pb-3">
                 <Link
-                  href={`/analysis/${analysis.id}`}
+                  href="/analysis"
                   className="text-xs font-medium text-quantis-carbon underline underline-offset-2"
                 >
                   Inspecter cette analyse

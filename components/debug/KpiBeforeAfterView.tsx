@@ -7,6 +7,7 @@ import type { AuthenticatedUser } from "@/types/auth";
 import { computeKpis } from "@/services/kpiEngine";
 import { firebaseAuthGateway } from "@/services/auth";
 import { listUserAnalyses } from "@/services/analysisStore";
+import { resolveAnalysisFiscalYear } from "@/services/analysisHistory";
 import { KPI_FORMULA_CATALOG } from "@/lib/kpi/kpiFormulaCatalog";
 import {
   compareStoredAndRecalculatedKpis,
@@ -26,13 +27,21 @@ export function KpiBeforeAfterView() {
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
       if (!nextUser) {
-        router.replace("/");
+        setUser(null);
+        setAnalyses([]);
+        setSelectedAnalysisId(null);
+        setLoadingAuth(false);
+        setErrorMessage("Aucune session active detectee. Connectez-vous pour charger vos analyses.");
         return;
       }
 
       if (!nextUser.emailVerified) {
         void firebaseAuthGateway.signOut();
-        router.replace("/");
+        setUser(null);
+        setAnalyses([]);
+        setSelectedAnalysisId(null);
+        setLoadingAuth(false);
+        setErrorMessage("Votre email n'est pas verifie. Verifiez votre boite mail puis reconnectez-vous.");
         return;
       }
 
@@ -119,27 +128,63 @@ export function KpiBeforeAfterView() {
     [comparedKpis]
   );
 
+  const resolvedFiscalYear = useMemo(
+    () => (selectedAnalysis ? resolveAnalysisFiscalYear(selectedAnalysis) : null),
+    [selectedAnalysis]
+  );
+
   if (loadingAuth) {
     return (
-      <section className="quantis-panel p-8 text-center">
-        <p className="text-sm text-quantis-slate">Chargement de la session...</p>
+      <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/70">Chargement de la session...</p>
+      </section>
+    );
+  }
+
+  if (!user) {
+    return (
+      <section className="precision-card relative z-10 mx-auto mt-8 w-full max-w-6xl rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/75">
+          {errorMessage ?? "Session indisponible. Connectez-vous pour acceder au comparateur KPI."}
+        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/login")}
+            className="btn-gold-premium rounded-xl px-4 py-2 text-sm font-semibold"
+          >
+            Aller a la connexion
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10"
+          >
+            Retour accueil
+          </button>
+        </div>
       </section>
     );
   }
 
   return (
-    <section className="space-y-6">
-      <header className="quantis-panel p-5">
-        <p className="text-xs uppercase tracking-wide text-quantis-slate">Test KPI</p>
-        <h1 className="mt-1 text-2xl font-semibold text-quantis-carbon">Avant / Calculs / Apres</h1>
-        <p className="mt-2 text-sm text-quantis-slate">
+    <section className="relative z-10 mx-auto w-full max-w-6xl space-y-6">
+      <header className="precision-card rounded-2xl p-5 md:p-6">
+        <p className="text-xs uppercase tracking-wide text-white/50">Test KPI</p>
+        <h1 className="mt-1 text-2xl font-semibold text-white md:text-3xl">
+          {`Avant / Calculs / Apr\u00E8s`}
+        </h1>
+        <p className="mt-2 text-sm text-white/65">
           Cette page lit uniquement les analyses stockees apres upload Excel/PDF. Aucune donnee n&apos;est en dur.
         </p>
+        <div className="mt-3 inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/70">
+          Source verifiee: Firestore + moteur KPI
+        </div>
       </header>
 
-      <section className="quantis-panel p-5">
-        <h2 className="text-sm font-semibold text-quantis-carbon">Analyse source</h2>
-        <p className="mt-1 text-sm text-quantis-slate">
+      <section className="precision-card rounded-2xl p-5 md:p-6">
+        <h2 className="text-sm font-semibold text-white">Analyse source</h2>
+        <p className="mt-1 text-sm text-white/60">
           Selectionnez une analyse issue du pipeline Upload {">"} Parsing {">"} Mapping {">"} KPI {">"} Stockage.
         </p>
 
@@ -147,7 +192,7 @@ export function KpiBeforeAfterView() {
           <select
             value={selectedAnalysis?.id ?? ""}
             onChange={(event) => setSelectedAnalysisId(event.target.value)}
-            className="min-w-[280px] flex-1 rounded-xl border border-quantis-mist bg-white px-3 py-2 text-sm text-quantis-carbon outline-none focus:border-quantis-gold/60"
+            className="min-w-[280px] flex-1 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-quantis-gold/60"
             disabled={!analyses.length || loadingAnalyses}
           >
             {!analyses.length ? (
@@ -167,7 +212,7 @@ export function KpiBeforeAfterView() {
                 void loadAnalyses(user.uid);
               }
             }}
-            className="rounded-xl border border-quantis-mist bg-white px-4 py-2 text-sm font-medium text-quantis-carbon hover:bg-quantis-paper"
+            className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10"
             disabled={loadingAnalyses || !user}
           >
             Rafraichir
@@ -176,28 +221,28 @@ export function KpiBeforeAfterView() {
             type="button"
             onClick={() => {
               if (selectedAnalysis) {
-                router.push(`/analysis/${selectedAnalysis.id}`);
+                router.push("/analysis");
               }
             }}
-            className="quantis-primary px-4 py-2 text-sm font-medium"
+            className="btn-gold-premium rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
             disabled={!selectedAnalysis}
           >
-            Ouvrir la page detail
+            Ouvrir la page détail
           </button>
         </div>
 
         {loadingAnalyses ? (
-          <p className="mt-3 text-sm text-quantis-slate">Chargement des analyses...</p>
+          <p className="mt-3 text-sm text-white/60">Chargement des analyses...</p>
         ) : null}
 
         {errorMessage ? (
-          <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          <div className="mt-3 rounded-xl border border-rose-400/35 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
             {errorMessage}
           </div>
         ) : null}
 
         {selectedAnalysis ? (
-          <div className="mt-4 grid gap-2 text-sm text-quantis-carbon md:grid-cols-2">
+          <div className="mt-4 grid gap-2 text-sm text-white/85 md:grid-cols-2">
             <p>
               Creee le:{" "}
               <span className="font-medium">
@@ -207,10 +252,10 @@ export function KpiBeforeAfterView() {
             <p>
               Exercice:{" "}
               <span className="font-medium">
-                {selectedAnalysis.fiscalYear !== null ? selectedAnalysis.fiscalYear : "Non renseigne"}
+                {resolvedFiscalYear ?? "Non renseigne"}
               </span>
             </p>
-            <p className="md:col-span-2">
+            <p className="md:col-span-2 text-white/80">
               Fichiers:{" "}
               <span className="font-medium">
                 {selectedAnalysis.sourceFiles.length
@@ -223,29 +268,29 @@ export function KpiBeforeAfterView() {
       </section>
 
       {!selectedAnalysis ? (
-        <section className="quantis-panel p-5">
-          <p className="text-sm text-quantis-slate">
+        <section className="precision-card rounded-2xl p-5">
+          <p className="text-sm text-white/65">
             Aucune analyse disponible. Depuis le dashboard, envoyez un fichier Excel pour alimenter cette page.
           </p>
         </section>
       ) : (
         <>
-      <section className="quantis-panel p-5">
-        <h2 className="text-sm font-semibold text-quantis-carbon">1) Donnees inserees (Avant)</h2>
-        <p className="mt-2 text-sm text-quantis-slate">
+      <section className="precision-card rounded-2xl p-5 md:p-6">
+        <h2 className="text-sm font-semibold text-white">1) Donnees inserees (Avant)</h2>
+        <p className="mt-2 text-sm text-white/60">
           Donnees extraites depuis le fichier source, puis mappees vers le schema interne.
         </p>
 
         <div className="mt-4">
-          <p className="text-xs uppercase tracking-wide text-quantis-slate">MappedData (champs non nuls)</p>
+          <p className="text-xs uppercase tracking-wide text-white/45">MappedData (champs non nuls)</p>
           {nonNullMappedEntries.length === 0 ? (
-            <p className="mt-1 text-sm text-quantis-slate">Aucune donnee numerique exploitable.</p>
+            <p className="mt-1 text-sm text-white/60">Aucune donnee numerique exploitable.</p>
           ) : (
             <div className="mt-2 grid gap-2 md:grid-cols-2">
               {nonNullMappedEntries.map((entry) => (
-                <div key={entry.key} className="rounded-xl border border-quantis-mist bg-white px-3 py-2 text-sm">
-                  <span className="font-mono text-quantis-carbon">{entry.key}</span>
-                  <span className="ml-2 text-quantis-slate">{formatNumber(entry.value)}</span>
+                <div key={entry.key} className="rounded-xl border border-white/12 bg-white/5 px-3 py-2 text-sm">
+                  <span className="font-mono text-white">{entry.key}</span>
+                  <span className="ml-2 text-white/65">{formatNumber(entry.value)}</span>
                 </div>
               ))}
             </div>
@@ -258,14 +303,14 @@ export function KpiBeforeAfterView() {
         </div>
       </section>
 
-      <section className="quantis-panel p-5">
-        <h2 className="text-sm font-semibold text-quantis-carbon">2) Calculs realises</h2>
-        <p className="mt-2 text-sm text-quantis-slate">
+      <section className="precision-card rounded-2xl p-5 md:p-6">
+        <h2 className="text-sm font-semibold text-white">2) Calculs realises</h2>
+        <p className="mt-2 text-sm text-white/60">
           Recalcul en direct avec le moteur `computeKpis(mappedData)` sur l&apos;analyse selectionnee.
         </p>
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-quantis-mist text-xs uppercase tracking-wide text-quantis-slate">
+            <thead className="border-b border-white/10 text-xs uppercase tracking-wide text-white/45">
               <tr>
                 <th className="px-2 py-2">KPI</th>
                 <th className="px-2 py-2">Formule</th>
@@ -274,10 +319,10 @@ export function KpiBeforeAfterView() {
             </thead>
             <tbody>
               {KPI_FORMULA_CATALOG.map((item) => (
-                <tr key={item.key} className="border-b border-quantis-mist last:border-b-0">
-                  <td className="px-2 py-2 text-quantis-carbon">{item.label}</td>
-                  <td className="px-2 py-2 font-mono text-xs text-quantis-slate">{item.formula}</td>
-                  <td className="px-2 py-2 text-quantis-carbon">
+                <tr key={item.key} className="border-b border-white/10 last:border-b-0">
+                  <td className="px-2 py-2 text-white">{item.label}</td>
+                  <td className="px-2 py-2 font-mono text-xs text-white/55">{item.formula}</td>
+                  <td className="px-2 py-2 text-white/85">
                     {formatMaybeNumber(recalculatedKpis?.[item.key] ?? null)}
                   </td>
                 </tr>
@@ -287,15 +332,15 @@ export function KpiBeforeAfterView() {
         </div>
       </section>
 
-      <section className="quantis-panel p-5">
-        <h2 className="text-sm font-semibold text-quantis-carbon">3) Resultats (Apres)</h2>
+      <section className="precision-card rounded-2xl p-5 md:p-6">
+        <h2 className="text-sm font-semibold text-white">3) Resultats (Apres)</h2>
         <div className="mt-2">
           {mismatchCount === 0 ? (
-            <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            <p className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
               Verification OK: KPI stockes et KPI recalcules sont alignes.
             </p>
           ) : (
-            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            <p className="rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
               {mismatchCount} KPI avec ecart entre la valeur stockee et la valeur recalculee.
             </p>
           )}
@@ -303,7 +348,7 @@ export function KpiBeforeAfterView() {
 
         <div className="mt-3 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-quantis-mist text-xs uppercase tracking-wide text-quantis-slate">
+            <thead className="border-b border-white/10 text-xs uppercase tracking-wide text-white/45">
               <tr>
                 <th className="px-2 py-2">KPI</th>
                 <th className="px-2 py-2">Stocke</th>
@@ -313,19 +358,19 @@ export function KpiBeforeAfterView() {
             </thead>
             <tbody>
               {comparedKpis.map((entry) => (
-                <tr key={entry.key} className="border-b border-quantis-mist last:border-b-0">
-                  <td className="px-2 py-2 font-mono text-quantis-carbon">{entry.key}</td>
-                  <td className="px-2 py-2 text-quantis-carbon">{formatMaybeNumber(entry.stored)}</td>
-                  <td className="px-2 py-2 text-quantis-carbon">{formatMaybeNumber(entry.recalculated)}</td>
+                <tr key={entry.key} className="border-b border-white/10 last:border-b-0">
+                  <td className="px-2 py-2 font-mono text-white">{entry.key}</td>
+                  <td className="px-2 py-2 text-white/85">{formatMaybeNumber(entry.stored)}</td>
+                  <td className="px-2 py-2 text-white/85">{formatMaybeNumber(entry.recalculated)}</td>
                   <td className="px-2 py-2">
                     <span
                       className={
                         entry.matches
-                          ? "rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700"
-                          : "rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700"
+                          ? "rounded-full border border-emerald-400/35 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-200"
+                          : "rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-200"
                       }
                     >
-                      {entry.matches ? "OK" : "Ecart"}
+                      {entry.matches ? "OK" : "Écart"}
                     </span>
                   </td>
                 </tr>
@@ -340,9 +385,9 @@ export function KpiBeforeAfterView() {
         </div>
       </section>
 
-      <section className="quantis-panel p-5">
-        <h2 className="text-sm font-semibold text-quantis-carbon">Complement debug parser</h2>
-        <p className="mt-2 text-sm text-quantis-slate">
+      <section className="precision-card rounded-2xl p-5 md:p-6">
+        <h2 className="text-sm font-semibold text-white">Complement debug parser</h2>
+        <p className="mt-2 text-sm text-white/60">
           Detail des fichiers parses (feuilles lues, fiscalYear detecte, lignes d&apos;apercu).
         </p>
         <div className="mt-4 grid gap-4 xl:grid-cols-2">
@@ -359,8 +404,8 @@ export function KpiBeforeAfterView() {
   );
 }
 
-function formatMaybeNumber(value: number | null): string {
-  if (value === null) {
+function formatMaybeNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined) {
     return "N/D";
   }
   return formatNumber(value);
@@ -388,8 +433,8 @@ function formatAnalysisOption(analysis: AnalysisRecord): string {
 function JsonPanel({ title, value }: { title: string; value: unknown }) {
   return (
     <section>
-      <p className="text-xs uppercase tracking-wide text-quantis-slate">{title}</p>
-      <pre className="mt-2 max-h-80 overflow-auto rounded-xl bg-quantis-paper p-3 text-xs text-quantis-carbon">
+      <p className="text-xs uppercase tracking-wide text-white/45">{title}</p>
+      <pre className="mt-2 max-h-80 overflow-auto rounded-xl border border-white/10 bg-black/25 p-3 text-xs text-white/85">
         {JSON.stringify(value, null, 2)}
       </pre>
     </section>
@@ -405,18 +450,18 @@ function KpiCardGroup({
 }) {
   return (
     <section>
-      <p className="text-xs uppercase tracking-wide text-quantis-slate">{title}</p>
+      <p className="text-xs uppercase tracking-wide text-white/45">{title}</p>
       {entries.length ? (
         <div className="mt-2 grid gap-2 md:grid-cols-2">
           {entries.map((entry) => (
-            <div key={entry.key} className="rounded-xl border border-quantis-mist bg-white px-3 py-2 text-sm">
-              <span className="font-mono text-quantis-carbon">{entry.key}</span>
-              <span className="ml-2 text-quantis-slate">{formatNumber(entry.value)}</span>
+            <div key={entry.key} className="rounded-xl border border-white/12 bg-white/5 px-3 py-2 text-sm">
+              <span className="font-mono text-white">{entry.key}</span>
+              <span className="ml-2 text-white/65">{formatNumber(entry.value)}</span>
             </div>
           ))}
         </div>
       ) : (
-        <p className="mt-2 text-sm text-quantis-slate">Aucune valeur non nulle.</p>
+        <p className="mt-2 text-sm text-white/60">Aucune valeur non nulle.</p>
       )}
     </section>
   );

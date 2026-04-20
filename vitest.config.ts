@@ -4,7 +4,14 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["lib/**/*.test.ts", "services/**/*.test.ts"]
+    // On execute les tests unitaires/integ sur toute l'application (hors E2E Playwright).
+    include: [
+      "lib/**/*.test.ts",
+      "services/**/*.test.ts",
+      "components/**/*.test.tsx",
+      "app/**/*.test.ts",
+      "tests/**/*.test.ts"
+    ]
   },
   resolve: {
     alias: {

@@ -28,6 +28,8 @@ export type MappedFinancialData = {
   immob_corp: number | null;
   immob_fin: number | null;
   total_actif_immo: number | null;
+  total_actif_immo_brut: number | null;
+  total_actif_immo_net: number | null;
   stocks_mp: number | null;
   stocks_march: number | null;
   total_stocks: number | null;
@@ -114,13 +116,16 @@ export type CalculatedKpis = {
   tcam: number | null;
   va: number | null;
   ebitda: number | null;
+  ebe: number | null;
   marge_ebitda: number | null;
   charges_var: number | null;
   mscv: number | null;
   tmscv: number | null;
+  ca: number | null;
   charges_fixes: number | null;
   point_mort: number | null;
   ratio_immo: number | null;
+  ratio_immo_usure?: number | null;
   bfr: number | null;
   rot_bfr: number | null;
   dso: number | null;
@@ -134,20 +139,25 @@ export type CalculatedKpis = {
   liq_gen: number | null;
   liq_red: number | null;
   liq_imm: number | null;
+  disponibilites: number | null;
   roce: number | null;
   roe: number | null;
   effet_levier: number | null;
+  resultat_net: number | null;
   grossMarginRate: number | null;
   netProfit: number | null;
   workingCapital: number | null;
   monthlyBurnRate: number | null;
   cashRunwayMonths: number | null;
+  capacite_remboursement_annees: number | null;
+  etat_materiel_indice: number | null;
   healthScore: number | null;
 };
 
 export type AnalysisRecord = {
   id: string;
   userId: string;
+  folderName: string;
   createdAt: string;
   fiscalYear: number | null;
   sourceFiles: FileDescriptor[];
@@ -156,6 +166,23 @@ export type AnalysisRecord = {
   mappedData: MappedFinancialData;
   financialFacts: FinancialFacts;
   kpis: CalculatedKpis;
+  quantisScore: {
+    quantis_score: number;
+    piliers: {
+      rentabilite: number;
+      solvabilite: number;
+      liquidite: number;
+      efficacite: number;
+    };
+    alerte_investissement: boolean;
+  } | null;
+  uploadContext: {
+    companySize: string | null;
+    sector: string | null;
+    source: "dashboard" | "analysis" | "upload" | "manual";
+  } | null;
+  parserVersion?: "v1" | "v2";
+  pdfType?: "native_text" | "scanned_text" | "image_only";
 };
 
 export type NewAnalysisRecord = Omit<AnalysisRecord, "id">;

@@ -26,5 +26,23 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
     }
+
+    match /folders/{folderId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0;
+
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0;
+
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
   }
 }

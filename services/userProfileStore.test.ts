@@ -22,6 +22,8 @@ import {
   deleteUserProfile,
   getUserProfile,
   markUserEmailAsVerified,
+  saveUserOnboardingTourCompleted,
+  saveUserThemePreference,
   saveUserProfile,
   updateUserProfile
 } from "@/services/userProfileStore";
@@ -39,7 +41,8 @@ describe("userProfileStore", () => {
       companyName: "Quantis SAS",
       siren: "123456789",
       companySize: "pme",
-      sector: "SaaS & Edition de Logiciels"
+      sector: "SaaS & Edition de Logiciels",
+      usageObjectives: ["analyser_comptes"]
     });
 
     expect(firestore.setDoc).toHaveBeenCalledWith(
@@ -102,8 +105,10 @@ describe("userProfileStore", () => {
       siren: "123456789",
       companySize: "pme",
       sector: "SaaS & Edition de Logiciels",
+      usageObjectives: [],
       email: "marie@quantis.fr",
       emailVerified: true,
+      onboardingTourCompleted: false,
       createdAt: "2026-03-01T10:00:00.000Z",
       updatedAt: "2026-03-03T10:00:00.000Z"
     });
@@ -123,6 +128,30 @@ describe("userProfileStore", () => {
       expect.objectContaining({ path: "users/uid-1" }),
       expect.objectContaining({
         firstName: "Marie"
+      }),
+      { merge: true }
+    );
+  });
+
+  it("saves theme preference with merge=true", async () => {
+    await saveUserThemePreference("uid-1", "light");
+
+    expect(firestore.setDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "users/uid-1" }),
+      expect.objectContaining({
+        themePreference: "light"
+      }),
+      { merge: true }
+    );
+  });
+
+  it("saves onboarding completion status with merge=true", async () => {
+    await saveUserOnboardingTourCompleted("uid-1", true);
+
+    expect(firestore.setDoc).toHaveBeenCalledWith(
+      expect.objectContaining({ path: "users/uid-1" }),
+      expect.objectContaining({
+        onboardingTourCompleted: true
       }),
       { merge: true }
     );

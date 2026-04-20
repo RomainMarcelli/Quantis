@@ -1,4 +1,8 @@
-import { isCompanySizeValue, isSectorValue } from "@/lib/onboarding/options";
+import { isCompanySizeValue } from "@/lib/onboarding/options";
+import {
+  isOnboardingObjectiveValue,
+  type OnboardingObjectiveValue
+} from "@/lib/onboarding/objectives";
 import { getPasswordValidationError } from "@/lib/auth/passwordPolicy";
 import type {
   AuthenticatedUser,
@@ -15,6 +19,7 @@ export type RegisterProfilePayload = {
   companySize: string;
   sector: string;
   email: string;
+  usageObjectives: OnboardingObjectiveValue[];
 };
 
 export interface RegisterGateway {
@@ -32,6 +37,7 @@ export function validateRegisterCredentials(
   const password = credentials.password;
   const companyName = credentials.companyName.trim();
   const siren = credentials.siren.trim();
+  const sector = credentials.sector.trim();
 
   if (lastName.length < 2) {
     errors.lastName = "Le nom doit contenir au moins 2 caracteres.";
@@ -70,8 +76,17 @@ export function validateRegisterCredentials(
     errors.companySize = "Veuillez choisir une taille d'entreprise.";
   }
 
-  if (!credentials.sector || !isSectorValue(credentials.sector)) {
+  if (sector.length < 2) {
     errors.sector = "Veuillez choisir un secteur.";
+  }
+
+  const hasOnlyKnownObjectives =
+    Array.isArray(credentials.usageObjectives) &&
+    credentials.usageObjectives.length > 0 &&
+    credentials.usageObjectives.every((objective) => isOnboardingObjectiveValue(objective));
+
+  if (!hasOnlyKnownObjectives) {
+    errors.usageObjectives = "Veuillez sélectionner au moins un objectif d'utilisation.";
   }
 
   return errors;
@@ -90,32 +105,22 @@ export async function registerWithEmailPassword(
     };
   }
 
+  const sanitizedCredentials: RegisterCredentials = {
+    ...credentials,
+    lastName: credentials.lastName.trim(),
+    firstName: credentials.firstName.trim(),
+    email: credentials.email.trim(),
+    companyName: credentials.companyName.trim(),
+    siren: credentials.siren.trim(),
+    sector: credentials.sector.trim(),
+    usageObjectives: credentials.usageObjectives.filter((objective) =>
+      isOnboardingObjectiveValue(objective)
+    )
+  };
+
+  let user: AuthenticatedUser;
   try {
-    const sanitizedCredentials: RegisterCredentials = {
-      ...credentials,
-      lastName: credentials.lastName.trim(),
-      firstName: credentials.firstName.trim(),
-      email: credentials.email.trim(),
-      companyName: credentials.companyName.trim(),
-      siren: credentials.siren.trim()
-    };
-
-    const user = await gateway.register(sanitizedCredentials);
-
-    await gateway.saveProfile(user.uid, {
-      firstName: sanitizedCredentials.firstName,
-      lastName: sanitizedCredentials.lastName,
-      email: sanitizedCredentials.email,
-      companyName: sanitizedCredentials.companyName,
-      siren: sanitizedCredentials.siren,
-      companySize: sanitizedCredentials.companySize,
-      sector: sanitizedCredentials.sector
-    });
-
-    return {
-      success: true,
-      user
-    };
+    user = await gateway.register(sanitizedCredentials);
   } catch (error) {
     return {
       success: false,
@@ -124,6 +129,27 @@ export async function registerWithEmailPassword(
       }
     };
   }
+
+  try {
+    await gateway.saveProfile(user.uid, {
+      firstName: sanitizedCredentials.firstName,
+      lastName: sanitizedCredentials.lastName,
+      email: sanitizedCredentials.email,
+      companyName: sanitizedCredentials.companyName,
+      siren: sanitizedCredentials.siren,
+      companySize: sanitizedCredentials.companySize,
+      sector: sanitizedCredentials.sector,
+      usageObjectives: sanitizedCredentials.usageObjectives
+    });
+  } catch {
+    // Le compte Firebase existe deja a ce stade; on retourne success
+    // pour eviter le faux negatif "erreur puis email deja utilise".
+  }
+
+  return {
+    success: true,
+    user
+  };
 }
 
 function hasValidationErrors(errors: RegisterValidationErrors): boolean {
@@ -136,6 +162,7 @@ function hasValidationErrors(errors: RegisterValidationErrors): boolean {
       errors.siren ||
       errors.companySize ||
       errors.sector ||
+      errors.usageObjectives ||
       errors.general
   );
 }
@@ -162,8 +189,8 @@ function mapFirebaseRegisterError(code: string | undefined): string {
     case "auth/weak-password":
       return "Mot de passe trop faible.";
     case "auth/too-many-requests":
-      return "Trop de tentatives. Reessayez plus tard.";
+      return "Trop de tentatives. Réessayez plus tard.";
     default:
-      return "Inscription impossible pour le moment. Veuillez reessayer.";
+      return "Inscription impossible pour le moment. Veuillez réessayer.";
   }
 }

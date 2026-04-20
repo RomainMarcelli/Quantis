@@ -88,6 +88,7 @@ describe("runAnalysisPipeline", () => {
       charges_var: null,
       mscv: null,
       tmscv: null,
+      ca: 100,
       charges_fixes: null,
       point_mort: null,
       ratio_immo: null,
@@ -104,14 +105,19 @@ describe("runAnalysisPipeline", () => {
       liq_gen: null,
       liq_red: null,
       liq_imm: null,
+      disponibilites: 20,
       roce: null,
       roe: null,
       effet_levier: null,
+      ebe: 12,
+      resultat_net: 60,
       grossMarginRate: 60,
       netProfit: 60,
       workingCapital: null,
       monthlyBurnRate: 0,
       cashRunwayMonths: null,
+      capacite_remboursement_annees: 1.8,
+      etat_materiel_indice: 45,
       healthScore: 82
     });
 
@@ -134,6 +140,7 @@ describe("runAnalysisPipeline", () => {
 
     const result = await runAnalysisPipeline({
       userId: "uid-1",
+      folderName: "Dossier test",
       files
     });
 
@@ -167,6 +174,7 @@ describe("runAnalysisPipeline", () => {
     );
 
     expect(result.userId).toBe("uid-1");
+    expect(result.folderName).toBe("Dossier test");
     expect(result.fiscalYear).toBe(2024);
     expect(result.sourceFiles).toEqual([
       {
@@ -186,6 +194,9 @@ describe("runAnalysisPipeline", () => {
     expect(result.rawData.byLineCode["232"]).toBe(100);
     expect(result.mappedData.total_prod_expl).toBe(100);
     expect(result.mappedData.dispo).toBe(20);
+    expect(result.kpis.ca).toBe(100);
+    expect(result.kpis.disponibilites).toBe(20);
+    expect(result.kpis.capacite_remboursement_annees).toBe(1.8);
     expect(result.kpis.healthScore).toBe(82);
     expect(Number.isNaN(Date.parse(result.createdAt))).toBe(false);
   });
@@ -217,10 +228,12 @@ describe("runAnalysisPipeline", () => {
       tcam: null,
       va: null,
       ebitda: null,
+      ebe: null,
       marge_ebitda: null,
       charges_var: null,
       mscv: null,
       tmscv: null,
+      ca: null,
       charges_fixes: null,
       point_mort: null,
       ratio_immo: null,
@@ -237,19 +250,24 @@ describe("runAnalysisPipeline", () => {
       liq_gen: null,
       liq_red: null,
       liq_imm: null,
+      disponibilites: null,
       roce: null,
       roe: null,
       effet_levier: null,
+      resultat_net: null,
       grossMarginRate: null,
       netProfit: null,
       workingCapital: null,
       monthlyBurnRate: 0,
       cashRunwayMonths: null,
+      capacite_remboursement_annees: null,
+      etat_materiel_indice: null,
       healthScore: null
     });
 
     const result = await runAnalysisPipeline({
       userId: "uid-1",
+      folderName: "Dossier test",
       files: [
         {
           name: "a.xlsx",
