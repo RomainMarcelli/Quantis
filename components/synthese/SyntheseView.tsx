@@ -18,8 +18,6 @@ import {
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
-import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
-import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
@@ -36,6 +34,7 @@ import {
 import { firebaseAuthGateway } from "@/services/auth";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
+import { useAuthenticatedUser } from "@/components/auth/AuthGate";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
@@ -53,8 +52,8 @@ import {
 
 export function SyntheseView() {
   const router = useRouter();
+  const { user } = useAuthenticatedUser();
 
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Quantis");
   const [sector, setSector] = useState<string | null>(null);
@@ -100,29 +99,6 @@ export function SyntheseView() {
   }, [isSidebarCollapsed, isSidebarPreferenceReady]);
 
   useEffect(() => {
-    const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
-      if (!nextUser) {
-        router.replace("/");
-        return;
-      }
-
-      if (!nextUser.emailVerified) {
-        void firebaseAuthGateway.signOut();
-        router.replace("/");
-        return;
-      }
-
-      setUser(nextUser);
-    });
-
-    return unsubscribe;
-  }, [router]);
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-
     void loadSyntheseData(user);
   }, [user]);
 
@@ -401,24 +377,15 @@ export function SyntheseView() {
               greetingName={greetingName}
               companyName={companyName}
               analysisCreatedAt={analysisPair.current.createdAt}
-              onDownloadReport={() => {
-                if (!analysisPair.current) {
-                  return;
-                }
-                void downloadSyntheseReport({
-                  companyName,
-                  greetingName,
-                  analysisCreatedAt: analysisPair.current.createdAt,
-                  selectedYearLabel,
-                  synthese,
-                  kpis: analysisPair.current.kpis,
-                  mappedData: analysisPair.current.mappedData
-                });
-              }}
-              onExportData={() => {
-                if (!analysisPair.current) return;
-                exportAnalysisDataAsJson({ analysis: analysisPair.current, companyName });
-              }}
+              getDownloadInput={() => ({
+                companyName,
+                greetingName,
+                analysisCreatedAt: analysisPair.current!.createdAt,
+                selectedYearLabel,
+                synthese,
+                kpis: analysisPair.current!.kpis,
+                mappedData: analysisPair.current!.mappedData
+              })}
               onReupload={() => router.push("/upload")}
               onManualEntry={() => router.push("/upload/manual")}
               synthese={synthese}

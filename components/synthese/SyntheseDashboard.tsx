@@ -4,9 +4,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, Download, Lightbulb } from "lucide-react";
+import { AlertTriangle, Lightbulb } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { QuantisScoreCard } from "@/components/dashboard/QuantisScoreCard";
+import { DownloadReportButton } from "@/components/analysis/DownloadReportButton";
+import type { DownloadSyntheseReportInput } from "@/lib/synthese/downloadSyntheseReport";
 import type { PremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 
@@ -14,8 +16,7 @@ type SyntheseDashboardProps = {
   greetingName: string;
   companyName: string;
   analysisCreatedAt: string;
-  onDownloadReport: () => void;
-  onExportData?: () => void;
+  getDownloadInput?: () => DownloadSyntheseReportInput;
   onReupload: () => void;
   onManualEntry: () => void;
   synthese: SyntheseViewModel;
@@ -26,8 +27,7 @@ export function SyntheseDashboard({
   greetingName,
   companyName,
   analysisCreatedAt,
-  onDownloadReport,
-  onExportData,
+  getDownloadInput,
   onReupload,
   onManualEntry,
   synthese,
@@ -39,37 +39,16 @@ export function SyntheseDashboard({
 
   return (
     <section className="space-y-4">
-      <header className="precision-card fade-up relative z-10 flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
-        <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
-          <p className="mt-1 text-sm text-white/70">
-            Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}
-            {parserVersion === "v2" && (
-              <span className="ml-2 inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
-                Parser V2
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <button
-            type="button"
-            onClick={onDownloadReport}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Télécharger le rapport
-          </button>
-          {onExportData ? (
-            <button
-              type="button"
-              onClick={onExportData}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
-            >
-              Exporter données
-            </button>
-          ) : null}
-        </div>
+      <header className="precision-card fade-up relative z-10 flex flex-col gap-1 rounded-2xl px-4 py-3 md:px-5">
+        <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
+        <p className="text-sm text-white/70">
+          Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}
+          {parserVersion === "v2" && (
+            <span className="ml-2 inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+              Parser V2
+            </span>
+          )}
+        </p>
       </header>
 
       <DashboardLayout
@@ -82,6 +61,12 @@ export function SyntheseDashboard({
         statusBadgeLabel="Analyse dynamique"
         aiMessage={strategicMessage}
         aiCtaLabel="Ouvrir le plan d'action"
+        headerAction={
+          <DownloadReportButton
+            disabled={!getDownloadInput}
+            getDownloadInput={getDownloadInput ?? (() => { throw new Error("No input"); })}
+          />
+        }
         scoreCard={
           <QuantisScoreCard
             score={synthese.score}

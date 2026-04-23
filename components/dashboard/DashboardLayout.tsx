@@ -33,6 +33,7 @@ type DashboardLayoutProps = {
   aiMessage?: string;
   aiCtaLabel?: string;
   searchIds?: DashboardLayoutSearchIds;
+  headerAction?: ReactNode;
 };
 
 export function DashboardLayout({
@@ -47,7 +48,8 @@ export function DashboardLayout({
   statusBadgeLabel = "Synchronisation active",
   aiMessage,
   aiCtaLabel = "Ouvrir le simulateur strategique",
-  searchIds
+  searchIds,
+  headerAction
 }: DashboardLayoutProps) {
   const healthState = getPremiumHealthState(kpis.healthScore);
 
@@ -92,6 +94,7 @@ export function DashboardLayout({
               {statusBadgeLabel}
             </span>
           </div>
+          {headerAction ? <div className="mt-1">{headerAction}</div> : null}
         </div>
       </header>
 

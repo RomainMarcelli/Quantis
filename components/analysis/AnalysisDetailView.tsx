@@ -61,6 +61,7 @@ import {
   renameUserFoldersByName
 } from "@/services/folderStore";
 import { firebaseAuthGateway } from "@/services/auth";
+import { useAuthenticatedUser } from "@/components/auth/AuthGate";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
@@ -77,9 +78,8 @@ import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
-import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
 import { buildSyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
-import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
+import { DownloadReportButton } from "@/components/analysis/DownloadReportButton";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
@@ -104,7 +104,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const currentCalendarYear = new Date().getFullYear();
   const isDocumentsView = viewMode === "documents";
 
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const { user } = useAuthenticatedUser();
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
@@ -115,7 +115,6 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Quantis");
-  const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [folderActionName, setFolderActionName] = useState<string | null>(null);
@@ -157,34 +156,6 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   }, [isSidebarCollapsed, isSidebarPreferenceReady]);
 
   useEffect(() => {
-    const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
-      if (!nextUser) {
-        setUser(null);
-        setLoadingAuth(false);
-        router.replace("/login");
-        return;
-      }
-
-      if (!nextUser.emailVerified) {
-        void firebaseAuthGateway.signOut();
-        setUser(null);
-        setLoadingAuth(false);
-        router.replace("/login");
-        return;
-      }
-
-      setUser(nextUser);
-      setLoadingAuth(false);
-    });
-
-    return unsubscribe;
-  }, [router]);
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-
     void loadDashboardData(user, analysisId);
   }, [user, analysisId]);
 
@@ -789,29 +760,6 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     await loadDashboardData(user, analysis?.id);
   }
 
-  if (loadingAuth) {
-    return (
-      <section className="precision-card rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Chargement de la session...</p>
-      </section>
-    );
-  }
-
-  if (!user) {
-    return (
-      <section className="precision-card rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/80">Votre session est expirée. Reconnectez-vous pour continuer.</p>
-        <button
-          type="button"
-          onClick={() => router.replace("/login")}
-          className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10"
-        >
-          Se connecter
-        </button>
-      </section>
-    );
-  }
-
   return (
     <section className="w-full space-y-4">
       {/* Bandeau d'actions globales conserve (settings/offres/compte/logout) avec skin premium dark. */}
@@ -1200,48 +1148,30 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             </>
           ) : analysis ? (
             <>
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div />
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!analysis) return;
-                      const synthese = buildSyntheseViewModel(
-                        analysis.kpis,
-                        previousAnalysis?.kpis ?? null,
-                        analysis.uploadContext?.sector ?? null
-                      );
-                      void downloadSyntheseReport({
-                        companyName,
-                        greetingName,
-                        analysisCreatedAt: analysis.createdAt,
-                        selectedYearLabel: selectedDashboardYear,
-                        synthese,
-                        kpis: analysis.kpis,
-                        mappedData: analysis.mappedData
-                      });
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-2 text-xs font-medium text-quantis-gold transition-colors hover:bg-quantis-gold/20"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    Télécharger le rapport
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!analysis) return;
-                      exportAnalysisDataAsJson({ analysis, companyName });
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
-                  >
-                    Exporter données
-                  </button>
-                </div>
-              </div>
               <DashboardFinancialTestMenu
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}
+                rightSlot={
+                  <DownloadReportButton
+                    disabled={!analysis}
+                    getDownloadInput={() => {
+                      const synthese = buildSyntheseViewModel(
+                        analysis!.kpis,
+                        previousAnalysis?.kpis ?? null,
+                        analysis!.uploadContext?.sector ?? null
+                      );
+                      return {
+                        companyName,
+                        greetingName,
+                        analysisCreatedAt: analysis!.createdAt,
+                        selectedYearLabel: selectedDashboardYear,
+                        synthese,
+                        kpis: analysis!.kpis,
+                        mappedData: analysis!.mappedData
+                      };
+                    }}
+                  />
+                }
               />
               <DashboardFinancialTestContent
                 activeTab={activeDashboardTab}

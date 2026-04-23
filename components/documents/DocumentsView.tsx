@@ -39,8 +39,8 @@ import {
   moveAnalysisToFolder
 } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
+import { useAuthenticatedUser } from "@/components/auth/AuthGate";
 import type { AnalysisRecord } from "@/types/analysis";
-import type { AuthenticatedUser } from "@/types/auth";
 
 type FolderDialogState = {
   isOpen: boolean;
@@ -56,7 +56,7 @@ type DeleteFolderConfirm = {
 
 export function DocumentsView() {
   const router = useRouter();
-  const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
+  const { user } = useAuthenticatedUser();
   const [loading, setLoading] = useState(true);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [folderNames, setFolderNames] = useState<string[]>([]);
@@ -65,12 +65,7 @@ export function DocumentsView() {
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteFolderConfirm>({ isOpen: false, folderName: "", analysisCount: 0 });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
 
-  useEffect(() => {
-    return firebaseAuthGateway.subscribe(setUser);
-  }, []);
-
   const loadData = useCallback(async () => {
-    if (!user) return;
     setLoading(true);
     try {
       const [allAnalyses, folders] = await Promise.all([
@@ -173,14 +168,6 @@ export function DocumentsView() {
     if (!user) return;
     await moveAnalysisToFolder(user.uid, id, targetFolder);
     void loadData();
-  }
-
-  if (!user) {
-    return (
-      <section className="precision-card mx-auto max-w-5xl rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Connectez-vous pour accéder à vos documents.</p>
-      </section>
-    );
   }
 
   return (

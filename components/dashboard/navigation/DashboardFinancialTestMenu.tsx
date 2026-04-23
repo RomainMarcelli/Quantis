@@ -2,6 +2,8 @@
 // Role: affiche le menu horizontal principal des sections financières (version design alternative).
 "use client";
 
+import type { ReactNode } from "react";
+
 export type DashboardTestTabId =
   | "creation-valeur"
   | "investissement-bfr"
@@ -18,11 +20,13 @@ const TEST_TABS: Array<{ id: DashboardTestTabId; label: string }> = [
 type DashboardFinancialTestMenuProps = {
   activeTab: DashboardTestTabId | null;
   onChange: (tab: DashboardTestTabId) => void;
+  rightSlot?: ReactNode;
 };
 
 export function DashboardFinancialTestMenu({
   activeTab,
-  onChange
+  onChange,
+  rightSlot
 }: DashboardFinancialTestMenuProps) {
   return (
     <nav
@@ -54,6 +58,7 @@ export function DashboardFinancialTestMenu({
             );
           })}
         </ul>
+        {rightSlot ? <div className="flex items-center self-start xl:self-auto">{rightSlot}</div> : null}
       </div>
     </nav>
   );
