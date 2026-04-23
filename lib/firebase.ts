@@ -1,6 +1,7 @@
 import { type FirebaseOptions, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // Next.js remplace uniquement les acces explicites process.env.NEXT_PUBLIC_*
 // lors du build client. On evite donc toute lecture dynamique process.env[name].
@@ -26,9 +27,10 @@ const firebaseConfig: FirebaseOptions = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-export const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+export const firebaseApp = getApps().length ? getApps()[0]! : initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(firebaseApp);
 export const firestoreDb = getFirestore(firebaseApp);
+export const firebaseStorage = getStorage(firebaseApp);
 export { firebaseConfig };
 
 function requiredEnv(value: string | undefined, name: string): string {
