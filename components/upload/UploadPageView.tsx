@@ -28,6 +28,8 @@ import {
 import type { CompanySizeValue } from "@/lib/onboarding/options";
 import { DEFAULT_FOLDER_NAME, ensureFolderName, setActiveFolderName } from "@/lib/folders/activeFolder";
 import { validateUploadInput } from "@/lib/upload/uploadValidation";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { firebaseStorage } from "@/lib/firebase";
 import { setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import { getPendingAnalysisDraft, savePendingAnalysisDraft } from "@/lib/analysis/pendingAnalysis";
 import { saveAnalysisDraft } from "@/services/analysisStore";
@@ -164,24 +166,61 @@ export function UploadPageView() {
     setSuccessMessage(null);
   }
 
+  async function uploadFileToStorage(file: File, userId: string): Promise<{ pdfUrl: string; fileName: string; fileSize: number }> {
+    const storagePath = `pdfs/${userId}/${Date.now()}_${file.name}`;
+    const storageRef = ref(firebaseStorage, storagePath);
+    await uploadBytes(storageRef, file);
+    const pdfUrl = await getDownloadURL(storageRef);
+    return { pdfUrl, fileName: file.name, fileSize: file.size };
+  }
+
   async function requestAnalysisDraft(
     targetUserId: string,
     sectorValue: string,
     filesToSubmit: File[]
   ): Promise<AnalysisDraft> {
     const folderName = ensureFolderName(DEFAULT_FOLDER_NAME) ?? DEFAULT_FOLDER_NAME;
-    const formData = new FormData();
-    formData.append("userId", targetUserId);
-    formData.append("folderName", folderName);
-    formData.append("companySize", companySize);
-    formData.append("sector", sectorValue);
-    formData.append("source", "upload");
-    filesToSubmit.forEach((file) => formData.append("files", file));
 
-    const response = await fetch("/api/analyses", {
-      method: "POST",
-      body: formData
-    });
+    const uploadedFiles: { pdfUrl: string; fileName: string; fileSize: number }[] = [];
+    const nonPdfFiles: File[] = [];
+
+    for (const file of filesToSubmit) {
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        uploadedFiles.push(await uploadFileToStorage(file, targetUserId));
+      } else {
+        nonPdfFiles.push(file);
+      }
+    }
+
+    let response: Response;
+
+    if (nonPdfFiles.length > 0) {
+      const formData = new FormData();
+      formData.append("userId", targetUserId);
+      formData.append("folderName", folderName);
+      formData.append("companySize", companySize);
+      formData.append("sector", sectorValue);
+      formData.append("source", "upload");
+      if (uploadedFiles.length > 0) {
+        formData.append("storageFiles", JSON.stringify(uploadedFiles));
+      }
+      nonPdfFiles.forEach((file) => formData.append("files", file));
+      response = await fetch("/api/analyses", { method: "POST", body: formData });
+    } else {
+      response = await fetch("/api/analyses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: targetUserId,
+          folderName,
+          companySize,
+          sector: sectorValue,
+          source: "upload",
+          storageFiles: uploadedFiles
+        })
+      });
+    }
+
     const payload = (await response.json()) as {
       analysisDraft?: AnalysisDraft;
       error?: string;

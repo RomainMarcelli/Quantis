@@ -3,10 +3,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runAnalysisPipeline } from "@/services/analysisPipeline";
 import { detectSupportedUploadType } from "@/services/parsers/fileParser";
+import type { UploadedBinaryFile } from "@/services/parsers/fileParser";
 import { enforceRouteRateLimit } from "@/lib/server/rateLimit";
 import { safeLogSecurityEventFromRequest } from "@/lib/server/securityAudit";
 
 export const runtime = "nodejs";
+
+interface StorageFileRef {
+  pdfUrl: string;
+  fileName: string;
+  fileSize: number;
+}
 
 export async function GET() {
   return NextResponse.json(
@@ -18,7 +25,6 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  // Protection anti-abus sur l'endpoint d'upload/calcul le plus coûteux.
   const rateLimitedResponse = enforceRouteRateLimit(request, {
     routeId: "api-analyses-post",
     maxRequests: 12,
@@ -28,73 +34,114 @@ export async function POST(request: NextRequest) {
     return rateLimitedResponse;
   }
 
-  const formData = await request.formData();
-  const userId = String(formData.get("userId") ?? "");
-  const folderName = String(formData.get("folderName") ?? "").trim() || "Dossier principal";
-  const companySize = String(formData.get("companySize") ?? "").trim() || null;
-  const sector = String(formData.get("sector") ?? "").trim() || null;
-  const sourceRaw = String(formData.get("source") ?? "").trim();
-  const source: "dashboard" | "analysis" | "upload" | "manual" =
-    sourceRaw === "analysis" || sourceRaw === "upload" || sourceRaw === "manual"
-      ? sourceRaw
-      : "dashboard";
-
-  if (!userId) {
-    await safeLogSecurityEventFromRequest(request, {
-      source: "api",
-      eventType: "upload_validation_failed",
-      statusCode: 400,
-      userId: null,
-      message: "Upload refusé: userId manquant."
-    });
-    return NextResponse.json({ error: "Le champ userId est obligatoire." }, { status: 400 });
-  }
-
-  const files = formData.getAll("files");
-  if (!files.length) {
-    await safeLogSecurityEventFromRequest(request, {
-      source: "api",
-      eventType: "upload_validation_failed",
-      statusCode: 400,
-      userId,
-      message: "Upload refusé: aucun fichier transmis."
-    });
-    return NextResponse.json({ error: "Au moins un fichier est obligatoire." }, { status: 400 });
-  }
-
   try {
-    const binaryFiles = await Promise.all(
-      files.map(async (candidate) => {
-        if (!(candidate instanceof File)) {
-          throw new Error("Payload fichier invalide.");
-        }
+    const contentType = request.headers.get("content-type") ?? "";
+    let userId: string;
+    let folderName: string;
+    let companySize: string | null;
+    let sector: string | null;
+    let source: "dashboard" | "analysis" | "upload" | "manual";
+    let storageFiles: StorageFileRef[] = [];
+    let formDataFiles: File[] = [];
 
-        const type = detectSupportedUploadType(candidate.name, candidate.type);
-        if (!type) {
-          throw new Error(`Format de fichier non supporte pour ${candidate.name}.`);
-        }
+    if (contentType.includes("application/json")) {
+      const body = await request.json();
+      userId = String(body.userId ?? "");
+      folderName = String(body.folderName ?? "").trim() || "Dossier principal";
+      companySize = body.companySize ? String(body.companySize).trim() : null;
+      sector = body.sector ? String(body.sector).trim() : null;
+      const sourceRaw = String(body.source ?? "").trim();
+      source = sourceRaw === "analysis" || sourceRaw === "upload" || sourceRaw === "manual" ? sourceRaw : "dashboard";
+      storageFiles = Array.isArray(body.storageFiles) ? body.storageFiles : [];
+    } else {
+      const formData = await request.formData();
+      userId = String(formData.get("userId") ?? "");
+      folderName = String(formData.get("folderName") ?? "").trim() || "Dossier principal";
+      companySize = String(formData.get("companySize") ?? "").trim() || null;
+      sector = String(formData.get("sector") ?? "").trim() || null;
+      const sourceRaw = String(formData.get("source") ?? "").trim();
+      source = sourceRaw === "analysis" || sourceRaw === "upload" || sourceRaw === "manual" ? sourceRaw : "dashboard";
+      formDataFiles = formData.getAll("files").filter((f): f is File => f instanceof File);
 
-        const arrayBuffer = await candidate.arrayBuffer();
+      const storageFilesRaw = formData.get("storageFiles");
+      if (typeof storageFilesRaw === "string") {
+        try {
+          storageFiles = JSON.parse(storageFilesRaw);
+        } catch { /* ignore */ }
+      }
+    }
 
-        return {
-          name: candidate.name,
-          mimeType: candidate.type,
-          size: candidate.size,
-          type,
-          buffer: Buffer.from(arrayBuffer)
-        };
-      })
-    );
+    if (!userId) {
+      await safeLogSecurityEventFromRequest(request, {
+        source: "api",
+        eventType: "upload_validation_failed",
+        statusCode: 400,
+        userId: null,
+        message: "Upload refusé: userId manquant."
+      });
+      return NextResponse.json({ error: "Le champ userId est obligatoire." }, { status: 400 });
+    }
+
+    if (!formDataFiles.length && !storageFiles.length) {
+      await safeLogSecurityEventFromRequest(request, {
+        source: "api",
+        eventType: "upload_validation_failed",
+        statusCode: 400,
+        userId,
+        message: "Upload refusé: aucun fichier transmis."
+      });
+      return NextResponse.json({ error: "Au moins un fichier est obligatoire." }, { status: 400 });
+    }
+
+    const binaryFiles: UploadedBinaryFile[] = [];
+
+    for (const sf of storageFiles) {
+      if (!sf.pdfUrl || !sf.fileName) continue;
+
+      const validDomain = sf.pdfUrl.startsWith("https://firebasestorage.googleapis.com/") ||
+        sf.pdfUrl.startsWith("https://storage.googleapis.com/");
+      if (!validDomain) {
+        return NextResponse.json({ error: `URL non autorisée pour ${sf.fileName}.` }, { status: 400 });
+      }
+
+      const res = await fetch(sf.pdfUrl);
+      if (!res.ok) {
+        throw new Error(`Impossible de télécharger ${sf.fileName} depuis Storage (HTTP ${res.status}).`);
+      }
+      const arrayBuffer = await res.arrayBuffer();
+      const type = detectSupportedUploadType(sf.fileName, "application/pdf");
+      if (!type) {
+        throw new Error(`Format de fichier non supporte pour ${sf.fileName}.`);
+      }
+      binaryFiles.push({
+        name: sf.fileName,
+        mimeType: "application/pdf",
+        size: sf.fileSize || arrayBuffer.byteLength,
+        type,
+        buffer: Buffer.from(arrayBuffer)
+      });
+    }
+
+    for (const candidate of formDataFiles) {
+      const type = detectSupportedUploadType(candidate.name, candidate.type);
+      if (!type) {
+        throw new Error(`Format de fichier non supporte pour ${candidate.name}.`);
+      }
+      const arrayBuffer = await candidate.arrayBuffer();
+      binaryFiles.push({
+        name: candidate.name,
+        mimeType: candidate.type,
+        size: candidate.size,
+        type,
+        buffer: Buffer.from(arrayBuffer)
+      });
+    }
 
     const analysisDraft = await runAnalysisPipeline({
       userId,
       folderName,
       files: binaryFiles,
-      uploadContext: {
-        companySize,
-        sector,
-        source
-      }
+      uploadContext: { companySize, sector, source }
     });
 
     await safeLogSecurityEventFromRequest(request, {
@@ -108,17 +155,19 @@ export async function POST(request: NextRequest) {
         filesCount: binaryFiles.length,
         source,
         hasCompanySize: Boolean(companySize),
-        hasSector: Boolean(sector)
+        hasSector: Boolean(sector),
+        storageFilesCount: storageFiles.length
       }
     });
 
     return NextResponse.json({ analysisDraft }, { status: 200 });
   } catch (error) {
+    const userId = "unknown";
     await safeLogSecurityEventFromRequest(request, {
       source: "api",
       eventType: "upload_analysis_failed",
       statusCode: 500,
-      userId: userId || null,
+      userId,
       message: toErrorMessage(error)
     });
     return NextResponse.json(
