@@ -7,6 +7,7 @@ import { mapToQuantisData, type QuantisFinancialData } from "@/services/financia
 import { computeKpis } from "@/services/kpiEngine";
 import { mapParsedFinancialDataToMappedFinancialData } from "@/services/mapping/parsedFinancialDataBridge";
 import { getFirebaseAdminAuth } from "@/lib/server/firebaseAdmin";
+import { AuthError, requireAdmin } from "@/lib/auth/requireAdmin";
 import {
   analyzeFinancialDocument,
   type FieldSelectionTrace,
@@ -124,6 +125,18 @@ type PdfParserHistoryResponse =
   | PdfParserErrorResponse;
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json<PdfParserHistoryResponse>(
+        { success: false, error: error.message },
+        { status: error.status }
+      );
+    }
+    throw error;
+  }
+
   const userId = await resolveAuthenticatedUserId(request);
   if (!userId) {
     return NextResponse.json<PdfParserHistoryResponse>(
@@ -206,6 +219,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json<PdfParserErrorResponse>(
+        { success: false, error: error.message },
+        { status: error.status }
+      );
+    }
+    throw error;
+  }
+
   const userId = await resolveAuthenticatedUserId(request);
   if (!userId) {
     return NextResponse.json<PdfParserErrorResponse>(
