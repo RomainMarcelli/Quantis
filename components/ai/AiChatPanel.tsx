@@ -1,7 +1,11 @@
 // File: components/ai/AiChatPanel.tsx
 // Role: panel latéral droit (480 px desktop, fullscreen mobile) glassmorphism
 // qui héberge la conversation IA. Ouverture slide-in, fermeture par Échap /
-// clic sur backdrop / bouton X. Rendu en blocs structurés (cf. AiResponseCard).
+// touche Échap / bouton X. Rendu en blocs structurés (cf. AiResponseCard).
+//
+// Pas de backdrop dim/blur en mode desktop : la sidebar gauche reste pleinement
+// visible et interactive pendant que le chat est ouvert (UX type panneau
+// latéral non-modal Slack/Linear).
 //
 // ─── Architecture ────────────────────────────────────────────────────────
 //
@@ -19,8 +23,8 @@
 // + saturate 1.2 → on voit le dashboard flou en dessous. Bordure gauche or
 // subtile (1 px rgba(197,160,89,0.3)) + glow doré (-4 px 0 24 px).
 //
-// Slide-in 400 ms ease-out-expo. Backdrop fade 200 ms. Fermeture immédiate
-// (pas de transition de sortie pour rester réactif).
+// Slide-in 400 ms ease-out-expo. Fermeture immédiate (pas de transition de
+// sortie pour rester réactif).
 //
 // Focus trap : Tab boucle dans le panel ; le textarea reçoit le focus
 // auto à l'ouverture (après 100 ms pour laisser l'animation démarrer).
@@ -272,17 +276,10 @@ export function AiChatPanel(props: AiChatPanelProps) {
 
   return (
     <>
-      {/* Backdrop : assombrit l'app et capture le clic pour fermer. */}
-      <div
-        aria-hidden
-        className="vyzor-chat-backdrop fixed inset-0 z-[990]"
-        style={{
-          backgroundColor: "rgba(0, 0, 0, 0.4)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-        }}
-        onClick={props.onClose}
-      />
+      {/* Pas de backdrop dim/blur en mode desktop : on veut garder la sidebar
+          gauche entièrement visible et interactive pendant que le chat est
+          ouvert. Fermeture via le bouton X ou Échap. Sur mobile (< md) le
+          panel prend tout l'écran de toute façon, donc question moot. */}
 
       {/* Panel glassmorphism : 480 px desktop, fullscreen mobile. */}
       <aside
