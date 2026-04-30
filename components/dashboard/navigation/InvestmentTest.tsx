@@ -342,14 +342,12 @@ function InvestmentMetricCard({
   tag,
   value,
   statusLabel,
-  code,
-  helper,
-  icon,
+  // code / helper / icon : conservés dans le contrat, plus rendus.
   trend,
   delayMs,
   className,
   kpiId,
-  kpiValue
+  kpiValue,
 }: InvestmentMetricCardProps) {
   return (
     <article
@@ -363,23 +361,14 @@ function InvestmentMetricCard({
             <h3 className="text-sm font-semibold text-white">{title}</h3>
             <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
-            <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-              {icon}
-            </div>
-          </div>
+          {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
         </div>
         <p className="tnum data-react text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
-        <div className="mt-5 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-white/80">{statusLabel}</span>
-            <KpiTrendPill trend={trend} compact />
-          </div>
-          <span className="text-[10px] font-mono text-white/35">{code}</span>
+        <div className="mt-5 flex items-center gap-2">
+          <span className="text-[11px] text-white/80">{statusLabel}</span>
+          <KpiTrendPill trend={trend} compact />
         </div>
       </div>
-      <p className="edu-text">{helper}</p>
     </article>
   );
 }
@@ -400,7 +389,7 @@ type DelayCardProps = {
   kpiValue?: number | null;
 };
 
-function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, icon, anomaly, kpiId, kpiValue }: DelayCardProps) {
+function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, anomaly, kpiId, kpiValue }: DelayCardProps) {
   const badgeClass =
     badgeTone === "good"
       ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
@@ -413,10 +402,7 @@ function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, icon, ano
     <div className="interactive-badge rounded-xl border border-white/5 bg-white/[0.02] p-5 transition-all hover:border-quantis-gold/30 hover:bg-quantis-gold/[0.03]">
       <div className="mb-4 flex items-start justify-between">
         <span className="text-[10px] uppercase tracking-widest text-white/55">{title}</span>
-        <div className="flex items-center gap-2">
-          {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
-          {icon}
-        </div>
+        {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
       </div>
       <div className="mb-3 flex items-end justify-between gap-2">
         <span className={valueClass}>{value}</span>

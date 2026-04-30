@@ -323,9 +323,6 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
             })}
           </div>
 
-          <p className="edu-text mt-4">
-            Ces ratios mesurent la capacité à régler les dettes court terme avec les actifs court terme.
-          </p>
         </article>
 
         <article
@@ -341,9 +338,8 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
                   Levier financier (gearing)
                 </span>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-                <Scale className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-              </div>
+              {/* L'icône colorée a été retirée pour simplifier — la cellule
+                  s'appuie sur le tooltip ✨ pour les explications. */}
             </div>
 
             <p className="tnum data-react text-[2.6rem] font-semibold leading-none tracking-tight text-white">
@@ -364,7 +360,6 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
               </div>
             </div>
           </div>
-          <p className="edu-text">{leverageInterpretation.helper}</p>
         </article>
 
         <button
@@ -421,14 +416,14 @@ function FinancingMetricCard({
   value,
   trend,
   statusLabel,
-  helper,
-  code,
-  icon,
+  // helper / code / icon : props conservés dans le contrat pour ne pas
+  // casser les call-sites existants, mais plus rendus dans la card depuis
+  // la simplification visuelle (le KpiTooltip ✨ couvre l'explication).
   severity,
   delayMs,
   className,
   kpiId,
-  kpiValue
+  kpiValue,
 }: FinancingMetricCardProps) {
   return (
     <article
@@ -442,23 +437,14 @@ function FinancingMetricCard({
             <h3 className="text-sm font-semibold text-white">{title}</h3>
             <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
-            <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-              {icon}
-            </div>
-          </div>
+          {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
         </div>
         <p className="tnum data-react text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
-        <div className="mt-5 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className={`rounded-md border px-2 py-1 text-[11px] ${severityClass(severity)}`}>{statusLabel}</span>
-            <KpiTrendPill trend={trend} compact />
-          </div>
-          <span className="text-[10px] font-mono text-white/35">{code}</span>
+        <div className="mt-5 flex items-center gap-2">
+          <span className={`rounded-md border px-2 py-1 text-[11px] ${severityClass(severity)}`}>{statusLabel}</span>
+          <KpiTrendPill trend={trend} compact />
         </div>
       </div>
-      <p className="edu-text">{helper}</p>
     </article>
   );
 }

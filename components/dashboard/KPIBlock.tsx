@@ -20,12 +20,22 @@ type KPIBlockProps = {
   tag: string;
   value: number | null;
   format: KPIBlockFormat;
-  icon: ReactNode;
+  /**
+   * Icône de catégorie — laissée dans la signature pour compatibilité avec
+   * les call-sites existants, mais plus rendue dans la card pour
+   * simplifier visuellement (l'icône ✨ du KpiTooltip suffit).
+   */
+  icon?: ReactNode;
   trendValue?: number | null;
+  /**
+   * Libellé "vs période précédente" — supprimé du rendu mais conservé
+   * dans la signature. La phrase explicative est désormais portée
+   * intégralement par le KpiTooltip.
+   */
   trendLabel?: string;
   sideLabel?: string;
   searchId?: string;
-  /** id du KPI dans le registre — déclenche l'affichage du KpiTooltip à côté de l'icône. */
+  /** id du KPI dans le registre — déclenche l'affichage du KpiTooltip. */
   kpiId?: string;
 };
 
@@ -34,9 +44,7 @@ export function KPIBlock({
   tag,
   value,
   format,
-  icon,
   trendValue,
-  trendLabel = "vs période précédente",
   sideLabel,
   searchId,
   kpiId
@@ -52,19 +60,19 @@ export function KPIBlock({
             <h3 className="text-sm font-semibold text-white">{title}</h3>
             <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {kpiId ? <KpiTooltip kpiId={kpiId} value={value} /> : null}
-            <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:scale-110 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-              {icon}
-            </div>
-          </div>
+          {/* Tooltip ✨ seul à droite — la cellule est volontairement compacte
+              maintenant que l'explication détaillée vit dans le tooltip. */}
+          {kpiId ? <KpiTooltip kpiId={kpiId} value={value} /> : null}
         </div>
 
         <div>
           <div className="tnum data-react text-[2.5rem] font-medium leading-none tracking-tight text-white">
             {formatKpiValue(animatedValue, value, format)}
           </div>
-          <div className="mt-5 flex items-center justify-between">
+          {/* Footer : badge tendance OU label de fallback. Le petit libellé
+              "vs période précédente" qui flottait à droite a été retiré —
+              le KpiTooltip explique le contexte si besoin. */}
+          <div className="mt-5 flex items-center">
             {trendValue !== undefined ? (
               <div className="interactive-badge flex items-center gap-2 rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-1">
                 <TrendingUp className="h-3 w-3 text-emerald-500" />
@@ -76,14 +84,9 @@ export function KPIBlock({
                 <span className="text-[11px] font-medium text-white/70">{sideLabel ?? INSUFFICIENT_DATA_LABEL}</span>
               </div>
             )}
-            <span className="text-[10px] font-mono uppercase text-white/30">{trendLabel}</span>
           </div>
         </div>
       </div>
-
-      <p className="edu-text">
-        {title} constitue un indicateur prioritaire de pilotage. La dynamique est mise à jour après chaque analyse.
-      </p>
     </article>
   );
 }

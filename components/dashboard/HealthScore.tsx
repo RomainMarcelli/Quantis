@@ -113,10 +113,6 @@ export function HealthScore({ score, tag = "SCORE_01", searchId }: HealthScorePr
         <div className="rounded-xl border border-white/10 bg-black/25 px-4 py-3">
           <p className="text-[13px] font-medium leading-relaxed text-white/85">{healthState.message}</p>
         </div>
-        <p className="edu-text mt-0 border-t-0 pt-0 text-left">
-          L&apos;indice de santé synthétise la liquidité, la rentabilité et la solvabilité pour piloter la
-          résilience financière.
-        </p>
       </div>
     </article>
   );

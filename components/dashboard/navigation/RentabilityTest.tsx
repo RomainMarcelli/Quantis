@@ -8,7 +8,6 @@ import {
   Award,
   BriefcaseBusiness,
   Cpu,
-  Scale,
 } from "lucide-react";
 import { formatNumber, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
@@ -271,13 +270,6 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
             </div>
           </div>
 
-          <p className="edu-text mt-8">
-            {spread === null
-              ? "Impossible de conclure sans ROE/ROCE."
-              : spread >= 0
-                ? "Effet de levier positif: la dette amplifie la rentabilité actionnariale."
-                : "Effet de levier négatif: la dette pèse sur la rentabilité des fonds propres."}
-          </p>
         </article>
 
         <article
@@ -294,14 +286,8 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
                   Levier financier (dettes / fonds propres)
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <KpiTooltip kpiId="effet_levier" value={kpis.effet_levier} />
-                <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-                  <Scale className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-                </div>
-              </div>
+              <KpiTooltip kpiId="effet_levier" value={kpis.effet_levier} />
             </div>
-            <p className="edu-text mt-0 border-t-0 pt-0">{leverageInterpretation.helper}</p>
           </div>
 
           <div className="w-full md:w-[32%]">
@@ -380,13 +366,12 @@ function RentabilityMetricCard({
   title,
   tag,
   value,
-  helper,
+  // helper / icon : conservés dans le contrat, plus rendus.
   trend,
-  icon,
   delayMs,
   className,
   kpiId,
-  kpiValue
+  kpiValue,
 }: RentabilityMetricCardProps) {
   return (
     <article
@@ -400,19 +385,13 @@ function RentabilityMetricCard({
             <h3 className="text-sm font-semibold text-white">{title}</h3>
             <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
-            <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-              {icon}
-            </div>
-          </div>
+          {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
         </div>
         <p className="tnum data-react text-[3rem] font-semibold leading-none tracking-tight text-white">{value}</p>
         <div className="mt-5 flex items-center gap-2">
           <KpiTrendPill trend={trend} compact />
         </div>
       </div>
-      <p className="edu-text">{helper}</p>
     </article>
   );
 }

@@ -9,7 +9,6 @@ import {
   BarChart3,
   BarChartBig,
   Cpu,
-  Landmark,
   Layers,
   PieChart as PieChartIcon
 } from "lucide-react";
@@ -325,12 +324,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
                 <h3 className="text-sm font-semibold text-white">Ce qu&apos;il reste à la fin</h3>
                 <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">Résultat net</span>
               </div>
-              <div className="flex items-center gap-2">
-                <KpiTooltip kpiId="resultat_net" value={kpis.resultat_net} />
-                <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-                  <Landmark className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-                </div>
-              </div>
+              <KpiTooltip kpiId="resultat_net" value={kpis.resultat_net} />
             </div>
             <div className="mt-2 flex items-center justify-between gap-4">
               <div className="data-react tnum text-[2.6rem] font-semibold leading-none tracking-tight text-white">
@@ -345,7 +339,6 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
               </div>
             </div>
           </div>
-          <p className="edu-text">Le bénéfice final après toutes les charges et impôts.</p>
         </article>
 
         <article
@@ -361,12 +354,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
                   TMSCV
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <KpiTooltip kpiId="tmscv" value={kpis.tmscv} />
-                <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-                  <PieChartIcon className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-                </div>
-              </div>
+              <KpiTooltip kpiId="tmscv" value={kpis.tmscv} />
             </div>
 
             <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -381,9 +369,6 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
               <KpiTrendPill trend={tmscvTrend} compact />
             </div>
           </div>
-          <p className="edu-text">
-            Le TMSCV mesure la marge disponible pour absorber les charges fixes.
-          </p>
         </article>
 
         <article
@@ -458,13 +443,10 @@ function MetricCard({
   tag,
   value,
   footerLabel,
-  footerCode,
   trend,
-  icon,
-  helpText,
   delayMs,
   kpiId,
-  kpiValue
+  kpiValue,
 }: MetricCardProps) {
   return (
     <article
@@ -478,26 +460,22 @@ function MetricCard({
             <h3 className="text-sm font-semibold text-white">{title}</h3>
             <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
-            <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-              {icon}
-            </div>
-          </div>
+          {/* Tooltip ✨ seul à droite — l'icône colorée de catégorie a été
+              retirée pour simplifier la cellule. */}
+          {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
         </div>
         <p className="data-react tnum text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
+        {/* Footer : libellé contextuel à gauche + badge de tendance à
+            droite si dispo. Le petit code mono "vs N-1"/footerCode
+            grisé sur la droite a été supprimé (porté par le tooltip). */}
         <div className="mt-5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
             <span className="text-[11px] text-white/80">{footerLabel}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {trend ? <KpiTrendPill trend={trend} /> : null}
-            <span className="text-[10px] font-mono text-white/35">{footerCode}</span>
-          </div>
+          {trend ? <KpiTrendPill trend={trend} /> : null}
         </div>
       </div>
-      <p className="edu-text">{helpText}</p>
     </article>
   );
 }
