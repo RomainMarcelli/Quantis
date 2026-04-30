@@ -48,6 +48,7 @@ import { useTemporality } from "@/lib/temporality/temporalityContext";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
+import { useAiChat } from "@/components/ai/AiChatProvider";
 import { resolveActiveAnalysis } from "@/lib/source/activeSource";
 import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
@@ -174,6 +175,15 @@ export function SyntheseView() {
 
     return { current, previous };
   }, [allAnalyses, analysesBySelectedYear, activeAnalysisId]);
+
+  // Pousse l'analyse courante au provider du chat IA — permet au backend
+  // d'enrichir les réponses Claude avec les données réelles (kpis, mappedData)
+  // sans que chaque tooltip ait à passer l'analysisId à la main.
+  const { setAnalysisContext } = useAiChat();
+  useEffect(() => {
+    setAnalysisContext(analysisPair.current?.id ?? null);
+    return () => setAnalysisContext(null);
+  }, [analysisPair.current?.id, setAnalysisContext]);
 
   // Filtre temporel global. Si l'analyse a un dailyAccounting (source dynamique Pennylane),
   // les KPI flow (CA, VA, EBITDA…) sont recalculés sur la période sélectionnée. Les KPI bilan

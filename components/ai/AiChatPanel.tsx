@@ -198,6 +198,10 @@ export function AiChatPanel(props: AiChatPanelProps) {
           body: JSON.stringify({
             question: trimmed,
             kpiId: props.kpiId,
+            // kpiValue : passé en clair pour que le mock l'utilise même sans
+            // analysisId (ex. page synthèse, widgets hors analyse). Le
+            // backend privilégie cette valeur sur le lookup `analysis.kpis`.
+            kpiValue: props.kpiValue ?? null,
             analysisId: props.analysisId ?? null,
             conversationId,
             userLevel: level,

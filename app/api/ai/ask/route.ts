@@ -34,6 +34,10 @@ export const runtime = "nodejs";
 type AskBody = {
   question?: unknown;
   kpiId?: unknown;
+  /** Valeur courante du KPI fournie par le front quand l'analyse n'est pas
+   *  contextualisée (analysisId absent). Permet au mock de répondre avec une
+   *  vraie valeur même hors page d'analyse. */
+  kpiValue?: unknown;
   analysisId?: unknown;
   conversationId?: unknown;
   userLevel?: unknown;
@@ -86,6 +90,10 @@ export async function POST(request: NextRequest) {
   }
 
   const kpiId = typeof body.kpiId === "string" && body.kpiId ? body.kpiId : null;
+  const kpiValue =
+    typeof body.kpiValue === "number" && Number.isFinite(body.kpiValue)
+      ? body.kpiValue
+      : null;
   const analysisId =
     typeof body.analysisId === "string" && body.analysisId ? body.analysisId : null;
   const conversationId =
@@ -133,10 +141,14 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Appel IA (mock ou Claude selon l'env) ───────────────────────────
+  // On passe kpiValue en override : le mock l'utilisera directement plutôt
+  // que de chercher dans `analysis.kpis` (utile quand le front a la valeur
+  // mais pas l'analysisId, p.ex. tooltip dans un widget hors page d'analyse).
   const ai = getAiService();
   const aiResponse = await ai.ask({
     question,
     kpiId,
+    kpiValue,
     analysis,
     userLevel,
     history,
