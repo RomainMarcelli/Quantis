@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   FileText,
+  Bot,
   Folder,
   LayoutDashboard,
   Lock,
@@ -63,6 +64,13 @@ import {
 import { firebaseAuthGateway } from "@/services/auth";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
+import { useTemporality } from "@/lib/temporality/temporalityContext";
+import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
+import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
+import { TemporalityBar } from "@/components/temporality/TemporalityBar";
+import { SourceBadge } from "@/components/analysis/SourceBadge";
+import { resolveActiveAnalysis } from "@/lib/source/activeSource";
+import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import {
@@ -77,9 +85,13 @@ import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
-import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
-import { buildSyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
+// Le téléchargement du rapport PDF est introduit par feat/pdf-report.
+// Stub local pour que la branche feat/source-selector compile sans dépendre
+// du module qui n'existe pas encore.
+const downloadFinancialReport = async (
+  _params: { analysisId: string }
+): Promise<string | null> => "feature non disponible sur cette branche";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
@@ -180,13 +192,26 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     return unsubscribe;
   }, [router]);
 
+  // Source active globale (localStorage `quantis.activeAnalysis`). Mise à jour
+  // par le bouton "Synchroniser et activer" du panneau de connexions et par
+  // "Utiliser comme source active" sur les cards de /documents. Si l'URL ne
+  // pointe pas explicitement sur une analyse (analysisId dans la prop), on
+  // se base dessus pour résoudre quelle analyse afficher dans le tableau de
+  // bord. Sans ça, /analysis restait coincé sur la première analyse de
+  // l'historique même après changement de source côté Synthèse.
+  const activeAnalysisIdFromStorage = useActiveAnalysisId();
+
   useEffect(() => {
     if (!user) {
       return;
     }
 
-    void loadDashboardData(user, analysisId);
-  }, [user, analysisId]);
+    // Priorité 1 : l'analysisId explicite venant de l'URL (/analysis/{id}).
+    // Priorité 2 : l'analyse marquée active dans localStorage.
+    // Priorité 3 (fallback dans loadDashboardData) : dossier actif → history[0].
+    const target = analysisId ?? activeAnalysisIdFromStorage ?? undefined;
+    void loadDashboardData(user, target);
+  }, [user, analysisId, activeAnalysisIdFromStorage]);
 
   useEffect(() => {
     if (currentFolder.trim()) {
@@ -255,6 +280,17 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     [allAnalyses, analysis]
   );
 
+  // Filtre temporel global : si l'analyse possède du dailyAccounting (source dynamique
+  // Pennylane), on recalcule les KPI flow (CA, VA, EBITDA, charges…) sur la période
+  // sélectionnée par la TemporalityBar. Les KPI bilan (BFR, dispo, total_cp…) restent
+  // ceux du snapshot car ils sont à un instant T.
+  // Source statique (PDF) : recomputeKpisForPeriod renvoie l'annuel inchangé.
+  const temporality = useTemporality();
+  const effectiveAnalysis = useMemo(() => {
+    if (!analysis) return null;
+    return recomputeKpisForPeriod(analysis, temporality.periodStart, temporality.periodEnd);
+  }, [analysis, temporality.periodStart, temporality.periodEnd]);
+
   useEffect(() => {
     if (!pendingSearchTarget) {
       return;
@@ -313,18 +349,35 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         setAnalysis(analysesInCurrentFolder[0]);
         return;
       }
-      setAnalysis(analysesFilteredByYear[0]);
+      // Aucune analyse dans le dossier actif → on adopte la première analyse disponible
+      // ET on bascule sur son dossier (sinon le check de folder ci-dessous nullifierait
+      // l'analyse au prochain render, créant une boucle setAnalysis(null) ↔ setAnalysis(...)).
+      const fallback = analysesFilteredByYear[0]!;
+      setAnalysis(fallback);
+      if (normalizeFolderName(fallback.folderName) !== normalizeFolderName(currentFolder)) {
+        setCurrentFolder(fallback.folderName);
+      }
       return;
     }
 
     const analysisStillInSelectedYear = analysesFilteredByYear.some((item) => item.id === analysis.id);
     if (!analysisStillInSelectedYear) {
-      setAnalysis(analysesInCurrentFolder[0] ?? analysesFilteredByYear[0] ?? null);
+      const fallback = analysesInCurrentFolder[0] ?? analysesFilteredByYear[0] ?? null;
+      setAnalysis(fallback);
+      if (fallback && normalizeFolderName(fallback.folderName) !== normalizeFolderName(currentFolder)) {
+        setCurrentFolder(fallback.folderName);
+      }
       return;
     }
 
+    // Folder mismatch : si le dossier actif ne contient pas l'analyse, on switch
+    // le dossier au lieu de nullifier l'analyse (sinon oscillation).
     if (normalizeFolderName(analysis.folderName) !== normalizeFolderName(currentFolder)) {
-      setAnalysis(analysesInCurrentFolder[0] ?? null);
+      if (analysesInCurrentFolder.length) {
+        setAnalysis(analysesInCurrentFolder[0]);
+      } else {
+        setCurrentFolder(analysis.folderName);
+      }
     }
   }, [analysis, analysesFilteredByYear, analysesInCurrentFolder, allAnalyses, currentFolder]);
 
@@ -919,15 +972,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             </button>
           </div>
           <nav className="space-y-1 text-sm">
-            <NavRow
-              icon={<LayoutDashboard className="h-4 w-4" />}
-              active={!isDocumentsView}
-              onClick={() => router.push("/analysis")}
-              collapsed={isSidebarCollapsed}
-            >
-              Tableau de bord
-            </NavRow>
-            {/* L'item "Analyses" est remplace par "Synthese" et devient navigable. */}
+            {/* Ordre figé sur tout l'app : Synthèse → Tableau de bord → Documents. */}
             <NavRow
               icon={<Sparkles className="h-4 w-4" />}
               onClick={() => router.push("/synthese")}
@@ -936,12 +981,27 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
               Synthèse
             </NavRow>
             <NavRow
+              icon={<LayoutDashboard className="h-4 w-4" />}
+              active={!isDocumentsView}
+              onClick={() => router.push("/analysis")}
+              collapsed={isSidebarCollapsed}
+            >
+              Tableau de bord
+            </NavRow>
+            <NavRow
               icon={<FileText className="h-4 w-4" />}
               active={isDocumentsView}
               onClick={() => router.push("/documents")}
               collapsed={isSidebarCollapsed}
             >
               Documents
+            </NavRow>
+            <NavRow
+              icon={<Bot className="h-4 w-4" />}
+              onClick={() => router.push("/assistant-ia")}
+              collapsed={isSidebarCollapsed}
+            >
+              Assistant IA
             </NavRow>
           </nav>
 
@@ -1200,32 +1260,60 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             </>
           ) : analysis ? (
             <>
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div />
-                <div className="flex items-center gap-2">
+              {/* Filtre temporel global — identique à /synthese. Caché si source
+                  statique (pas de dailyAccounting) car aucune granularité à
+                  proposer ; remplacé par "Exercice YYYY" en texte simple. */}
+              {shouldShowTemporalityBar(analysis) ? (
+                <TemporalityBar
+                  availableRange={computeAvailableRange(analysis)}
+                  daysInPeriod={effectiveAnalysis?.isFiltered ? effectiveAnalysis.filterSummary.daysInPeriod : null}
+                  rightLabel={
+                    effectiveAnalysis?.isFiltered
+                      ? `${effectiveAnalysis.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
+                      : undefined
+                  }
+                />
+              ) : (
+                <div
+                  className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70"
+                  data-scroll-reveal-ignore
+                >
+                  <span className="text-xs uppercase tracking-wider text-white/45">Période · </span>
+                  <span className="font-semibold text-white">
+                    Exercice {analysis.fiscalYear ?? "(non renseigné)"}
+                  </span>
+                  <span className="ml-2 text-xs text-white/45">— source statique, vue annuelle uniquement</span>
+                </div>
+              )}
+
+              {/* Bandeau utilisateur (identique au header de SyntheseDashboard) :
+                  nom de société + date d'analyse + boutons Télécharger / Exporter. */}
+              <header className="precision-card flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
+                    <span>Analyse du {new Date(analysis.createdAt).toLocaleString("fr-FR")}</span>
+                    <SourceBadge
+                      sourceMetadata={analysis.sourceMetadata ?? null}
+                      analysisCreatedAt={analysis.createdAt}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-start md:self-auto">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!analysis) return;
-                      const synthese = buildSyntheseViewModel(
-                        analysis.kpis,
-                        previousAnalysis?.kpis ?? null,
-                        analysis.uploadContext?.sector ?? null
-                      );
-                      void downloadSyntheseReport({
-                        companyName,
-                        greetingName,
-                        analysisCreatedAt: analysis.createdAt,
-                        selectedYearLabel: selectedDashboardYear,
-                        synthese,
-                        kpis: analysis.kpis,
-                        mappedData: analysis.mappedData
-                      });
+                      const err = await downloadFinancialReport({ analysisId: analysis.id });
+                      if (err) {
+                        // Erreur silencieuse : on log côté console pour debug.
+                        console.warn("[financial-report] download failed", err);
+                      }
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-2 text-xs font-medium text-quantis-gold transition-colors hover:bg-quantis-gold/20"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20"
                   >
                     <FileText className="h-3.5 w-3.5" />
-                    Télécharger le rapport
+                    Télécharger le rapport PDF
                   </button>
                   <button
                     type="button"
@@ -1233,20 +1321,29 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                       if (!analysis) return;
                       exportAnalysisDataAsJson({ analysis, companyName });
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
                   >
                     Exporter données
                   </button>
                 </div>
+              </header>
+
+              {/* Titre + sous-titre (analogue au DashboardLayout de /synthese). */}
+              <div className="px-1">
+                <h1 className="text-2xl font-semibold text-white md:text-3xl">Tableau de bord</h1>
+                <p className="mt-1 text-sm text-white/65">
+                  Bonjour {greetingName}, voici la vue détaillée de vos indicateurs financiers.
+                </p>
               </div>
+
               <DashboardFinancialTestMenu
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}
               />
               <DashboardFinancialTestContent
                 activeTab={activeDashboardTab}
-                kpis={analysis.kpis}
-                mappedData={analysis.mappedData}
+                kpis={effectiveAnalysis?.kpis ?? analysis.kpis}
+                mappedData={effectiveAnalysis?.mappedData ?? analysis.mappedData}
                 previousKpis={previousAnalysis?.kpis ?? null}
               />
             </>
