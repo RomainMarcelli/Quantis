@@ -123,17 +123,19 @@ export async function POST(request: NextRequest) {
     }
 
     for (const candidate of formDataFiles) {
-      const type = detectSupportedUploadType(candidate.name, candidate.type);
+      // Lit le buffer en avance pour permettre le sniff FEC sur les .csv/.txt.
+      const arrayBuffer = await candidate.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const type = detectSupportedUploadType(candidate.name, candidate.type, buffer);
       if (!type) {
         throw new Error(`Format de fichier non supporte pour ${candidate.name}.`);
       }
-      const arrayBuffer = await candidate.arrayBuffer();
       binaryFiles.push({
         name: candidate.name,
         mimeType: candidate.type,
         size: candidate.size,
         type,
-        buffer: Buffer.from(arrayBuffer)
+        buffer,
       });
     }
 

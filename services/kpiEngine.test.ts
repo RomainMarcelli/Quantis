@@ -109,4 +109,28 @@ describe("computeKpis", () => {
 
     expect(result.ca).toBeNull();
   });
+
+  it("returns null healthScore when ca=0 but other signals were extracted (parser failure pattern)", () => {
+    // Reproduit le cas SORETOLE post-sanitization : le CA tombe à 0 (revenue
+    // non extrait), mais workingCapital reste calculable depuis stocks/dettes.
+    // L'ancien comportement renvoyait 100 (workingCapital ≥ 0 → +20/20pts).
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      ventes_march: 0,
+      prod_vendue: 0,
+      total_stocks: 50_000,
+      creances: 10_000,
+      fournisseurs: 8_000
+    });
+
+    expect(result.ca).toBe(0);
+    expect(result.workingCapital).not.toBeNull();
+    expect(result.healthScore).toBeNull();
+  });
+
+  it("preserves null healthScore when no signals at all (legitimate empty input)", () => {
+    const result = computeKpis(createEmptyMappedFinancialData());
+    expect(result.ca).toBeNull();
+    expect(result.healthScore).toBeNull();
+  });
 });
