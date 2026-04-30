@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Plug, RefreshCw, Trash2 } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
+import { writeActiveAnalysisId } from "@/lib/source/activeSource";
 import type { ConnectionDto } from "@/app/api/integrations/connections/route";
 
 type PerConnectionStatus = "idle" | "syncing" | "disconnecting";
@@ -88,11 +89,14 @@ export function ConnectionsPanel({ onChanged }: ConnectionsPanelProps) {
       if (!res.ok) {
         throw new Error((data as { error?: string }).error ?? `Resync échoué (HTTP ${res.status})`);
       }
-      // L'auto-activation de la nouvelle analyse comme source du dashboard
-      // est ajoutée dans la branche `feat/source-selector` (qui introduit
-      // `lib/source/activeSource`). Ici on se contente de rafraîchir la
-      // liste — la conséquence : après resync, l'utilisateur doit cliquer
-      // explicitement sur la card pour activer la source.
+      // Auto-activation : la sync a généré une nouvelle analyse → on la
+      // pose comme source active du dashboard. Sans ça l'utilisateur reste
+      // sur sa source précédente (ex. Excel) sans s'en rendre compte —
+      // c'est le bug remonté par l'utilisateur le 30/04/2026.
+      const analysisId = (data as { analysis?: { analysisId?: string } }).analysis?.analysisId;
+      if (analysisId) {
+        writeActiveAnalysisId(analysisId);
+      }
       await refresh();
       if (onChanged) await onChanged();
     } catch (err) {

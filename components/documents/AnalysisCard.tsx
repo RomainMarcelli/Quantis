@@ -2,9 +2,27 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, ChevronDown, FileSpreadsheet, FileText, FolderInput, Trash2 } from "lucide-react";
+import {
+  BarChart3,
+  CheckCircle2,
+  FileSpreadsheet,
+  FileText,
+  FolderInput,
+  Plug,
+  Star,
+  Trash2,
+} from "lucide-react";
 import { formatCurrency } from "@/components/dashboard/formatting";
+// La constante INSUFFICIENT_DATA_LABEL est introduite par feat/kpi-tooltips
+// dans dashboard/formatting.ts. On inline ici pour que feat/source-selector
+// reste autonome ; la branche kpi-tooltips remplacera par l'import propre.
+const INSUFFICIENT_DATA_LABEL = "Données insuffisantes";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
+import {
+  describeAnalysisSource,
+  getAnalysisSourceKind,
+  writeActiveAnalysisId,
+} from "@/lib/source/activeSource";
 import type { AnalysisRecord } from "@/types/analysis";
 
 type AnalysisCardProps = {
@@ -12,18 +30,47 @@ type AnalysisCardProps = {
   folders: string[];
   onDelete: (id: string) => void;
   onMove: (id: string, targetFolder: string) => void;
+  isActive?: boolean;
+  onSetActive?: (id: string) => void;
 };
 
-export function AnalysisCard({ analysis, folders, onDelete, onMove }: AnalysisCardProps) {
+export function AnalysisCard({ analysis, folders, onDelete, onMove, isActive = false, onSetActive }: AnalysisCardProps) {
   const router = useRouter();
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Détermine la "présentation" de la source : un fichier uploadé garde son
+  // nom et son icône type-fichier ; une source dynamique (Pennylane / MyUnisoft
+  // / Odoo) prend l'icône Plug + le label provider — sinon l'utilisateur voit
+  // "Analyse sans fichier" et ne sait pas que c'est sa sync Pennylane.
+  const sourceKind = getAnalysisSourceKind(analysis);
+  const isDynamic =
+    sourceKind === "pennylane" || sourceKind === "myunisoft" || sourceKind === "odoo";
   const sourceFile = analysis.sourceFiles[0];
-  const fileName = sourceFile?.name ?? "Analyse sans fichier";
-  const fileType = sourceFile?.type ?? "pdf";
+  const description = describeAnalysisSource(analysis);
+  const fileName = isDynamic
+    ? description.label
+    : sourceFile?.name ?? "Analyse sans fichier";
+  const fileType: "pdf" | "excel" | "fec" | "pennylane" | "myunisoft" | "odoo" = isDynamic
+    ? sourceKind
+    : (sourceFile?.type ?? "pdf");
   const ca = analysis.kpis.ca;
   const score = analysis.quantisScore?.quantis_score ?? null;
+
+  // Couleurs par type — étendues aux sources dynamiques pour qu'elles ne
+  // ressemblent pas à un PDF (palette rouge) par accident.
+  const TYPE_VISUALS: Record<
+    typeof fileType,
+    { iconClass: string; bgClass: string; badge: string; badgeClass: string }
+  > = {
+    pdf: { iconClass: "text-rose-400", bgClass: "bg-rose-500/10", badge: "PDF", badgeClass: "bg-rose-500/15 text-rose-300" },
+    excel: { iconClass: "text-emerald-400", bgClass: "bg-emerald-500/10", badge: "EXCEL", badgeClass: "bg-emerald-500/15 text-emerald-300" },
+    fec: { iconClass: "text-cyan-400", bgClass: "bg-cyan-500/10", badge: "FEC", badgeClass: "bg-cyan-500/15 text-cyan-300" },
+    pennylane: { iconClass: "text-quantis-gold", bgClass: "bg-quantis-gold/10", badge: "PENNYLANE", badgeClass: "bg-quantis-gold/15 text-quantis-gold" },
+    myunisoft: { iconClass: "text-violet-300", bgClass: "bg-violet-500/10", badge: "MYUNISOFT", badgeClass: "bg-violet-500/15 text-violet-300" },
+    odoo: { iconClass: "text-fuchsia-300", bgClass: "bg-fuchsia-500/10", badge: "ODOO", badgeClass: "bg-fuchsia-500/15 text-fuchsia-300" },
+  };
+  const visuals = TYPE_VISUALS[fileType];
 
   const scoreColor =
     score === null
@@ -38,7 +85,7 @@ export function AnalysisCard({ analysis, folders, onDelete, onMove }: AnalysisCa
 
   const scoreLabel =
     score === null
-      ? "N/D"
+      ? INSUFFICIENT_DATA_LABEL
       : score >= 80
         ? "Excellent"
         : score >= 60
@@ -59,25 +106,51 @@ export function AnalysisCard({ analysis, folders, onDelete, onMove }: AnalysisCa
     (f) => f.toLowerCase() !== analysis.folderName.toLowerCase()
   );
 
+  // Bordure dorée + halo si active. Opacité réduite si non-active (toujours
+  // consultable via "Voir l'analyse" mais visuellement reléguée).
+  const containerClasses = [
+    "group relative flex flex-col rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5",
+    isActive
+      ? "border-quantis-gold/60 bg-quantis-gold/[0.06] shadow-[0_4px_28px_rgba(245,158,11,0.18)] hover:border-quantis-gold/80"
+      : onSetActive
+        ? "border-white/10 bg-white/[0.04] opacity-75 hover:border-amber-400/40 hover:bg-white/[0.06] hover:opacity-100 hover:shadow-[0_4px_24px_rgba(245,158,11,0.08)]"
+        : "border-white/10 bg-white/[0.04] hover:border-amber-400/40 hover:bg-white/[0.06] hover:shadow-[0_4px_24px_rgba(245,158,11,0.08)]",
+  ].join(" ");
+
+  function handleSetActive() {
+    writeActiveAnalysisId(analysis.id);
+    onSetActive?.(analysis.id);
+  }
+
   return (
     <>
-      <div className="group flex flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/40 hover:bg-white/[0.06] hover:shadow-[0_4px_24px_rgba(245,158,11,0.08)]">
+      <div className={containerClasses}>
+        {isActive ? (
+          <span className="absolute -top-2 left-4 inline-flex items-center gap-1 rounded-full border border-quantis-gold/60 bg-quantis-gold px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black shadow-md">
+            <Star className="h-2.5 w-2.5" />
+            Active
+          </span>
+        ) : null}
         <div className="mb-4 flex items-start gap-3">
-          <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${fileType === "pdf" ? "bg-rose-500/10" : "bg-emerald-500/10"}`}>
-            {fileType === "pdf" ? (
-              <FileText className="h-5 w-5 text-rose-400" />
+          <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${visuals.bgClass}`}>
+            {isDynamic ? (
+              <Plug className={`h-5 w-5 ${visuals.iconClass}`} />
+            ) : fileType === "excel" ? (
+              <FileSpreadsheet className={`h-5 w-5 ${visuals.iconClass}`} />
             ) : (
-              <FileSpreadsheet className="h-5 w-5 text-emerald-400" />
+              <FileText className={`h-5 w-5 ${visuals.iconClass}`} />
             )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="line-clamp-2 text-sm font-medium leading-snug text-white" title={fileName}>
               {fileName}
             </p>
-            <p className="mt-1 text-xs text-white/40">{formattedDate}</p>
+            <p className="mt-1 text-xs text-white/40">
+              {isDynamic ? description.detail : formattedDate}
+            </p>
           </div>
-          <span className={`flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${fileType === "pdf" ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300"}`}>
-            {fileType}
+          <span className={`flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${visuals.badgeClass}`}>
+            {visuals.badge}
           </span>
         </div>
 
@@ -102,6 +175,29 @@ export function AnalysisCard({ analysis, folders, onDelete, onMove }: AnalysisCa
             </span>
           </div>
         </div>
+
+        {/* Bouton "source active" : visible uniquement si onSetActive câblé.
+            État active = bouton désactivé (déjà active, juste un repère visuel).
+            État inactive = bouton secondaire qui pousse l'id en localStorage
+            via writeActiveAnalysisId (déclenche un event que SyntheseView écoute). */}
+        {onSetActive ? (
+          isActive ? (
+            <div className="mb-2 inline-flex items-center justify-center gap-1.5 rounded-xl border border-quantis-gold/40 bg-quantis-gold/10 py-2 text-xs font-semibold text-quantis-gold">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Source active du dashboard
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSetActive}
+              className="mb-2 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 py-2 text-xs font-medium text-white/80 transition-colors hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"
+              title="Utiliser cette analyse comme source du dashboard"
+            >
+              <Star className="h-3.5 w-3.5" />
+              Utiliser comme source active
+            </button>
+          )
+        ) : null}
 
         <div className="mt-auto flex items-center gap-2">
           <button

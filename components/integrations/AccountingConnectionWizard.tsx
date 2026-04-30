@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { writeActiveAnalysisId } from "@/lib/source/activeSource";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -373,11 +374,11 @@ function totalPersisted(data: unknown): number {
  * réussi ne doit pas forcer ce changement pour les autres devices de
  * l'utilisateur. C'est uniquement la session courante qui bascule.
  */
-function activateAnalysisFromSync(_data: unknown): void {
-  // No-op sur cette branche. La logique d'activation de la source active est
-  // introduite dans `feat/source-selector` (qui crée `lib/source/activeSource`).
-  // On garde la fonction comme point d'extension pour que les call-sites
-  // n'aient pas à être modifiés quand la branche source-selector la branche.
+function activateAnalysisFromSync(data: unknown): void {
+  const analysisId = (data as { analysis?: { analysisId?: string } }).analysis?.analysisId;
+  if (analysisId) {
+    writeActiveAnalysisId(analysisId);
+  }
 }
 
 type ConnectedHandler = (recap: ConnectedRecap) => void;
