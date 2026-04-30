@@ -304,6 +304,38 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
     phase: "CT",
   },
 
+  ratio_masse_salariale: {
+    id: "ratio_masse_salariale",
+    label: "Ratio masse salariale / CA",
+    shortLabel: "Masse sal. / CA",
+    category: "creation_valeur",
+    formula: "(Salaires bruts + Charges sociales) / CA × 100",
+    formulaCode: "(salaires + charges_soc) / ca * 100",
+    unit: "percent",
+    tooltip: {
+      explanation:
+        "Sur chaque euro gagné, combien part dans les salaires et les charges. Au-dessus de 60 %, vos salaires pèsent lourd sur votre rentabilité.",
+      goodSign:
+        "Un ratio < 40 % laisse du coussin pour absorber les charges fixes et investir.",
+      badSign:
+        "Au-delà de 70 %, l'équation devient tendue : peu de marge pour absorber un imprévu.",
+      benchmark:
+        "PME services FR : 50-60 %. Industrie : 25-35 %. Tech / SaaS : 35-45 % (sources INSEE ESANE 2022, OPIIEC).",
+    },
+    suggestedQuestions: {
+      whenGood: "Quels postes (commerciaux, R&D…) seraient les plus rentables à étoffer ?",
+      whenBad: "Comment réduire le ratio sans casser la dynamique commerciale ?",
+    },
+    thresholds: { good: 40, warning: 55, danger: 70 },
+    simulation: {
+      levers: ["salaires", "charges_soc"],
+      impactFormula: "Ratio = (salaires + charges_soc) / ca — bouge avec chacune des 3 variables.",
+    },
+    dependencies: ["salaires", "charges_soc", "ca"],
+    sourceLayer: "accounting",
+    phase: "CT",
+  },
+
   charges_var: {
     id: "charges_var",
     label: "Charges variables",

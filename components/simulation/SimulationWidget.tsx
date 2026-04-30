@@ -86,12 +86,14 @@ export function SimulationWidget({ mappedData, initialScenarioId, onClose }: Sim
       if (!scenario) return next;
       // Sync : tout levier hidden qui a le même defaultDelta initial qu'un
       // levier visible suit la valeur du levier visible. C'est la convention
-      // cascade utilisée par le moteur.
+      // cascade utilisée par le moteur. Si le hidden a un `cascadeMultiplier`
+      // (ex. charges TNS à 45 % de la rémunération brute), on l'applique.
       const visible = scenario.levers.find((l) => l.variableCode === code && !l.hidden);
       if (visible) {
         for (const cascade of scenario.levers) {
           if (cascade.hidden && cascade.defaultDelta === visible.defaultDelta) {
-            next[cascade.variableCode] = value;
+            const multiplier = cascade.cascadeMultiplier ?? 1;
+            next[cascade.variableCode] = value * multiplier;
           }
         }
       }

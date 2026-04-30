@@ -47,6 +47,13 @@ export type SimulationLever = {
    * polluer l'UI avec des champs techniques que le dirigeant n'a pas à voir.
    */
   hidden?: boolean;
+  /**
+   * Pour les leviers cachés en cascade : multiplicateur appliqué à la valeur
+   * du levier visible parent. Ex. dans `remuneration_dirigeant`, les charges
+   * TNS suivent à 45 % le delta de rémunération brute. Défaut implicite : 1
+   * (le hidden mime la valeur du visible).
+   */
+  cascadeMultiplier?: number;
 };
 
 export type SimulationScenario = {
@@ -265,6 +272,88 @@ export const SIMULATION_SCENARIOS: SimulationScenario[] = [
       },
     ],
     affectedKpis: ["tn", "gearing", "solvabilite", "capacite_remboursement_annees", "liq_imm"],
+  },
+
+  {
+    id: "analyse_masse_salariale",
+    label: "👥 Impact de ma masse salariale",
+    description:
+      "Votre masse salariale (salaires + charges) représente une part significative de votre CA. Ce simulateur vous montre l'impact d'une variation : que se passe-t-il si vous embauchez, augmentez les salaires, ou réduisez les effectifs ? Voyez comment le poids des salaires influence votre EBE, votre point mort et votre résultat.",
+    levers: [
+      {
+        variableCode: "salaires",
+        label: "Masse salariale brute",
+        type: "percent",
+        min: -30,
+        max: 30,
+        step: 1,
+        defaultDelta: 0,
+      },
+      {
+        // Cascade : les charges sociales suivent la même variation que les
+        // salaires (en % aligné). Hidden — l'utilisateur ne voit qu'un seul
+        // curseur "masse salariale" mais l'engine bouge bien les deux.
+        variableCode: "charges_soc",
+        label: "Charges sociales (cascade)",
+        type: "percent",
+        min: -30,
+        max: 30,
+        step: 1,
+        defaultDelta: 0,
+        hidden: true,
+      },
+    ],
+    affectedKpis: [
+      "ebitda",
+      "marge_ebitda",
+      "charges_fixes",
+      "point_mort",
+      "caf",
+      "ratio_masse_salariale",
+    ],
+  },
+
+  {
+    id: "remuneration_dirigeant",
+    label: "👔 Ma rémunération de dirigeant",
+    description:
+      "Vous hésitez sur le montant de votre rémunération ? Saisissez le montant brut annuel que vous envisagez. Le simulateur calcule le coût total (brut + charges TNS ≈ 45 %) et montre l'impact sur votre EBE, votre résultat net et votre provision IS. Trouvez le juste équilibre entre vous rémunérer et préserver l'entreprise.",
+    levers: [
+      {
+        // Le moteur travaille en delta absolute annuel sur `salaires`. Le
+        // widget peut afficher l'équivalent mensuel via `value/12` à côté du
+        // slider, mais la grandeur de référence reste l'annuel pour rester
+        // cohérent avec les autres scénarios et les variables 2033-SD.
+        variableCode: "salaires",
+        label: "Rémunération brute annuelle envisagée",
+        type: "absolute",
+        min: 0,
+        max: 180_000,
+        step: 3_000,
+        defaultDelta: 0,
+      },
+      {
+        // Cascade automatique : charges TNS = 45 % du delta de rémunération
+        // brute (cascadeMultiplier=0.45). Hidden — propagée par le widget.
+        variableCode: "charges_soc",
+        label: "Charges TNS (≈ 45 %)",
+        type: "absolute",
+        min: 0,
+        max: 81_000,
+        step: 1_350,
+        defaultDelta: 0,
+        hidden: true,
+        cascadeMultiplier: 0.45,
+      },
+    ],
+    affectedKpis: [
+      "ebitda",
+      "marge_ebitda",
+      "charges_fixes",
+      "point_mort",
+      "caf",
+      "ratio_masse_salariale",
+    ],
   },
 
   {

@@ -152,6 +152,10 @@ export type CalculatedKpis = {
   capacite_remboursement_annees: number | null;
   etat_materiel_indice: number | null;
   healthScore: number | null;
+  /** Ratio masse salariale (salaires + charges_soc) / CA × 100. Indicateur
+   *  d'intensité main-d'œuvre — alimente les scénarios "analyse masse salariale"
+   *  et "rémunération dirigeant". Optionnel pour ne pas casser les fixtures. */
+  ratio_masse_salariale?: number | null;
 };
 
 export type AnalysisRecord = {

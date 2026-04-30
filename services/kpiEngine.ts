@@ -67,6 +67,12 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const monthlyBurnRate = netProfit !== null && netProfit < 0 ? round(Math.abs(netProfit) / 12) : 0;
   const cashRunwayMonths = monthlyBurnRate > 0 ? div(data.dispo, monthlyBurnRate) : null;
 
+  // Ratio masse salariale / CA — sur chaque euro de CA, combien part en
+  // rémunération (bruts + charges patronales). Au-delà de 60 % le poids
+  // de la main-d'œuvre devient un signal de fragilité opérationnelle.
+  const masseSalariale = sumPartial(data.salaires, data.charges_soc);
+  const ratio_masse_salariale = percent(div(masseSalariale, ca));
+
   return {
     tcam: roundOrNull(tcam),
     ca: roundOrNull(ca),
@@ -111,7 +117,8 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
       netProfit,
       workingCapital,
       cashRunwayMonths
-    })
+    }),
+    ratio_masse_salariale: roundOrNull(ratio_masse_salariale)
   };
 }
 

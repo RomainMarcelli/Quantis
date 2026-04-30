@@ -137,6 +137,106 @@ describe("runSimulation", () => {
   });
 });
 
+describe("ratio_masse_salariale (kpiEngine)", () => {
+  it("calcule (salaires + charges_soc) / ca × 100", () => {
+    const base = {
+      ...createEmptyMappedFinancialData(),
+      ventes_march: 0,
+      prod_vendue: 500_000,
+      total_prod_expl: 500_000,
+      salaires: 200_000,
+      charges_soc: 90_000,
+    };
+    // Le moteur renvoie le ratio depuis computeKpis — on passe par
+    // runSimulation pour récupérer baselineKpis sans imports croisés.
+    const scenario = getSimulationScenario("analyse_masse_salariale")!;
+    const { baselineKpis } = runSimulation(scenario, base, { salaires: 0, charges_soc: 0 });
+    // (200_000 + 90_000) / 500_000 × 100 = 58 %
+    expect(baselineKpis.ratio_masse_salariale).toBeCloseTo(58, 1);
+  });
+});
+
+describe("scénario analyse_masse_salariale", () => {
+  const baseline = {
+    ...createEmptyMappedFinancialData(),
+    ventes_march: 0,
+    prod_vendue: 500_000,
+    total_prod_expl: 500_000,
+    achats_march: 50_000,
+    achats_mp: 30_000,
+    ace: 80_000,
+    salaires: 200_000,
+    charges_soc: 90_000,
+    impots_taxes: 10_000,
+    dap: 15_000,
+  };
+
+  it("+10 % de masse salariale → EBITDA baisse de (salaires + charges) × 10 %", () => {
+    const scenario = getSimulationScenario("analyse_masse_salariale")!;
+    const result = runSimulation(scenario, baseline, {
+      salaires: 10,
+      charges_soc: 10, // cascade : même % que salaires
+    });
+
+    // EBE = VA − (impôts + salaires + charges_soc + dap)
+    // Delta EBE = − (200_000 × 0.1 + 90_000 × 0.1) = −29 000
+    const ebitdaDelta = result.simulatedKpis.ebitda! - result.baselineKpis.ebitda!;
+    expect(ebitdaDelta).toBeCloseTo(-29_000, 0);
+  });
+
+  it("+10 % de masse salariale → point mort remonte (charges fixes en hausse)", () => {
+    const scenario = getSimulationScenario("analyse_masse_salariale")!;
+    const result = runSimulation(scenario, baseline, {
+      salaires: 10,
+      charges_soc: 10,
+    });
+
+    // charges_fixes = ace + salaires + charges_soc + dap
+    // Delta = 200_000 × 0.1 + 90_000 × 0.1 = 29 000
+    // point_mort = charges_fixes / tmscv → augmente proportionnellement.
+    const pmBefore = result.baselineKpis.point_mort!;
+    const pmAfter = result.simulatedKpis.point_mort!;
+    expect(pmAfter).toBeGreaterThan(pmBefore);
+  });
+});
+
+describe("scénario remuneration_dirigeant", () => {
+  const baseline = {
+    ...createEmptyMappedFinancialData(),
+    ventes_march: 0,
+    prod_vendue: 500_000,
+    total_prod_expl: 500_000,
+    achats_march: 50_000,
+    achats_mp: 30_000,
+    ace: 80_000,
+    salaires: 0,
+    charges_soc: 0,
+    impots_taxes: 10_000,
+    dap: 15_000,
+  };
+
+  it("3 000 €/mois brut (= 36 000 € annuel) + TNS 45 % → coût total 52 200 €/an, EBITDA chute d'autant", () => {
+    const scenario = getSimulationScenario("remuneration_dirigeant")!;
+    // 3 000 × 12 = 36 000 € de rémunération brute annuelle
+    // Charges TNS ≈ 45 % = 16 200 €
+    // Coût total annuel = 52 200 €
+    const result = runSimulation(scenario, baseline, {
+      salaires: 36_000,
+      charges_soc: 16_200, // = 36_000 × 0.45 (cascadeMultiplier appliqué côté UI)
+    });
+
+    const ebitdaDelta = result.simulatedKpis.ebitda! - result.baselineKpis.ebitda!;
+    expect(ebitdaDelta).toBeCloseTo(-52_200, 0);
+  });
+
+  it("le scénario expose la cascade charges_soc avec cascadeMultiplier=0.45", () => {
+    const scenario = getSimulationScenario("remuneration_dirigeant")!;
+    const cascadeLever = scenario.levers.find((l) => l.variableCode === "charges_soc");
+    expect(cascadeLever?.hidden).toBe(true);
+    expect(cascadeLever?.cascadeMultiplier).toBe(0.45);
+  });
+});
+
 describe("SIMULATION_SCENARIOS catalog", () => {
   it("contient au moins 5 scénarios", () => {
     expect(SIMULATION_SCENARIOS.length).toBeGreaterThanOrEqual(5);
