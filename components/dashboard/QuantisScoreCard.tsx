@@ -86,9 +86,18 @@ export function QuantisScoreCard({
         </svg>
 
         <div className="absolute flex flex-col items-center gap-3">
-          <span className="tnum data-react text-[6.8rem] font-semibold leading-none text-white md:text-[7.2rem]">
-            {score === null ? "N/D" : Math.round(animatedScore)}
-          </span>
+          {score === null ? (
+            // Cohérent avec HealthScore : tiret au lieu d'un "N/D" en gros qui
+            // se lit mal dans le cadran. Le label "Données insuffisantes" est
+            // porté par scoreState.label dans le badge ci-dessous.
+            <span className="tnum text-[6.8rem] font-semibold leading-none text-white/40 md:text-[7.2rem]">
+              —
+            </span>
+          ) : (
+            <span className="tnum data-react text-[6.8rem] font-semibold leading-none text-white md:text-[7.2rem]">
+              {Math.round(animatedScore)}
+            </span>
+          )}
           <div className="interactive-badge flex items-center gap-2 rounded border border-white/15 bg-white/[0.03] px-3 py-1">
             <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: scoreState.colorHex }} />
             <span
@@ -125,7 +134,7 @@ export function QuantisScoreCard({
 
 function getQuantisScoreState(score: number | null): { label: string; colorHex: string } {
   if (score === null) {
-    return { label: "Indéterminé", colorHex: "#8b8b93" };
+    return { label: "Données insuffisantes", colorHex: "#8b8b93" };
   }
   if (score > 80) {
     return { label: "Excellent", colorHex: "#10B981" };

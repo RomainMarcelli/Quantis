@@ -7,31 +7,35 @@ import { useMemo } from "react";
 import { AlertTriangle, Download, Lightbulb } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { QuantisScoreCard } from "@/components/dashboard/QuantisScoreCard";
+import { SourceBadge } from "@/components/analysis/SourceBadge";
 import type { PremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
+import type { SourceMetadata } from "@/types/connectors";
 
 type SyntheseDashboardProps = {
   greetingName: string;
   companyName: string;
   analysisCreatedAt: string;
-  onDownloadReport: () => void;
+  onDownloadFinancialReport?: () => void;
   onExportData?: () => void;
   onReupload: () => void;
   onManualEntry: () => void;
   synthese: SyntheseViewModel;
   parserVersion?: "v1" | "v2";
+  sourceMetadata?: SourceMetadata | null;
 };
 
 export function SyntheseDashboard({
   greetingName,
   companyName,
   analysisCreatedAt,
-  onDownloadReport,
+  onDownloadFinancialReport,
   onExportData,
   onReupload,
   onManualEntry,
   synthese,
-  parserVersion
+  parserVersion,
+  sourceMetadata
 }: SyntheseDashboardProps) {
   const cockpitKpis = useMemo(() => toCockpitKpis(synthese), [synthese]);
   const strategicMessage = synthese.actions[0] ?? "Maintenir la trajectoire actuelle et suivre les KPI chaque semaine.";
@@ -42,24 +46,27 @@ export function SyntheseDashboard({
       <header className="precision-card fade-up relative z-10 flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
-          <p className="mt-1 text-sm text-white/70">
-            Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
+            <span>Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}</span>
+            <SourceBadge sourceMetadata={sourceMetadata} analysisCreatedAt={analysisCreatedAt} />
             {parserVersion === "v2" && (
-              <span className="ml-2 inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+              <span className="inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
                 Parser V2
               </span>
             )}
-          </p>
+          </div>
         </div>
         <div className="flex items-center gap-2 self-start md:self-auto">
-          <button
-            type="button"
-            onClick={onDownloadReport}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Télécharger le rapport
-          </button>
+          {onDownloadFinancialReport ? (
+            <button
+              type="button"
+              onClick={onDownloadFinancialReport}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Télécharger le rapport PDF
+            </button>
+          ) : null}
           {onExportData ? (
             <button
               type="button"
@@ -169,7 +176,7 @@ function toCockpitKpis(synthese: SyntheseViewModel): PremiumKpis {
 
   return {
     ca: revenue?.value ?? null,
-    tresorerie: cash?.value ?? null,
+    disponibilites: cash?.value ?? null,
     ebe: ebe?.value ?? null,
     healthScore: synthese.score,
     croissance: revenue?.trend.changePercent ?? null,

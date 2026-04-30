@@ -7,11 +7,12 @@ import {
   ComposedChart,
   Line,
   ReferenceArea,
+  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
-import { formatPercent } from "@/components/dashboard/formatting";
+import { formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { BreakEvenFullscreenModal } from "@/components/dashboard/navigation/BreakEvenFullscreenModal";
 import { BreakEvenPointGuide, BreakEvenPointMarker } from "@/components/dashboard/navigation/BreakEvenPointMarker";
 import { BreakEvenTooltip } from "@/components/dashboard/navigation/BreakEvenTooltip";
@@ -76,7 +77,7 @@ function BreakEvenChartComponent({ model, isDark }: BreakEvenChartProps) {
         />
         <SummaryCard
           label="TMSCV retenu"
-          value={model.metrics.tmscv === null ? "N/D" : formatPercent(model.metrics.tmscv, 1)}
+          value={model.metrics.tmscv === null ? INSUFFICIENT_DATA_LABEL : formatPercent(model.metrics.tmscv, 1)}
           hint="Calculé sur les ventes de marchandises + la production vendue."
           isDark={isDark}
           tone={model.metrics.tmscv !== null && model.metrics.tmscv > 0 ? "success" : "danger"}
@@ -199,10 +200,14 @@ function BreakEvenChartCanvas({
       ) : null}
 
       {model.hasUsableData ? (
+        // ResponsiveContainer (au lieu du `responsive` prop direct sur ComposedChart) :
+        // dans recharts 3.x avec React 19, le `responsive` prop déclenche une boucle
+        // ResizeObserver → setState → re-render → re-attach ref → setState → "Maximum
+        // update depth exceeded". ResponsiveContainer est l'API stable et utilise un debounce
+        // interne sur les changements de taille, ce qui supprime la boucle.
+        <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={model.points}
-          responsive
-          style={{ width: "100%", height: "100%", overflow: "visible" }}
           margin={CHART_MARGIN}
         >
           <defs>
@@ -344,6 +349,7 @@ function BreakEvenChartCanvas({
             />
           ) : null}
         </ComposedChart>
+        </ResponsiveContainer>
       ) : (
         <div className="flex h-full items-center justify-center px-6 text-center">
           <p className={`max-w-md text-sm ${isDark ? "text-white/60" : "text-slate-600"}`}>
@@ -420,7 +426,7 @@ function formatAxisCurrency(value: number): string {
 
 function formatCurrencyValue(value: number | null): string {
   if (value === null || Number.isNaN(value)) {
-    return "N/D";
+    return INSUFFICIENT_DATA_LABEL;
   }
 
   return new Intl.NumberFormat("fr-FR", {
