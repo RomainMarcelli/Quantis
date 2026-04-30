@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
+import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { BreakEvenChart } from "@/components/dashboard/navigation/BreakEvenChart";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
@@ -241,6 +242,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           helpText="Le chiffre d'affaires totalise l'ensemble des ventes de biens et services."
           kpiId="ca"
           kpiValue={kpis.ca}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={150}
@@ -255,6 +257,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           helpText="Le TCAM mesure la dynamique de croissance moyenne annuelle."
           kpiId="tcam"
           kpiValue={kpis.tcam}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={200}
@@ -269,6 +272,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           helpText="L'EBE indique la richesse générée par l'exploitation."
           kpiId="ebe"
           kpiValue={kpis.ebe}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={220}
@@ -283,6 +287,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           helpText="La valeur ajoutée mesure la richesse réellement créée par l'entreprise."
           kpiId="va"
           kpiValue={kpis.va}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={240}
@@ -297,6 +302,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           helpText="Part de la production transformée en excédent brut d'exploitation."
           kpiId="marge_ebitda"
           kpiValue={kpis.marge_ebitda}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={260}
@@ -311,6 +317,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           helpText="CA minimum pour couvrir l'ensemble des charges fixes."
           kpiId="point_mort"
           kpiValue={kpis.point_mort}
+          previousKpis={previousKpis}
         />
 
         <article
@@ -422,19 +429,29 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
 
 type MetricCardProps = {
   searchId?: string;
+  /** Titre vulgarisé (ligne 2). */
   title: string;
+  /** Nom officiel uppercase (ligne 1). */
   tag: string;
+  /** Valeur formatée affichée en grand. */
   value: string;
-  footerLabel: string;
-  footerCode: string;
-  trend?: KpiTrend;
-  icon: ReactNode;
-  helpText: string;
   delayMs: number;
-  /** id du KPI dans le registre — déclenche l'affichage du KpiTooltip à côté de l'icône. */
+  /** id du KPI dans le registre — déclenche tooltip + diagnostic + badge. */
   kpiId?: string;
-  /** Valeur numérique courante du KPI — sert au tooltip pour calculer le diagnostic. */
+  /** Valeur numérique courante — sert au tooltip et au diagnostic. */
   kpiValue?: number | null;
+  /**
+   * Tous les KPIs de la période précédente. La card va y chercher la
+   * valeur correspondant à son kpiId pour calculer la variation +/-X%.
+   * Plus pratique que de passer `kpiPreviousValue` à chaque call-site.
+   */
+  previousKpis?: CalculatedKpis | null;
+  /** Props legacy conservés pour compat — plus rendus. */
+  footerLabel?: string;
+  footerCode?: string;
+  trend?: KpiTrend;
+  icon?: ReactNode;
+  helpText?: string;
 };
 
 function MetricCard({
@@ -442,41 +459,31 @@ function MetricCard({
   title,
   tag,
   value,
-  footerLabel,
-  trend,
   delayMs,
   kpiId,
   kpiValue,
+  previousKpis,
 }: MetricCardProps) {
+  const previousValue =
+    kpiId && previousKpis
+      ? (previousKpis as Record<string, number | null>)[kpiId] ?? null
+      : null;
   return (
-    <article
-      className="precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 md:col-span-4"
+    <div
+      className="col-span-1 md:col-span-4"
       style={{ animationDelay: `${delayMs}ms` }}
-      data-search-id={searchId}
     >
-      <div>
-        <div className="card-header flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-            <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
-          </div>
-          {/* Tooltip ✨ seul à droite — l'icône colorée de catégorie a été
-              retirée pour simplifier la cellule. */}
-          {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
-        </div>
-        <p className="data-react tnum text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
-        {/* Footer : libellé contextuel à gauche + badge de tendance à
-            droite si dispo. Le petit code mono "vs N-1"/footerCode
-            grisé sur la droite a été supprimé (porté par le tooltip). */}
-        <div className="mt-5 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
-            <span className="text-[11px] text-white/80">{footerLabel}</span>
-          </div>
-          {trend ? <KpiTrendPill trend={trend} /> : null}
-        </div>
-      </div>
-    </article>
+      <KpiCardLayout
+        kpiId={kpiId}
+        fullName={tag}
+        title={title}
+        value={kpiValue ?? null}
+        previousValue={previousValue}
+        formattedValue={value}
+        searchId={searchId}
+        className="fade-up"
+      />
+    </div>
   );
 }
 

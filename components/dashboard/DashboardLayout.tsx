@@ -24,6 +24,12 @@ type DashboardLayoutProps = {
   companyName: string;
   greetingName: string;
   kpis: PremiumKpis;
+  /**
+   * KPIs de la période antérieure de même durée — passés aux KPIBlock /
+   * KPIWide pour calculer la variation +/-X% sur chaque card.
+   * Optionnel ; null/undefined = pas de variation affichée.
+   */
+  previousKpis?: PremiumKpis | null;
   children?: ReactNode;
   scoreCard?: ReactNode;
   title?: string;
@@ -39,6 +45,7 @@ export function DashboardLayout({
   companyName,
   greetingName,
   kpis,
+  previousKpis,
   children,
   scoreCard,
   title = "Cockpit financier",
@@ -107,10 +114,8 @@ export function DashboardLayout({
             title="Ce qui rentre"
             tag="Chiffre d'Affaires"
             value={kpis.ca}
+            previousValue={previousKpis?.ca ?? null}
             format="currency"
-            trendValue={kpis.croissance}
-            trendLabel="vs M-1"
-            icon={<ArrowUpRight className="h-4 w-4 text-white/40 group-hover:text-quantis-gold" />}
             searchId={searchIds?.revenue}
             kpiId="ca"
           />
@@ -119,10 +124,9 @@ export function DashboardLayout({
             title="Sur le compte"
             tag="Disponibilités"
             value={kpis.disponibilites}
+            previousValue={previousKpis?.disponibilites ?? null}
             format="currency"
             sideLabel={`Runway: ${formatMonths(kpis.runway)}`}
-            trendLabel="LIQUIDITE"
-            icon={<Wallet className="h-4 w-4 text-white/40 group-hover:text-quantis-gold" />}
             searchId={searchIds?.cash}
             kpiId="disponibilites"
           />
@@ -131,6 +135,7 @@ export function DashboardLayout({
             title="Ce qu'il reste vraiment"
             tag="Excédent brut d'exploitation"
             value={kpis.ebe}
+            previousValue={previousKpis?.ebe ?? null}
             target={50000}
             searchId={searchIds?.ebe}
             kpiId="ebe"

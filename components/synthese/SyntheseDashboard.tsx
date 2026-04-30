@@ -11,6 +11,7 @@ import { SourceBadge } from "@/components/analysis/SourceBadge";
 import type { PremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import type { SourceMetadata } from "@/types/connectors";
+import type { CalculatedKpis } from "@/types/analysis";
 
 type SyntheseDashboardProps = {
   greetingName: string;
@@ -23,6 +24,13 @@ type SyntheseDashboardProps = {
   synthese: SyntheseViewModel;
   parserVersion?: "v1" | "v2";
   sourceMetadata?: SourceMetadata | null;
+  /**
+   * KPIs de la période antérieure de même durée. Calculés une seule
+   * fois côté SyntheseView via `recomputeKpisForPeriod` sur la période
+   * précédente — propagés ici pour activer la ligne "variation +/-X%"
+   * sur chaque card. Null si pas de dailyAccounting exploitable.
+   */
+  previousKpis?: CalculatedKpis | null;
 };
 
 export function SyntheseDashboard({
@@ -35,9 +43,23 @@ export function SyntheseDashboard({
   onManualEntry,
   synthese,
   parserVersion,
-  sourceMetadata
+  sourceMetadata,
+  previousKpis,
 }: SyntheseDashboardProps) {
   const cockpitKpis = useMemo(() => toCockpitKpis(synthese), [synthese]);
+  // Conversion CalculatedKpis → PremiumKpis pour passer au DashboardLayout
+  // (qui attend la forme premium avec ca/ebe/disponibilites/croissance/...).
+  const previousCockpitKpis = useMemo<PremiumKpis | null>(() => {
+    if (!previousKpis) return null;
+    return {
+      ca: previousKpis.ca ?? null,
+      disponibilites: previousKpis.disponibilites ?? null,
+      ebe: previousKpis.ebe ?? null,
+      healthScore: previousKpis.healthScore ?? null,
+      croissance: previousKpis.tcam ?? null,
+      runway: previousKpis.cashRunwayMonths ?? null,
+    };
+  }, [previousKpis]);
   const strategicMessage = synthese.actions[0] ?? "Maintenir la trajectoire actuelle et suivre les KPI chaque semaine.";
   const hasMissingMetric = synthese.metrics.some((metric) => metric.value === null);
 
@@ -83,6 +105,7 @@ export function SyntheseDashboard({
         companyName={companyName}
         greetingName={greetingName}
         kpis={cockpitKpis}
+        previousKpis={previousCockpitKpis}
         title="Cockpit financier"
         subtitle={`Bonjour ${greetingName}, voici la vue d'ensemble de vos indicateurs clés.`}
         statusLabel="Vue consolidée - Exercice en cours"

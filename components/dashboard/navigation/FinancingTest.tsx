@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { formatNumber, formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
+import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
@@ -182,6 +183,7 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           code="DEBT_RATIO"
           kpiId="capacite_remboursement_annees"
           kpiValue={kpis.capacite_remboursement_annees}
+          previousKpis={previousKpis}
         />
 
         <FinancingMetricCard
@@ -199,6 +201,7 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           code="CASH_FLOW_GEN"
           kpiId="caf"
           kpiValue={kpis.caf}
+          previousKpis={previousKpis}
         />
 
         <FinancingMetricCard
@@ -216,6 +219,7 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           code="OCF_NET"
           kpiId="fte"
           kpiValue={kpis.fte}
+          previousKpis={previousKpis}
         />
 
         <FinancingMetricCard
@@ -233,6 +237,7 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           code="SOLVENCY"
           kpiId="solvabilite"
           kpiValue={kpis.solvabilite}
+          previousKpis={previousKpis}
         />
 
         <FinancingMetricCard
@@ -250,6 +255,7 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           code="GEARING"
           kpiId="gearing"
           kpiValue={kpis.gearing}
+          previousKpis={previousKpis}
         />
 
         <FinancingMetricCard
@@ -267,6 +273,7 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           code="NET_CASH"
           kpiId="tn"
           kpiValue={kpis.tn}
+          previousKpis={previousKpis}
         />
 
         <article
@@ -397,16 +404,19 @@ type FinancingMetricCardProps = {
   title: string;
   tag: string;
   value: string;
-  trend: KpiTrend;
-  statusLabel: string;
-  helper: string;
-  code: string;
-  icon: ReactNode;
-  severity: FinancingSeverity;
   delayMs: number;
   className?: string;
   kpiId?: string;
   kpiValue?: number | null;
+  /** Tous les KPIs de la période précédente — la card va y chercher kpiId. */
+  previousKpis?: CalculatedKpis | null;
+  /** Props legacy conservés pour compat — plus rendus. */
+  trend?: KpiTrend;
+  statusLabel?: string;
+  helper?: string;
+  code?: string;
+  icon?: ReactNode;
+  severity?: FinancingSeverity;
 };
 
 function FinancingMetricCard({
@@ -414,38 +424,32 @@ function FinancingMetricCard({
   title,
   tag,
   value,
-  trend,
-  statusLabel,
-  // helper / code / icon : props conservés dans le contrat pour ne pas
-  // casser les call-sites existants, mais plus rendus dans la card depuis
-  // la simplification visuelle (le KpiTooltip ✨ couvre l'explication).
-  severity,
   delayMs,
   className,
   kpiId,
   kpiValue,
+  previousKpis,
 }: FinancingMetricCardProps) {
+  const previousValue =
+    kpiId && previousKpis
+      ? (previousKpis as Record<string, number | null>)[kpiId] ?? null
+      : null;
   return (
-    <article
-      className={`precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 ${className ?? ""}`}
+    <div
+      className={`col-span-1 ${className ?? ""}`}
       style={{ animationDelay: `${delayMs}ms` }}
-      data-search-id={searchId}
     >
-      <div>
-        <div className="card-header flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-            <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
-          </div>
-          {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
-        </div>
-        <p className="tnum data-react text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
-        <div className="mt-5 flex items-center gap-2">
-          <span className={`rounded-md border px-2 py-1 text-[11px] ${severityClass(severity)}`}>{statusLabel}</span>
-          <KpiTrendPill trend={trend} compact />
-        </div>
-      </div>
-    </article>
+      <KpiCardLayout
+        kpiId={kpiId}
+        fullName={tag}
+        title={title}
+        value={kpiValue ?? null}
+        previousValue={previousValue}
+        formattedValue={value}
+        searchId={searchId}
+        className="fade-up"
+      />
+    </div>
   );
 }
 

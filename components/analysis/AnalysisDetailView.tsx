@@ -69,6 +69,7 @@ import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
 import { useTemporality } from "@/lib/temporality/temporalityContext";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
+import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
 import { SourceBadge } from "@/components/analysis/SourceBadge";
@@ -289,6 +290,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const effectiveAnalysis = useMemo(() => {
     if (!analysis) return null;
     return recomputeKpisForPeriod(analysis, temporality.periodStart, temporality.periodEnd);
+  }, [analysis, temporality.periodStart, temporality.periodEnd]);
+
+  // KPIs de la période ANTÉRIEURE de même durée — pour la variation
+  // +/-X% sur les cartes de chaque onglet du tableau de bord.
+  const previousPeriodKpis = useMemo(() => {
+    if (!analysis) return null;
+    if (!shouldShowTemporalityBar(analysis)) return null;
+    const prev = computePreviousPeriod(temporality.periodStart, temporality.periodEnd);
+    if (!prev) return null;
+    return recomputeKpisForPeriod(analysis, prev.periodStart, prev.periodEnd).kpis;
   }, [analysis, temporality.periodStart, temporality.periodEnd]);
 
   useEffect(() => {
@@ -1259,11 +1270,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}
               />
+              {/* previousKpis :
+                   - Priorité 1 = KPIs de la période antérieure de même durée
+                     (Année → N-1, Mois → M-1…) calculés via dailyAccounting.
+                   - Priorité 2 = KPIs de l'exercice N-1 (fallback historique
+                     pour les sources statiques PDF/Excel sans daily). */}
               <DashboardFinancialTestContent
                 activeTab={activeDashboardTab}
                 kpis={effectiveAnalysis?.kpis ?? analysis.kpis}
                 mappedData={effectiveAnalysis?.mappedData ?? analysis.mappedData}
-                previousKpis={previousAnalysis?.kpis ?? null}
+                previousKpis={previousPeriodKpis ?? previousAnalysis?.kpis ?? null}
               />
             </>
           ) : (

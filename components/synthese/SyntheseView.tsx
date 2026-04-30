@@ -46,6 +46,7 @@ import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
 import { useTemporality } from "@/lib/temporality/temporalityContext";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
+import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
 import { resolveActiveAnalysis } from "@/lib/source/activeSource";
 import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
@@ -185,6 +186,25 @@ export function SyntheseView() {
       temporality.periodStart,
       temporality.periodEnd
     );
+  }, [analysisPair.current, temporality.periodStart, temporality.periodEnd]);
+
+  // KPIs de la période ANTÉRIEURE de même durée — pour calculer la
+  // variation +/-X% sur chaque carte. On recalcule via la même fonction
+  // que la période courante. null si :
+  //   - pas d'analyse sélectionnée,
+  //   - pas de dailyAccounting (source statique : pas de variation
+  //     intra-exercice exploitable),
+  //   - bornes invalides.
+  const previousKpis = useMemo(() => {
+    if (!analysisPair.current) return null;
+    if (!shouldShowTemporalityBar(analysisPair.current)) return null;
+    const prev = computePreviousPeriod(temporality.periodStart, temporality.periodEnd);
+    if (!prev) return null;
+    return recomputeKpisForPeriod(
+      analysisPair.current,
+      prev.periodStart,
+      prev.periodEnd
+    ).kpis;
   }, [analysisPair.current, temporality.periodStart, temporality.periodEnd]);
 
   const synthese = useMemo(() => {
@@ -418,6 +438,7 @@ export function SyntheseView() {
               synthese={synthese}
               parserVersion={analysisPair.current.parserVersion}
               sourceMetadata={analysisPair.current.sourceMetadata ?? null}
+              previousKpis={previousKpis}
             />
           ) : (
             <section className="precision-card rounded-2xl p-5">
