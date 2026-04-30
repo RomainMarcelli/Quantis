@@ -110,7 +110,25 @@ export async function buildAndPersistAnalysisFromSync(
   }
 
   // ─── 3. Réutiliser la chaîne existante : bridge → mappedData → KPI → score
-  const mappedData = mapParsedFinancialDataToMappedFinancialData(parsedFinancialData);
+  // On calcule le snapshot AVANT computeKpis pour pouvoir hydrater mappedData
+  // avec les soldes TVA (tva_collectee / tva_deductible) — sans ce câblage,
+  // computeKpis ne pourrait pas calculer tva_a_payer (cf. KPI Synthèse cockpit).
+  const balanceSheetSnapshot = lastTrialBalance
+    ? buildBalanceSheetSnapshot(
+        lastTrialBalance,
+        options.periodEnd.toISOString().slice(0, 10),
+        options.periodStart.toISOString().slice(0, 10)
+      )
+    : null;
+
+  const mappedDataRaw = mapParsedFinancialDataToMappedFinancialData(parsedFinancialData);
+  const mappedData = balanceSheetSnapshot
+    ? {
+        ...mappedDataRaw,
+        tva_collectee: balanceSheetSnapshot.values.tva_collectee,
+        tva_deductible: balanceSheetSnapshot.values.tva_deductible,
+      }
+    : mappedDataRaw;
   const kpis = computeKpis(mappedData);
   const quantisScore = calculateQuantisScore(kpis);
   const financialFacts = mapMappedDataToFinancialFacts(mappedData);
@@ -134,15 +152,9 @@ export async function buildAndPersistAnalysisFromSync(
 
   // ─── 4 bis. Nouveau format demandé par le PM (Option 1 additif) ──────────
   // Matière première à destination du front : daily accounting + bilan snapshot.
-  // Le front applique ses propres formules KPI sur ces données brutes.
+  // Le snapshot lui-même est calculé en amont (étape 3) pour pouvoir hydrater
+  // mappedData avec les soldes TVA avant le passage par computeKpis.
   const dailyAccounting = buildDailyAccounting(entries);
-  const balanceSheetSnapshot = lastTrialBalance
-    ? buildBalanceSheetSnapshot(
-        lastTrialBalance,
-        options.periodEnd.toISOString().slice(0, 10),
-        options.periodStart.toISOString().slice(0, 10)
-      )
-    : null;
 
   // ─── 5. Construire l'AnalysisDraft ───────────────────────────────────────
   const fiscalYear = options.periodEnd.getFullYear();
