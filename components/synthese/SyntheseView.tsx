@@ -20,7 +20,7 @@ import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
 // Le téléchargement du rapport PDF est introduit par feat/pdf-report.
-// Stub local pour que feat/kpi-tooltips reste autonome.
+// Stub local pour rester autonome jusqu'à ce que le module réel arrive.
 const downloadFinancialReport = async (
   _params: { analysisId: string }
 ): Promise<string | null> => "feature non disponible sur cette branche";
@@ -51,11 +51,7 @@ import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporali
 import { resolveActiveAnalysis } from "@/lib/source/activeSource";
 import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
-// SimulationToggleButton est introduit par feat/simulation. Stub no-op
-// dans cette branche pour que feat/kpi-tooltips reste autonome.
-function SimulationToggleButton(_props: { mappedData: unknown }): null {
-  return null;
-}
+import { SimulationToggleButton } from "@/components/simulation/SimulationWidget";
 import {
   consumeSearchTarget,
   routeMatchesPath,
