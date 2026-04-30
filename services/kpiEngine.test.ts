@@ -134,3 +134,51 @@ describe("computeKpis", () => {
     expect(result.healthScore).toBeNull();
   });
 });
+
+describe("provision_is — barème IS 2 tranches (article 219 CGI taux PME)", () => {
+  it("résultat 30 000 € (sous le seuil 42 500 €) → 30 000 × 15 % = 4 500 €", () => {
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      resultat_exercice: 30_000,
+    });
+    expect(result.provision_is).toBeCloseTo(4_500, 2);
+  });
+
+  it("résultat 80 000 € → 42 500 × 15 % + (80 000 − 42 500) × 25 % = 15 750 €", () => {
+    // 42 500 × 0.15 = 6 375 ; 37 500 × 0.25 = 9 375 ; total = 15 750
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      resultat_exercice: 80_000,
+    });
+    expect(result.provision_is).toBeCloseTo(15_750, 2);
+  });
+
+  it("résultat = seuil exact 42 500 € → 6 375 €", () => {
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      resultat_exercice: 42_500,
+    });
+    expect(result.provision_is).toBeCloseTo(6_375, 2);
+  });
+
+  it("résultat ≤ 0 → 0 € (pas d'IS dû)", () => {
+    const negative = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      resultat_exercice: -25_000,
+    });
+    expect(negative.provision_is).toBe(0);
+  });
+
+  it("résultat null → null (pas calculable)", () => {
+    const result = computeKpis(createEmptyMappedFinancialData());
+    expect(result.provision_is ?? null).toBeNull();
+  });
+
+  it("provision_is_mensuelle = provision_is / 12", () => {
+    const result = computeKpis({
+      ...createEmptyMappedFinancialData(),
+      resultat_exercice: 80_000,
+    });
+    expect(result.provision_is_mensuelle).toBeCloseTo(15_750 / 12, 2);
+  });
+});

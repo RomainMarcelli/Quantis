@@ -83,6 +83,12 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const provision_is = computeIncomeTaxProvision(data.resultat_exercice);
   const provision_is_mensuelle = provision_is !== null ? provision_is / 12 : null;
 
+  // Ratio masse salariale / CA — sur chaque euro de CA, combien part en
+  // rémunération (bruts + charges patronales). Au-delà de 60 % le poids
+  // de la main-d'œuvre devient un signal de fragilité opérationnelle.
+  const masseSalariale = sumPartial(data.salaires, data.charges_soc);
+  const ratio_masse_salariale = percent(div(masseSalariale, ca));
+
   return {
     tcam: roundOrNull(tcam),
     ca: roundOrNull(ca),
@@ -131,7 +137,8 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
     tva_a_payer: roundOrNull(tva_a_payer),
     tva_provision_mensuelle: roundOrNull(tva_provision_mensuelle),
     provision_is: roundOrNull(provision_is),
-    provision_is_mensuelle: roundOrNull(provision_is_mensuelle)
+    provision_is_mensuelle: roundOrNull(provision_is_mensuelle),
+    ratio_masse_salariale: roundOrNull(ratio_masse_salariale)
   };
 }
 

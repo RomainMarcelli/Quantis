@@ -168,6 +168,10 @@ export type CalculatedKpis = {
   provision_is?: number | null;
   /** Provision IS mensuelle (= provision_is / 12). */
   provision_is_mensuelle?: number | null;
+  /** Ratio masse salariale (salaires + charges_soc) / CA × 100. Indicateur
+   *  d'intensité main-d'œuvre — alimente les scénarios "analyse masse salariale"
+   *  et "rémunération dirigeant". Optionnel pour ne pas casser les fixtures. */
+  ratio_masse_salariale?: number | null;
 };
 
 export type AnalysisRecord = {
