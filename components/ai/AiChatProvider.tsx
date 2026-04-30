@@ -25,6 +25,10 @@ import type { ChatMessage } from "@/lib/ai/types";
 type OpenChatPayload = {
   /** KPI focus (ou null pour un chat libre). */
   kpiId?: string | null;
+  /** Valeur actuelle du KPI — alimente le header mini-cockpit. */
+  kpiValue?: number | null;
+  /** Valeur N-1 du KPI — calcule la variation affichée dans le header. */
+  kpiPreviousValue?: number | null;
   /** Question pré-remplie qui sera envoyée automatiquement. */
   initialQuestion?: string | null;
   /** Conversation existante à reprendre. */
@@ -46,6 +50,8 @@ const AiChatContext = createContext<AiChatContextValue | null>(null);
 export function AiChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [kpiId, setKpiId] = useState<string | null>(null);
+  const [kpiValue, setKpiValue] = useState<number | null>(null);
+  const [kpiPreviousValue, setKpiPreviousValue] = useState<number | null>(null);
   const [initialQuestion, setInitialQuestion] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [initialMessages, setInitialMessages] = useState<ChatMessage[]>([]);
@@ -53,6 +59,8 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
 
   const open = useCallback((payload?: OpenChatPayload) => {
     setKpiId(payload?.kpiId ?? null);
+    setKpiValue(payload?.kpiValue ?? null);
+    setKpiPreviousValue(payload?.kpiPreviousValue ?? null);
     setInitialQuestion(payload?.initialQuestion ?? null);
     setConversationId(payload?.conversationId ?? null);
     setInitialMessages(payload?.initialMessages ?? []);
@@ -79,6 +87,8 @@ export function AiChatProvider({ children }: { children: ReactNode }) {
         open={isOpen}
         onClose={close}
         kpiId={kpiId}
+        kpiValue={kpiValue}
+        kpiPreviousValue={kpiPreviousValue}
         initialQuestion={initialQuestion}
         analysisId={analysisId}
         conversationId={conversationId}

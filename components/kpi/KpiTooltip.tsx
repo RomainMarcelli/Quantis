@@ -54,7 +54,6 @@ type KpiTooltipProps = {
   align?: "left" | "right";
 };
 
-const POPOVER_WIDTH = 320;
 const VIEWPORT_PADDING = 12;
 
 // Durée des transitions enter/exit. ~200 ms est la zone douce — au-delà laggy,
@@ -356,7 +355,7 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                     type="button"
                     onClick={() => {
                       setOpen(false);
-                      openAiChat({ kpiId, initialQuestion: question });
+                      openAiChat({ kpiId, kpiValue: value ?? null, initialQuestion: question });
                     }}
                     className="flex w-full items-center gap-2 rounded-lg border border-quantis-gold/60 bg-quantis-gold/10 px-3 py-2 text-left text-[12px] font-medium text-quantis-gold transition hover:border-quantis-gold/90 hover:bg-quantis-gold/20"
                   >
@@ -373,7 +372,7 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                     type="button"
                     onClick={() => {
                       setOpen(false);
-                      openAiChat({ kpiId });
+                      openAiChat({ kpiId, kpiValue: value ?? null });
                     }}
                     className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-white/55 transition hover:text-quantis-gold"
                   >

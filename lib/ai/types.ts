@@ -84,4 +84,64 @@ export type AiResponse = {
   mode: "mock" | "claude";
   /** Identifiant de modèle utilisé (côté Claude uniquement). */
   modelId?: string;
+  /**
+   * Réponse structurée optionnelle — disponible en mode mock (et calculable
+   * côté client pour Claude via `buildStructuredFromMarkdown`). Permet au
+   * front de rendre les blocs A-F (diagnostic, explication, data, comparaison,
+   * actions, follow-up) au lieu d'un markdown brut.
+   */
+  structured?: AiStructuredResponse;
+};
+
+// ─── Réponse structurée ────────────────────────────────────────────────
+
+export type AiDiagnosticStatus = "danger" | "good" | "neutral";
+
+export type AiDataPoint = {
+  label: string;
+  value: string;
+  /** Optionnel : kpiId vers lequel naviguer au clic. */
+  kpiId?: string;
+};
+
+export type AiComparison = {
+  current: { label: string; value: number };
+  reference: { label: string; value: number };
+};
+
+export type AiActionType = "simulate" | "navigate" | "compare";
+/** Icônes lucide-react autorisées pour les chips d'action (tree-shaking). */
+export type AiActionIcon =
+  | "Sliders"
+  | "BarChart3"
+  | "ArrowRight"
+  | "TrendingUp"
+  | "Eye"
+  | "Calendar";
+
+export type AiAction = {
+  label: string;
+  icon: AiActionIcon;
+  type: AiActionType;
+  /** Cible : kpiId pour navigate, scénario id pour simulate, période id pour compare. */
+  target: string;
+};
+
+/**
+ * Forme structurée d'une réponse IA — rendue sous forme de blocs visuels
+ * dans `AiChatPanel`. Le markdown brut reste disponible dans `AiResponse.answer`
+ * pour la persistance et l'historique.
+ */
+export type AiStructuredResponse = {
+  diagnostic: { status: AiDiagnosticStatus; message: string };
+  /** Explication 2-4 phrases — peut contenir des **gras** simples. */
+  explanation: string;
+  /** Chiffres clés en micro-cards (2-3 max). */
+  dataPoints?: AiDataPoint[];
+  /** Comparaison binaire actuel vs référence (mini-graph horizontal). */
+  comparison?: AiComparison;
+  /** Chips d'actions recommandées. */
+  actions: AiAction[];
+  /** Questions de suivi pré-remplies (2 max). */
+  followUpQuestions: string[];
 };

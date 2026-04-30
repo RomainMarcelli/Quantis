@@ -164,6 +164,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     answer: aiResponse.answer,
+    structured: aiResponse.structured ?? null,
     conversationId: resolvedConversationId,
     remainingQuota: quota.remaining,
     mode: aiResponse.mode,

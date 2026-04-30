@@ -24,6 +24,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { buildSystemPrompt } from "@/lib/ai/promptBuilder";
 import { getMockResponse, MOCK_LATENCY_MS } from "@/lib/ai/mockResponses";
+import { buildStructuredFromContext } from "@/lib/ai/structuredResponse";
 import type { AiAskParams, AiResponse } from "@/lib/ai/types";
 
 /**
@@ -69,7 +70,12 @@ export class MockAiService implements AiService {
       value,
       userLevel: params.userLevel,
     });
-    return { answer, mode: "mock" };
+    const structured = buildStructuredFromContext({
+      kpiId: params.kpiId,
+      value,
+      markdown: answer,
+    });
+    return { answer, mode: "mock", structured };
   }
 }
 
