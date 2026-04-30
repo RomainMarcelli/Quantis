@@ -50,9 +50,9 @@ type NavItem = {
 const PRIMARY_NAV: NavItem[] = [
   { id: "synthese", label: "Synthèse", icon: Sparkles, href: "/synthese" },
   { id: "analysis", label: "Tableau de bord", icon: LayoutDashboard, href: "/analysis" },
+  { id: "assistant-ia", label: "Assistant IA", icon: Bot, href: "/assistant-ia" },
   { id: "etats-financiers", label: "États financiers", icon: Receipt, href: "/etats-financiers" },
   { id: "documents", label: "Documents", icon: FileText, href: "/documents" },
-  { id: "assistant-ia", label: "Assistant IA", icon: Bot, href: "/assistant-ia" },
 ];
 
 type AppSidebarProps = {
