@@ -42,6 +42,7 @@ import {
 } from "@/lib/folders/activeFolder";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
@@ -944,121 +945,31 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         </div>
       ) : null}
 
-      <div
-        className={`relative grid gap-6 ${
-          isSidebarCollapsed ? "grid-cols-[88px_minmax(0,1fr)]" : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]"
-        }`}
-      >
-        {/* Sidebar metier: dossiers + fichiers + upload, conservee mais re-skinee premium. */}
-        <aside
-          data-scroll-reveal-ignore
-          className={`precision-card relative h-fit rounded-2xl lg:sticky lg:top-4 ${
-            isSidebarCollapsed ? "p-3" : "p-4"
-          }`}
-        >
-          <div className={`mb-2 flex ${isSidebarCollapsed ? "justify-center" : "justify-end"}`}>
-            <button
-              type="button"
-              onClick={() => setIsSidebarCollapsed((previous) => !previous)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white/85 transition hover:border-quantis-gold/60 hover:bg-black/80"
-              aria-label={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
-              title={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
-            >
-              {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </button>
-          </div>
-          <nav className="space-y-1 text-sm">
-            {/* Ordre figé sur tout l'app : Synthèse → Tableau de bord → Documents. */}
-            <NavRow
-              icon={<Sparkles className="h-4 w-4" />}
-              onClick={() => router.push("/synthese")}
-              collapsed={isSidebarCollapsed}
-            >
-              Synthèse
-            </NavRow>
-            <NavRow
-              icon={<LayoutDashboard className="h-4 w-4" />}
-              active={!isDocumentsView}
-              onClick={() => router.push("/analysis")}
-              collapsed={isSidebarCollapsed}
-            >
-              Tableau de bord
-            </NavRow>
-            <NavRow
-              icon={<Receipt className="h-4 w-4" />}
-              onClick={() => router.push("/etats-financiers")}
-              collapsed={isSidebarCollapsed}
-            >
-              États financiers
-            </NavRow>
-            <NavRow
-              icon={<FileText className="h-4 w-4" />}
-              active={isDocumentsView}
-              onClick={() => router.push("/documents")}
-              collapsed={isSidebarCollapsed}
-            >
-              Documents
-            </NavRow>
-            <NavRow
-              icon={<Bot className="h-4 w-4" />}
-              onClick={() => router.push("/assistant-ia")}
-              collapsed={isSidebarCollapsed}
-            >
-              Assistant IA
-            </NavRow>
-          </nav>
-
-          {!isSidebarCollapsed && !isDocumentsView && dashboardYearOptions.length > 1 ? (
-            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-              <label htmlFor="sidebar-dashboard-year" className="text-[11px] uppercase tracking-wide text-white/50">
-                Année de synthèse
-              </label>
-              <select
-                id="sidebar-dashboard-year"
-                value={selectedDashboardYear}
-                onChange={(event) => setSelectedDashboardYear(event.target.value)}
-                className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
-              >
-                {dashboardYearOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-
-          {/* Le bloc compte remplace le lien de navigation "Compte" pour eviter le doublon. */}
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className={`mt-4 rounded-xl border border-white/10 bg-black/20 transition-colors hover:bg-white/10 ${
-              isSidebarCollapsed ? "flex w-full justify-center p-2" : "w-full p-3 text-left"
-            }`}
-            aria-label="Ouvrir le compte"
-            title="Compte"
-          >
-            {isSidebarCollapsed ? (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                {greetingName.charAt(0).toUpperCase()}
-              </span>
-            ) : (
-              <>
-                <p className="text-[11px] uppercase tracking-wide text-white/50">Compte</p>
-                <div className="mt-2 flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                    {greetingName.charAt(0).toUpperCase()}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-white">{greetingName}</p>
-                    <p className="text-xs text-white/55">Free</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </button>
-
-        </aside>
+      <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <AppSidebar
+          activeRoute={isDocumentsView ? "documents" : "analysis"}
+          contextSlot={
+            !isDocumentsView && dashboardYearOptions.length > 1 ? (
+              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <label htmlFor="sidebar-dashboard-year" className="text-[10px] font-mono uppercase tracking-wide text-white/45">
+                  Année de synthèse
+                </label>
+                <select
+                  id="sidebar-dashboard-year"
+                  value={selectedDashboardYear}
+                  onChange={(event) => setSelectedDashboardYear(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
+                >
+                  {dashboardYearOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null
+          }
+        />
 
         <div className="space-y-6">
           {isDocumentsView ? (
