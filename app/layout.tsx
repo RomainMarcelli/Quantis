@@ -5,6 +5,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { ScrollRevealInitializer } from "@/components/ui/ScrollRevealInitializer";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { ProductTourProvider } from "@/components/product-tour/ProductTourProvider";
+import { TemporalityProvider } from "@/lib/temporality/temporalityContext";
 import "./globals.css";
 
 const inter = Inter({
@@ -37,8 +38,10 @@ export default function RootLayout({
       <body id="body" className={`${inter.variable} ${jetBrainsMono.variable} premium-app-shell`}>
         <ThemeProvider>
           <ProductTourProvider>
-            <ScrollRevealInitializer />
-            {children}
+            <TemporalityProvider>
+              <ScrollRevealInitializer />
+              {children}
+            </TemporalityProvider>
           </ProductTourProvider>
         </ThemeProvider>
       </body>
