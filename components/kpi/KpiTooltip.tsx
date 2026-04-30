@@ -30,10 +30,10 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { ArrowRight, MessageCircle, Sparkles } from "lucide-react";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { getKpiDiagnostic, pickSuggestedQuestion } from "@/lib/kpi/kpiDiagnostic";
+import { useAiChat } from "@/components/ai/AiChatProvider";
 
 type KpiTooltipProps = {
   kpiId: string;
@@ -98,6 +98,7 @@ const LEAVE_DURATION_MS = 180;
 
 export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
   const definition = getKpiDefinition(kpiId);
+  const { open: openAiChat } = useAiChat();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
@@ -337,15 +338,17 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                     </p>
                   ) : null}
 
-                  {/* Question suggérée — clic = navigation vers /assistant-ia
-                      avec le KPI et la question en query params. Cette branche
-                      utilise une page placeholder pour l'assistant IA ; la
-                      vraie discussion (drawer + appel API) est introduite par
-                      feat/ai-assistant qui remplace ce <Link> par un appel
-                      au provider AiChatProvider. */}
-                  <Link
-                    href={`/assistant-ia?kpi=${encodeURIComponent(kpiId)}&q=${encodeURIComponent(question)}`}
-                    onClick={() => setOpen(false)}
+                  {/* Question suggérée — clic = ouvre l'AiChatPanel via le
+                      provider global avec la question pré-remplie. La question
+                      est envoyée automatiquement à l'API IA, la réponse mock
+                      (ou Claude réel si la clé est branchée) s'affiche dans
+                      le drawer. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      openAiChat({ kpiId, initialQuestion: question });
+                    }}
                     className="mt-1 flex w-full items-center justify-between gap-2 rounded-lg border border-quantis-gold/50 bg-quantis-gold/10 px-3 py-2 text-left text-[11px] font-medium text-quantis-gold transition hover:border-quantis-gold/80 hover:bg-quantis-gold/20"
                   >
                     <span className="flex items-center gap-2">
@@ -353,21 +356,23 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                       <span>{question}</span>
                     </span>
                     <ArrowRight className="h-3 w-3 flex-shrink-0 opacity-70" />
-                  </Link>
+                  </button>
 
-                  {/* Action secondaire : ouvrir l'assistant sans question
-                      pré-remplie. Même remarque que ci-dessus — Link vers la
-                      page placeholder, remplacé par un openChat() dans
-                      feat/ai-assistant. */}
-                  <Link
-                    href={`/assistant-ia?kpi=${encodeURIComponent(kpiId)}`}
-                    onClick={() => setOpen(false)}
+                  {/* Action secondaire : ouvrir le chat sans question pré-remplie.
+                      Utile quand l'utilisateur veut explorer le KPI librement
+                      (poser SA question, ou choisir parmi les suggestions). */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      openAiChat({ kpiId });
+                    }}
                     className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium text-white/55 transition hover:text-quantis-gold"
                   >
                     <MessageCircle className="h-3 w-3" />
                     <span>Ou ouvrir le chat sans question</span>
                     <span className="text-quantis-gold/70">→</span>
-                  </Link>
+                  </button>
 
                   {/* Formule — petite ligne tech tout en bas pour les curieux */}
                   <p
