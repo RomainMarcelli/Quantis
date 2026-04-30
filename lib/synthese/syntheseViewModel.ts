@@ -176,6 +176,8 @@ export function buildSyntheseViewModel(
  * Règles produit :
  *  - TVA : si tva_a_payer null ⇒ tile complètement omise (les soldes 4456/4457
  *    ne sont disponibles que via les sources accounting avec trial balance).
+ *    La valeur est déjà au prorata de la période sélectionnée (cf.
+ *    hydrateFiscalKpis dans recomputeKpisForPeriod).
  *  - IS  : si resultat_exercice null ⇒ tile omise. Si ≤ 0 ⇒ tile affichée à 0
  *    avec un hint "Pas d'IS — résultat négatif" (signal explicite, pas un trou).
  */
@@ -184,17 +186,33 @@ function buildFiscalTiles(kpis: CalculatedKpis): SyntheseFiscalTile[] {
 
   const tvaToPay = kpis.tva_a_payer;
   if (typeof tvaToPay === "number" && Number.isFinite(tvaToPay)) {
+    // Le label TVA s'adapte à l'échelle implicite (montant période vs ~mensuel).
+    // Si la valeur courante est proche du mensuel ⇒ on dit "ce mois", sinon
+    // on indique le rythme moyen pour ancrer la lecture.
     const monthly = kpis.tva_provision_mensuelle;
-    const monthlyHint =
-      typeof monthly === "number" && Number.isFinite(monthly) && Math.abs(monthly) > 0.5
-        ? `~${formatEuroCompact(monthly)}/mois en moyenne`
-        : "À reverser à l'État sur la période";
+    let hint: string;
+    if (
+      typeof monthly === "number" &&
+      Number.isFinite(monthly) &&
+      Math.abs(monthly) > 0.5
+    ) {
+      const ratio = Math.abs(monthly) > 0 ? Math.abs(tvaToPay) / Math.abs(monthly) : 0;
+      if (ratio > 0 && ratio < 1.5) {
+        hint = `≈ 1 mois — moyenne ${formatEuroCompact(monthly)}/mois`;
+      } else if (ratio >= 1.5 && ratio < 4.5) {
+        hint = `≈ ${Math.round(ratio)} mois — moyenne ${formatEuroCompact(monthly)}/mois`;
+      } else {
+        hint = `~${formatEuroCompact(monthly)}/mois en moyenne`;
+      }
+    } else {
+      hint = "À reverser à l'État sur la période";
+    }
     tiles.push({
       id: "tva_a_payer",
       title: "TVA à sortir",
       label: "TVA COLLECTÉE − TVA DÉDUCTIBLE",
       value: tvaToPay,
-      hint: monthlyHint,
+      hint,
     });
   }
 

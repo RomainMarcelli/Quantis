@@ -50,7 +50,7 @@ export function recomputeKpisForPeriod(
   // exploitables même quand `analysis.kpis.tva_a_payer` est null.
   if (!daily || daily.length === 0) {
     return {
-      kpis: hydrateFiscalKpis(analysis.kpis, analysis),
+      kpis: hydrateFiscalKpis(analysis.kpis, analysis, undefined, periodStart, periodEnd),
       mappedData: analysis.mappedData,
       isFiltered: false,
       filterSummary: { daysInPeriod: 0, totalDaysAvailable: 0 },
@@ -65,7 +65,7 @@ export function recomputeKpisForPeriod(
   // partout. On retourne l'analyse telle quelle, comme pour une source statique.
   if (filtered.length === 0) {
     return {
-      kpis: hydrateFiscalKpis(analysis.kpis, analysis),
+      kpis: hydrateFiscalKpis(analysis.kpis, analysis, undefined, periodStart, periodEnd),
       mappedData: analysis.mappedData,
       isFiltered: false,
       filterSummary: { daysInPeriod: 0, totalDaysAvailable: totalDays },
@@ -99,7 +99,13 @@ export function recomputeKpisForPeriod(
   // TVA/IS : récupérés depuis le snapshot bilan + résultat période. Vit en
   // dehors de recomputeFromMappedData pour garder cette fonction concentrée
   // sur les KPI flow ; les KPI fiscaux sont des dérivés "snapshot + barème".
-  const kpisWithFiscal = hydrateFiscalKpis(kpis, analysis, periodTotals.resultat_exercice);
+  const kpisWithFiscal = hydrateFiscalKpis(
+    kpis,
+    analysis,
+    periodTotals.resultat_exercice,
+    periodStart,
+    periodEnd
+  );
 
   return {
     kpis: kpisWithFiscal,
@@ -245,40 +251,53 @@ function recomputeFromMappedData(
 }
 
 /**
- * Hydrate les KPI fiscaux (TVA + IS) à partir du snapshot bilan et du résultat
- * période quand `analysis.kpis.tva_a_payer` ou `provision_is` sont absents
- * (cas typique : analyse synchronisée avant le câblage TVA dans mappedData).
+ * Hydrate les KPI fiscaux (TVA + IS) au prorata de la période sélectionnée
+ * dans la barre temporelle (jour / semaine / mois / trimestre / année).
  *
  * Stratégie :
- *   - TVA : prend `balanceSheetSnapshot.values.tva_collectee/tva_deductible`
- *     si dispo. Pas une valeur "période" : c'est un solde au jour J du snapshot.
- *   - IS : applique le barème 2024 (15 %/25 %) sur le résultat. Si on a un
- *     résultat période recalculé (filtre temporel actif), on l'utilise ;
- *     sinon on retombe sur `mappedData.resultat_exercice` annuel.
+ *   - TVA : `balanceSheetSnapshot.values.tva_collectee/tva_deductible` est un
+ *     solde cumulé sur la période du snapshot (`asOfDate − snapshot.periodStart`).
+ *     On scale au prorata `periodDays / snapshotDays` pour rendre la tile
+ *     "TVA à reverser ce mois" / "TVA à reverser ce trimestre" intuitive
+ *     selon ce que l'utilisateur a sélectionné.
+ *   - IS : barème 2024 PME (15 % / 25 %) appliqué sur le résultat de la
+ *     période quand on a un filtre temporel actif (periodResultatExercice
+ *     fourni), sinon résultat annuel.
  *
- * Si les valeurs existent déjà dans `kpis` (analyse synchronisée après le fix),
- * on les garde — pas d'écrasement.
+ * On force le recalcul TVA quand `periodStart`/`periodEnd` sont fournis (pour
+ * que la tile s'adapte à la barre temporelle), sinon on respecte la valeur
+ * pré-calculée dans `kpis.tva_a_payer` (cas SyntheseDashboard sans filtre).
  */
 function hydrateFiscalKpis(
   kpis: CalculatedKpis,
   analysis: AnalysisRecord,
-  periodResultatExercice?: number
+  periodResultatExercice?: number,
+  periodStart?: string,
+  periodEnd?: string
 ): CalculatedKpis {
   const snapshot = analysis.balanceSheetSnapshot;
   const tvaCollectee = snapshot?.values.tva_collectee;
   const tvaDeductible = snapshot?.values.tva_deductible;
 
-  const tvaAlreadyPresent =
-    typeof kpis.tva_a_payer === "number" && Number.isFinite(kpis.tva_a_payer);
   let tva_a_payer = kpis.tva_a_payer ?? null;
   let tva_provision_mensuelle = kpis.tva_provision_mensuelle ?? null;
-  if (
-    !tvaAlreadyPresent &&
-    typeof tvaCollectee === "number" &&
-    typeof tvaDeductible === "number"
-  ) {
-    tva_a_payer = Math.round((tvaCollectee - tvaDeductible) * 100) / 100;
-    tva_provision_mensuelle = Math.round((tva_a_payer / 12) * 100) / 100;
+
+  if (typeof tvaCollectee === "number" && typeof tvaDeductible === "number") {
+    const annualTva = tvaCollectee - tvaDeductible;
+    // Prorata vs durée du snapshot. Si `snapshot.periodStart` et `asOfDate`
+    // sont disponibles, on scale en fonction de la fenêtre utilisateur.
+    let scaledTva = annualTva;
+    if (snapshot && periodStart && periodEnd) {
+      const snapshotDays = computePeriodDays(snapshot.periodStart, snapshot.asOfDate);
+      const userDays = computePeriodDays(periodStart, periodEnd);
+      if (snapshotDays > 0 && userDays > 0 && userDays !== snapshotDays) {
+        scaledTva = annualTva * (userDays / snapshotDays);
+      }
+    }
+    tva_a_payer = Math.round(scaledTva * 100) / 100;
+    // La "moyenne mensuelle" reste basée sur le total annuel (référence stable
+    // pour le hint « ~X €/mois en moyenne », indépendant de la fenêtre choisie).
+    tva_provision_mensuelle = Math.round((annualTva / 12) * 100) / 100;
   }
 
   const isAlreadyPresent =
