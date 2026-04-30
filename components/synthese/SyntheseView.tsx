@@ -11,6 +11,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Receipt,
   Settings,
   Sparkles,
   UserCircle2,
@@ -371,6 +372,13 @@ export function SyntheseView() {
               collapsed={isSidebarCollapsed}
             >
               Tableau de bord
+            </NavRow>
+            <NavRow
+              icon={<Receipt className="h-4 w-4" />}
+              onClick={() => router.push("/etats-financiers")}
+              collapsed={isSidebarCollapsed}
+            >
+              États financiers
             </NavRow>
             <NavRow
               icon={<FileText className="h-4 w-4" />}

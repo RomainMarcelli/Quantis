@@ -16,6 +16,7 @@ import {
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
+  Receipt,
   RefreshCcw,
   Settings,
   Sparkles,
@@ -982,6 +983,13 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
               collapsed={isSidebarCollapsed}
             >
               Tableau de bord
+            </NavRow>
+            <NavRow
+              icon={<Receipt className="h-4 w-4" />}
+              onClick={() => router.push("/etats-financiers")}
+              collapsed={isSidebarCollapsed}
+            >
+              États financiers
             </NavRow>
             <NavRow
               icon={<FileText className="h-4 w-4" />}
