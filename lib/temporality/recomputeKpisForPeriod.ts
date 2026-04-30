@@ -42,10 +42,15 @@ export function recomputeKpisForPeriod(
   const daily = analysis.dailyAccounting ?? null;
   const totalDays = daily?.length ?? 0;
 
-  // Source statique ou pas de données journalières : on retourne les KPI annuels tels quels.
+  // Source statique ou pas de données journalières : on retourne les KPI annuels
+  // tels quels — mais on hydrate quand même TVA/IS à partir du snapshot bilan
+  // si présent. Ça permet aux analyses synchronisées AVANT le câblage TVA dans
+  // mappedData (cf. fix buildAnalysisFromSync) de quand même afficher la tile :
+  // les soldes 4456/4457 vivent dans `balanceSheetSnapshot.values` et restent
+  // exploitables même quand `analysis.kpis.tva_a_payer` est null.
   if (!daily || daily.length === 0) {
     return {
-      kpis: analysis.kpis,
+      kpis: hydrateFiscalKpis(analysis.kpis, analysis),
       mappedData: analysis.mappedData,
       isFiltered: false,
       filterSummary: { daysInPeriod: 0, totalDaysAvailable: 0 },
@@ -60,7 +65,7 @@ export function recomputeKpisForPeriod(
   // partout. On retourne l'analyse telle quelle, comme pour une source statique.
   if (filtered.length === 0) {
     return {
-      kpis: analysis.kpis,
+      kpis: hydrateFiscalKpis(analysis.kpis, analysis),
       mappedData: analysis.mappedData,
       isFiltered: false,
       filterSummary: { daysInPeriod: 0, totalDaysAvailable: totalDays },
@@ -91,9 +96,13 @@ export function recomputeKpisForPeriod(
 
   // Recalcul des KPI front à partir des nouveaux totals.
   const kpis: CalculatedKpis = recomputeFromMappedData(analysis, mappedData, periodTotals, periodDays);
+  // TVA/IS : récupérés depuis le snapshot bilan + résultat période. Vit en
+  // dehors de recomputeFromMappedData pour garder cette fonction concentrée
+  // sur les KPI flow ; les KPI fiscaux sont des dérivés "snapshot + barème".
+  const kpisWithFiscal = hydrateFiscalKpis(kpis, analysis, periodTotals.resultat_exercice);
 
   return {
-    kpis,
+    kpis: kpisWithFiscal,
     mappedData,
     isFiltered: true,
     filterSummary: {
@@ -233,4 +242,76 @@ function recomputeFromMappedData(
     workingCapital: round(bfr),
     grossMarginRate: tmscv === null ? null : Math.round(tmscv * 10000) / 100,
   };
+}
+
+/**
+ * Hydrate les KPI fiscaux (TVA + IS) à partir du snapshot bilan et du résultat
+ * période quand `analysis.kpis.tva_a_payer` ou `provision_is` sont absents
+ * (cas typique : analyse synchronisée avant le câblage TVA dans mappedData).
+ *
+ * Stratégie :
+ *   - TVA : prend `balanceSheetSnapshot.values.tva_collectee/tva_deductible`
+ *     si dispo. Pas une valeur "période" : c'est un solde au jour J du snapshot.
+ *   - IS : applique le barème 2024 (15 %/25 %) sur le résultat. Si on a un
+ *     résultat période recalculé (filtre temporel actif), on l'utilise ;
+ *     sinon on retombe sur `mappedData.resultat_exercice` annuel.
+ *
+ * Si les valeurs existent déjà dans `kpis` (analyse synchronisée après le fix),
+ * on les garde — pas d'écrasement.
+ */
+function hydrateFiscalKpis(
+  kpis: CalculatedKpis,
+  analysis: AnalysisRecord,
+  periodResultatExercice?: number
+): CalculatedKpis {
+  const snapshot = analysis.balanceSheetSnapshot;
+  const tvaCollectee = snapshot?.values.tva_collectee;
+  const tvaDeductible = snapshot?.values.tva_deductible;
+
+  const tvaAlreadyPresent =
+    typeof kpis.tva_a_payer === "number" && Number.isFinite(kpis.tva_a_payer);
+  let tva_a_payer = kpis.tva_a_payer ?? null;
+  let tva_provision_mensuelle = kpis.tva_provision_mensuelle ?? null;
+  if (
+    !tvaAlreadyPresent &&
+    typeof tvaCollectee === "number" &&
+    typeof tvaDeductible === "number"
+  ) {
+    tva_a_payer = Math.round((tvaCollectee - tvaDeductible) * 100) / 100;
+    tva_provision_mensuelle = Math.round((tva_a_payer / 12) * 100) / 100;
+  }
+
+  const isAlreadyPresent =
+    typeof kpis.provision_is === "number" && Number.isFinite(kpis.provision_is);
+  let provision_is = kpis.provision_is ?? null;
+  let provision_is_mensuelle = kpis.provision_is_mensuelle ?? null;
+  if (!isAlreadyPresent || periodResultatExercice !== undefined) {
+    const resultat =
+      periodResultatExercice ?? analysis.mappedData.resultat_exercice ?? null;
+    if (resultat !== null && Number.isFinite(resultat)) {
+      provision_is = Math.round(applyIncomeTaxScale(resultat) * 100) / 100;
+      provision_is_mensuelle = Math.round((provision_is / 12) * 100) / 100;
+    }
+  }
+
+  return {
+    ...kpis,
+    tva_a_payer,
+    tva_provision_mensuelle,
+    provision_is,
+    provision_is_mensuelle,
+  };
+}
+
+/**
+ * Barème IS 2024 — taux réduit PME : 15 % jusqu'à 42 500 €, 25 % au-delà.
+ * Dupliqué (volontairement, version locale simple) du `kpiEngine` pour ne
+ * pas créer un import inverse depuis services/ vers lib/. À refactorer si
+ * un 3e endroit a besoin de la même formule.
+ */
+function applyIncomeTaxScale(resultatExercice: number): number {
+  if (resultatExercice <= 0) return 0;
+  const reducedRateThreshold = 42500;
+  if (resultatExercice <= reducedRateThreshold) return resultatExercice * 0.15;
+  return reducedRateThreshold * 0.15 + (resultatExercice - reducedRateThreshold) * 0.25;
 }
