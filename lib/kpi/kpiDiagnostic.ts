@@ -79,3 +79,26 @@ export function pickSuggestedQuestion(
     ? definition.suggestedQuestions.whenGood
     : definition.suggestedQuestions.whenBad;
 }
+
+/**
+ * Détermine si le KPI suit la convention "plus grand = mieux".
+ * Renvoie :
+ *   - true  : croissance favorable (CA, EBITDA, marge…)
+ *   - false : décroissance favorable (DSO, gearing, BFR jours, runway burn…)
+ *   - null  : indéterminable (seuils manquants / partiels — on ne peut pas
+ *     conclure sans risque).
+ *
+ * Utilisé par les cartes KPI pour choisir la couleur de la variation
+ * période vs période précédente (vert si la variation va dans le bon sens).
+ */
+export function isHigherBetter(thresholds: KpiThresholds | undefined): boolean | null {
+  if (!thresholds) return null;
+  const { danger, warning, good } = thresholds;
+  if (danger !== undefined && warning !== undefined && good !== undefined) {
+    return danger <= warning && warning <= good;
+  }
+  // Seuils partiels — on déduit du couple disponible quand c'est non-ambigu.
+  if (danger !== undefined && good !== undefined) return danger < good;
+  if (good !== undefined && warning !== undefined) return warning < good;
+  return null;
+}

@@ -31,7 +31,8 @@ describe("premium dashboard components", () => {
     );
 
     expect(html).toContain("Objectif");
-    expect(html).toContain("Excédent brut d&#x27;exploitation");
+    // Le nom officiel est rendu en UPPERCASE depuis la refonte des cartes.
+    expect(html).toContain("EXCÉDENT BRUT D&#x27;EXPLOITATION");
   });
 
   it("keeps child sections rendered inside DashboardLayout", () => {

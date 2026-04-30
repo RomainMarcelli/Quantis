@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { formatNumber, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
+import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
@@ -166,6 +167,7 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
           helper="Rentabilité des fonds propres: mesure ce que l'actionnaire gagne pour chaque euro investi."
           kpiId="roe"
           kpiValue={kpis.roe}
+          previousKpis={previousKpis}
         />
 
         <RentabilityMetricCard
@@ -182,6 +184,7 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
           helper="Performance économique pure de l'exploitation, indépendamment du mode de financement."
           kpiId="roce"
           kpiValue={kpis.roce}
+          previousKpis={previousKpis}
         />
 
         <article
@@ -352,13 +355,16 @@ type RentabilityMetricCardProps = {
   title: string;
   tag: string;
   value: string;
-  helper: string;
-  trend: KpiTrend;
-  icon: ReactNode;
   delayMs: number;
   className?: string;
   kpiId?: string;
   kpiValue?: number | null;
+  /** Tous les KPIs de la période précédente — la card y cherche kpiId. */
+  previousKpis?: CalculatedKpis | null;
+  /** Props legacy conservés pour compat — plus rendus. */
+  helper?: string;
+  trend?: KpiTrend;
+  icon?: ReactNode;
 };
 
 function RentabilityMetricCard({
@@ -366,33 +372,32 @@ function RentabilityMetricCard({
   title,
   tag,
   value,
-  // helper / icon : conservés dans le contrat, plus rendus.
-  trend,
   delayMs,
   className,
   kpiId,
   kpiValue,
+  previousKpis,
 }: RentabilityMetricCardProps) {
+  const previousValue =
+    kpiId && previousKpis
+      ? (previousKpis as Record<string, number | null>)[kpiId] ?? null
+      : null;
   return (
-    <article
-      className={`precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 ${className ?? ""}`}
+    <div
+      className={`col-span-1 ${className ?? ""}`}
       style={{ animationDelay: `${delayMs}ms` }}
-      data-search-id={searchId}
     >
-      <div>
-        <div className="card-header flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-            <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
-          </div>
-          {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
-        </div>
-        <p className="tnum data-react text-[3rem] font-semibold leading-none tracking-tight text-white">{value}</p>
-        <div className="mt-5 flex items-center gap-2">
-          <KpiTrendPill trend={trend} compact />
-        </div>
-      </div>
-    </article>
+      <KpiCardLayout
+        kpiId={kpiId}
+        fullName={tag}
+        title={title}
+        value={kpiValue ?? null}
+        previousValue={previousValue}
+        formattedValue={value}
+        searchId={searchId}
+        className="fade-up"
+      />
+    </div>
   );
 }
 

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
+import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import { buildKpiTrend, buildSignedTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
@@ -152,6 +153,7 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
           helper="Montant immobilisé dans le cycle (stocks + créances - fournisseurs)."
           kpiId="bfr"
           kpiValue={kpis.bfr}
+          previousKpis={previousKpis}
         />
 
         <InvestmentMetricCard
@@ -196,6 +198,7 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
           helper="Part des immobilisations encore non amortie (net / brut)."
           kpiId="ratio_immo"
           kpiValue={kpis.ratio_immo}
+          previousKpis={previousKpis}
         />
 
         <article
@@ -325,15 +328,18 @@ type InvestmentMetricCardProps = {
   title: string;
   tag: string;
   value: string;
-  statusLabel: string;
-  code: string;
-  helper: string;
-  icon: ReactNode;
-  trend: KpiTrend;
   delayMs: number;
   className?: string;
   kpiId?: string;
   kpiValue?: number | null;
+  /** Tous les KPIs de la période précédente — la card y cherche kpiId. */
+  previousKpis?: CalculatedKpis | null;
+  /** Props legacy conservés pour compat — plus rendus. */
+  statusLabel?: string;
+  code?: string;
+  helper?: string;
+  icon?: ReactNode;
+  trend?: KpiTrend;
 };
 
 function InvestmentMetricCard({
@@ -341,35 +347,32 @@ function InvestmentMetricCard({
   title,
   tag,
   value,
-  statusLabel,
-  // code / helper / icon : conservés dans le contrat, plus rendus.
-  trend,
   delayMs,
   className,
   kpiId,
   kpiValue,
+  previousKpis,
 }: InvestmentMetricCardProps) {
+  const previousValue =
+    kpiId && previousKpis
+      ? (previousKpis as Record<string, number | null>)[kpiId] ?? null
+      : null;
   return (
-    <article
-      className={`precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 ${className ?? ""}`}
+    <div
+      className={`col-span-1 ${className ?? ""}`}
       style={{ animationDelay: `${delayMs}ms` }}
-      data-search-id={searchId}
     >
-      <div>
-        <div className="card-header flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-            <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
-          </div>
-          {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
-        </div>
-        <p className="tnum data-react text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
-        <div className="mt-5 flex items-center gap-2">
-          <span className="text-[11px] text-white/80">{statusLabel}</span>
-          <KpiTrendPill trend={trend} compact />
-        </div>
-      </div>
-    </article>
+      <KpiCardLayout
+        kpiId={kpiId}
+        fullName={tag}
+        title={title}
+        value={kpiValue ?? null}
+        previousValue={previousValue}
+        formattedValue={value}
+        searchId={searchId}
+        className="fade-up"
+      />
+    </div>
   );
 }
 
