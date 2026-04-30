@@ -17,6 +17,7 @@ import { ArrowLeft, MessageCircle, Sparkles } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { useAiChat } from "@/components/ai/AiChatProvider";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import type { ConversationSummary } from "@/lib/ai/types";
 
@@ -42,6 +43,25 @@ function AssistantConversationsViewInner() {
   // Loader visible uniquement si la requête dépasse 400 ms (cf. hook).
   const showSlowLoader = useDelayedFlag(fetchState === "loading");
   const [quota, setQuota] = useState<{ remaining: number; total: number } | null>(null);
+  // Prénom affiché dans le bloc Compte de la sidebar — synchronisé avec
+  // l'auth gateway pour rester cohérent entre les pages.
+  const [greetingName, setGreetingName] = useState("Utilisateur");
+
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    void (async () => {
+      const { firebaseAuthGateway } = await import("@/services/auth");
+      unsub = firebaseAuthGateway.subscribe((user) => {
+        if (!user) return;
+        const first =
+          user.displayName?.trim().split(" ")[0] ||
+          user.email?.split("@")[0] ||
+          "Utilisateur";
+        setGreetingName(first);
+      });
+    })();
+    return () => unsub?.();
+  }, []);
 
   const definition = kpiIdParam ? getKpiDefinition(kpiIdParam) : null;
 
@@ -96,7 +116,10 @@ function AssistantConversationsViewInner() {
   }, []);
 
   return (
-    <section className="mx-auto w-full max-w-4xl space-y-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
+      <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
+
+      <section className="space-y-6">
       <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
         <div className="flex items-center gap-3">
           <QuantisLogo withText={false} size={28} />
@@ -244,7 +267,8 @@ function AssistantConversationsViewInner() {
           </ul>
         )}
       </div>
-    </section>
+      </section>
+    </div>
   );
 }
 
