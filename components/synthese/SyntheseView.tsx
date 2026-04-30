@@ -11,6 +11,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Receipt,
   Settings,
   Sparkles,
   UserCircle2,
@@ -18,6 +19,8 @@ import {
 } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
@@ -71,9 +74,11 @@ export function SyntheseView() {
   const [selectedYearValue, setSelectedYearValue] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isSidebarPreferenceReady, setIsSidebarPreferenceReady] = useState(false);
   const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
+  // Le loader visible n'apparaît que si la requête dépasse 400 ms — sinon
+  // on évite un flash désagréable sur les chargements rapides.
+  const showSlowLoader = useDelayedFlag(loading);
+  // L'état replié de la sidebar est désormais géré par AppSidebar lui-même.
 
   // Référence utilisée pour l'option "Année en cours" dans le sélecteur de synthèse.
   const currentCalendarYear = new Date().getFullYear();
@@ -95,18 +100,6 @@ export function SyntheseView() {
     window.addEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
     return () => window.removeEventListener(SEARCH_NAVIGATE_EVENT, onSearchNavigate as EventListener);
   }, []);
-
-  useEffect(() => {
-    setIsSidebarCollapsed(readSidebarCollapsedPreference());
-    setIsSidebarPreferenceReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isSidebarPreferenceReady) {
-      return;
-    }
-    writeSidebarCollapsedPreference(isSidebarCollapsed);
-  }, [isSidebarCollapsed, isSidebarPreferenceReady]);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
@@ -329,7 +322,9 @@ export function SyntheseView() {
         <GlobalSearchBar placeholder="Rechercher..." />
       </div>
 
-      {loading ? (
+      {/* Loader retardé : n'apparaît que si la requête dépasse 400 ms.
+          Évite le flash sous le header pour les chargements rapides. */}
+      {showSlowLoader ? (
         <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de la synthèse...</div>
       ) : null}
 
@@ -339,104 +334,32 @@ export function SyntheseView() {
         </div>
       ) : null}
 
-      <div
-        className={`relative grid gap-6 ${
-          isSidebarCollapsed ? "grid-cols-[88px_minmax(0,1fr)]" : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]"
-        }`}
-      >
-        <aside
-          data-scroll-reveal-ignore
-          className={`precision-card relative h-fit rounded-2xl lg:sticky lg:top-4 ${
-            isSidebarCollapsed ? "p-3" : "p-4"
-          }`}
-        >
-          <div className={`mb-2 flex ${isSidebarCollapsed ? "justify-center" : "justify-end"}`}>
-            <button
-              type="button"
-              onClick={() => setIsSidebarCollapsed((previous) => !previous)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white/85 transition hover:border-quantis-gold/60 hover:bg-black/80"
-              aria-label={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
-              title={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
-            >
-              {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </button>
-          </div>
-          <nav className="space-y-1 text-sm" data-tour-id="synthese-sidebar-nav">
-            <NavRow icon={<Sparkles className="h-4 w-4" />} active collapsed={isSidebarCollapsed}>
-              Synthèse
-            </NavRow>
-            <NavRow
-              icon={<LayoutDashboard className="h-4 w-4" />}
-              onClick={() => router.push("/analysis")}
-              collapsed={isSidebarCollapsed}
-            >
-              Tableau de bord
-            </NavRow>
-            <NavRow
-              icon={<FileText className="h-4 w-4" />}
-              onClick={() => router.push("/documents")}
-              collapsed={isSidebarCollapsed}
-            >
-              Documents
-            </NavRow>
-            <NavRow
-              icon={<Bot className="h-4 w-4" />}
-              onClick={() => router.push("/assistant-ia")}
-              collapsed={isSidebarCollapsed}
-            >
-              Assistant IA
-            </NavRow>
-          </nav>
-
-          {!isSidebarCollapsed && yearOptions.length > 1 ? (
-            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-              <label htmlFor="sidebar-synthese-year" className="text-[11px] uppercase tracking-wide text-white/50">
-                Année de synthèse
-              </label>
-              <select
-                id="sidebar-synthese-year"
-                value={selectedYearValue}
-                onChange={(event) => setSelectedYearValue(event.target.value)}
-                className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
-              >
-                {yearOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className={`mt-4 rounded-xl border border-white/10 bg-black/20 transition-colors hover:bg-white/10 ${
-              isSidebarCollapsed ? "flex w-full justify-center p-2" : "w-full p-3 text-left"
-            }`}
-            aria-label="Ouvrir le compte"
-            title="Compte"
-          >
-            {isSidebarCollapsed ? (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                {greetingName.charAt(0).toUpperCase()}
-              </span>
-            ) : (
-              <>
-                <p className="text-[11px] uppercase tracking-wide text-white/50">Compte</p>
-                <div className="mt-2 flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                    {greetingName.charAt(0).toUpperCase()}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-white">{greetingName}</p>
-                    <p className="text-xs text-white/55">Free</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </button>
-        </aside>
+      <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <AppSidebar
+          activeRoute="synthese"
+          accountFirstName={greetingName}
+          contextSlot={
+            yearOptions.length > 1 ? (
+              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <label htmlFor="sidebar-synthese-year" className="text-[10px] font-mono uppercase tracking-wide text-white/45">
+                  Année de synthèse
+                </label>
+                <select
+                  id="sidebar-synthese-year"
+                  value={selectedYearValue}
+                  onChange={(event) => setSelectedYearValue(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
+                >
+                  {yearOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null
+          }
+        />
 
         <div className="space-y-4">
           {/* Filtre temporel global. On ne l'affiche que si l'analyse active a
@@ -562,53 +485,5 @@ function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): s
   return "Utilisateur";
 }
 
-function NavRow({
-  children,
-  icon,
-  active,
-  collapsed,
-  disabled,
-  onClick
-}: {
-  children: ReactNode;
-  icon: ReactNode;
-  active?: boolean;
-  collapsed?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  const label = typeof children === "string" ? children : undefined;
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      aria-label={collapsed ? label : undefined}
-      title={collapsed ? label : undefined}
-      className={`flex w-full items-center rounded-xl transition-colors ${
-        collapsed ? "group justify-center px-2 py-2" : "gap-2 px-3 py-2 text-left"
-      } ${
-        active
-          ? "bg-white/10 text-white"
-          : disabled
-            ? "cursor-not-allowed text-white/40"
-            : "text-white/75 hover:bg-white/10 hover:text-white"
-      }`}
-    >
-      {collapsed ? (
-        <span
-          className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
-            active
-              ? "border-quantis-gold/60 bg-quantis-gold/15 text-quantis-gold"
-              : "border-white/15 bg-white/5 text-white/80 group-hover:border-white/30 group-hover:bg-white/10 group-hover:text-white"
-          }`}
-        >
-          {icon}
-        </span>
-      ) : (
-        icon
-      )}
-      {!collapsed ? <span>{children}</span> : null}
-    </button>
-  );
-}
+// (NavRow déplacé dans `components/layout/AppSidebar.tsx` — source unique
+// pour la navigation latérale.)

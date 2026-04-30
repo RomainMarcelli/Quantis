@@ -11,6 +11,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Receipt,
   Settings,
   Sparkles,
   UserCircle2,
@@ -23,6 +24,8 @@ import { FolderDialog } from "@/components/documents/FolderDialog";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
 import { ConnectionsPanel } from "@/components/integrations/ConnectionsPanel";
 import { AccountingConnectionWizard } from "@/components/integrations/AccountingConnectionWizard";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { DEFAULT_FOLDER_NAME } from "@/lib/folders/activeFolder";
 import {
@@ -64,6 +67,8 @@ export function DocumentsView() {
   const router = useRouter();
   const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
   const [loading, setLoading] = useState(true);
+  // Loader visible uniquement si le chargement dépasse 400 ms — évite le flash.
+  const showSlowLoader = useDelayedFlag(loading);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [folderNames, setFolderNames] = useState<string[]>([]);
   const [activeFolder, setActiveFolder] = useState(DEFAULT_FOLDER_NAME);
@@ -277,68 +282,8 @@ export function DocumentsView() {
       </header>
 
       {/* Grille sidebar navigation + contenu */}
-      <div className={`relative grid gap-6 ${isSidebarCollapsed ? "grid-cols-[88px_minmax(0,1fr)]" : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]"}`}>
-
-        {/* ===== SIDEBAR NAVIGATION GLOBALE ===== */}
-        <aside
-          data-scroll-reveal-ignore
-          className={`precision-card relative h-fit rounded-2xl lg:sticky lg:top-4 ${isSidebarCollapsed ? "p-3" : "p-4"}`}
-        >
-          <div className={`mb-2 flex ${isSidebarCollapsed ? "justify-center" : "justify-end"}`}>
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white/85 transition hover:border-quantis-gold/60"
-              title={isSidebarCollapsed ? "Ouvrir le menu" : "Réduire le menu"}
-            >
-              {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </button>
-          </div>
-          <nav className="space-y-1 text-sm">
-            <NavRow icon={<Sparkles className="h-4 w-4" />} onClick={() => router.push("/synthese")} collapsed={isSidebarCollapsed}>
-              Synthèse
-            </NavRow>
-            <NavRow icon={<LayoutDashboard className="h-4 w-4" />} onClick={() => router.push("/analysis")} collapsed={isSidebarCollapsed}>
-              Tableau de bord
-            </NavRow>
-            <NavRow icon={<FileText className="h-4 w-4" />} active onClick={() => {}} collapsed={isSidebarCollapsed}>
-              Documents
-            </NavRow>
-            <NavRow icon={<Bot className="h-4 w-4" />} onClick={() => router.push("/assistant-ia")} collapsed={isSidebarCollapsed}>
-              Assistant IA
-            </NavRow>
-          </nav>
-
-          {/* Bloc Compte (identique à Synthese / Analyse) — clic = ouvre la page Compte. */}
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className={`mt-4 rounded-xl border border-white/10 bg-black/20 transition-colors hover:bg-white/10 ${
-              isSidebarCollapsed ? "flex w-full justify-center p-2" : "w-full p-3 text-left"
-            }`}
-            aria-label="Ouvrir le compte"
-            title="Compte"
-          >
-            {isSidebarCollapsed ? (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                {greetingName.charAt(0).toUpperCase()}
-              </span>
-            ) : (
-              <>
-                <p className="text-[11px] uppercase tracking-wide text-white/50">Compte</p>
-                <div className="mt-2 flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                    {greetingName.charAt(0).toUpperCase()}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-white">{greetingName}</p>
-                    <p className="text-xs text-white/55">Free</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </button>
-        </aside>
+      <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <AppSidebar activeRoute="documents" accountFirstName={greetingName} />
 
         {/* ===== ZONE CONTENU ===== */}
         <div className="space-y-4">
@@ -369,12 +314,12 @@ export function DocumentsView() {
             </p>
           </div>
 
-          {/* Cards */}
-          {loading ? (
+          {/* Cards — loader retardé pour éviter le flash <400ms. */}
+          {loading && showSlowLoader ? (
             <div className="py-20 text-center">
               <p className="text-sm text-white/50">Chargement des analyses...</p>
             </div>
-          ) : filteredAnalyses.length === 0 ? (
+          ) : filteredAnalyses.length === 0 && !loading ? (
             <EmptyFolderState
               folderName={activeFolder}
               onUpload={() => router.push("/upload")}
