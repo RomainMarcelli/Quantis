@@ -86,12 +86,8 @@ import {
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
-// Le téléchargement du rapport PDF est introduit par feat/pdf-report.
-// Stub local pour que la branche feat/source-selector compile sans dépendre
-// du module qui n'existe pas encore.
-const downloadFinancialReport = async (
-  _params: { analysisId: string }
-): Promise<string | null> => "feature non disponible sur cette branche";
+import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
+import { useAiChat } from "@/components/ai/AiChatProvider";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
@@ -119,6 +115,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
+
+  // Pousse l'analyse courante au provider du chat IA — permet au backend
+  // d'enrichir les réponses Claude avec les données réelles (kpis, mappedData)
+  // sans que chaque tooltip ait à passer l'analysisId à la main.
+  const { setAnalysisContext } = useAiChat();
+  useEffect(() => {
+    setAnalysisContext(analysis?.id ?? null);
+    return () => setAnalysisContext(null);
+  }, [analysis?.id, setAnalysisContext]);
+
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
   // Le select du menu pilote l'année d'analyse affichée dans le dashboard.

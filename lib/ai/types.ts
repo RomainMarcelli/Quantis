@@ -61,6 +61,12 @@ export type AiAskParams = {
   /** KPI sur lequel l'utilisateur a cliqué (peut être null pour un chat libre). */
   kpiId: string | null;
   /**
+   * Valeur courante du KPI fournie par le front. Override prioritaire sur
+   * `analysis.kpis[kpiId]` — utile quand le tooltip a la valeur mais pas
+   * l'analysisId pour la lookup serveur.
+   */
+  kpiValue?: number | null;
+  /**
    * Snapshot de l'analyse au moment de la question. Sert à injecter les
    * données réelles dans le system prompt (KPIs non-null, mappedData).
    */

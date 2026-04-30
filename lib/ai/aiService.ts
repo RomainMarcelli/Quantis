@@ -170,11 +170,19 @@ export function getAiService(): AiService {
 // ─── Helpers internes ───────────────────────────────────────────────────
 
 /**
- * Récupère la valeur courante d'un KPI depuis l'analyse, pour la passer au
- * mock. Si l'analyse manque ou si le KPI n'est pas dans `kpis`, on retourne
- * `null` (le mock a un branchement dédié).
+ * Récupère la valeur courante d'un KPI. Priorité :
+ *   1. `params.kpiValue` (fourni par le front depuis la carte KPI cliquée)
+ *   2. `analysis.kpis[kpiId]` (lookup côté serveur si analysisId fourni)
+ *   3. null (le mock a un branchement dédié pour les valeurs absentes)
+ *
+ * Cette priorité corrige le bug "non disponible" : le tooltip a toujours
+ * la valeur, mais pas forcément l'analysisId (synthèse, widgets hors page
+ * d'analyse).
  */
 function getKpiValue(params: AiAskParams): number | null {
+  if (typeof params.kpiValue === "number" && Number.isFinite(params.kpiValue)) {
+    return params.kpiValue;
+  }
   if (!params.kpiId || !params.analysis) return null;
   const kpis = params.analysis.kpis as Record<string, number | null | undefined>;
   const raw = kpis[params.kpiId];
