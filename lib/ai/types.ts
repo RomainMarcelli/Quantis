@@ -108,6 +108,12 @@ export type AiDataPoint = {
   value: string;
   /** Optionnel : kpiId vers lequel naviguer au clic. */
   kpiId?: string;
+  /** Variation vs N-1 en % (ex. -75.4 = baisse 75.4%). Affichée à droite du
+   *  chiffre avec flèche colorée si fournie. */
+  variationPct?: number | null;
+  /** Série mensuelle (6 derniers mois) pour le sparkline inline. Ignorée si
+   *  moins de 2 points (pas de tendance interprétable). */
+  sparklinePoints?: number[];
 };
 
 export type AiComparison = {

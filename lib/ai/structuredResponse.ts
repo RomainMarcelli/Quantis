@@ -160,23 +160,39 @@ function buildDataPoints(
   if (!kpiId || value === null || value === undefined) return undefined;
   if (kpiId === "ebitda" || kpiId === "ebe") {
     return [
-      { label: "Valeur ajoutée", value: "264 100 €", kpiId: "va" },
-      { label: "Salaires", value: "192 000 €" },
-      { label: "Charges ext.", value: "72 100 €" },
+      {
+        label: "Valeur ajoutée",
+        value: "264 100 €",
+        kpiId: "va",
+        variationPct: 4.2,
+        sparklinePoints: [248000, 251000, 255000, 258000, 261000, 264100],
+      },
+      {
+        label: "Salaires",
+        value: "192 000 €",
+        variationPct: 6.1,
+        sparklinePoints: [181000, 184000, 186000, 188000, 190000, 192000],
+      },
+      {
+        label: "Charges ext.",
+        value: "72 100 €",
+        variationPct: -3.4,
+        sparklinePoints: [74600, 73900, 73200, 72800, 72400, 72100],
+      },
     ];
   }
   if (kpiId === "dso") {
     return [
-      { label: "Encours clients", value: "184 500 €" },
-      { label: "CA quotidien", value: "2 410 €" },
+      { label: "Encours clients", value: "184 500 €", variationPct: 12.3 },
+      { label: "CA quotidien", value: "2 410 €", variationPct: 1.8 },
       { label: "Cible", value: "≤ 45 j" },
     ];
   }
   if (kpiId === "bfr") {
     return [
-      { label: "Stocks", value: "62 300 €" },
-      { label: "Créances", value: "184 500 €" },
-      { label: "Dettes fourn.", value: "118 700 €" },
+      { label: "Stocks", value: "62 300 €", variationPct: -8.2 },
+      { label: "Créances", value: "184 500 €", variationPct: 15.6 },
+      { label: "Dettes fourn.", value: "118 700 €", variationPct: 4.1 },
     ];
   }
   return undefined;
