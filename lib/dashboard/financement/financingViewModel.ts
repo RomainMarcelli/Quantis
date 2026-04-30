@@ -8,6 +8,8 @@ export type FinancingIndicator = {
   value: number | null;
   severity: FinancingSeverity;
   helper: string;
+  /** id KPI dans le registre — déclenche le KpiTooltip côté UI. */
+  kpiId?: string;
 };
 
 export type FinancingInterpretation = {
@@ -134,19 +136,22 @@ export function buildLiquidityIndicators(params: {
       label: "Générale",
       value: params.liquiditeGenerale,
       severity: interpretLiquidity(params.liquiditeGenerale).severity,
-      helper: "Actif circulant / dettes court terme"
+      helper: "Actif circulant / dettes court terme",
+      kpiId: "liq_gen"
     },
     {
       label: "Réduite",
       value: params.liquiditeReduite,
       severity: interpretLiquidity(params.liquiditeReduite).severity,
-      helper: "(Actif circulant - stocks) / dettes court terme"
+      helper: "(Actif circulant - stocks) / dettes court terme",
+      kpiId: "liq_red"
     },
     {
       label: "Immédiate",
       value: params.liquiditeImmediate,
       severity: interpretLiquidity(params.liquiditeImmediate).severity,
-      helper: "Trésorerie / dettes court terme"
+      helper: "Trésorerie / dettes court terme",
+      kpiId: "liq_imm"
     }
   ];
 }

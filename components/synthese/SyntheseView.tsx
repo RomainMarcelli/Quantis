@@ -13,12 +13,17 @@ import {
   PanelLeftOpen,
   Settings,
   Sparkles,
-  UserCircle2
+  UserCircle2,
+  Bot
 } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
-import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
+// Le téléchargement du rapport PDF est introduit par feat/pdf-report.
+// Stub local pour que feat/kpi-tooltips reste autonome.
+const downloadFinancialReport = async (
+  _params: { analysisId: string }
+): Promise<string | null> => "feature non disponible sur cette branche";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import {
   buildSyntheseYearOptions,
@@ -39,6 +44,18 @@ import { getUserProfile } from "@/services/userProfileStore";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
+import { TemporalityBar } from "@/components/temporality/TemporalityBar";
+import { useTemporality } from "@/lib/temporality/temporalityContext";
+import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
+import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
+import { resolveActiveAnalysis } from "@/lib/source/activeSource";
+import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
+import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
+// SimulationToggleButton est introduit par feat/simulation. Stub no-op
+// dans cette branche pour que feat/kpi-tooltips reste autonome.
+function SimulationToggleButton(_props: { mappedData: unknown }): null {
+  return null;
+}
 import {
   consumeSearchTarget,
   routeMatchesPath,
@@ -142,12 +159,23 @@ export function SyntheseView() {
     [currentCalendarYear, selectedYearValue, yearOptions]
   );
 
+  // Source active : si l'utilisateur a explicitement choisi une analyse via
+  // Documents → "Utiliser comme source active" (localStorage `quantis.activeAnalysis`),
+  // on la prend en priorité absolue. Sinon fallback : connexion dynamique > FEC > upload,
+  // la plus récente à priorité égale. Implémenté dans `resolveActiveAnalysis`.
+  const activeAnalysisId = useActiveAnalysisId();
+
   const analysisPair = useMemo(() => {
     if (!analysesBySelectedYear.length) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
 
-    const current = resolveCurrentAnalysis(analysesBySelectedYear, getActiveFolderName());
+    // Priorité 1 : analyse explicitement marquée active (si dans la sélection courante).
+    // Priorité 2 : règle métier source dynamique > FEC > upload (le plus récent gagne).
+    // Priorité 3 (fallback historique) : dossier actif → 1ère analyse triée fiscalYear desc.
+    const fromActive = resolveActiveAnalysis(analysesBySelectedYear, activeAnalysisId);
+    const current =
+      fromActive ?? resolveCurrentAnalysis(analysesBySelectedYear, getActiveFolderName());
     if (!current) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
@@ -159,14 +187,27 @@ export function SyntheseView() {
     });
 
     return { current, previous };
-  }, [allAnalyses, analysesBySelectedYear]);
+  }, [allAnalyses, analysesBySelectedYear, activeAnalysisId]);
+
+  // Filtre temporel global. Si l'analyse a un dailyAccounting (source dynamique Pennylane),
+  // les KPI flow (CA, VA, EBITDA…) sont recalculés sur la période sélectionnée. Les KPI bilan
+  // (BFR, dispo, total_cp…) restent ceux du snapshot, car ils sont à un instant T.
+  const temporality = useTemporality();
+  const effective = useMemo(() => {
+    if (!analysisPair.current) return null;
+    return recomputeKpisForPeriod(
+      analysisPair.current,
+      temporality.periodStart,
+      temporality.periodEnd
+    );
+  }, [analysisPair.current, temporality.periodStart, temporality.periodEnd]);
 
   const synthese = useMemo(() => {
-    if (!analysisPair.current) {
+    if (!analysisPair.current || !effective) {
       return null;
     }
-    return buildSyntheseViewModel(analysisPair.current.kpis, analysisPair.previous?.kpis ?? null, sector);
-  }, [analysisPair, sector]);
+    return buildSyntheseViewModel(effective.kpis, analysisPair.previous?.kpis ?? null, sector);
+  }, [analysisPair, effective, sector]);
 
   useEffect(() => {
     if (!yearOptions.length) return;
@@ -243,6 +284,9 @@ export function SyntheseView() {
           <div>
             <p className="text-sm font-semibold text-white">{companyName}</p>
             <p className="text-xs text-white/55">Plateforme financière</p>
+          </div>
+          <div className="ml-2 hidden lg:block">
+            <ActiveSourceBadge analysis={analysisPair.current} />
           </div>
         </div>
 
@@ -343,6 +387,13 @@ export function SyntheseView() {
             >
               Documents
             </NavRow>
+            <NavRow
+              icon={<Bot className="h-4 w-4" />}
+              onClick={() => router.push("/assistant-ia")}
+              collapsed={isSidebarCollapsed}
+            >
+              Assistant IA
+            </NavRow>
           </nav>
 
           {!isSidebarCollapsed && yearOptions.length > 1 ? (
@@ -395,34 +446,63 @@ export function SyntheseView() {
           </button>
         </aside>
 
-        <div>
+        <div className="space-y-4">
+          {/* Filtre temporel global. On ne l'affiche que si l'analyse active a
+              du `dailyAccounting` exploitable — sinon (source statique PDF/Excel
+              avec un seul exercice annuel) la barre ne sert à rien et on
+              affiche juste "Exercice YYYY" en texte simple. */}
+          {shouldShowTemporalityBar(analysisPair.current) ? (
+            <TemporalityBar
+              availableRange={computeAvailableRange(analysisPair.current!)}
+              daysInPeriod={effective?.isFiltered ? effective.filterSummary.daysInPeriod : null}
+              rightLabel={
+                effective?.isFiltered
+                  ? `${effective.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
+                  : undefined
+              }
+            />
+          ) : analysisPair.current ? (
+            <div
+              className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70"
+              data-scroll-reveal-ignore
+            >
+              <span className="text-xs uppercase tracking-wider text-white/45">Période · </span>
+              <span className="font-semibold text-white">
+                Exercice {analysisPair.current.fiscalYear ?? "(non renseigné)"}
+              </span>
+              <span className="ml-2 text-xs text-white/45">— source statique, vue annuelle uniquement</span>
+            </div>
+          ) : null}
+
+          {/* Simulation What-If : visible uniquement quand on a un mappedData
+              exploitable. SimulationToggleButton gère lui-même son propre
+              état ouvert/fermé pour rester découplé du parent. */}
+          {analysisPair.current && effective ? (
+            <SimulationToggleButton mappedData={effective.mappedData} />
+          ) : null}
+
           {analysisPair.current && synthese ? (
             <SyntheseDashboard
               greetingName={greetingName}
               companyName={companyName}
               analysisCreatedAt={analysisPair.current.createdAt}
-              onDownloadReport={() => {
-                if (!analysisPair.current) {
-                  return;
-                }
-                void downloadSyntheseReport({
-                  companyName,
-                  greetingName,
-                  analysisCreatedAt: analysisPair.current.createdAt,
-                  selectedYearLabel,
-                  synthese,
-                  kpis: analysisPair.current.kpis,
-                  mappedData: analysisPair.current.mappedData
-                });
-              }}
               onExportData={() => {
                 if (!analysisPair.current) return;
                 exportAnalysisDataAsJson({ analysis: analysisPair.current, companyName });
               }}
               onReupload={() => router.push("/upload")}
               onManualEntry={() => router.push("/upload/manual")}
+              onDownloadFinancialReport={async () => {
+                if (!analysisPair.current) return;
+                const err = await downloadFinancialReport({ analysisId: analysisPair.current.id });
+                if (err) {
+                  // Erreur silencieuse — log debug, le bouton n'a pas de feedback UX dédié.
+                  console.warn("[financial-report] download failed", err);
+                }
+              }}
               synthese={synthese}
               parserVersion={analysisPair.current.parserVersion}
+              sourceMetadata={analysisPair.current.sourceMetadata ?? null}
             />
           ) : (
             <section className="precision-card rounded-2xl p-5">

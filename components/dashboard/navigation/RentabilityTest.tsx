@@ -10,7 +10,8 @@ import {
   Cpu,
   Scale,
 } from "lucide-react";
-import { formatNumber } from "@/components/dashboard/formatting";
+import { formatNumber, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
+import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
@@ -144,16 +145,7 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
 
       <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <div className="interactive-badge flex h-8 w-8 items-center justify-center border border-quantis-gold/20 bg-quantis-base">
-              <span className="text-sm font-bold text-quantis-gold">Q</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white">Quantis</span>
-              <span className="text-[10px] font-mono text-quantis-muted">Financial Operating System</span>
-            </div>
-          </div>
-          <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
             Rentabilité & valeur actionnariale
           </h2>
           <p className="text-sm text-quantis-muted">
@@ -169,10 +161,12 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
           searchId="analysis-rent-roe"
           title="Rentabilité actionnariale"
           tag="Return on Equity (ROE)"
-          value={roePercent === null ? "N/D" : `${formatNumber(animatedRoe, 1)}%`}
+          value={roePercent === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedRoe, 1)}%`}
           trend={roeTrend}
           icon={<Award className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper="Rentabilité des fonds propres: mesure ce que l'actionnaire gagne pour chaque euro investi."
+          kpiId="roe"
+          kpiValue={kpis.roe}
         />
 
         <RentabilityMetricCard
@@ -181,12 +175,14 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
           searchId="analysis-rent-roce"
           title="Rentabilité opérationnelle"
           tag="Return on Capital Employed (ROCE)"
-          value={rocePercent === null ? "N/D" : `${formatNumber(animatedRoce, 1)}%`}
+          value={rocePercent === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedRoce, 1)}%`}
           trend={roceTrend}
           icon={
             <BriefcaseBusiness className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
           }
           helper="Performance économique pure de l'exploitation, indépendamment du mode de financement."
+          kpiId="roce"
+          kpiValue={kpis.roce}
         />
 
         <article
@@ -298,8 +294,11 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
                   Levier financier (dettes / fonds propres)
                 </span>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-                <Scale className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
+              <div className="flex items-center gap-2">
+                <KpiTooltip kpiId="effet_levier" value={kpis.effet_levier} />
+                <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
+                  <Scale className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
+                </div>
               </div>
             </div>
             <p className="edu-text mt-0 border-t-0 pt-0">{leverageInterpretation.helper}</p>
@@ -307,7 +306,7 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
 
           <div className="w-full md:w-[32%]">
             <p className="tnum data-react text-right text-[3rem] font-semibold leading-none tracking-tight text-white">
-              {kpis.effet_levier === null ? "N/D" : `${formatNumber(animatedLeverage, 2)}x`}
+              {kpis.effet_levier === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedLeverage, 2)}x`}
             </p>
             <div className="mt-3 flex justify-end">
               <div className="flex items-center gap-2">
@@ -372,6 +371,8 @@ type RentabilityMetricCardProps = {
   icon: ReactNode;
   delayMs: number;
   className?: string;
+  kpiId?: string;
+  kpiValue?: number | null;
 };
 
 function RentabilityMetricCard({
@@ -383,7 +384,9 @@ function RentabilityMetricCard({
   trend,
   icon,
   delayMs,
-  className
+  className,
+  kpiId,
+  kpiValue
 }: RentabilityMetricCardProps) {
   return (
     <article
@@ -397,8 +400,11 @@ function RentabilityMetricCard({
             <h3 className="text-sm font-semibold text-white">{title}</h3>
             <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
           </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-            {icon}
+          <div className="flex items-center gap-2">
+            {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
+            <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
+              {icon}
+            </div>
           </div>
         </div>
         <p className="tnum data-react text-[3rem] font-semibold leading-none tracking-tight text-white">{value}</p>

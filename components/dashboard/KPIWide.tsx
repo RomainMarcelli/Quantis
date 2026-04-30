@@ -4,8 +4,9 @@
 
 import { Target } from "lucide-react";
 import { computeEbeProgressPercent } from "@/lib/dashboard/premiumDashboardAdapter";
-import { formatCurrency } from "@/components/dashboard/formatting";
+import { formatCurrency, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
+import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 
 type KPIWideProps = {
   title: string;
@@ -13,9 +14,10 @@ type KPIWideProps = {
   value: number | null;
   target?: number;
   searchId?: string;
+  kpiId?: string;
 };
 
-export function KPIWide({ title, tag, value, target = 50000, searchId }: KPIWideProps) {
+export function KPIWide({ title, tag, value, target = 50000, searchId, kpiId }: KPIWideProps) {
   // Animation de la valeur EBE.
   const animatedValue = useAnimatedNumber(value, { durationMs: 1200 });
   // Animation de la barre de progression vers l'objectif.
@@ -24,15 +26,18 @@ export function KPIWide({ title, tag, value, target = 50000, searchId }: KPIWide
 
   return (
     <article className="precision-card group fade-up flex flex-col rounded-2xl p-6 md:col-span-2" data-search-id={searchId}>
-      <div className="card-header mb-6 flex flex-col gap-1">
-        <h3 className="text-sm font-semibold text-white">{title}</h3>
-        <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
+      <div className="card-header mb-6 flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-sm font-semibold text-white">{title}</h3>
+          <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
+        </div>
+        {kpiId ? <KpiTooltip kpiId={kpiId} value={value} /> : null}
       </div>
 
       <div className="flex flex-col items-center justify-between gap-8 md:flex-row">
         <div className="w-full flex-1">
           <div className="tnum data-react text-5xl font-semibold tracking-tight text-white">
-            {value === null ? "N/D" : formatCurrency(animatedValue)}
+            {value === null ? INSUFFICIENT_DATA_LABEL : formatCurrency(animatedValue)}
           </div>
         </div>
 

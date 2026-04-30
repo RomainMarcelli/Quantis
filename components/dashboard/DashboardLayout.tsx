@@ -55,7 +55,7 @@ export function DashboardLayout({
     subtitle ?? `Bonjour ${greetingName}, voici la vue d'ensemble de votre santé financière.`;
 
   const defaultAiMessage =
-    kpis.tresorerie !== null && kpis.tresorerie > 0
+    kpis.disponibilites !== null && kpis.disponibilites > 0
       ? `Flux de trésorerie disponible (${formatMonths(kpis.runway)}). Une projection RH reste soutenable.`
       : "Priorité liquidité détectée. Révision des décaissements recommandée avant tout engagement.";
 
@@ -112,17 +112,19 @@ export function DashboardLayout({
             trendLabel="vs M-1"
             icon={<ArrowUpRight className="h-4 w-4 text-white/40 group-hover:text-quantis-gold" />}
             searchId={searchIds?.revenue}
+            kpiId="ca"
           />
 
           <KPIBlock
             title="Sur le compte"
-            tag="Trésorerie nette"
-            value={kpis.tresorerie}
+            tag="Disponibilités"
+            value={kpis.disponibilites}
             format="currency"
             sideLabel={`Runway: ${formatMonths(kpis.runway)}`}
             trendLabel="LIQUIDITE"
             icon={<Wallet className="h-4 w-4 text-white/40 group-hover:text-quantis-gold" />}
             searchId={searchIds?.cash}
+            kpiId="disponibilites"
           />
 
           <KPIWide
@@ -131,6 +133,7 @@ export function DashboardLayout({
             value={kpis.ebe}
             target={50000}
             searchId={searchIds?.ebe}
+            kpiId="ebe"
           />
 
           <AIInsight message={aiMessage ?? defaultAiMessage} ctaLabel={aiCtaLabel} searchId={searchIds?.recommendation} />

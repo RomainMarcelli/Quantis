@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   Waves
 } from "lucide-react";
-import { formatNumber, formatPercent } from "@/components/dashboard/formatting";
+import { formatNumber, formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
+import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
@@ -145,16 +146,7 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
 
       <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <div className="interactive-badge flex h-8 w-8 items-center justify-center border border-quantis-gold/20 bg-quantis-base">
-              <span className="text-sm font-bold text-quantis-gold">Q</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white">Quantis</span>
-              <span className="text-[10px] font-mono text-quantis-muted">Financial Operating System</span>
-            </div>
-          </div>
-          <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
             Financement & solvabilité
           </h2>
           <p className="text-sm text-quantis-muted">Capacité d&apos;emprunt, génération de cash et liquidité court terme</p>
@@ -181,13 +173,15 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           className="md:col-span-4"
           title="Capacité de remboursement"
           tag="Dette nette / CAF (années)"
-          value={kpis.capacite_remboursement_annees === null ? "N/D" : `${animatedDebtCapacity.toFixed(1)} ans`}
+          value={kpis.capacite_remboursement_annees === null ? INSUFFICIENT_DATA_LABEL : `${animatedDebtCapacity.toFixed(1)} ans`}
           trend={debtCapacityTrend}
           icon={<ShieldCheck className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper={debtInterpretation.helper}
           statusLabel={debtInterpretation.label}
           severity={debtInterpretation.severity}
           code="DEBT_RATIO"
+          kpiId="capacite_remboursement_annees"
+          kpiValue={kpis.capacite_remboursement_annees}
         />
 
         <FinancingMetricCard
@@ -196,13 +190,15 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           className="md:col-span-4"
           title="Autofinancement"
           tag="Capacité d'autofinancement (CAF)"
-          value={kpis.caf === null ? "N/D" : formatCompactCurrency(animatedCaf)}
+          value={kpis.caf === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedCaf)}
           trend={cafTrend}
           icon={<Landmark className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper="Cash théorique généré par l'exploitation avant variation du BFR."
-          statusLabel={kpis.caf === null ? "N/D" : kpis.caf >= 0 ? "Création de cash" : "Cash négatif"}
+          statusLabel={kpis.caf === null ? INSUFFICIENT_DATA_LABEL : kpis.caf >= 0 ? "Création de cash" : "Cash négatif"}
           severity={kpis.caf === null ? "na" : kpis.caf >= 0 ? "good" : "risk"}
           code="CASH_FLOW_GEN"
+          kpiId="caf"
+          kpiValue={kpis.caf}
         />
 
         <FinancingMetricCard
@@ -211,13 +207,15 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           className="md:col-span-4"
           title="Cash réel d'exploitation"
           tag="CAF - variation du BFR"
-          value={kpis.fte === null ? "N/D" : formatCompactCurrency(animatedFte)}
+          value={kpis.fte === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedFte)}
           trend={fteTrend}
           icon={<Waves className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper="Trésorerie réellement dégagée après absorption du besoin en fonds de roulement."
-          statusLabel={kpis.fte === null ? "N/D" : kpis.fte >= 0 ? "Cash disponible" : "Cash consommé"}
+          statusLabel={kpis.fte === null ? INSUFFICIENT_DATA_LABEL : kpis.fte >= 0 ? "Cash disponible" : "Cash consommé"}
           severity={kpis.fte === null ? "na" : kpis.fte >= 0 ? "good" : "risk"}
           code="OCF_NET"
+          kpiId="fte"
+          kpiValue={kpis.fte}
         />
 
         <FinancingMetricCard
@@ -226,13 +224,15 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           className="md:col-span-4"
           title="Solidité du bilan"
           tag="Capitaux propres / Total passif"
-          value={kpis.solvabilite === null ? "N/D" : formatPercent(animatedSolvabilite * 100)}
-          trend={{ direction: "na", changePercent: null, label: "N/D", tone: "neutral" }}
+          value={kpis.solvabilite === null ? INSUFFICIENT_DATA_LABEL : formatPercent(animatedSolvabilite * 100)}
+          trend={{ direction: "na", changePercent: null, label: INSUFFICIENT_DATA_LABEL, tone: "neutral" }}
           icon={<ShieldCheck className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper="Mesure la proportion du bilan financée par les fonds propres."
-          statusLabel={kpis.solvabilite === null ? "N/D" : kpis.solvabilite >= 0.3 ? "Bilan solide" : "Sous-capitalisé"}
+          statusLabel={kpis.solvabilite === null ? INSUFFICIENT_DATA_LABEL : kpis.solvabilite >= 0.3 ? "Bilan solide" : "Sous-capitalisé"}
           severity={kpis.solvabilite === null ? "na" : kpis.solvabilite >= 0.3 ? "good" : "risk"}
           code="SOLVENCY"
+          kpiId="solvabilite"
+          kpiValue={kpis.solvabilite}
         />
 
         <FinancingMetricCard
@@ -241,13 +241,15 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           className="md:col-span-4"
           title="Poids de la dette"
           tag="Ratio d'endettement"
-          value={kpis.gearing === null ? "N/D" : `${formatNumber(animatedGearing, 1)}x`}
-          trend={{ direction: "na", changePercent: null, label: "N/D", tone: "neutral" }}
+          value={kpis.gearing === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedGearing, 1)}x`}
+          trend={{ direction: "na", changePercent: null, label: INSUFFICIENT_DATA_LABEL, tone: "neutral" }}
           icon={<Scale className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper="Nombre d'années d'EBITDA pour rembourser la dette nette."
-          statusLabel={kpis.gearing === null ? "N/D" : kpis.gearing <= 3 ? "Endettement maîtrisé" : "Endettement élevé"}
+          statusLabel={kpis.gearing === null ? INSUFFICIENT_DATA_LABEL : kpis.gearing <= 3 ? "Endettement maîtrisé" : "Endettement élevé"}
           severity={kpis.gearing === null ? "na" : kpis.gearing <= 3 ? "good" : "risk"}
           code="GEARING"
+          kpiId="gearing"
+          kpiValue={kpis.gearing}
         />
 
         <FinancingMetricCard
@@ -256,13 +258,15 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           className="md:col-span-4"
           title="Position nette de trésorerie"
           tag="Disponibilités - Emprunts"
-          value={kpis.tn === null ? "N/D" : formatCompactCurrency(animatedTn)}
-          trend={{ direction: "na", changePercent: null, label: "N/D", tone: "neutral" }}
+          value={kpis.tn === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedTn)}
+          trend={{ direction: "na", changePercent: null, label: INSUFFICIENT_DATA_LABEL, tone: "neutral" }}
           icon={<Landmark className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper="Solde net entre la trésorerie disponible et les emprunts bancaires."
-          statusLabel={kpis.tn === null ? "N/D" : kpis.tn >= 0 ? "Trésorerie positive" : "Trésorerie négative"}
+          statusLabel={kpis.tn === null ? INSUFFICIENT_DATA_LABEL : kpis.tn >= 0 ? "Trésorerie positive" : "Trésorerie négative"}
           severity={kpis.tn === null ? "na" : kpis.tn >= 0 ? "good" : "risk"}
           code="NET_CASH"
+          kpiId="tn"
+          kpiValue={kpis.tn}
         />
 
         <article
@@ -284,7 +288,7 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
               const trend = liquidityTrends[index] ?? {
                 direction: "na",
                 changePercent: null,
-                label: "N/D",
+                label: INSUFFICIENT_DATA_LABEL,
                 tone: "neutral"
               };
 
@@ -293,12 +297,17 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
                   key={indicator.label}
                   className="interactive-badge rounded-xl border border-white/5 bg-white/[0.02] p-5 transition-all hover:border-quantis-gold/30 hover:bg-quantis-gold/[0.03]"
                 >
-                  <span className="text-[10px] uppercase tracking-widest text-white/55">
-                    Liquidité {indicator.label}
-                  </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] uppercase tracking-widest text-white/55">
+                      Liquidité {indicator.label}
+                    </span>
+                    {indicator.kpiId ? (
+                      <KpiTooltip kpiId={indicator.kpiId} value={indicator.value} />
+                    ) : null}
+                  </div>
                   <div className="mt-3 flex items-baseline gap-2">
                     <span className="tnum text-3xl font-medium text-white">
-                      {indicator.value === null ? "N/D" : formatNumber(indicator.value, 2)}
+                      {indicator.value === null ? INSUFFICIENT_DATA_LABEL : formatNumber(indicator.value, 2)}
                       {indicator.value === null ? null : <span className="text-sm text-white/35">x</span>}
                     </span>
                   </div>
@@ -338,7 +347,7 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
             </div>
 
             <p className="tnum data-react text-[2.6rem] font-semibold leading-none tracking-tight text-white">
-              {kpis.effet_levier === null ? "N/D" : `${animatedLeverage.toFixed(2)}x`}
+              {kpis.effet_levier === null ? INSUFFICIENT_DATA_LABEL : `${animatedLeverage.toFixed(2)}x`}
             </p>
             <div className="mt-2">
               <KpiTrendPill trend={leverageTrend} compact />
@@ -401,6 +410,8 @@ type FinancingMetricCardProps = {
   severity: FinancingSeverity;
   delayMs: number;
   className?: string;
+  kpiId?: string;
+  kpiValue?: number | null;
 };
 
 function FinancingMetricCard({
@@ -415,7 +426,9 @@ function FinancingMetricCard({
   icon,
   severity,
   delayMs,
-  className
+  className,
+  kpiId,
+  kpiValue
 }: FinancingMetricCardProps) {
   return (
     <article
@@ -429,8 +442,11 @@ function FinancingMetricCard({
             <h3 className="text-sm font-semibold text-white">{title}</h3>
             <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
           </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-            {icon}
+          <div className="flex items-center gap-2">
+            {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
+            <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
+              {icon}
+            </div>
           </div>
         </div>
         <p className="tnum data-react text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
@@ -457,7 +473,7 @@ function interpretLabel(severity: FinancingSeverity): string {
   if (severity === "risk") {
     return "Tension";
   }
-  return "N/D";
+  return INSUFFICIENT_DATA_LABEL;
 }
 
 function formatCompactCurrency(value: number): string {
