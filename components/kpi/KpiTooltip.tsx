@@ -48,11 +48,6 @@ type KpiTooltipProps = {
   align?: "left" | "right";
 };
 
-const POPOVER_WIDTH = 320;
-// Marge minimale entre le popover et le bord du viewport — uniquement utilisée
-// pour le clamp anti-débordement quand la tuile est elle-même au bord. Le
-// popover s'aligne désormais COIN À COIN sur la tuile (pas de gap entre les
-// deux), donc plus besoin de POPOVER_GAP.
 const VIEWPORT_PADDING = 12;
 
 // Position : on aligne UN COIN du popover sur LE MÊME COIN de la tuile.
@@ -347,7 +342,7 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                     type="button"
                     onClick={() => {
                       setOpen(false);
-                      openAiChat({ kpiId, initialQuestion: question });
+                      openAiChat({ kpiId, kpiValue: value ?? null, initialQuestion: question });
                     }}
                     className="mt-1 flex w-full items-center justify-between gap-2 rounded-lg border border-quantis-gold/50 bg-quantis-gold/10 px-3 py-2 text-left text-[11px] font-medium text-quantis-gold transition hover:border-quantis-gold/80 hover:bg-quantis-gold/20"
                   >
@@ -365,7 +360,7 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                     type="button"
                     onClick={() => {
                       setOpen(false);
-                      openAiChat({ kpiId });
+                      openAiChat({ kpiId, kpiValue: value ?? null });
                     }}
                     className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-medium text-white/55 transition hover:text-quantis-gold"
                   >
