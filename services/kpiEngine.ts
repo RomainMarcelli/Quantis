@@ -106,6 +106,7 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
     capacite_remboursement_annees: roundOrNull(capacite_remboursement_annees),
     etat_materiel_indice: roundOrNull(etat_materiel_indice),
     healthScore: scoreHealth({
+      ca,
       grossMarginRate,
       netProfit,
       workingCapital,
@@ -115,16 +116,33 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
 }
 
 function scoreHealth({
+  ca,
   grossMarginRate,
   netProfit,
   workingCapital,
   cashRunwayMonths
 }: {
+  ca: number | null;
   grossMarginRate: number | null;
   netProfit: number | null;
   workingCapital: number | null;
   cashRunwayMonths: number | null;
 }): number | null {
+  // Garde-fou : si le CA est à 0 mais qu'on a quand même reçu au moins un signal
+  // (workingCapital, netProfit...), c'est un parsing à moitié foiré. Un score
+  // de "100" calculé sur le seul fait que workingCapital ≥ 0 (ex. stocks
+  // aberrants après mauvaise extraction PDF) serait trompeur. On retourne null
+  // — l'UI affichera "Données insuffisantes" plutôt qu'un score faussement
+  // rassurant. À distinguer du cas ca=null où aucune extraction n'a eu lieu.
+  if (ca === 0 && (
+    grossMarginRate !== null ||
+    netProfit !== null ||
+    workingCapital !== null ||
+    cashRunwayMonths !== null
+  )) {
+    return null;
+  }
+
   let score = 0;
   let weights = 0;
 

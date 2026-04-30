@@ -1,4 +1,4 @@
-export type SupportedUploadType = "excel" | "pdf";
+export type SupportedUploadType = "excel" | "pdf" | "fec";
 
 export type FileDescriptor = {
   name: string;
@@ -183,6 +183,19 @@ export type AnalysisRecord = {
   } | null;
   parserVersion?: "v1" | "v2";
   pdfType?: "native_text" | "scanned_text" | "image_only";
+  // Extensions "donnée dynamique" (sync depuis logiciels comptables).
+  // Présents uniquement quand sourceMetadata.type === "dynamic".
+  // Le front continue de consommer mappedData/kpis/quantisScore comme avant ;
+  // les champs ci-dessous sont des bonus ignorables sans casse.
+  sourceMetadata?: import("@/types/connectors").SourceMetadata | null;
+  granularInsights?: import("@/types/connectors").GranularInsights | null;
+  kpisTimeSeries?: import("@/types/connectors").KpiTimeSeriesEntry[] | null;
+  vatInsights?: import("@/types/connectors").VatInsights | null;
+  // Nouveau format demandé par le PM : matière première pour les KPI calculés côté front.
+  // Présents uniquement quand sourceMetadata.type === "dynamic". Drafts exclus de fait
+  // (Pennylane n'émet d'écritures que pour les factures finalisées).
+  dailyAccounting?: import("@/types/connectors").DailyAccountingEntry[] | null;
+  balanceSheetSnapshot?: import("@/types/connectors").BalanceSheetSnapshot | null;
 };
 
 export type NewAnalysisRecord = Omit<AnalysisRecord, "id">;

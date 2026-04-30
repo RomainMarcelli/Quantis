@@ -97,4 +97,21 @@ describe("detectSupportedUploadType", () => {
   it("returns null for unsupported formats", () => {
     expect(detectSupportedUploadType("photo.png", "image/png")).toBeNull();
   });
+
+  it("detects FEC files via header sniff (.txt extension + FEC headers)", () => {
+    const fecHeader =
+      "JournalCode|JournalLib|EcritureNum|EcritureDate|CompteNum|CompteLib|CompAuxNum|CompAuxLib|PieceRef|PieceDate|EcritureLib|Debit|Credit|EcritureLet|DateLet|ValidDate|Montantdevise|Idevise\n";
+    expect(detectSupportedUploadType("export.txt", "text/plain", Buffer.from(fecHeader))).toBe("fec");
+    expect(detectSupportedUploadType("export.csv", "text/csv", Buffer.from(fecHeader))).toBe("fec");
+  });
+
+  it("falls back to excel for .csv without FEC headers", () => {
+    const generic = Buffer.from("date,libelle,montant\n2026-01-01,test,100");
+    expect(detectSupportedUploadType("export.csv", "text/csv", generic)).toBe("excel");
+  });
+
+  it("returns null for .txt without FEC headers (no buffer or non-FEC content)", () => {
+    expect(detectSupportedUploadType("notes.txt", "text/plain")).toBeNull();
+    expect(detectSupportedUploadType("notes.txt", "text/plain", Buffer.from("Hello world"))).toBeNull();
+  });
 });
