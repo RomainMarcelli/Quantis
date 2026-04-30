@@ -1002,6 +1002,65 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
     phase: "CT",
   },
 
+  // ─── Obligations fiscales ───────────────────────────────────────────────
+  // KPIs dérivés des soldes comptables qui projettent les sorties de cash
+  // fiscales à venir (TVA à reverser, IS à provisionner). Affichés dans le
+  // cockpit Synthèse pour aider le dirigeant à anticiper sa trésorerie.
+
+  tva_a_payer: {
+    id: "tva_a_payer",
+    label: "TVA à reverser",
+    shortLabel: "TVA à sortir",
+    category: "tresorerie",
+    formula: "TVA collectée (4457) − TVA déductible (4456)",
+    formulaCode: "tva_collectee - tva_deductible",
+    unit: "currency",
+    tooltip: {
+      explanation:
+        "C'est le montant de TVA que vous devrez reverser à l'État. Vous la collectez sur vos ventes et vous la déduisez sur vos achats — la différence c'est ce que vous devez.",
+      goodSign:
+        "Si vous mettez de côté la part mensuelle dès la facturation, l'échéance se fait sans douleur.",
+      badSign:
+        "Si la trésorerie ne couvre pas la TVA à reverser, c'est le premier signal d'alerte BFR à traiter.",
+      benchmark:
+        "Régime réel normal : déclaration CA3 mensuelle. Régime simplifié : acomptes semestriels + CA12 annuelle.",
+    },
+    suggestedQuestions: {
+      whenGood: "Comment optimiser le rythme TVA pour soulager mon BFR ?",
+      whenBad: "Quels leviers pour réduire l'écart entre TVA collectée et déductible ?",
+    },
+    dependencies: ["tva_collectee", "tva_deductible"],
+    sourceLayer: "accounting",
+    phase: "CT",
+  },
+
+  provision_is: {
+    id: "provision_is",
+    label: "Provision impôt sur les sociétés",
+    shortLabel: "Provision IS",
+    category: "tresorerie",
+    formula: "15 % jusqu'à 42 500 € puis 25 % au-delà du résultat de l'exercice",
+    formulaCode: "min(resultat, 42500)*0.15 + max(0, resultat-42500)*0.25",
+    unit: "currency",
+    tooltip: {
+      explanation:
+        "C'est l'impôt sur les bénéfices que vous devrez payer si votre entreprise gagne de l'argent. Mettez-le de côté chaque mois pour ne pas être surpris au moment du paiement.",
+      goodSign:
+        "Provision IS bien identifiée et mise de côté = pas de mauvaise surprise au solde annuel.",
+      badSign:
+        "Sans provision IS, l'échéance peut consommer une grande part de la trésorerie d'un coup.",
+      benchmark:
+        "Barème 2024 — taux réduit PME 15 % jusqu'à 42 500 €, taux normal 25 % au-delà (article 219 CGI). Hors crédits d'impôt et intégration fiscale.",
+    },
+    suggestedQuestions: {
+      whenGood: "Quels mécanismes (CIR, JEI, intégration) pourraient réduire mon IS ?",
+      whenBad: "Quelles charges déductibles pourrais-je activer pour minorer la base imposable ?",
+    },
+    dependencies: ["resultat_exercice"],
+    sourceLayer: "accounting",
+    phase: "CT",
+  },
+
   // ─── Score synthétique ──────────────────────────────────────────────────
   healthScore: {
     id: "healthScore",

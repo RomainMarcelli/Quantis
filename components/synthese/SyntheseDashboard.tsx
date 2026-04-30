@@ -4,12 +4,14 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, Download, Lightbulb } from "lucide-react";
+import { AlertTriangle, Download, Lightbulb, Receipt, Landmark } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { QuantisScoreCard } from "@/components/dashboard/QuantisScoreCard";
 import { SourceBadge } from "@/components/analysis/SourceBadge";
+import { KpiTooltip } from "@/components/kpi/KpiTooltip";
+import { formatCurrency } from "@/components/dashboard/formatting";
 import type { PremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
-import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
+import type { SyntheseFiscalTile, SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import type { SourceMetadata } from "@/types/connectors";
 import type { CalculatedKpis } from "@/types/analysis";
 
@@ -128,6 +130,17 @@ export function SyntheseDashboard({
           recommendation: "synthese-actions"
         }}
       >
+        {/* Tiles fiscales — sorties de cash à anticiper (TVA, IS). Visibles
+            uniquement quand les données amont sont calculables (cf.
+            buildFiscalTiles dans syntheseViewModel.ts). */}
+        {synthese.fiscalTiles.length > 0 ? (
+          <section className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {synthese.fiscalTiles.map((tile) => (
+              <FiscalTile key={tile.id} tile={tile} />
+            ))}
+          </section>
+        ) : null}
+
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr]">
           <article className="precision-card fade-up rounded-2xl p-5" style={{ animationDelay: "0.22s" }} data-search-id="synthese-actions-details">
             <div className="card-header flex items-center gap-2">
@@ -215,4 +228,41 @@ function alertSeverityClass(severity: "high" | "medium" | "low"): string {
     return "border-amber-300/35 bg-amber-500/15 text-amber-100";
   }
   return "border-emerald-300/35 bg-emerald-500/15 text-emerald-100";
+}
+
+/**
+ * Tile compacte fiscale (TVA / IS). Couleur neutre — c'est une projection,
+ * pas un diagnostic bon/mauvais. Le KpiTooltip ✨ permet d'ouvrir le détail
+ * (formule, vulgarisation 3 niveaux, question IA contextualisée).
+ */
+function FiscalTile({ tile }: { tile: SyntheseFiscalTile }) {
+  const Icon = tile.id === "tva_a_payer" ? Receipt : Landmark;
+  const value = tile.value ?? 0;
+  return (
+    <article
+      className="precision-card fade-up rounded-2xl p-4"
+      style={{ animationDelay: "0.18s" }}
+      data-search-id={`synthese-${tile.id}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-2.5">
+          <span className="mt-0.5 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 text-quantis-gold">
+            <Icon className="h-3.5 w-3.5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/55">
+              {tile.label}
+            </p>
+            <h3 className="text-sm font-semibold text-white">{tile.title}</h3>
+          </div>
+        </div>
+        <KpiTooltip kpiId={tile.id} value={value} />
+      </div>
+
+      <p className="tnum mt-3 text-[1.6rem] font-semibold leading-none tracking-tight text-white">
+        {formatCurrency(value)}
+      </p>
+      <p className="mt-2 text-[11px] text-white/60">{tile.hint}</p>
+    </article>
+  );
 }

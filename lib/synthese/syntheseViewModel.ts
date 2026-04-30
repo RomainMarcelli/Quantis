@@ -25,6 +25,19 @@ export type SyntheseAlert = {
   severity: "high" | "medium" | "low";
 };
 
+/**
+ * Tile fiscal compacte (TVA / IS). `value` à null ⇒ tile non rendue côté
+ * dashboard (cf. consigne produit "ne pas afficher si pas calculable").
+ */
+export type SyntheseFiscalTile = {
+  id: "tva_a_payer" | "provision_is";
+  title: string;
+  label: string;
+  value: number | null;
+  /** Phrase de bas de tile : moyenne mensuelle ou message de fallback. */
+  hint: string;
+};
+
 export type SyntheseViewModel = {
   score: number | null;
   scoreLabel: string;
@@ -36,6 +49,8 @@ export type SyntheseViewModel = {
   } | null;
   alerteInvestissement: boolean;
   metrics: SyntheseMetric[];
+  /** Tiles fiscales — TVA à reverser + provision IS. Null si pas calculable. */
+  fiscalTiles: SyntheseFiscalTile[];
   actions: string[];
   alerts: SyntheseAlert[];
 };
@@ -142,6 +157,7 @@ export function buildSyntheseViewModel(
   }
 
   const actions = buildActions(metrics, alerts);
+  const fiscalTiles = buildFiscalTiles(currentKpis);
 
   return {
     score: quantisScore.quantis_score,
@@ -149,9 +165,70 @@ export function buildSyntheseViewModel(
     scorePiliers: quantisScore.piliers,
     alerteInvestissement: quantisScore.alerte_investissement,
     metrics,
+    fiscalTiles,
     actions,
     alerts
   };
+}
+
+/**
+ * Construit les 2 tiles fiscales (TVA + IS) destinées au cockpit Synthèse.
+ * Règles produit :
+ *  - TVA : si tva_a_payer null ⇒ tile complètement omise (les soldes 4456/4457
+ *    ne sont disponibles que via les sources accounting avec trial balance).
+ *  - IS  : si resultat_exercice null ⇒ tile omise. Si ≤ 0 ⇒ tile affichée à 0
+ *    avec un hint "Pas d'IS — résultat négatif" (signal explicite, pas un trou).
+ */
+function buildFiscalTiles(kpis: CalculatedKpis): SyntheseFiscalTile[] {
+  const tiles: SyntheseFiscalTile[] = [];
+
+  const tvaToPay = kpis.tva_a_payer;
+  if (typeof tvaToPay === "number" && Number.isFinite(tvaToPay)) {
+    const monthly = kpis.tva_provision_mensuelle;
+    const monthlyHint =
+      typeof monthly === "number" && Number.isFinite(monthly) && Math.abs(monthly) > 0.5
+        ? `~${formatEuroCompact(monthly)}/mois en moyenne`
+        : "À reverser à l'État sur la période";
+    tiles.push({
+      id: "tva_a_payer",
+      title: "TVA à sortir",
+      label: "TVA COLLECTÉE − TVA DÉDUCTIBLE",
+      value: tvaToPay,
+      hint: monthlyHint,
+    });
+  }
+
+  const isProvision = kpis.provision_is;
+  // Si la provision est null ⇒ on ne sait pas (résultat manquant). On affiche
+  // quand même la tile à 0 si resultat_exercice = 0 (= pas d'IS dû mais
+  // calculable) — le test sur null suffit.
+  if (typeof isProvision === "number" && Number.isFinite(isProvision)) {
+    const isZero = isProvision <= 0;
+    const monthly = kpis.provision_is_mensuelle;
+    const hint = isZero
+      ? "Pas d'IS — résultat négatif"
+      : typeof monthly === "number" && Number.isFinite(monthly)
+        ? `Mettez ~${formatEuroCompact(monthly)}/mois de côté`
+        : "À provisionner mensuellement";
+    tiles.push({
+      id: "provision_is",
+      title: "Impôts à provisionner",
+      label: "ESTIMATION IS",
+      value: isProvision,
+      hint,
+    });
+  }
+
+  return tiles;
+}
+
+/** Format euro compact pour les hints (~1.2 k€, ~24 k€, …). Pas de décimales. */
+function formatEuroCompact(value: number): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toFixed(1).replace(".0", "")} M€`;
+  if (abs >= 1_000) return `${sign}${(abs / 1_000).toFixed(1).replace(".0", "")} k€`;
+  return `${sign}${Math.round(abs)} €`;
 }
 
 function resolveMetricStatus(

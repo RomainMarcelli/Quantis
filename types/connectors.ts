@@ -505,7 +505,12 @@ export type BalanceSheetVariableCode =
   | "autres_dettes"
   | "pca"
   | "total_dettes"
-  | "total_passif";
+  | "total_passif"
+  // TVA — soldes des comptes 4457 (collectée) et 4456 (déductible). Sortis
+  // du regroupement générique "dettes_fisc_soc" pour pouvoir calculer la TVA
+  // nette à reverser sans confondre avec les autres impôts/charges sociales.
+  | "tva_collectee"
+  | "tva_deductible";
 
 // ─── Données comptables agrégées par jour (consommé par le front) ──────────
 // Pour chaque jour où il y a au moins une écriture, on fournit les variables 2033-SD

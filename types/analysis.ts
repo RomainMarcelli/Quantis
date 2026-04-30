@@ -93,6 +93,11 @@ export type MappedFinancialData = {
   ca_n_minus_1: number | null;
   n: number | null;
   delta_bfr: number | null;
+  /** Solde créditeur du compte 4457 (TVA collectée sur ventes). Optionnel —
+   *  alimenté uniquement par les sources ayant accès à la trial balance. */
+  tva_collectee?: number | null;
+  /** Solde débiteur du compte 4456 (TVA déductible sur achats). */
+  tva_deductible?: number | null;
 };
 
 export type ParsedMetric = {
@@ -152,6 +157,17 @@ export type CalculatedKpis = {
   capacite_remboursement_annees: number | null;
   etat_materiel_indice: number | null;
   healthScore: number | null;
+  /** TVA nette à reverser à l'État sur la période (4457 − 4456). Null si les
+   *  soldes TVA ne sont pas dispos (sources sans trial balance, p.ex. PDF). */
+  tva_a_payer?: number | null;
+  /** Provision mensuelle de TVA à mettre de côté. Calculée depuis tva_a_payer
+   *  divisé par le nombre de mois de la période (par défaut 12). */
+  tva_provision_mensuelle?: number | null;
+  /** Estimation IS à provisionner sur le résultat courant. Barème 2024 :
+   *  15 % jusqu'à 42 500 €, 25 % au-delà. 0 si résultat ≤ 0. */
+  provision_is?: number | null;
+  /** Provision IS mensuelle (= provision_is / 12). */
+  provision_is_mensuelle?: number | null;
 };
 
 export type AnalysisRecord = {

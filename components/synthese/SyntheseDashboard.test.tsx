@@ -48,7 +48,8 @@ const sampleSynthese: SyntheseViewModel = {
     }
   ],
   actions: ["Sécuriser la trésorerie."],
-  alerts: [{ id: "bfr", label: "BFR élevé", severity: "high" }]
+  alerts: [{ id: "bfr", label: "BFR élevé", severity: "high" }],
+  fiscalTiles: []
 };
 
 describe("SyntheseDashboard", () => {

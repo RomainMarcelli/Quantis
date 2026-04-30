@@ -53,7 +53,35 @@ const BS_CODES: readonly BalanceSheetVariableCode[] = [
   "pca",
   "total_dettes",
   "total_passif",
+  "tva_collectee",
+  "tva_deductible",
 ];
+
+/**
+ * Calcule les soldes TVA depuis la trial balance brute. Le PCG sépare :
+ *   - 4457 (et sous-comptes 44571/44572/...) : TVA collectée — solde naturel CRÉDITEUR
+ *   - 4456 (44562/44566/44567/...) : TVA déductible — solde naturel DÉBITEUR
+ * On somme tout ce qui commence par ces préfixes. Retourne 0 si aucun match
+ * (entreprise hors champ TVA ou trial balance partielle).
+ */
+function computeVatBalances(
+  trialBalance: NormalizedTrialBalanceEntry[]
+): { collectee: number; deductible: number } {
+  let collectee = 0;
+  let deductible = 0;
+  for (const entry of trialBalance) {
+    const acc = (entry.accountNumber || "").trim();
+    if (!acc) continue;
+    const debit = Number.isFinite(entry.debit) ? entry.debit : 0;
+    const credit = Number.isFinite(entry.credit) ? entry.credit : 0;
+    if (acc.startsWith("4457")) {
+      collectee += credit - debit;
+    } else if (acc.startsWith("4456")) {
+      deductible += debit - credit;
+    }
+  }
+  return { collectee, deductible };
+}
 
 function roundMoney(value: number): number {
   return Math.round(value * 100) / 100;
@@ -67,8 +95,18 @@ export function buildBalanceSheetSnapshot(
   const parsed = aggregateTrialBalanceToParsedFinancialData(trialBalance);
   const mapped = mapParsedFinancialDataToMappedFinancialData(parsed);
 
+  const vat = computeVatBalances(trialBalance);
+
   const values = {} as Record<BalanceSheetVariableCode, number>;
   for (const code of BS_CODES) {
+    if (code === "tva_collectee") {
+      values[code] = roundMoney(vat.collectee);
+      continue;
+    }
+    if (code === "tva_deductible") {
+      values[code] = roundMoney(vat.deductible);
+      continue;
+    }
     const v = mapped[code as keyof MappedFinancialData];
     values[code] = typeof v === "number" && Number.isFinite(v) ? roundMoney(v) : 0;
   }
