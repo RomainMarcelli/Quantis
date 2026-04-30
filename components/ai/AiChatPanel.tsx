@@ -38,8 +38,8 @@ import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { getKpiDiagnostic } from "@/lib/kpi/kpiDiagnostic";
 import { getUserLevel, setUserLevel } from "@/lib/ai/userLevel";
 import { UserLevelPicker } from "@/components/ai/UserLevelPicker";
-import { AiHeartbeatSpinner } from "@/components/ai/AiHeartbeatSpinner";
-import { AiResponseCard } from "@/components/ai/AiResponseCard";
+import { AiSpinner } from "@/components/ai/AiSpinner";
+import { AiMessageBubble, type UiMessage } from "@/components/ai/AiMessageBubble";
 import { buildStructuredFromMarkdown } from "@/lib/ai/structuredResponse";
 import { formatCurrency, formatPercent, formatNumber } from "@/components/dashboard/formatting";
 import type {
@@ -66,10 +66,6 @@ export type AiChatPanelProps = {
   /** Messages d'entrée si on reprend une conversation. */
   initialMessages?: ChatMessage[];
 };
-
-/** Message côté UI : on attache un `structured` calculé côté client si l'API
- *  ne le fournit pas (vieille conversation persistée). */
-type UiMessage = ChatMessage & { structured?: AiStructuredResponse };
 
 export function AiChatPanel(props: AiChatPanelProps) {
   const definition = props.kpiId ? getKpiDefinition(props.kpiId) : null;
@@ -343,14 +339,14 @@ export function AiChatPanel(props: AiChatPanelProps) {
           )}
 
           {messages.map((m, idx) => (
-            <MessageItem
+            <AiMessageBubble
               key={idx}
               message={m}
               onFollowUp={(q) => void sendQuestion(q)}
             />
           ))}
 
-          {loading && <AiHeartbeatSpinner />}
+          {loading && <AiSpinner />}
 
           {errorMessage && (
             <div
@@ -479,36 +475,6 @@ function Variation({ current, previous }: { current: number; previous: number | 
       {arrow} {up ? "+" : ""}
       {delta.toFixed(1)}%
     </span>
-  );
-}
-
-function MessageItem({
-  message,
-  onFollowUp,
-}: {
-  message: UiMessage;
-  onFollowUp: (q: string) => void;
-}) {
-  if (message.role === "user") {
-    return (
-      <div className="vyzor-msg-enter flex justify-end">
-        <p
-          className="max-w-[88%] text-[14px] leading-relaxed text-white"
-          style={{ paddingRight: 16, opacity: 0.9 }}
-        >
-          {message.content}
-        </p>
-      </div>
-    );
-  }
-  // Assistant : toujours rendre via la card structurée. Si pas de structuré
-  // (cas quasi impossible avec le fallback), on reconstruit à la volée.
-  const structured =
-    message.structured ?? buildStructuredFromMarkdown(message.content, null, null);
-  return (
-    <div className="vyzor-msg-enter">
-      <AiResponseCard response={structured} onFollowUp={onFollowUp} />
-    </div>
   );
 }
 

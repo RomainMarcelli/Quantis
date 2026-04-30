@@ -1,22 +1,21 @@
 // File: components/ai/AiResponseCard.tsx
 // Role: rend une réponse IA structurée (`AiStructuredResponse`) sous forme
 // de blocs visuels distincts plutôt que d'un markdown brut. Les blocs A-F
-// apparaissent en cascade avec un stagger de 100 ms (animation
-// vyzor-block-stagger définie dans globals.css).
+// apparaissent en cascade avec un stagger de 150 ms (animation
+// vyzor-block-stagger-12 — translateY 12 px, durée 400 ms).
 //
 // Blocs :
-//   A. Diagnostic — bandeau coloré (rouge/vert/neutre) avec icône + message
+//   A. Diagnostic — bandeau coloré (rouge/orange/vert/neutre) + icône
 //   B. Explication — texte 13 px, mots clés en bold blanc
-//   C. Data points (optionnel) — micro-cards inline (2-3 chiffres clés)
+//   C. Data points (optionnel) — micro-cards `AiDataCard` (variation, sparkline)
 //   D. Comparaison (optionnel) — 2 barres horizontales (actuel vs référence)
-//   E. Actions — chips dorés (Simuler / Voir détail / Comparer)
+//   E. Actions — chips dorés (Simuler / Voir détail / Comparer) avec glow hover
 //   F. Follow-ups — chips discrets (questions de suivi pré-remplies)
 //
 // Si une réponse n'a pas de structuré (vieille conversation persistée),
 // l'appelant doit construire le structuré via `buildStructuredFromMarkdown`.
 "use client";
 
-import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRight,
@@ -28,6 +27,7 @@ import {
   Sliders,
   TrendingUp,
 } from "lucide-react";
+import { AiDataCard } from "@/components/ai/AiDataCard";
 import type {
   AiAction,
   AiActionIcon,
@@ -45,30 +45,38 @@ const ACTION_ICONS: Record<AiActionIcon, typeof AlertTriangle> = {
   Calendar,
 };
 
+// Délais staggered des blocs A-F (en ms). 150 ms entre chaque pour un
+// rendu en cascade visible sans être lent.
+const BLOCK_DELAYS = {
+  diagnostic: 0,
+  explanation: 150,
+  data: 300,
+  comparison: 450,
+  actions: 450, // mutually-exclusive avec data dans la pratique
+  followUp: 600,
+} as const;
+
 const STATUS_TO_STYLE: Record<
   AiDiagnosticStatus,
-  { bg: string; border: string; color: string; Icon: typeof AlertTriangle; emoji: string }
+  { bg: string; border: string; color: string; Icon: typeof AlertTriangle }
 > = {
   danger: {
     bg: "rgba(239, 68, 68, 0.08)",
     border: "#EF4444",
     color: "#FCA5A5",
     Icon: AlertTriangle,
-    emoji: "🔴",
   },
   good: {
     bg: "rgba(34, 197, 94, 0.08)",
     border: "#22C55E",
     color: "#86EFAC",
     Icon: CheckCircle,
-    emoji: "🟢",
   },
   neutral: {
     bg: "rgba(197, 160, 89, 0.08)",
     border: "#C5A059",
     color: "#E8D9B8",
     Icon: Lightbulb,
-    emoji: "💡",
   },
 };
 
@@ -79,13 +87,11 @@ type AiResponseCardProps = {
 };
 
 export function AiResponseCard({ response, onFollowUp }: AiResponseCardProps) {
-  const router = useRouter();
-
   function handleAction(action: AiAction) {
+    if (typeof window === "undefined") return;
     if (action.type === "navigate") {
       // Navigation vers l'onglet/section du KPI. Le routing exact dépend de
-      // l'app — on dispatche un événement custom que l'app peut écouter
-      // (ou ouvrir une page dédiée plus tard).
+      // l'app — on dispatche un événement custom que les pages peuvent écouter.
       window.dispatchEvent(
         new CustomEvent("vyzor:kpi:navigate", { detail: { kpiId: action.target } })
       );
@@ -110,27 +116,41 @@ export function AiResponseCard({ response, onFollowUp }: AiResponseCardProps) {
   return (
     <div className="space-y-3">
       {/* Bloc A — Diagnostic (toujours présent) */}
-      <DiagnosticBlock status={response.diagnostic.status} message={response.diagnostic.message} delay={0} />
+      <DiagnosticBlock
+        status={response.diagnostic.status}
+        message={response.diagnostic.message}
+        delay={BLOCK_DELAYS.diagnostic}
+      />
 
       {/* Bloc B — Explication (toujours présent) */}
-      <ExplanationBlock text={response.explanation} delay={100} />
+      <ExplanationBlock text={response.explanation} delay={BLOCK_DELAYS.explanation} />
 
       {/* Bloc C — Data points (optionnel) */}
       {response.dataPoints && response.dataPoints.length > 0 ? (
-        <DataPointsBlock points={response.dataPoints} delay={200} router={router} />
+        <DataPointsBlock points={response.dataPoints} delay={BLOCK_DELAYS.data} />
       ) : null}
 
       {/* Bloc D — Comparaison (optionnel) */}
-      {response.comparison ? <ComparisonBlock comparison={response.comparison} delay={300} /> : null}
+      {response.comparison ? (
+        <ComparisonBlock comparison={response.comparison} delay={BLOCK_DELAYS.comparison} />
+      ) : null}
 
       {/* Bloc E — Actions (toujours présent) */}
       {response.actions.length > 0 ? (
-        <ActionsBlock actions={response.actions} delay={400} onAction={handleAction} />
+        <ActionsBlock
+          actions={response.actions}
+          delay={BLOCK_DELAYS.actions}
+          onAction={handleAction}
+        />
       ) : null}
 
       {/* Bloc F — Questions de suivi (toujours présent) */}
       {response.followUpQuestions.length > 0 ? (
-        <FollowUpBlock questions={response.followUpQuestions} delay={500} onPick={onFollowUp} />
+        <FollowUpBlock
+          questions={response.followUpQuestions}
+          delay={BLOCK_DELAYS.followUp}
+          onPick={onFollowUp}
+        />
       ) : null}
     </div>
   );
@@ -149,7 +169,7 @@ function DiagnosticBlock({
   const Icon = s.Icon;
   return (
     <div
-      className="vyzor-block-enter flex items-start gap-2.5 rounded-lg px-3.5 py-2.5"
+      className="vyzor-block-enter-12 flex items-start gap-2.5 rounded-lg px-3.5 py-2.5"
       style={{
         backgroundColor: s.bg,
         borderLeft: `3px solid ${s.border}`,
@@ -172,7 +192,7 @@ function ExplanationBlock({ text, delay }: { text: string; delay: number }) {
   const tokens = renderBold(text);
   return (
     <p
-      className="vyzor-block-enter text-[13px] leading-relaxed"
+      className="vyzor-block-enter-12 text-[13px] leading-relaxed"
       style={{ color: "rgba(255, 255, 255, 0.75)", animationDelay: `${delay}ms` }}
     >
       {tokens}
@@ -199,49 +219,22 @@ function renderBold(text: string): React.ReactNode[] {
   return tokens;
 }
 
-function DataPointsBlock({
-  points,
-  delay,
-  router,
-}: {
-  points: AiDataPoint[];
-  delay: number;
-  router: ReturnType<typeof useRouter>;
-}) {
+function DataPointsBlock({ points, delay }: { points: AiDataPoint[]; delay: number }) {
   return (
     <div
-      className="vyzor-block-enter flex flex-col gap-2 sm:flex-row"
+      className="vyzor-block-enter-12 flex flex-col gap-2 sm:flex-row"
       style={{ animationDelay: `${delay}ms` }}
     >
       {points.map((p, i) => (
-        <button
-          key={`${p.label}-${i}`}
-          type="button"
-          onClick={() => {
-            if (p.kpiId) {
-              window.dispatchEvent(
-                new CustomEvent("vyzor:kpi:navigate", { detail: { kpiId: p.kpiId } })
-              );
-            }
-          }}
-          aria-label={`${p.label} : ${p.value}`}
-          className="flex flex-1 flex-col items-start gap-0.5 rounded-lg border px-3.5 py-2.5 text-left transition hover:shadow-[0_0_12px_rgba(197,160,89,0.18)]"
-          style={{
-            backgroundColor: "rgba(255, 255, 255, 0.04)",
-            borderColor: "rgba(255, 255, 255, 0.08)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "rgba(197, 160, 89, 0.3)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
-          }}
-        >
-          <span className="text-[18px] font-semibold tracking-tight text-white">{p.value}</span>
-          <span className="text-[10px] uppercase tracking-wider" style={{ color: "#9CA3AF" }}>
-            {p.label}
-          </span>
-        </button>
+        <div key={`${p.label}-${i}`} className="flex-1">
+          <AiDataCard
+            label={p.label}
+            value={p.value}
+            variationPct={p.variationPct ?? null}
+            kpiId={p.kpiId}
+            sparklinePoints={p.sparklinePoints}
+          />
+        </div>
       ))}
     </div>
   );
@@ -254,14 +247,13 @@ function ComparisonBlock({
   comparison: NonNullable<AiStructuredResponse["comparison"]>;
   delay: number;
 }) {
-  // Largeurs proportionnelles : la valeur la plus grande (en absolu) = 100%.
   const maxAbs = Math.max(Math.abs(comparison.current.value), Math.abs(comparison.reference.value));
   const currentPct = maxAbs > 0 ? (Math.abs(comparison.current.value) / maxAbs) * 100 : 0;
   const referencePct = maxAbs > 0 ? (Math.abs(comparison.reference.value) / maxAbs) * 100 : 0;
 
   return (
     <div
-      className="vyzor-block-enter rounded-lg p-3"
+      className="vyzor-block-enter-12 rounded-lg p-3"
       style={{ backgroundColor: "rgba(255, 255, 255, 0.02)", animationDelay: `${delay}ms` }}
     >
       <div className="space-y-2">
@@ -299,7 +291,10 @@ function Bar({
   const formatted = formatBarValue(value);
   return (
     <div className="flex items-center gap-3">
-      <div className="relative h-6 flex-1 overflow-hidden rounded" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+      <div
+        className="relative h-6 flex-1 overflow-hidden rounded"
+        style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+      >
         <div
           className="absolute inset-y-0 left-0 rounded transition-all"
           style={{ width: `${Math.max(widthPct, 4)}%`, background: color }}
@@ -332,7 +327,10 @@ function ActionsBlock({
   onAction: (action: AiAction) => void;
 }) {
   return (
-    <div className="vyzor-block-enter flex flex-wrap gap-2" style={{ animationDelay: `${delay}ms` }}>
+    <div
+      className="vyzor-block-enter-12 flex flex-wrap gap-2"
+      style={{ animationDelay: `${delay}ms` }}
+    >
       {actions.map((action, i) => {
         const Icon = ACTION_ICONS[action.icon] ?? ArrowRight;
         return (
@@ -346,14 +344,19 @@ function ActionsBlock({
               borderColor: "rgba(197, 160, 89, 0.4)",
               color: "#C5A059",
               backgroundColor: "transparent",
+              boxShadow: "none",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = "rgba(197, 160, 89, 0.1)";
               e.currentTarget.style.borderColor = "rgba(197, 160, 89, 0.6)";
+              // Glow doré subtil — renforce l'affordance "interactive" sans
+              // être tape-à-l'œil. 12 px de blur, opacité 0.15.
+              e.currentTarget.style.boxShadow = "0 0 12px rgba(197, 160, 89, 0.15)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = "transparent";
               e.currentTarget.style.borderColor = "rgba(197, 160, 89, 0.4)";
+              e.currentTarget.style.boxShadow = "none";
             }}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -375,7 +378,10 @@ function FollowUpBlock({
   onPick: (q: string) => void;
 }) {
   return (
-    <div className="vyzor-block-enter flex flex-wrap gap-2" style={{ animationDelay: `${delay}ms` }}>
+    <div
+      className="vyzor-block-enter-12 flex flex-wrap gap-2"
+      style={{ animationDelay: `${delay}ms` }}
+    >
       {questions.map((q, i) => (
         <button
           key={`${q}-${i}`}
