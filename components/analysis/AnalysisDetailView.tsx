@@ -86,12 +86,7 @@ import {
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
-// Le téléchargement du rapport PDF est introduit par feat/pdf-report.
-// Stub local pour que la branche feat/source-selector compile sans dépendre
-// du module qui n'existe pas encore.
-const downloadFinancialReport = async (
-  _params: { analysisId: string }
-): Promise<string | null> => "feature non disponible sur cette branche";
+import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;

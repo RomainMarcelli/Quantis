@@ -19,11 +19,7 @@ import {
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
-// Le téléchargement du rapport PDF est introduit par feat/pdf-report.
-// Stub local pour rester autonome jusqu'à ce que le module réel arrive.
-const downloadFinancialReport = async (
-  _params: { analysisId: string }
-): Promise<string | null> => "feature non disponible sur cette branche";
+import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import {
   buildSyntheseYearOptions,

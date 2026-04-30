@@ -12,11 +12,7 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import { formatCurrency } from "@/components/dashboard/formatting";
-// La constante INSUFFICIENT_DATA_LABEL est introduite par feat/kpi-tooltips
-// dans dashboard/formatting.ts. On inline ici pour que feat/source-selector
-// reste autonome ; la branche kpi-tooltips remplacera par l'import propre.
-const INSUFFICIENT_DATA_LABEL = "Données insuffisantes";
+import { formatCurrency, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
 import {
   describeAnalysisSource,
