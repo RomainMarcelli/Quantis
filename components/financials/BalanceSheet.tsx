@@ -1,8 +1,14 @@
 // File: components/financials/BalanceSheet.tsx
-// Role: rendu visuel d'un bilan (actif gauche / passif droite).
+// Role: rendu visuel d'un bilan — actif à gauche, passif à droite.
 //
-// Direction artistique alignée sur IncomeStatement : sobre, monospace,
-// totaux en accent doré. Les sections / sous-postes vides sont masqués.
+// Architecture en 2 sous-grilles :
+//   1. La grille "contenu" : les sections (immobilisé, circulant, CCA |
+//      capitaux propres, provisions, dettes, PCA). Hauteur libre.
+//   2. La grille "totaux" : Total actif et Total passif côte à côte sur
+//      la même ligne, en encart doré. Indépendant de la hauteur du
+//      contenu — ainsi les deux totaux sont toujours alignés
+//      visuellement quel que soit le nombre de sections affichées
+//      dans chaque colonne.
 "use client";
 
 import type { BalanceSheet as BalanceSheetType } from "@/lib/financials/types";
@@ -36,18 +42,25 @@ export function BalanceSheet({ sheet }: { sheet: BalanceSheetType }) {
         ) : null}
       </header>
 
+      {/* En-tête de colonnes — toujours visible. */}
+      <div className="mb-3 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/55">
+          Actif
+        </p>
+        <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/55">
+          Passif
+        </p>
+      </div>
+
+      {/* ─── Contenu (sections en colonnes) ───────────────────────────── */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {/* ─── ACTIF ─────────────────────────────────────────────────── */}
-        <section>
-          <p className="mb-2.5 text-[10px] font-mono uppercase tracking-[0.18em] text-white/55">
-            Actif
-          </p>
+        <section className="space-y-3">
           {!hasActifContent ? (
             <p className="text-xs italic text-white/35">
               Aucune donnée d'actif disponible.
             </p>
           ) : (
-            <div className="space-y-3">
+            <>
               {sheet.actif.immobilise.subtotal !== null ? (
                 <SectionCard section={sheet.actif.immobilise} />
               ) : null}
@@ -67,30 +80,17 @@ export function BalanceSheet({ sheet }: { sheet: BalanceSheetType }) {
                   </div>
                 </div>
               ) : null}
-              {sheet.actif.total !== null ? (
-                <div className="rounded-xl border border-quantis-gold/30 bg-quantis-gold/[0.04] px-4 py-3">
-                  <SectionSubtotal
-                    label="TOTAL ACTIF"
-                    value={sheet.actif.total}
-                    intensity="final"
-                  />
-                </div>
-              ) : null}
-            </div>
+            </>
           )}
         </section>
 
-        {/* ─── PASSIF ────────────────────────────────────────────────── */}
-        <section>
-          <p className="mb-2.5 text-[10px] font-mono uppercase tracking-[0.18em] text-white/55">
-            Passif
-          </p>
+        <section className="space-y-3">
           {!hasPassifContent ? (
             <p className="text-xs italic text-white/35">
               Aucune donnée de passif disponible.
             </p>
           ) : (
-            <div className="space-y-3">
+            <>
               {sheet.passif.capitauxPropres.subtotal !== null ? (
                 <SectionCard section={sheet.passif.capitauxPropres} />
               ) : null}
@@ -113,19 +113,38 @@ export function BalanceSheet({ sheet }: { sheet: BalanceSheetType }) {
                   </div>
                 </div>
               ) : null}
-              {sheet.passif.total !== null ? (
-                <div className="rounded-xl border border-quantis-gold/30 bg-quantis-gold/[0.04] px-4 py-3">
-                  <SectionSubtotal
-                    label="TOTAL PASSIF"
-                    value={sheet.passif.total}
-                    intensity="final"
-                  />
-                </div>
-              ) : null}
-            </div>
+            </>
           )}
         </section>
       </div>
+
+      {/* ─── Totaux Actif / Passif sur la même ligne ────────────────── */}
+      {(sheet.actif.total !== null || sheet.passif.total !== null) ? (
+        <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {sheet.actif.total !== null ? (
+            <div className="rounded-xl border border-quantis-gold/30 bg-quantis-gold/[0.04] px-4 py-3">
+              <SectionSubtotal
+                label="TOTAL ACTIF"
+                value={sheet.actif.total}
+                intensity="final"
+              />
+            </div>
+          ) : (
+            <div />
+          )}
+          {sheet.passif.total !== null ? (
+            <div className="rounded-xl border border-quantis-gold/30 bg-quantis-gold/[0.04] px-4 py-3">
+              <SectionSubtotal
+                label="TOTAL PASSIF"
+                value={sheet.passif.total}
+                intensity="final"
+              />
+            </div>
+          ) : (
+            <div />
+          )}
+        </div>
+      ) : null}
     </article>
   );
 }

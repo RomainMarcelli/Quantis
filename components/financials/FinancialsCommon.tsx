@@ -113,25 +113,42 @@ export function SectionSubtotal({
 /**
  * Bloc de section (titre + lignes filtrées + sous-total).
  * Les lignes à valeur nulle ou 0 sont masquées pour rester compact.
- * Si toutes les lignes sont vides, la section affiche un message discret
- * au lieu d'être une boîte vide qui parasite la lecture.
+ *
+ * Mode `equalHeight` : utilisé quand deux SectionCard sont placés côte à
+ * côte dans une grille (compte de résultat 2 colonnes : produits / charges,
+ * bilan 2 colonnes : actif / passif). Le card prend toute la hauteur de
+ * la cellule de grille (`h-full`) et la zone de lignes pousse le sous-total
+ * en bas (`flex-1`), ce qui aligne visuellement les sous-totaux des deux
+ * cards même quand l'un a moins de lignes que l'autre.
  */
-export function SectionCard({ section }: { section: FinancialSection }) {
+export function SectionCard({
+  section,
+  equalHeight = false,
+}: {
+  section: FinancialSection;
+  equalHeight?: boolean;
+}) {
   const visibleLines = section.lines.filter(
     (l) => l.value !== null && l.value !== 0
   );
 
+  const containerClass = `rounded-xl border border-white/10 bg-black/[0.18] px-4 py-3 ${
+    equalHeight ? "flex h-full flex-col" : ""
+  }`;
+
   return (
-    <div className="rounded-xl border border-white/10 bg-black/[0.18] px-4 py-3">
+    <div className={containerClass}>
       <p className="mb-2 text-[10px] font-mono uppercase tracking-[0.16em] text-white/55">
         {section.title}
       </p>
       {visibleLines.length === 0 ? (
-        <p className="text-xs italic text-white/35">
+        <p
+          className={`text-xs italic text-white/35 ${equalHeight ? "flex-1" : ""}`}
+        >
           Aucune valeur disponible pour cette section.
         </p>
       ) : (
-        <div className="space-y-0">
+        <div className={`space-y-0 ${equalHeight ? "flex-1" : ""}`}>
           {visibleLines.map((line, idx) => (
             <FinancialLineRow key={idx} line={line} />
           ))}
