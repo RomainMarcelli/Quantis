@@ -17,6 +17,7 @@ import { resolveActiveAnalysis } from "@/lib/source/activeSource";
 import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { buildIncomeStatement } from "@/lib/financials/buildIncomeStatement";
 import { buildBalanceSheet } from "@/lib/financials/buildBalanceSheet";
 import { buildCoherenceChecks } from "@/lib/financials/coherenceChecks";
@@ -33,6 +34,8 @@ export function FinancialStatementsView() {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [fetchState, setFetchState] = useState<FetchState>("idle");
+  // Loader visible uniquement si la requête dépasse 400 ms.
+  const showSlowLoader = useDelayedFlag(fetchState === "loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("Quantis");
   const [greetingName, setGreetingName] = useState("Utilisateur");
@@ -195,7 +198,7 @@ export function FinancialStatementsView() {
           </div>
         </header>
 
-        {fetchState === "loading" && (
+        {fetchState === "loading" && showSlowLoader && (
           <p className="precision-card rounded-2xl px-5 py-4 text-sm text-white/55">
             Chargement de votre analyse…
           </p>

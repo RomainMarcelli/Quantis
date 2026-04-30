@@ -43,6 +43,7 @@ import {
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
@@ -126,6 +127,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [companyName, setCompanyName] = useState("Quantis");
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  // Loader visible uniquement si le chargement dépasse 400 ms (cf. hook).
+  const showAnalysisLoader = useDelayedFlag(loadingAnalysis);
   const [uploading, setUploading] = useState(false);
   const [folderActionName, setFolderActionName] = useState<string | null>(null);
   const [folderDialogMode, setFolderDialogMode] = useState<FolderDialogMode>(null);
@@ -922,7 +925,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         <GlobalSearchBar placeholder="Rechercher..." />
       </div>
 
-      {loadingAnalysis ? (
+      {/* Loader retardé : ne s'affiche que si le chargement dépasse 400 ms. */}
+      {showAnalysisLoader ? (
         <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de l&apos;analyse...</div>
       ) : null}
 

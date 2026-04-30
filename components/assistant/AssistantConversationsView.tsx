@@ -17,6 +17,7 @@ import { ArrowLeft, MessageCircle, Sparkles } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { useAiChat } from "@/components/ai/AiChatProvider";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import type { ConversationSummary } from "@/lib/ai/types";
 
 const GLOBAL_SAMPLE_QUESTIONS: Array<{ kpiId: string | null; question: string }> = [
@@ -38,6 +39,8 @@ function AssistantConversationsViewInner() {
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [fetchState, setFetchState] = useState<FetchState>("idle");
+  // Loader visible uniquement si la requête dépasse 400 ms (cf. hook).
+  const showSlowLoader = useDelayedFlag(fetchState === "loading");
   const [quota, setQuota] = useState<{ remaining: number; total: number } | null>(null);
 
   const definition = kpiIdParam ? getKpiDefinition(kpiIdParam) : null;
@@ -166,7 +169,7 @@ function AssistantConversationsViewInner() {
           )}
         </div>
 
-        {fetchState === "loading" && (
+        {fetchState === "loading" && showSlowLoader && (
           <p className="text-sm text-white/55">Chargement de vos conversations...</p>
         )}
 

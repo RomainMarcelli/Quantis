@@ -25,6 +25,7 @@ import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
 import { ConnectionsPanel } from "@/components/integrations/ConnectionsPanel";
 import { AccountingConnectionWizard } from "@/components/integrations/AccountingConnectionWizard";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { DEFAULT_FOLDER_NAME } from "@/lib/folders/activeFolder";
 import {
@@ -66,6 +67,8 @@ export function DocumentsView() {
   const router = useRouter();
   const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
   const [loading, setLoading] = useState(true);
+  // Loader visible uniquement si le chargement dépasse 400 ms — évite le flash.
+  const showSlowLoader = useDelayedFlag(loading);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [folderNames, setFolderNames] = useState<string[]>([]);
   const [activeFolder, setActiveFolder] = useState(DEFAULT_FOLDER_NAME);
@@ -311,12 +314,12 @@ export function DocumentsView() {
             </p>
           </div>
 
-          {/* Cards */}
-          {loading ? (
+          {/* Cards — loader retardé pour éviter le flash <400ms. */}
+          {loading && showSlowLoader ? (
             <div className="py-20 text-center">
               <p className="text-sm text-white/50">Chargement des analyses...</p>
             </div>
-          ) : filteredAnalyses.length === 0 ? (
+          ) : filteredAnalyses.length === 0 && !loading ? (
             <EmptyFolderState
               folderName={activeFolder}
               onUpload={() => router.push("/upload")}

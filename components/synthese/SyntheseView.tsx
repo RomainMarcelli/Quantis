@@ -20,6 +20,7 @@ import {
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
@@ -74,6 +75,9 @@ export function SyntheseView() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
+  // Le loader visible n'apparaît que si la requête dépasse 400 ms — sinon
+  // on évite un flash désagréable sur les chargements rapides.
+  const showSlowLoader = useDelayedFlag(loading);
   // L'état replié de la sidebar est désormais géré par AppSidebar lui-même.
 
   // Référence utilisée pour l'option "Année en cours" dans le sélecteur de synthèse.
@@ -318,7 +322,9 @@ export function SyntheseView() {
         <GlobalSearchBar placeholder="Rechercher..." />
       </div>
 
-      {loading ? (
+      {/* Loader retardé : n'apparaît que si la requête dépasse 400 ms.
+          Évite le flash sous le header pour les chargements rapides. */}
+      {showSlowLoader ? (
         <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de la synthèse...</div>
       ) : null}
 
