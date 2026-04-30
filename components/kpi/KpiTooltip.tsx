@@ -10,6 +10,8 @@
 //   4. Benchmark sectoriel — UNIQUEMENT si tooltip.benchmark existe
 //   5. Formule — code monospace (JetBrains Mono), 11 px, fond rgba blanc 0.05
 //   6. Question suggérée — bouton or qui ouvre l'AiChatPanel pré-rempli
+//   7. Lien discret "Ou ouvrir le chat sans question" — ouvre le chat lié
+//      au KPI sans envoyer la question (n'engage pas de tokens)
 //
 // NE figurent PAS : valeur courante, variation N-1, mini-graph, catégorie,
 // nom vulgarisé. Ces infos sont sur la carte.
@@ -360,6 +362,23 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                   >
                     <MessageCircle className="h-3.5 w-3.5 flex-shrink-0" />
                     <span style={{ lineHeight: 1.4 }}>{question}</span>
+                  </button>
+
+                  {/* Action secondaire : ouvrir le chat lié au KPI sans
+                      pré-remplir la question. Permet d'explorer librement le
+                      KPI (poser sa propre question, choisir parmi les
+                      suggestions du panel) sans consommer un round-trip API
+                      sur une question qui n'intéresse pas l'utilisateur. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(false);
+                      openAiChat({ kpiId });
+                    }}
+                    className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-white/55 transition hover:text-quantis-gold"
+                  >
+                    <span>Ou ouvrir le chat sans question</span>
+                    <span className="text-quantis-gold/70">→</span>
                   </button>
                 </div>
               ) : null}
