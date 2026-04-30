@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, FileDown } from "lucide-react";
+import { ArrowLeft, Lock, LogOut, Settings, UserCircle2 } from "lucide-react";
 import { listUserAnalyses } from "@/services/analysisStore";
 import { getUserProfile } from "@/services/userProfileStore";
 import { resolveActiveAnalysis } from "@/lib/source/activeSource";
@@ -35,6 +35,7 @@ export function FinancialStatementsView() {
   const [fetchState, setFetchState] = useState<FetchState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("Quantis");
+  const [greetingName, setGreetingName] = useState("Utilisateur");
 
   const activeAnalysisId = useActiveAnalysisId();
 
@@ -73,6 +74,10 @@ export function FinancialStatementsView() {
       ]);
       setAnalyses(history);
       setCompanyName(profile?.companyName?.trim() || "Quantis");
+      // Prénom affiché dans le bloc Compte de la sidebar — même règle de
+      // résolution que les autres pages (profile.firstName en priorité,
+      // puis displayName, puis email).
+      setGreetingName(resolveFirstName(currentUser, profile?.firstName));
       setFetchState("ready");
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : "Erreur de chargement");
@@ -113,7 +118,7 @@ export function FinancialStatementsView() {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
-      <AppSidebar activeRoute="etats-financiers" />
+      <AppSidebar activeRoute="etats-financiers" accountFirstName={greetingName} />
 
       <section className="space-y-5">
         <header className="precision-card flex flex-wrap items-baseline justify-between gap-3 rounded-2xl px-5 py-4">
@@ -135,14 +140,59 @@ export function FinancialStatementsView() {
               </div>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Retour
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Boutons utilitaires alignés sur Synthèse / Tableau de bord :
+                Réglages, Premium, Mon compte, Déconnexion. La sidebar reste
+                dédiée à la navigation entre pages. */}
+            <button
+              type="button"
+              onClick={() => router.push("/settings")}
+              className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+              aria-label="Paramètres"
+              title="Paramètres"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/pricing")}
+              className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+              aria-label="Offres"
+              title="Offre Premium"
+            >
+              <Lock className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/account?from=app")}
+              className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+              aria-label="Compte"
+              title="Mon compte"
+            >
+              <UserCircle2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const { firebaseAuthGateway } = await import("@/services/auth");
+                await firebaseAuthGateway.signOut();
+                router.replace("/");
+              }}
+              className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+              aria-label="Se déconnecter"
+              title="Se déconnecter"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Retour
+            </button>
+          </div>
         </header>
 
         {fetchState === "loading" && (
@@ -176,9 +226,13 @@ export function FinancialStatementsView() {
 
         {fetchState === "ready" && activeAnalysis && incomeStatement && balanceSheet && (
           <>
-            <CoherenceChecksCard checks={checks} />
             <IncomeStatement statement={incomeStatement} />
             <BalanceSheet sheet={balanceSheet} />
+            {/* La carte de cohérence est volontairement placée APRÈS le compte
+                de résultat et le bilan : un expert-comptable lit d'abord les
+                états chiffrés, puis vérifie la réconciliation avec les KPIs
+                calculés. */}
+            <CoherenceChecksCard checks={checks} />
             <p className="text-center text-[10px] italic text-white/35">
               Codes 2033-SD entre crochets sur chaque ligne · survolez pour la
               définition · postes à zéro masqués pour la lisibilité.
@@ -188,4 +242,16 @@ export function FinancialStatementsView() {
       </section>
     </div>
   );
+}
+
+/**
+ * Prénom à afficher dans le bloc Compte. Aligné sur les règles utilisées
+ * par les autres vues (Synthèse, Tableau de bord, Documents) pour rester
+ * cohérent d'une page à l'autre.
+ */
+function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): string {
+  if (profileFirstName && profileFirstName.trim()) return profileFirstName.trim();
+  if (user.displayName?.trim()) return user.displayName.trim().split(" ")[0] || "Utilisateur";
+  if (user.email) return user.email.split("@")[0] || "Utilisateur";
+  return "Utilisateur";
 }

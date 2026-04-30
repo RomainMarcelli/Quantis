@@ -280,7 +280,7 @@ export function DocumentsView() {
 
       {/* Grille sidebar navigation + contenu */}
       <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
-        <AppSidebar activeRoute="documents" />
+        <AppSidebar activeRoute="documents" accountFirstName={greetingName} />
 
         {/* ===== ZONE CONTENU ===== */}
         <div className="space-y-4">

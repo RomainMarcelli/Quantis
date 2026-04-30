@@ -331,6 +331,7 @@ export function SyntheseView() {
       <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
         <AppSidebar
           activeRoute="synthese"
+          accountFirstName={greetingName}
           contextSlot={
             yearOptions.length > 1 ? (
               <div className="rounded-xl border border-white/10 bg-black/20 p-3">
