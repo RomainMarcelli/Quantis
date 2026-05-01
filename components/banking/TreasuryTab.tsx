@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { AiSparkline } from "@/components/ai/AiSparkline";
 import { formatCurrency } from "@/components/dashboard/formatting";
+import { useTemporality } from "@/lib/temporality/temporalityContext";
 import type {
   BankAccount,
   BankAccountType,
@@ -71,14 +72,29 @@ export function TreasuryTab({ summary }: TreasuryTabProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("overview");
   const [accountFilter, setAccountFilter] = useState<string | null>(null);
 
-  // Cashflow net cumulé sur la période disponible (entrées − sorties).
+  // ─── Filtrage par la barre temporelle globale ───────────────────────
+  // La TemporalityBar pilote `periodStart`/`periodEnd` (ISO YYYY-MM-DD).
+  // On dérive un summary "filtré" sur cette fenêtre :
+  //   - monthlyFlows : on ne garde que les mois qui chevauchent la période
+  //   - recentTransactions : filtrées par date (limitées aux 90j stockés
+  //     dans le summary — au-delà la donnée n'a pas été persistée)
+  //   - burn / runway / cashflow : recalculés depuis les flux filtrés
+  //   - top dépenses : recalculées depuis les transactions filtrées
+  // Les soldes des comptes (point-in-time) restent inchangés — ils
+  // représentent toujours l'instant T (= dernière sync Bridge).
+  const temporality = useTemporality();
+  const periodSummary = useMemo(
+    () => buildPeriodSummary(summary, temporality.periodStart, temporality.periodEnd),
+    [summary, temporality.periodStart, temporality.periodEnd]
+  );
+
   const cashflowNet = useMemo(
     () =>
-      summary.monthlyFlows.reduce(
+      periodSummary.monthlyFlows.reduce(
         (acc, m) => acc + (m.totalIn - m.totalOut),
         0
       ),
-    [summary.monthlyFlows]
+    [periodSummary.monthlyFlows]
   );
 
   function handleAccountClick(accountId: string) {
@@ -89,7 +105,7 @@ export function TreasuryTab({ summary }: TreasuryTabProps) {
   return (
     <section className="space-y-5">
       <HeroCard
-        summary={summary}
+        summary={periodSummary}
         cashflowNet={cashflowNet}
       />
 
@@ -97,24 +113,145 @@ export function TreasuryTab({ summary }: TreasuryTabProps) {
         active={viewMode}
         onChange={setViewMode}
         accountFilter={accountFilter}
-        accounts={summary.accounts}
+        accounts={periodSummary.accounts}
         onResetFilter={() => setAccountFilter(null)}
       />
 
       {viewMode === "overview" ? (
         <OverviewView
-          summary={summary}
+          summary={periodSummary}
           onAccountClick={handleAccountClick}
         />
       ) : (
         <TransactionsView
-          transactions={summary.recentTransactions}
-          accounts={summary.accounts}
+          transactions={periodSummary.recentTransactions}
+          accounts={periodSummary.accounts}
           accountFilter={accountFilter}
         />
       )}
     </section>
   );
+}
+
+/**
+ * Construit un summary période-aware à partir du summary annuel + bornes
+ * de la barre temporelle. Les sections période-dépendantes (flux mensuels,
+ * burn, runway, top dépenses, transactions) sont recalculées ; les sections
+ * point-in-time (soldes des comptes, totalBalance, lastSyncAt, balanceHistory)
+ * restent intactes.
+ *
+ * Notes :
+ *   - Les transactions stockées couvrent ~90j (cf. RECENT_TRANSACTIONS_LOOKBACK).
+ *     Une période plus large fonctionne mais avec uniquement les flux mensuels
+ *     pré-agrégés (jusqu'à 12 mois).
+ *   - Si la période est entièrement HORS fenêtre des données stockées, on
+ *     retourne des collections vides — la TreasuryTab affichera ses empty
+ *     states naturellement (CashflowChart "Pas encore de flux", etc.).
+ */
+function buildPeriodSummary(
+  source: BankingSummary,
+  periodStart: string,
+  periodEnd: string
+): BankingSummary {
+  const startMonth = periodStart.slice(0, 7); // YYYY-MM
+  const endMonth = periodEnd.slice(0, 7);
+
+  // Flux mensuels filtrés (chevauchement par YYYY-MM)
+  const monthlyFlows = source.monthlyFlows.filter(
+    (m) => m.month >= startMonth && m.month <= endMonth
+  );
+
+  // Transactions sur la période — borné par les 90j stockés.
+  const recentTransactions = source.recentTransactions.filter(
+    (tx) => tx.date >= periodStart && tx.date <= periodEnd
+  );
+
+  // Burn rate sur la période : sortie nette / nb jours
+  const periodDays = Math.max(
+    1,
+    Math.round(
+      (new Date(`${periodEnd}T00:00:00Z`).getTime() -
+        new Date(`${periodStart}T00:00:00Z`).getTime()) /
+        86_400_000
+    ) + 1
+  );
+  let totalIn = 0;
+  let totalOut = 0;
+  for (const tx of recentTransactions) {
+    if (tx.isFuture) continue;
+    if (tx.amount >= 0) totalIn += tx.amount;
+    else totalOut += Math.abs(tx.amount);
+  }
+  const netOut = totalOut - totalIn;
+  const dailyBurn = netOut > 0 ? netOut / periodDays : 0;
+  const monthlyBurn = dailyBurn * 30;
+  const burnRate = {
+    daily: round(dailyBurn),
+    monthly: round(monthlyBurn),
+  };
+
+  // Runway recalculé avec le burn période — totalBalance reste celui du jour J
+  const runway = computeRunwayFromBurn(source.totalBalance, monthlyBurn);
+
+  // Top dépenses sur la période — on récupère les labels via le summary
+  // annuel (qui les a résolus depuis les categories Bridge au moment du sync).
+  const labelByCategoryId = new Map<number, string>();
+  for (const cat of source.topExpenseCategories) {
+    labelByCategoryId.set(cat.categoryId, cat.categoryLabel);
+  }
+  const topExpenseCategories = aggregateExpensesByCategory(
+    recentTransactions,
+    labelByCategoryId
+  );
+
+  return {
+    ...source,
+    monthlyFlows,
+    recentTransactions,
+    burnRate,
+    runway,
+    topExpenseCategories,
+  };
+}
+
+function computeRunwayFromBurn(
+  totalBalance: number,
+  monthlyBurn: number
+): BankingSummary["runway"] {
+  if (!Number.isFinite(monthlyBurn) || monthlyBurn <= 0) {
+    return { months: Number.MAX_SAFE_INTEGER, status: "safe" };
+  }
+  const months = totalBalance / monthlyBurn;
+  let status: BankingRunwayStatus = "critical";
+  if (months >= 12) status = "safe";
+  else if (months >= 6) status = "warning";
+  return { months: round(months), status };
+}
+
+function aggregateExpensesByCategory(
+  transactions: BankTransaction[],
+  labelByCategoryId: Map<number, string>
+): CategoryAggregate[] {
+  const buckets = new Map<number, { total: number; count: number }>();
+  for (const tx of transactions) {
+    if (tx.isFuture || tx.amount >= 0) continue;
+    const cur = buckets.get(tx.categoryId) ?? { total: 0, count: 0 };
+    cur.total += Math.abs(tx.amount);
+    cur.count += 1;
+    buckets.set(tx.categoryId, cur);
+  }
+  return [...buckets.entries()]
+    .map(([categoryId, b]) => ({
+      categoryId,
+      categoryLabel: labelByCategoryId.get(categoryId) ?? `Catégorie #${categoryId}`,
+      total: round(b.total),
+      count: b.count,
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+function round(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 // ─── Hero card ──────────────────────────────────────────────────────────
