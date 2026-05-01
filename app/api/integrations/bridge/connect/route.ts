@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     const userClient = buildBridgeClientFromEnv(userToken.access_token);
     const session = await createBridgeConnectSession(userClient, {
       userEmail,
-      redirectUrl: request.nextUrl.origin
+      callbackUrl: request.nextUrl.origin
         ? `${request.nextUrl.origin}/integrations/bridge/callback`
         : undefined,
     });
