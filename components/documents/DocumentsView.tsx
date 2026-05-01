@@ -24,6 +24,7 @@ import { FolderDialog } from "@/components/documents/FolderDialog";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
 import { ConnectionsPanel } from "@/components/integrations/ConnectionsPanel";
 import { AccountingConnectionWizard } from "@/components/integrations/AccountingConnectionWizard";
+import { BridgeConnectCard } from "@/components/integrations/BridgeConnectCard";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
@@ -292,6 +293,11 @@ export function DocumentsView() {
 
           {/* Assistant pas-à-pas pour connecter un logiciel comptable. */}
           <AccountingConnectionWizard onSyncCompleted={() => void loadData()} />
+
+          {/* Connexion bancaire (Bridge / Open Banking) — source complémentaire
+              indépendante de la compta. Doit rester accessible même quand un
+              logiciel comptable est déjà connecté. */}
+          <BridgeConnectCard onChanged={() => void loadData()} />
 
           {/* Tabs dossiers */}
           <div className="precision-card rounded-2xl">
