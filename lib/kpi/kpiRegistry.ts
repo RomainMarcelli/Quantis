@@ -1093,6 +1093,163 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
     phase: "CT",
   },
 
+  // ─── Trésorerie bancaire (Bridge Open Banking) ──────────────────────────
+  // KPIs dérivés du moteur `lib/treasury/treasuryEngine.ts`. Calculés à partir
+  // des données bancaires temps réel (BankingSummary), pas des écritures
+  // comptables — donc INDÉPENDANTS de mappedData/computeKpis. Ne s'affichent
+  // que quand l'utilisateur a une connexion Bridge active.
+
+  bank_runway: {
+    id: "bank_runway",
+    label: "Runway bancaire",
+    shortLabel: "Runway",
+    category: "tresorerie",
+    formula: "Solde total / burn rate net mensuel",
+    formulaCode: "totalBalance / burnRateNet",
+    unit: "ratio",
+    tooltip: {
+      explanation:
+        "Combien de mois votre trésorerie peut tenir au rythme actuel de consommation, si rien ne change. Calculé à partir des comptes bancaires connectés via Bridge — c'est du temps réel, pas un instantané comptable.",
+      goodSign: "Au-delà de 12 mois, vous avez le temps de prendre des décisions sans urgence.",
+      badSign: "Sous 6 mois, c'est tendu — il faut accélérer les encaissements ou réduire les dépenses.",
+      benchmark: "PME équilibrée : 6-12 mois. Hyper-croissance financée : 18-24 mois minimum après une levée.",
+    },
+    suggestedQuestions: {
+      whenGood: "Comment investir mon excédent de trésorerie sans le bloquer ?",
+      whenBad: "Quels leviers immédiats pour rallonger mon runway ?",
+    },
+    thresholds: { danger: 3, warning: 6, good: 12 },
+    dependencies: ["bridge_accounts", "bridge_transactions"],
+    sourceLayer: "banking",
+    phase: "MT",
+  },
+
+  bank_burn_net: {
+    id: "bank_burn_net",
+    label: "Burn rate net",
+    shortLabel: "Burn net",
+    category: "tresorerie",
+    formula: "Sorties moyennes mensuelles − entrées moyennes mensuelles",
+    formulaCode: "avg(monthlyOutflows) - avg(monthlyInflows)",
+    unit: "currency",
+    tooltip: {
+      explanation:
+        "Combien vous consommez (positif) ou générez (négatif) de cash net chaque mois en moyenne, vu depuis vos comptes bancaires. Sert de base au calcul du runway.",
+      goodSign: "Un burn net négatif = vous générez du cash chaque mois — situation idéale.",
+      badSign: "Un burn net positif élevé indique une consommation rapide qui doit être justifiée par une croissance.",
+    },
+    suggestedQuestions: {
+      whenGood: "Comment réinvestir ce cash net sans gonfler les charges fixes ?",
+      whenBad: "Sur quels postes mensuels puis-je gagner immédiatement ?",
+    },
+    thresholds: { danger: 10000, warning: 3000 },
+    dependencies: ["bridge_transactions"],
+    sourceLayer: "banking",
+    phase: "MT",
+  },
+
+  bank_cashflow_ratio: {
+    id: "bank_cashflow_ratio",
+    label: "Ratio encaissements / décaissements",
+    shortLabel: "Cashflow ratio",
+    category: "tresorerie",
+    formula: "Encaissements moyens mensuels / décaissements moyens mensuels",
+    formulaCode: "avg(monthlyInflows) / avg(monthlyOutflows)",
+    unit: "ratio",
+    tooltip: {
+      explanation:
+        "Pour 1 € qui sort de vos comptes, combien rentre. Au-dessus de 1, l'activité génère du cash ; en-dessous, elle en consomme.",
+      goodSign: "Un ratio > 1.2 montre une activité qui s'auto-finance largement.",
+      badSign: "Un ratio < 1 signifie que chaque mois la trésorerie diminue — pas viable à long terme.",
+      benchmark: "PME saine : > 1.05. Phase d'investissement : 0.95-1 toléré 12-18 mois.",
+    },
+    suggestedQuestions: {
+      whenGood: "Comment maintenir ce ratio en cas de hausse des charges ?",
+      whenBad: "Quels leviers d'amélioration pour repasser au-dessus de 1 ?",
+    },
+    thresholds: { danger: 0.95, warning: 1.05, good: 1.2 },
+    dependencies: ["bridge_transactions"],
+    sourceLayer: "banking",
+    phase: "MT",
+  },
+
+  bank_income_regularity: {
+    id: "bank_income_regularity",
+    label: "Indice de régularité des revenus",
+    shortLabel: "Régularité",
+    category: "tresorerie",
+    formula: "1 − (écart-type des inflows / moyenne des inflows)",
+    formulaCode: "1 - stddev(inflows) / mean(inflows)",
+    unit: "ratio",
+    tooltip: {
+      explanation:
+        "Vos encaissements sont-ils prévisibles (proche de 1) ou volatils (proche de 0). Un indice élevé permet de projeter facilement la trésorerie ; un indice bas demande des coussins de sécurité plus importants.",
+      goodSign: "Au-delà de 0.8 : revenus quasi-mensualisés (abonnements, contrats récurrents).",
+      badSign: "Sous 0.4 : revenus erratiques — risque de ruptures de cash sur les mois faibles.",
+    },
+    suggestedQuestions: {
+      whenGood: "Comment capitaliser sur cette prédictibilité pour négocier de meilleures conditions banque ?",
+      whenBad: "Quels leviers pour lisser les encaissements (acomptes, abonnements, contrats cadres) ?",
+    },
+    thresholds: { danger: 0.4, warning: 0.6, good: 0.8 },
+    dependencies: ["bridge_transactions"],
+    sourceLayer: "banking",
+    phase: "MT",
+  },
+
+  bank_fixed_charges_ratio: {
+    id: "bank_fixed_charges_ratio",
+    label: "Ratio charges fixes",
+    shortLabel: "Charges fixes",
+    category: "tresorerie",
+    formula: "Charges fixes mensuelles / total des charges mensuelles",
+    formulaCode: "fixedCharges / totalMonthlyExpenses",
+    unit: "ratio",
+    tooltip: {
+      explanation:
+        "Part de vos dépenses incompressibles (loyer, salaires, abonnements, prélèvements récurrents) dans le total de vos sorties. Plus c'est élevé, moins vous pouvez ajuster en cas de baisse d'activité.",
+      goodSign: "Autour de 50 %, vous gardez de la flexibilité tout en couvrant vos engagements stables.",
+      badSign: "> 80 % de charges fixes = peu de marge de manœuvre en cas de coup dur.",
+    },
+    suggestedQuestions: {
+      whenGood: "Comment optimiser les 50 % de charges variables (achats opportunistes, sous-traitance ponctuelle) ?",
+      whenBad: "Quelles charges fixes peuvent être renégociées ou converties en variables ?",
+    },
+    thresholds: { good: 0.4, warning: 0.65, danger: 0.85 },
+    dependencies: ["bridge_transactions"],
+    sourceLayer: "banking",
+    phase: "MT",
+  },
+
+  bank_treasury_health: {
+    id: "bank_treasury_health",
+    label: "Score santé trésorerie",
+    shortLabel: "Treasury Score",
+    category: "score",
+    formula: "Composite : runway 40 % + cashFlowRatio 20 % + régularité 15 % + ratio charges fixes 15 % + anomalies 10 %",
+    formulaCode: "weighted(runway, cashFlowRatio, regularity, fixedChargesRatio, anomalies)",
+    unit: "score",
+    tooltip: {
+      explanation:
+        "Score composite sur 100 calculé à partir de toutes les dimensions trésorerie : durée de visibilité, équilibre entrées/sorties, régularité des revenus, structure des charges, et anomalies détectées.",
+      goodSign: "> 75 : trésorerie sereine, capacité à absorber un choc.",
+      badSign: "< 40 : situation tendue à plusieurs niveaux — agir maintenant.",
+    },
+    suggestedQuestions: {
+      whenGood: "Sur quelle dimension puis-je encore gagner pour maximiser ma résilience ?",
+      whenBad: "Quel est le pilier le plus dégradé et comment le redresser en priorité ?",
+    },
+    thresholds: { danger: 40, warning: 60, good: 75 },
+    dependencies: [
+      "bank_runway",
+      "bank_cashflow_ratio",
+      "bank_income_regularity",
+      "bank_fixed_charges_ratio",
+    ],
+    sourceLayer: "banking",
+    phase: "MT",
+  },
+
   // ─── Score synthétique ──────────────────────────────────────────────────
   healthScore: {
     id: "healthScore",
