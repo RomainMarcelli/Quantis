@@ -9,12 +9,11 @@
 // Le pipeline Bridge a sa propre route dédiée (POST /api/integrations/bridge/sync)
 // qui appelle directement `buildBankingSummary` ci-dessous, sans passer par
 // `buildAndPersistAnalysisFromSync`.
+//
+// Imports relatifs (pas d'alias `@/…`) pour que les scripts CLI lancés via
+// `npx tsx` résolvent correctement le barrel sans plugin tsconfig-paths.
 
-export {
-  BridgeClient,
-  BridgeApiError,
-  buildBridgeClientFromEnv,
-} from "@/services/integrations/adapters/bridge/client";
+export { BridgeClient, BridgeApiError, buildBridgeClientFromEnv } from "./client";
 
 export {
   fetchBridgeAccounts,
@@ -23,7 +22,7 @@ export {
   createBridgeUser,
   authenticateBridgeUser,
   createBridgeConnectSession,
-} from "@/services/integrations/adapters/bridge/fetchers";
+} from "./fetchers";
 
 export type {
   BridgeRawAccount,
@@ -32,7 +31,7 @@ export type {
   BridgeConnectSession,
   BridgeUser,
   BridgeUserToken,
-} from "@/services/integrations/adapters/bridge/fetchers";
+} from "./fetchers";
 
 export {
   mapBridgeAccountToInternal,
@@ -42,6 +41,6 @@ export {
   computeRunway,
   groupByCategory,
   groupByOperationType,
-} from "@/services/integrations/adapters/bridge/mappers";
+} from "./mappers";
 
-export { buildBankingSummary } from "@/services/integrations/adapters/bridge/summaryBuilder";
+export { buildBankingSummary } from "./summaryBuilder";
