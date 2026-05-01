@@ -155,7 +155,8 @@ async function main() {
   console.log("\n➡️  Création de la session Connect...");
   const session = await bridge.createBridgeConnectSession(userClient, {
     userEmail,
-    redirectUrl: "http://localhost:3000/integrations/bridge/callback",
+    // Pas de callbackUrl en sandbox CLI — l'utilisateur reste sur la page
+    // de succès Bridge, le polling /accounts ci-dessous détecte la connexion.
   });
   console.log(`   ✓ session id=${session.id}`);
   console.log(`\n🌐 Ouvre cette URL dans ton navigateur pour connecter la Demo Bank :\n`);

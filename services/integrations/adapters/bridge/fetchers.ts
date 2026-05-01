@@ -101,23 +101,22 @@ export async function authenticateBridgeUser(
  * front polle ensuite /accounts pour confirmer la connexion.
  *
  * Auth : le client DOIT porter le bearer user (la session est nominative).
- * Body : `user_email` est OBLIGATOIRE — Bridge l'utilise pour pré-remplir
- * le widget Connect et pour les notifications. Pas un secret — on peut
- * passer l'email Vyzor du dirigeant.
+ *
+ * Body :
+ *  - `user_email`   OBLIGATOIRE — pré-remplit le widget Connect.
+ *  - `callback_url` OPTIONNEL — URL de retour après validation.
+ *    Attention : le champ s'appelle `callback_url` (pas `redirect_url` ni
+ *    `redirect_uri`) — Bridge renvoie 400 "Invalid body content" sinon.
  */
 export async function createBridgeConnectSession(
   client: BridgeClient,
-  options: { userEmail: string; redirectUrl?: string }
+  options: { userEmail: string; callbackUrl?: string }
 ): Promise<BridgeConnectSession> {
+  const body: Record<string, string> = { user_email: options.userEmail };
+  if (options.callbackUrl) body.callback_url = options.callbackUrl;
   return client.request<BridgeConnectSession>(
     "/v3/aggregation/connect-sessions",
-    {
-      method: "POST",
-      body: {
-        user_email: options.userEmail,
-        redirect_url: options.redirectUrl,
-      },
-    }
+    { method: "POST", body }
   );
 }
 
