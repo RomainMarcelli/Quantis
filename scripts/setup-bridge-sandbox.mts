@@ -13,16 +13,25 @@
 // Pré-requis :
 //   - BRIDGE_CLIENT_ID et BRIDGE_CLIENT_SECRET dans .env (cf. .env.example)
 
-import {
-  buildBridgeClientFromEnv,
-  createBridgeUser,
-  authenticateBridgeUser,
-  createBridgeConnectSession,
-  fetchBridgeAccounts,
-  fetchBridgeTransactions,
-  type BridgeRawAccount,
-  type BridgeRawTransaction,
-} from "../services/integrations/adapters/bridge/index";
+// Import dynamique : tsx charge les .ts internes en CJS, et les named
+// imports statiques ne traversent pas vers ce fichier .mts (ESM strict).
+// Cf. scripts/audit-pennylane-sandbox.mts pour le même contournement.
+import type {
+  BridgeRawAccount,
+  BridgeRawTransaction,
+} from "../services/integrations/adapters/bridge/fetchers";
+
+type BridgeAdapter = typeof import("../services/integrations/adapters/bridge/index");
+
+async function loadBridge(): Promise<BridgeAdapter> {
+  // On importe les modules unitaires (pas le barrel) pour éviter la
+  // re-export chain qui ne survit pas au passage CJS→ESM.
+  const [client, fetchers] = await Promise.all([
+    import("../services/integrations/adapters/bridge/client"),
+    import("../services/integrations/adapters/bridge/fetchers"),
+  ]);
+  return { ...client, ...fetchers } as unknown as BridgeAdapter;
+}
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 60_000;
@@ -52,13 +61,14 @@ async function waitForUserInput(prompt: string): Promise<void> {
 }
 
 async function pollAccounts(
-  client: ReturnType<typeof buildBridgeClientFromEnv>,
+  bridge: BridgeAdapter,
+  client: ReturnType<BridgeAdapter["buildBridgeClientFromEnv"]>,
   timeoutMs: number
 ): Promise<BridgeRawAccount[]> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const accounts = await fetchBridgeAccounts(client);
+      const accounts = await bridge.fetchBridgeAccounts(client);
       if (accounts.length > 0) return accounts;
     } catch (err) {
       // 401 transitoire ou rate limit → on retente jusqu'au timeout
@@ -120,12 +130,13 @@ async function main() {
   console.log(`   external_user_id : ${externalUserId}`);
   console.log(`   user_email       : ${userEmail}\n`);
 
-  const appClient = buildBridgeClientFromEnv();
+  const bridge = await loadBridge();
+  const appClient = bridge.buildBridgeClientFromEnv();
 
   // ─── 1. Création de l'utilisateur Bridge (idempotent côté API)
   console.log("➡️  Création utilisateur Bridge...");
   try {
-    const user = await createBridgeUser(appClient, externalUserId);
+    const user = await bridge.createBridgeUser(appClient, externalUserId);
     console.log(`   ✓ utilisateur uuid=${user.uuid}`);
   } catch (err) {
     // 409 si déjà existant — on continue avec authenticate.
@@ -134,15 +145,15 @@ async function main() {
 
   // ─── 2. Récupération du token utilisateur
   console.log("\n➡️  Authentification utilisateur...");
-  const userToken = await authenticateBridgeUser(appClient, externalUserId);
+  const userToken = await bridge.authenticateBridgeUser(appClient, externalUserId);
   console.log(`   ✓ access_token reçu (expiry=${userToken.expires_at ?? "?"})`);
 
   // Client utilisateur pour les requêtes /accounts /transactions et /connect-sessions
-  const userClient = buildBridgeClientFromEnv(userToken.access_token);
+  const userClient = bridge.buildBridgeClientFromEnv(userToken.access_token);
 
   // ─── 3. Création de la session Connect (auth utilisateur + user_email requis)
   console.log("\n➡️  Création de la session Connect...");
-  const session = await createBridgeConnectSession(userClient, {
+  const session = await bridge.createBridgeConnectSession(userClient, {
     userEmail,
     redirectUrl: "http://localhost:3000/integrations/bridge/callback",
   });
@@ -157,12 +168,12 @@ async function main() {
 
   // ─── 4. Polling /accounts jusqu'à apparition des comptes
   console.log(`\n⏳ Polling /accounts (timeout ${POLL_TIMEOUT_MS / 1000}s)...`);
-  const accounts = await pollAccounts(userClient, POLL_TIMEOUT_MS);
+  const accounts = await pollAccounts(bridge, userClient, POLL_TIMEOUT_MS);
   summarizeAccounts(accounts);
 
   // ─── 5. Récupération des transactions
   console.log(`\n➡️  Récupération des transactions (toutes pages)...`);
-  const transactions = await fetchBridgeTransactions(userClient, { maxPages: 20 });
+  const transactions = await bridge.fetchBridgeTransactions(userClient, { maxPages: 20 });
   summarizeTransactions(transactions);
 
   // ─── 6. Résumé global
