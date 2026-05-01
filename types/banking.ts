@@ -114,6 +114,25 @@ export type OperationTypeAggregate = {
  * Les agrégats lourds (monthlyFlows, topExpenseCategories) sont précalculés
  * pour éviter une boucle sur N transactions au render.
  */
+/**
+ * Point de l'historique du solde total (reconstruit "à reculons" depuis le
+ * solde courant en appliquant les flux nets mensuels). Sert au sparkline de
+ * la hero card Trésorerie. ⚠️ Approximation : ne tient pas compte des comptes
+ * fermés/ouverts en cours de période (acceptable pour un MVP visuel).
+ */
+export type BalanceHistoryPoint = {
+  /** YYYY-MM. */
+  month: string;
+  /** Solde total estimé en fin de mois. */
+  totalBalance: number;
+};
+
+/**
+ * Vue d'ensemble bancaire stockée côté analyse Firestore (à côté de
+ * `dailyAccounting` / `balanceSheetSnapshot`). Recalculée à chaque sync.
+ * Les agrégats lourds (monthlyFlows, topExpenseCategories) sont précalculés
+ * pour éviter une boucle sur N transactions au render.
+ */
 export type BankingSummary = {
   accounts: BankAccount[];
   /** Somme des soldes — devises mélangées non gérées (MVP : tout en EUR). */
@@ -126,6 +145,13 @@ export type BankingSummary = {
   topExpenseCategories: CategoryAggregate[];
   /** 12 derniers mois max — pour le mini-graph flux entrées/sorties. */
   monthlyFlows: MonthlyFlow[];
+  /** Historique reconstruit du solde total (6-12 derniers mois). Pour la
+   *  sparkline de la hero card Trésorerie. */
+  balanceHistory: BalanceHistoryPoint[];
+  /** Transactions des 90 derniers jours (passées + futures). Permet
+   *  d'alimenter la vue Transactions sans re-fetch Bridge à chaque ouverture
+   *  de l'onglet. Borné pour ne pas exploser le doc Firestore. */
+  recentTransactions: BankTransaction[];
   /** Transactions futures (prélèvements programmés / virements planifiés). */
   upcomingTransactions: BankTransaction[];
   /** ISO timestamp de la dernière sync Bridge réussie. */

@@ -216,6 +216,10 @@ export type AnalysisRecord = {
   // (Pennylane n'émet d'écritures que pour les factures finalisées).
   dailyAccounting?: import("@/types/connectors").DailyAccountingEntry[] | null;
   balanceSheetSnapshot?: import("@/types/connectors").BalanceSheetSnapshot | null;
+  /** Vue d'ensemble bancaire (Bridge / Open Banking). Optionnel — alimenté
+   *  par /api/integrations/bridge/sync et indépendant du pipeline comptable.
+   *  Voir types/banking.ts pour le détail. */
+  bankingSummary?: import("@/types/banking").BankingSummary | null;
 };
 
 export type NewAnalysisRecord = Omit<AnalysisRecord, "id">;

@@ -92,6 +92,7 @@ import {
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import { useAiChat } from "@/components/ai/AiChatProvider";
+import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
@@ -128,6 +129,15 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     setAnalysisContext(analysis?.id ?? null);
     return () => setAnalysisContext(null);
   }, [analysis?.id, setAnalysisContext]);
+
+  // L'onglet Trésorerie n'apparaît que si :
+  //  - une connexion Bridge active existe (useBridgeStatus polle /status)
+  //  - OU l'analyse courante porte un bankingSummary (résultat d'un sync
+  //    précédent attaché à cette analyse, même si la connexion vient d'être
+  //    supprimée — l'historique reste exploitable).
+  const bridgeStatus = useBridgeStatus();
+  const bankingSummary = analysis?.bankingSummary ?? null;
+  const showTresorerie = Boolean(bridgeStatus.status?.connected) || bankingSummary !== null;
 
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
@@ -1280,6 +1290,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
               <DashboardFinancialTestMenu
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}
+                showTresorerie={showTresorerie}
               />
               {/* previousKpis :
                    - Priorité 1 = KPIs de la période antérieure de même durée
@@ -1291,6 +1302,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 kpis={effectiveAnalysis?.kpis ?? analysis.kpis}
                 mappedData={effectiveAnalysis?.mappedData ?? analysis.mappedData}
                 previousKpis={previousPeriodKpis ?? previousAnalysis?.kpis ?? null}
+                bankingSummary={bankingSummary}
               />
             </>
           ) : (

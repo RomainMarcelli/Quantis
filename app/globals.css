@@ -865,3 +865,14 @@ body {
 .vyzor-typing-dot {
   animation: vyzor-typing-dots 1.4s ease-in-out infinite;
 }
+
+/* ─── TreasuryTab — fade slide up staggered ──────────────────────────── */
+
+@keyframes vyzor-treasury-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.vyzor-fade-up {
+  animation: vyzor-treasury-fade-up 480ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}

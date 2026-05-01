@@ -6,7 +6,7 @@ import { FinancingTest } from "@/components/dashboard/navigation/FinancingTest";
 import { InvestmentTest } from "@/components/dashboard/navigation/InvestmentTest";
 import { RentabilityTest } from "@/components/dashboard/navigation/RentabilityTest";
 import { ValueCreationTest } from "@/components/dashboard/navigation/ValueCreationTest";
-import { BankingSummaryView } from "@/components/banking/BankingSummaryView";
+import { TreasuryTab } from "@/components/banking/TreasuryTab";
 import type { DashboardTestTabId } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
 import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 import type { BankingSummary } from "@/types/banking";
@@ -53,7 +53,7 @@ export function DashboardFinancialTestContent({
         />
       );
     }
-    return <BankingSummaryView summary={bankingSummary} />;
+    return <TreasuryTab summary={bankingSummary} />;
   }
 
   return (
