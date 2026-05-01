@@ -100,11 +100,15 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    const summary: BankingSummary = buildBankingSummary({
+    const rawSummary: BankingSummary = buildBankingSummary({
       accounts,
       transactions,
       categories: categories.map((c) => ({ id: c.id, name: c.name })),
     });
+    // Firestore refuse les valeurs `undefined` ; or les types BankAccount /
+    // BankTransaction ont des champs optionnels (iban?, rawDescription?,
+    // sparklinePoints?). On purge récursivement les undefined avant l'écrit.
+    const summary = stripUndefined(rawSummary) as BankingSummary;
 
     // Persistance : si analysisId fourni, on attache au doc analyse. Sinon
     // doc dédié dans banking_summaries (clé = userId — un summary par user).
@@ -146,4 +150,29 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * Purge récursivement les valeurs `undefined` d'un objet/tableau pour
+ * compatibilité Firestore (qui refuse `undefined`). Préserve `null`,
+ * tableaux, dates ISO (strings), nombres.
+ *
+ * Pourquoi pas activer `ignoreUndefinedProperties` côté Firebase Admin :
+ * c'est un setting global qui pourrait masquer des bugs ailleurs (un
+ * champ qu'on aurait OUBLIÉ de remplir, plutôt que choisi d'omettre).
+ * Ici on cible explicitement le payload Bridge.
+ */
+function stripUndefined(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripUndefined(v));
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v === undefined) continue;
+      out[k] = stripUndefined(v);
+    }
+    return out;
+  }
+  return value;
 }
