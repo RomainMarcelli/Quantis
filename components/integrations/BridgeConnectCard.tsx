@@ -123,14 +123,23 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
   const isConnected = !!status?.connected;
   const accountsCount = status?.accountsCount ?? 0;
   const totalBalance = status?.totalBalance ?? null;
+  // Distingue 2 sous-états quand isConnected = true :
+  //  - hasSynced  → comptes + summary disponibles
+  //  - pendingSync → connexion établie mais aucun /sync n'a encore tourné
+  //                  (l'utilisateur a fermé le tab Bridge avant le retour
+  //                  callback, ou le sandbox n'a pas redirigé). On l'incite
+  //                  alors à cliquer "Synchroniser".
+  const hasSynced = isConnected && accountsCount > 0;
+  const pendingSync = isConnected && accountsCount === 0;
   // Affichage du nom de banque : si une seule banque, on prend son nom ;
   // si plusieurs, on les joint avec " · ". Fallback "Banque connectée"
-  // tant qu'aucun sync n'a peuplé providerNames (état transitoire après
-  // la SCA mais avant le premier /sync).
+  // tant qu'aucun sync n'a peuplé providerNames.
   const providerNames = status?.providerNames ?? [];
   const bankLabel =
     providerNames.length === 0
-      ? "Banque connectée"
+      ? hasSynced
+        ? "Banque connectée"
+        : "Connexion en attente de synchronisation"
       : providerNames.length === 1
         ? providerNames[0]!
         : providerNames.join(" · ");
@@ -154,13 +163,21 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
               <h2 className="text-base font-semibold text-white">
                 {isConnected ? bankLabel : "Connecter ma banque"}
               </h2>
-              {isConnected ? (
+              {hasSynced ? (
                 <span
                   className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
                   style={{ backgroundColor: "rgba(34,197,94,0.12)", color: "#86EFAC" }}
                 >
                   <CheckCircle2 className="h-3 w-3" />
-                  Connectée
+                  Synchronisée
+                </span>
+              ) : pendingSync ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  style={{ backgroundColor: "rgba(245,158,11,0.12)", color: "#FCD34D" }}
+                >
+                  <RefreshCcw className="h-3 w-3" />
+                  À synchroniser
                 </span>
               ) : (
                 <span
@@ -176,16 +193,19 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
               )}
             </div>
             <p className="mt-1 max-w-[60ch] text-[13px] text-white/65">
-              {isConnected ? (
+              {hasSynced ? (
                 <>
-                  {accountsCount > 0
-                    ? `${accountsCount} compte${accountsCount > 1 ? "s" : ""} synchronisé${accountsCount > 1 ? "s" : ""}${
-                        totalBalance !== null ? ` · solde total ${formatCurrency(totalBalance)}` : ""
-                      }.`
-                    : "Comptes en cours de synchronisation."}
+                  {accountsCount} compte{accountsCount > 1 ? "s" : ""} synchronisé{accountsCount > 1 ? "s" : ""}
+                  {totalBalance !== null ? ` · solde total ${formatCurrency(totalBalance)}` : ""}.
                   <span className="ml-1 text-white/40">
                     Connexion Open Banking PSD2 via Bridge.
                   </span>
+                </>
+              ) : pendingSync ? (
+                <>
+                  La connexion Bridge est établie, mais les comptes n'ont pas
+                  encore été récupérés. Cliquez sur <strong>Synchroniser</strong>
+                  &nbsp;ci-dessous pour finaliser.
                 </>
               ) : (
                 <>
