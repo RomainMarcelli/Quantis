@@ -24,6 +24,8 @@ import {
 import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis } from "@/types/analysis";
+import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
+import type { BenchmarkableKpiKey } from "@/lib/benchmark/kpiMapping";
 
 type FinancingTestProps = {
   kpis: CalculatedKpis;
@@ -188,6 +190,8 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           statusLabel={debtInterpretation.label}
           severity={debtInterpretation.severity}
           code="DEBT_RATIO"
+          benchmarkKey="capacite_remboursement_annees"
+          benchmarkValue={kpis.capacite_remboursement_annees}
         />
 
         <FinancingMetricCard
@@ -203,6 +207,8 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           statusLabel={kpis.caf === null ? "N/D" : kpis.caf >= 0 ? "Création de cash" : "Cash négatif"}
           severity={kpis.caf === null ? "na" : kpis.caf >= 0 ? "good" : "risk"}
           code="CASH_FLOW_GEN"
+          benchmarkKey="caf"
+          benchmarkValue={kpis.caf}
         />
 
         <FinancingMetricCard
@@ -218,6 +224,8 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           statusLabel={kpis.fte === null ? "N/D" : kpis.fte >= 0 ? "Cash disponible" : "Cash consommé"}
           severity={kpis.fte === null ? "na" : kpis.fte >= 0 ? "good" : "risk"}
           code="OCF_NET"
+          benchmarkKey="fte"
+          benchmarkValue={kpis.fte}
         />
 
         <FinancingMetricCard
@@ -233,6 +241,8 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           statusLabel={kpis.solvabilite === null ? "N/D" : kpis.solvabilite >= 0.3 ? "Bilan solide" : "Sous-capitalisé"}
           severity={kpis.solvabilite === null ? "na" : kpis.solvabilite >= 0.3 ? "good" : "risk"}
           code="SOLVENCY"
+          benchmarkKey="solvabilite"
+          benchmarkValue={kpis.solvabilite}
         />
 
         <FinancingMetricCard
@@ -248,6 +258,8 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           statusLabel={kpis.gearing === null ? "N/D" : kpis.gearing <= 3 ? "Endettement maîtrisé" : "Endettement élevé"}
           severity={kpis.gearing === null ? "na" : kpis.gearing <= 3 ? "good" : "risk"}
           code="GEARING"
+          benchmarkKey="gearing"
+          benchmarkValue={kpis.gearing}
         />
 
         <FinancingMetricCard
@@ -288,6 +300,9 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
                 tone: "neutral"
               };
 
+              // Seule la liquidité générale a un mapping Vyzor (liq_gen) ; les liquidités réduite/immédiate n'en ont pas en V1.
+              const isGenerale = index === 0;
+
               return (
                 <div
                   key={indicator.label}
@@ -302,6 +317,15 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
                       {indicator.value === null ? null : <span className="text-sm text-white/35">x</span>}
                     </span>
                   </div>
+                  {isGenerale ? (
+                    <div className="mt-3">
+                      <KpiBenchmarkAutoIndicator
+                        kpiKey="liq_gen"
+                        value={indicator.value}
+                        kpiLabel={`Liquidité ${indicator.label}`}
+                      />
+                    </div>
+                  ) : null}
                   <p className="mt-2 text-xs text-white/65">{indicator.helper}</p>
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <span className={`inline-flex rounded-md border px-2 py-1 text-[11px] ${severityClass(indicator.severity)}`}>
@@ -401,6 +425,8 @@ type FinancingMetricCardProps = {
   severity: FinancingSeverity;
   delayMs: number;
   className?: string;
+  benchmarkKey?: BenchmarkableKpiKey;
+  benchmarkValue?: number | null;
 };
 
 function FinancingMetricCard({
@@ -415,7 +441,9 @@ function FinancingMetricCard({
   icon,
   severity,
   delayMs,
-  className
+  className,
+  benchmarkKey,
+  benchmarkValue
 }: FinancingMetricCardProps) {
   return (
     <article
@@ -434,6 +462,11 @@ function FinancingMetricCard({
           </div>
         </div>
         <p className="tnum data-react text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
+        {benchmarkKey ? (
+          <div className="mt-3">
+            <KpiBenchmarkAutoIndicator kpiKey={benchmarkKey} value={benchmarkValue ?? null} kpiLabel={title} />
+          </div>
+        ) : null}
         <div className="mt-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <span className={`rounded-md border px-2 py-1 text-[11px] ${severityClass(severity)}`}>{statusLabel}</span>

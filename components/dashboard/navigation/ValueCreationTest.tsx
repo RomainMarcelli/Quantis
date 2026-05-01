@@ -25,6 +25,8 @@ import {
 } from "@/lib/dashboard/tabs/valueCreationData";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
+import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
+import type { BenchmarkableKpiKey } from "@/lib/benchmark/kpiMapping";
 
 type ValueCreationTestProps = {
   kpis: CalculatedKpis;
@@ -237,6 +239,8 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={caTrend}
           icon={<Layers className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="Le chiffre d'affaires totalise l'ensemble des ventes de biens et services."
+          benchmarkKey="ca"
+          benchmarkValue={kpis.ca}
         />
         <MetricCard
           delayMs={150}
@@ -249,6 +253,8 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={tcamTrend}
           icon={<Activity className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="Le TCAM mesure la dynamique de croissance moyenne annuelle."
+          benchmarkKey="tcam"
+          benchmarkValue={kpis.tcam}
         />
         <MetricCard
           delayMs={200}
@@ -261,6 +267,8 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={ebeTrend}
           icon={<BarChartBig className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="L'EBE indique la richesse générée par l'exploitation."
+          benchmarkKey="ebe"
+          benchmarkValue={kpis.ebe}
         />
         <MetricCard
           delayMs={220}
@@ -273,6 +281,8 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={undefined}
           icon={<Layers className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="La valeur ajoutée mesure la richesse réellement créée par l'entreprise."
+          benchmarkKey="va"
+          benchmarkValue={kpis.va}
         />
         <MetricCard
           delayMs={240}
@@ -285,6 +295,8 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={undefined}
           icon={<PieChartIcon className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="Part de la production transformée en excédent brut d'exploitation."
+          benchmarkKey="marge_ebitda"
+          benchmarkValue={kpis.marge_ebitda}
         />
         <MetricCard
           delayMs={260}
@@ -325,6 +337,13 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
                 </span>
                 <KpiTrendPill trend={resultatNetTrend} compact />
               </div>
+            </div>
+            <div className="mt-3">
+              <KpiBenchmarkAutoIndicator
+                kpiKey="resultat_net"
+                value={kpis.resultat_net}
+                kpiLabel="Résultat net"
+              />
             </div>
           </div>
           <p className="edu-text">Le bénéfice final après toutes les charges et impôts.</p>
@@ -425,6 +444,8 @@ type MetricCardProps = {
   icon: ReactNode;
   helpText: string;
   delayMs: number;
+  benchmarkKey?: BenchmarkableKpiKey;
+  benchmarkValue?: number | null;
 };
 
 function MetricCard({
@@ -437,7 +458,9 @@ function MetricCard({
   trend,
   icon,
   helpText,
-  delayMs
+  delayMs,
+  benchmarkKey,
+  benchmarkValue
 }: MetricCardProps) {
   return (
     <article
@@ -456,6 +479,11 @@ function MetricCard({
           </div>
         </div>
         <p className="data-react tnum text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
+        {benchmarkKey ? (
+          <div className="mt-3">
+            <KpiBenchmarkAutoIndicator kpiKey={benchmarkKey} value={benchmarkValue ?? null} kpiLabel={title} />
+          </div>
+        ) : null}
         <div className="mt-5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />

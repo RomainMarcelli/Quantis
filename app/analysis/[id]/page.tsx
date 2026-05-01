@@ -1,4 +1,5 @@
 import { AnalysisDetailView } from "@/components/analysis/AnalysisDetailView";
+import { VyzorBenchmarkProvider } from "@/lib/benchmark/BenchmarkContext";
 
 type AnalysisDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -9,7 +10,9 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
 
   return (
     <main className="premium-analysis-root relative min-h-screen w-full overflow-hidden px-3 py-8 md:px-4 lg:px-6">
-      <AnalysisDetailView analysisId={id} />
+      <VyzorBenchmarkProvider>
+        <AnalysisDetailView analysisId={id} />
+      </VyzorBenchmarkProvider>
     </main>
   );
 }

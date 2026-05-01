@@ -5,10 +5,11 @@
 
 import { useMemo } from "react";
 import { AlertTriangle, Download, Lightbulb } from "lucide-react";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { DashboardLayout, type DashboardLayoutBenchmarks } from "@/components/dashboard/DashboardLayout";
 import { QuantisScoreCard } from "@/components/dashboard/QuantisScoreCard";
 import type { PremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
+import { useBenchmarkContext } from "@/lib/benchmark/BenchmarkContext";
 
 type SyntheseDashboardProps = {
   greetingName: string;
@@ -36,6 +37,18 @@ export function SyntheseDashboard({
   const cockpitKpis = useMemo(() => toCockpitKpis(synthese), [synthese]);
   const strategicMessage = synthese.actions[0] ?? "Maintenir la trajectoire actuelle et suivre les KPI chaque semaine.";
   const hasMissingMetric = synthese.metrics.some((metric) => metric.value === null);
+
+  // Benchmark Vyzor : médianes marché P25/P50/P75 fournies par le VyzorBenchmarkProvider en amont.
+  // Si la requête échoue ou que le KPI n'a pas de mapping, l'indicateur ne s'affiche pas (graceful fallback).
+  const { getBenchmarkFor } = useBenchmarkContext();
+  const benchmarks = useMemo<DashboardLayoutBenchmarks>(
+    () => ({
+      ca: getBenchmarkFor("ca", cockpitKpis.ca),
+      tresorerie: getBenchmarkFor("disponibilites", cockpitKpis.tresorerie),
+      ebe: getBenchmarkFor("ebe", cockpitKpis.ebe)
+    }),
+    [getBenchmarkFor, cockpitKpis.ca, cockpitKpis.tresorerie, cockpitKpis.ebe]
+  );
 
   return (
     <section className="space-y-4">
@@ -97,6 +110,7 @@ export function SyntheseDashboard({
           ebe: "synthese-kpi-ebe",
           recommendation: "synthese-actions"
         }}
+        benchmarks={benchmarks}
       >
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr]">
           <article className="precision-card fade-up rounded-2xl p-5" style={{ animationDelay: "0.22s" }} data-search-id="synthese-actions-details">

@@ -22,6 +22,8 @@ import {
 } from "@/lib/dashboard/rentabilite/rentabilityViewModel";
 import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import type { CalculatedKpis } from "@/types/analysis";
+import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
+import type { BenchmarkableKpiKey } from "@/lib/benchmark/kpiMapping";
 
 type RentabilityTestProps = {
   kpis: CalculatedKpis;
@@ -173,6 +175,8 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
           trend={roeTrend}
           icon={<Award className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper="Rentabilité des fonds propres: mesure ce que l'actionnaire gagne pour chaque euro investi."
+          benchmarkKey="roe"
+          benchmarkValue={roePercent}
         />
 
         <RentabilityMetricCard
@@ -187,6 +191,8 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
             <BriefcaseBusiness className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
           }
           helper="Performance économique pure de l'exploitation, indépendamment du mode de financement."
+          benchmarkKey="roce"
+          benchmarkValue={rocePercent}
         />
 
         <article
@@ -372,6 +378,8 @@ type RentabilityMetricCardProps = {
   icon: ReactNode;
   delayMs: number;
   className?: string;
+  benchmarkKey?: BenchmarkableKpiKey;
+  benchmarkValue?: number | null;
 };
 
 function RentabilityMetricCard({
@@ -383,7 +391,9 @@ function RentabilityMetricCard({
   trend,
   icon,
   delayMs,
-  className
+  className,
+  benchmarkKey,
+  benchmarkValue
 }: RentabilityMetricCardProps) {
   return (
     <article
@@ -402,6 +412,11 @@ function RentabilityMetricCard({
           </div>
         </div>
         <p className="tnum data-react text-[3rem] font-semibold leading-none tracking-tight text-white">{value}</p>
+        {benchmarkKey ? (
+          <div className="mt-3">
+            <KpiBenchmarkAutoIndicator kpiKey={benchmarkKey} value={benchmarkValue ?? null} kpiLabel={title} />
+          </div>
+        ) : null}
         <div className="mt-5 flex items-center gap-2">
           <KpiTrendPill trend={trend} compact />
         </div>

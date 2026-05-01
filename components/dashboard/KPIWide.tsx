@@ -6,6 +6,8 @@ import { Target } from "lucide-react";
 import { computeEbeProgressPercent } from "@/lib/dashboard/premiumDashboardAdapter";
 import { formatCurrency } from "@/components/dashboard/formatting";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
+import { KpiBenchmarkIndicator } from "@/components/synthese/KpiBenchmarkIndicator";
+import type { BenchmarkValueFormat, KpiBenchmark } from "@/types/benchmark";
 
 type KPIWideProps = {
   title: string;
@@ -13,9 +15,21 @@ type KPIWideProps = {
   value: number | null;
   target?: number;
   searchId?: string;
+  benchmark?: KpiBenchmark | null;
+  benchmarkFormat?: BenchmarkValueFormat;
+  benchmarkInvertSentiment?: boolean;
 };
 
-export function KPIWide({ title, tag, value, target = 50000, searchId }: KPIWideProps) {
+export function KPIWide({
+  title,
+  tag,
+  value,
+  target = 50000,
+  searchId,
+  benchmark = null,
+  benchmarkFormat = "currency",
+  benchmarkInvertSentiment = false
+}: KPIWideProps) {
   // Animation de la valeur EBE.
   const animatedValue = useAnimatedNumber(value, { durationMs: 1200 });
   // Animation de la barre de progression vers l'objectif.
@@ -34,6 +48,16 @@ export function KPIWide({ title, tag, value, target = 50000, searchId }: KPIWide
           <div className="tnum data-react text-5xl font-semibold tracking-tight text-white">
             {value === null ? "N/D" : formatCurrency(animatedValue)}
           </div>
+          {benchmark ? (
+            <div className="mt-3">
+              <KpiBenchmarkIndicator
+                benchmark={benchmark}
+                format={benchmarkFormat}
+                invertSentiment={benchmarkInvertSentiment}
+                kpiLabel={title}
+              />
+            </div>
+          ) : null}
         </div>
 
         <div className="w-full rounded-lg border border-white/5 bg-quantis-base p-5 transition-all duration-500 group-hover:border-quantis-gold/30 md:w-1/2">

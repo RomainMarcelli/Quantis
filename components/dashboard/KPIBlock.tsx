@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 import { Clock, TrendingUp } from "lucide-react";
 import { formatCurrency, formatMonths, formatPercent } from "@/components/dashboard/formatting";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
+import { KpiBenchmarkIndicator } from "@/components/synthese/KpiBenchmarkIndicator";
+import type { BenchmarkValueFormat, KpiBenchmark } from "@/types/benchmark";
 
 type KPIBlockFormat = "currency" | "percent";
 
@@ -19,6 +21,9 @@ type KPIBlockProps = {
   trendLabel?: string;
   sideLabel?: string;
   searchId?: string;
+  benchmark?: KpiBenchmark | null;
+  benchmarkFormat?: BenchmarkValueFormat;
+  benchmarkInvertSentiment?: boolean;
 };
 
 export function KPIBlock({
@@ -30,7 +35,10 @@ export function KPIBlock({
   trendValue,
   trendLabel = "vs période précédente",
   sideLabel,
-  searchId
+  searchId,
+  benchmark = null,
+  benchmarkFormat,
+  benchmarkInvertSentiment = false
 }: KPIBlockProps) {
   // Le compteur anime uniquement la valeur principale de la carte.
   const animatedValue = useAnimatedNumber(value, { durationMs: 1200 });
@@ -52,6 +60,16 @@ export function KPIBlock({
           <div className="tnum data-react text-[2.5rem] font-medium leading-none tracking-tight text-white">
             {formatKpiValue(animatedValue, value, format)}
           </div>
+          {benchmark ? (
+            <div className="mt-3">
+              <KpiBenchmarkIndicator
+                benchmark={benchmark}
+                format={benchmarkFormat ?? (format === "currency" ? "currency" : "percent")}
+                invertSentiment={benchmarkInvertSentiment}
+                kpiLabel={title}
+              />
+            </div>
+          ) : null}
           <div className="mt-5 flex items-center justify-between">
             {trendValue !== undefined ? (
               <div className="interactive-badge flex items-center gap-2 rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-1">

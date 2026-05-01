@@ -11,6 +11,7 @@ import { AIInsight } from "@/components/dashboard/AIInsight";
 import { HealthScore } from "@/components/dashboard/HealthScore";
 import { KPIBlock } from "@/components/dashboard/KPIBlock";
 import { KPIWide } from "@/components/dashboard/KPIWide";
+import type { KpiBenchmark } from "@/types/benchmark";
 
 export type DashboardLayoutSearchIds = {
   score?: string;
@@ -18,6 +19,12 @@ export type DashboardLayoutSearchIds = {
   cash?: string;
   ebe?: string;
   recommendation?: string;
+};
+
+export type DashboardLayoutBenchmarks = {
+  ca?: KpiBenchmark | null;
+  tresorerie?: KpiBenchmark | null;
+  ebe?: KpiBenchmark | null;
 };
 
 type DashboardLayoutProps = {
@@ -33,6 +40,7 @@ type DashboardLayoutProps = {
   aiMessage?: string;
   aiCtaLabel?: string;
   searchIds?: DashboardLayoutSearchIds;
+  benchmarks?: DashboardLayoutBenchmarks;
 };
 
 export function DashboardLayout({
@@ -47,7 +55,8 @@ export function DashboardLayout({
   statusBadgeLabel = "Synchronisation active",
   aiMessage,
   aiCtaLabel = "Ouvrir le simulateur strategique",
-  searchIds
+  searchIds,
+  benchmarks
 }: DashboardLayoutProps) {
   const healthState = getPremiumHealthState(kpis.healthScore);
 
@@ -112,6 +121,8 @@ export function DashboardLayout({
             trendLabel="vs M-1"
             icon={<ArrowUpRight className="h-4 w-4 text-white/40 group-hover:text-quantis-gold" />}
             searchId={searchIds?.revenue}
+            benchmark={benchmarks?.ca ?? null}
+            benchmarkFormat="currency"
           />
 
           <KPIBlock
@@ -123,6 +134,8 @@ export function DashboardLayout({
             trendLabel="LIQUIDITE"
             icon={<Wallet className="h-4 w-4 text-white/40 group-hover:text-quantis-gold" />}
             searchId={searchIds?.cash}
+            benchmark={benchmarks?.tresorerie ?? null}
+            benchmarkFormat="currency"
           />
 
           <KPIWide
@@ -131,6 +144,8 @@ export function DashboardLayout({
             value={kpis.ebe}
             target={50000}
             searchId={searchIds?.ebe}
+            benchmark={benchmarks?.ebe ?? null}
+            benchmarkFormat="currency"
           />
 
           <AIInsight message={aiMessage ?? defaultAiMessage} ctaLabel={aiCtaLabel} searchId={searchIds?.recommendation} />

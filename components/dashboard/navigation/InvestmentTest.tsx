@@ -20,6 +20,8 @@ import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import { buildKpiTrend, buildSignedTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import type { CalculatedKpis } from "@/types/analysis";
+import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
+import type { BenchmarkableKpiKey } from "@/lib/benchmark/kpiMapping";
 
 type InvestmentTestProps = {
   kpis: CalculatedKpis;
@@ -234,6 +236,8 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
           trend={bfrTrend}
           icon={<Lock className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper="Montant immobilisé dans le cycle (stocks + créances - fournisseurs)."
+          benchmarkKey="bfr"
+          benchmarkValue={kpis.bfr}
         />
 
         <InvestmentMetricCard
@@ -299,6 +303,7 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
                 {kpis.rot_bfr === null ? "N/D" : `${Math.round(animatedRotBfr)} jours`}
               </p>
               <KpiTrendPill trend={rotBfrTrend} compact />
+              <KpiBenchmarkAutoIndicator kpiKey="rot_bfr" value={kpis.rot_bfr} kpiLabel="Rotation BFR" />
             </div>
           </div>
 
@@ -311,6 +316,8 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
               hint="Temps moyen d'encaissement des factures clients."
               badgeLabel="↘ À réduire"
               badgeTone="warning"
+              benchmarkKey="dso"
+              benchmarkValue={kpis.dso}
             />
             <DelayCard
               title="Délai stocks (DIO)"
@@ -320,6 +327,8 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
               hint="Temps moyen d'écoulement du stock."
               badgeLabel="↘ À réduire"
               badgeTone="warning"
+              benchmarkKey="rot_stocks"
+              benchmarkValue={kpis.rot_stocks}
             />
             <DelayCard
               title="Délai fournisseurs (DPO)"
@@ -329,6 +338,8 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
               hint="Délai moyen accordé par les fournisseurs."
               badgeLabel="↗ À allonger"
               badgeTone="good"
+              benchmarkKey="dpo"
+              benchmarkValue={kpis.dpo}
             />
           </div>
 
@@ -453,6 +464,8 @@ type InvestmentMetricCardProps = {
   trend: KpiTrend;
   delayMs: number;
   className?: string;
+  benchmarkKey?: BenchmarkableKpiKey;
+  benchmarkValue?: number | null;
 };
 
 function InvestmentMetricCard({
@@ -466,7 +479,9 @@ function InvestmentMetricCard({
   icon,
   trend,
   delayMs,
-  className
+  className,
+  benchmarkKey,
+  benchmarkValue
 }: InvestmentMetricCardProps) {
   return (
     <article
@@ -485,6 +500,11 @@ function InvestmentMetricCard({
           </div>
         </div>
         <p className="tnum data-react text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
+        {benchmarkKey ? (
+          <div className="mt-3">
+            <KpiBenchmarkAutoIndicator kpiKey={benchmarkKey} value={benchmarkValue ?? null} kpiLabel={title} />
+          </div>
+        ) : null}
         <div className="mt-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-white/80">{statusLabel}</span>
@@ -506,9 +526,21 @@ type DelayCardProps = {
   badgeLabel: string;
   badgeTone: "good" | "warning";
   icon: ReactNode;
+  benchmarkKey?: BenchmarkableKpiKey;
+  benchmarkValue?: number | null;
 };
 
-function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, icon }: DelayCardProps) {
+function DelayCard({
+  title,
+  value,
+  trend,
+  hint,
+  badgeLabel,
+  badgeTone,
+  icon,
+  benchmarkKey,
+  benchmarkValue
+}: DelayCardProps) {
   const badgeClass =
     badgeTone === "good"
       ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
@@ -524,6 +556,11 @@ function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, icon }: D
         <span className="tnum text-3xl font-medium text-white">{value}</span>
         <span className={`rounded px-2 py-1 text-[9px] uppercase tracking-wide ${badgeClass}`}>{badgeLabel}</span>
       </div>
+      {benchmarkKey ? (
+        <div className="mb-2">
+          <KpiBenchmarkAutoIndicator kpiKey={benchmarkKey} value={benchmarkValue ?? null} kpiLabel={title} />
+        </div>
+      ) : null}
       <KpiTrendPill trend={trend} compact className="mb-2" />
       <p className="text-[10px] italic text-white/45">{hint}</p>
     </div>
