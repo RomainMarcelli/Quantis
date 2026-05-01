@@ -55,5 +55,9 @@ export async function GET(request: NextRequest) {
     providerNames,
     lastSyncAt: data?.summary?.lastSyncAt ?? null,
     lastSyncStatus: active.lastSyncStatus ?? "never",
+    // Summary complet — sert au fallback quand l'analyse courante n'a pas
+    // de bankingSummary attaché (cas typique : sync standalone via la card
+    // Documents qui n'a pas d'analysisId à l'instant T).
+    summary: data?.summary ?? null,
   });
 }
