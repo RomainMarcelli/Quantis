@@ -123,6 +123,17 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
   const isConnected = !!status?.connected;
   const accountsCount = status?.accountsCount ?? 0;
   const totalBalance = status?.totalBalance ?? null;
+  // Affichage du nom de banque : si une seule banque, on prend son nom ;
+  // si plusieurs, on les joint avec " · ". Fallback "Banque connectée"
+  // tant qu'aucun sync n'a peuplé providerNames (état transitoire après
+  // la SCA mais avant le premier /sync).
+  const providerNames = status?.providerNames ?? [];
+  const bankLabel =
+    providerNames.length === 0
+      ? "Banque connectée"
+      : providerNames.length === 1
+        ? providerNames[0]!
+        : providerNames.join(" · ");
 
   return (
     <article className="precision-card rounded-2xl p-4 md:p-5">
@@ -140,7 +151,9 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-white">Connecter ma banque</h2>
+              <h2 className="text-base font-semibold text-white">
+                {isConnected ? bankLabel : "Connecter ma banque"}
+              </h2>
               {isConnected ? (
                 <span
                   className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
@@ -163,13 +176,24 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
               )}
             </div>
             <p className="mt-1 max-w-[60ch] text-[13px] text-white/65">
-              Source <strong>complémentaire</strong> à votre comptabilité — récupère
-              le cash temps réel, les flux et le runway via Bridge (Open Banking PSD2).
-              {isConnected && accountsCount > 0
-                ? ` ${accountsCount} compte${accountsCount > 1 ? "s" : ""} connecté${accountsCount > 1 ? "s" : ""}${
-                    totalBalance !== null ? ` · solde total ${formatCurrency(totalBalance)}` : ""
-                  }.`
-                : ""}
+              {isConnected ? (
+                <>
+                  {accountsCount > 0
+                    ? `${accountsCount} compte${accountsCount > 1 ? "s" : ""} synchronisé${accountsCount > 1 ? "s" : ""}${
+                        totalBalance !== null ? ` · solde total ${formatCurrency(totalBalance)}` : ""
+                      }.`
+                    : "Comptes en cours de synchronisation."}
+                  <span className="ml-1 text-white/40">
+                    Connexion Open Banking PSD2 via Bridge.
+                  </span>
+                </>
+              ) : (
+                <>
+                  Source <strong>complémentaire</strong> à votre comptabilité —
+                  récupère le cash temps réel, les flux et le runway via Bridge
+                  (Open Banking PSD2).
+                </>
+              )}
             </p>
           </div>
         </div>
