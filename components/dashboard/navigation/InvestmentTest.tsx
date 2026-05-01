@@ -17,6 +17,7 @@ import {
 import { formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
+import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import { buildKpiTrend, buildSignedTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
@@ -237,6 +238,7 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
                 </p>
               ) : null}
               <KpiTrendPill trend={rotBfrTrend} compact />
+              <KpiBenchmarkAutoIndicator kpiId="rot_bfr" value={kpis.rot_bfr} kpiLabel="Rotation BFR" />
             </div>
           </div>
 
@@ -415,6 +417,11 @@ function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, anomaly, 
         <p className="mb-2 rounded border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-[10px] font-medium text-rose-300">
           ⚠ {anomaly.message}
         </p>
+      ) : null}
+      {kpiId ? (
+        <div className="mb-2">
+          <KpiBenchmarkAutoIndicator kpiId={kpiId} value={kpiValue ?? null} kpiLabel={title} />
+        </div>
       ) : null}
       <KpiTrendPill trend={trend} compact className="mb-2" />
       <p className="text-[10px] italic text-white/45">{hint}</p>

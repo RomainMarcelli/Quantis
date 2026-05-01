@@ -14,6 +14,7 @@ import {
 import { formatNumber, formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
+import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
@@ -325,6 +326,15 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
                     </span>
                     <KpiTrendPill trend={trend} compact />
                   </div>
+                  {indicator.kpiId ? (
+                    <div className="mt-3">
+                      <KpiBenchmarkAutoIndicator
+                        kpiId={indicator.kpiId}
+                        value={indicator.value}
+                        kpiLabel={`Liquidité ${indicator.label}`}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               );
             })}

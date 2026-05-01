@@ -15,6 +15,7 @@ import {
 import { formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
+import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
 import { BreakEvenChart } from "@/components/dashboard/navigation/BreakEvenChart";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
@@ -344,6 +345,13 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
                 </span>
                 <KpiTrendPill trend={resultatNetTrend} compact />
               </div>
+            </div>
+            <div className="mt-3">
+              <KpiBenchmarkAutoIndicator
+                kpiId="resultat_net"
+                value={kpis.resultat_net}
+                kpiLabel="Résultat net"
+              />
             </div>
           </div>
         </article>

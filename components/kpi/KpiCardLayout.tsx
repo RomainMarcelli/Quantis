@@ -27,11 +27,8 @@
 import type { ReactNode } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
-import {
-  getKpiDiagnostic,
-  type KpiDiagnostic,
-} from "@/lib/kpi/kpiDiagnostic";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
+import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
 
 export type KpiCardLayoutProps = {
   /** Identifiant du KPI dans le registre — pilote tooltip + diagnostic. */
@@ -114,10 +111,6 @@ export function KpiCardLayout({
       ? computeVariation(value, previousValue)
       : null;
 
-  // ─── Badge de statut ─────────────────────────────────────────────────
-  const diagnostic: KpiDiagnostic = getKpiDiagnostic(value, definition?.thresholds);
-  const badge = buildStatusBadge(diagnostic);
-
   return (
     <article
       className={`precision-card group fade-up flex flex-col rounded-2xl p-6 ${className ?? ""}`}
@@ -160,27 +153,22 @@ export function KpiCardLayout({
         </div>
       ) : null}
 
-      {/* Ligne 5 — Badge de statut conditionnel (8 px sous variation).
-          Format compact : icône + label court. Le détail textuel vit dans
-          le KpiTooltip ✨ pour ne pas saturer la card. */}
-      {badge ? (
-        <div
-          className="self-start"
-          style={{
-            marginTop: "8px",
-            padding: "4px 8px",
-            borderRadius: "4px",
-            fontSize: "11px",
-            fontWeight: 500,
-            color: badge.color,
-            backgroundColor: badge.background,
-          }}
-        >
-          {badge.icon} {badge.label}
+      {/* Ligne 5 — Indicateur de benchmark Vyzor (3 cercles horizontaux + label
+          de position). Auto-résolu via le `kpiId` quand un mapping Vyzor existe
+          pour ce KPI ; rien rendu sinon (graceful — KPIs banking, point_mort,
+          healthScore...). Voir lib/benchmark/kpiMapping.ts pour la couverture.
+          Le badge "Excellent / Critique" basé sur les seuils Quantis a été
+          retiré : sa lecture entre en conflit avec la position marché (un KPI
+          peut être "Excellent" sur les seuils internes mais "Médiane" sur le
+          marché — confusion). Le tooltip ✨ continue d'expliquer le diagnostic
+          textuellement si besoin. */}
+      {kpiId ? (
+        <div style={{ marginTop: "8px" }}>
+          <KpiBenchmarkAutoIndicator kpiId={kpiId} value={value} kpiLabel={title} />
         </div>
       ) : null}
 
-      {/* Slot extra — rendu sous le badge si fourni (jauge EBE, sparkline). */}
+      {/* Slot extra — rendu sous le benchmark si fourni (jauge EBE, sparkline). */}
       {extra ? <div style={{ marginTop: "8px" }}>{extra}</div> : null}
     </article>
   );
@@ -222,35 +210,3 @@ function computeVariation(current: number, previous: number): Variation {
   };
 }
 
-type StatusBadge = { label: string; icon: string; color: string; background: string };
-
-/**
- * Badge compact selon le diagnostic. On affiche uniquement les statuts
- * extrêmes (good / danger) — la zone warning et neutral ne déclenchent
- * pas de badge pour garder la card propre.
- *
- * Le label est volontairement court et générique (Excellent / Critique)
- * — l'explication détaillée vit dans le KpiTooltip ✨ accessible au
- * survol. Évite la confusion "le badge dit < 0.15 mais ma valeur est 4 ?"
- * en supprimant la friction de la valeur de seuil dans le badge lui-même.
- */
-function buildStatusBadge(diagnostic: KpiDiagnostic): StatusBadge | null {
-  if (diagnostic === "good") {
-    return {
-      label: "Excellent",
-      icon: "✓",
-      color: COLOR_GREEN,
-      background: "rgba(34,197,94,0.1)",
-    };
-  }
-  if (diagnostic === "danger") {
-    return {
-      label: "Critique",
-      icon: "⚠",
-      color: COLOR_RED,
-      background: "rgba(239,68,68,0.1)",
-    };
-  }
-  // Zone intermédiaire (warning / neutral) → pas de badge.
-  return null;
-}
