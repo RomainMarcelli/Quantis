@@ -7,6 +7,7 @@ import { InvestmentTest } from "@/components/dashboard/navigation/InvestmentTest
 import { RentabilityTest } from "@/components/dashboard/navigation/RentabilityTest";
 import { ValueCreationTest } from "@/components/dashboard/navigation/ValueCreationTest";
 import { TreasuryTab } from "@/components/banking/TreasuryTab";
+import { TreasuryEmptyState } from "@/components/banking/TreasuryEmptyState";
 import type { DashboardTestTabId } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
 import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 import type { BankingSummary } from "@/types/banking";
@@ -46,12 +47,8 @@ export function DashboardFinancialTestContent({
 
   if (activeTab === "tresorerie") {
     if (!bankingSummary) {
-      return (
-        <TestPlaceholderCard
-          title="Trésorerie"
-          description="Connectez votre compte bancaire via Bridge pour afficher cette section."
-        />
-      );
+      // Empty state contextuel (pas connecté vs connecté en attente de sync).
+      return <TreasuryEmptyState />;
     }
     return <TreasuryTab summary={bankingSummary} />;
   }
