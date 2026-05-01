@@ -52,7 +52,8 @@ export type BridgeConnectSession = {
 
 export type BridgeUser = {
   uuid: string;
-  email?: string;
+  /** ID externe fourni à la création (= notre identifiant Vyzor pour le user). */
+  external_user_id: string;
 };
 
 export type BridgeUserToken = {
@@ -64,33 +65,32 @@ export type BridgeUserToken = {
 // ─── Endpoints "app" (auth Client-Id/Client-Secret seulement) ──────────────
 
 /**
- * Crée (ou réutilise) un utilisateur Bridge. Bridge a 2 conventions selon la
- * version d'API : v3 expose POST /v3/aggregation/users avec { email }. Si
- * l'utilisateur existe déjà, l'API renvoie un 409 — on laisse l'appelant
- * gérer le cas (ex. setup script affiche un message clair).
+ * Crée un utilisateur Bridge. Bridge v3 attend `external_user_id` — un ID
+ * stable côté Vyzor (ex. uid Firebase ou hash email). Si l'utilisateur existe
+ * déjà, Bridge renvoie 409 — on laisse l'appelant gérer.
  */
 export async function createBridgeUser(
   client: BridgeClient,
-  email: string
+  externalUserId: string
 ): Promise<BridgeUser> {
   return client.request<BridgeUser>("/v3/aggregation/users", {
     method: "POST",
-    body: { email },
+    body: { external_user_id: externalUserId },
   });
 }
 
 /**
  * Récupère un access_token utilisateur (court-vivant). Bridge l'utilise pour
- * rendre la session Connect personnalisée et pour les requêtes /accounts /
+ * rendre la session Connect personnalisée et pour les requêtes /accounts et
  * /transactions sur les données de cet utilisateur.
  */
 export async function authenticateBridgeUser(
   client: BridgeClient,
-  email: string
+  externalUserId: string
 ): Promise<BridgeUserToken> {
   return client.request<BridgeUserToken>("/v3/aggregation/authorization/token", {
     method: "POST",
-    body: { email },
+    body: { external_user_id: externalUserId },
   });
 }
 
@@ -99,6 +99,11 @@ export async function authenticateBridgeUser(
  * son navigateur pour autoriser une banque (avec SCA en sandbox simulée).
  * Bridge invalide la session côté serveur quand l'utilisateur termine — le
  * front polle ensuite /accounts pour confirmer la connexion.
+ *
+ * Auth : le client DOIT porter le bearer user (la session est nominative).
+ * Body : `user_email` est OBLIGATOIRE — Bridge l'utilise pour pré-remplir
+ * le widget Connect et pour les notifications. Pas un secret — on peut
+ * passer l'email Vyzor du dirigeant.
  */
 export async function createBridgeConnectSession(
   client: BridgeClient,

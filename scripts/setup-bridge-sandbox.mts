@@ -27,12 +27,17 @@ import {
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 60_000;
 
-function parseArgs(): { email: string } {
+function parseArgs(): { externalUserId: string; userEmail: string } {
   const args = process.argv.slice(2);
-  const emailArg = args.find((a) => a.startsWith("--email="));
-  const email = emailArg ? emailArg.split("=")[1] : `demo+${Date.now()}@vyzor.fr`;
-  if (!email) throw new Error("Email vide.");
-  return { email };
+  const idArg = args.find((a) => a.startsWith("--user="))?.split("=")[1];
+  const emailArg = args.find((a) => a.startsWith("--email="))?.split("=")[1];
+  const ts = Date.now();
+  const externalUserId = idArg ?? `demo-${ts}`;
+  // user_email obligatoire pour la session Connect (cf. Bridge API). En
+  // sandbox un email synthétique suffit ; en prod on utilisera l'email du
+  // dirigeant.
+  const userEmail = emailArg ?? `demo+${ts}@vyzor.fr`;
+  return { externalUserId, userEmail };
 }
 
 async function waitForUserInput(prompt: string): Promise<void> {
@@ -110,24 +115,17 @@ function summarizeAll(
 }
 
 async function main() {
-  const { email } = parseArgs();
-  console.log(`🔧 Setup sandbox Bridge pour : ${email}\n`);
-
-  // Charge .env.local / .env si dispo (Next.js convention).
-  try {
-    const dotenv = await import("dotenv");
-    dotenv.config({ path: ".env.local" });
-    dotenv.config({ path: ".env" });
-  } catch {
-    // dotenv pas dispo — l'env doit être chargé en amont.
-  }
+  const { externalUserId, userEmail } = parseArgs();
+  console.log(`🔧 Setup sandbox Bridge`);
+  console.log(`   external_user_id : ${externalUserId}`);
+  console.log(`   user_email       : ${userEmail}\n`);
 
   const appClient = buildBridgeClientFromEnv();
 
   // ─── 1. Création de l'utilisateur Bridge (idempotent côté API)
-  console.log("➡️  Création / récupération utilisateur Bridge...");
+  console.log("➡️  Création utilisateur Bridge...");
   try {
-    const user = await createBridgeUser(appClient, email);
+    const user = await createBridgeUser(appClient, externalUserId);
     console.log(`   ✓ utilisateur uuid=${user.uuid}`);
   } catch (err) {
     // 409 si déjà existant — on continue avec authenticate.
@@ -136,17 +134,17 @@ async function main() {
 
   // ─── 2. Récupération du token utilisateur
   console.log("\n➡️  Authentification utilisateur...");
-  const userToken = await authenticateBridgeUser(appClient, email);
+  const userToken = await authenticateBridgeUser(appClient, externalUserId);
   console.log(`   ✓ access_token reçu (expiry=${userToken.expires_at ?? "?"})`);
 
-  // Client utilisateur pour les requêtes /accounts /transactions
+  // Client utilisateur pour les requêtes /accounts /transactions et /connect-sessions
   const userClient = buildBridgeClientFromEnv(userToken.access_token);
 
-  // ─── 3. Création de la session Connect
+  // ─── 3. Création de la session Connect (auth utilisateur + user_email requis)
   console.log("\n➡️  Création de la session Connect...");
-  const session = await createBridgeConnectSession(appClient, {
-    userEmail: email,
-    redirectUrl: "https://localhost:3000/integrations/bridge/callback",
+  const session = await createBridgeConnectSession(userClient, {
+    userEmail,
+    redirectUrl: "http://localhost:3000/integrations/bridge/callback",
   });
   console.log(`   ✓ session id=${session.id}`);
   console.log(`\n🌐 Ouvre cette URL dans ton navigateur pour connecter la Demo Bank :\n`);
