@@ -6,21 +6,27 @@ import { FinancingTest } from "@/components/dashboard/navigation/FinancingTest";
 import { InvestmentTest } from "@/components/dashboard/navigation/InvestmentTest";
 import { RentabilityTest } from "@/components/dashboard/navigation/RentabilityTest";
 import { ValueCreationTest } from "@/components/dashboard/navigation/ValueCreationTest";
+import { BankingSummaryView } from "@/components/banking/BankingSummaryView";
 import type { DashboardTestTabId } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
 import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
+import type { BankingSummary } from "@/types/banking";
 
 type DashboardFinancialTestContentProps = {
   activeTab: DashboardTestTabId;
   kpis: CalculatedKpis;
   mappedData: MappedFinancialData;
   previousKpis?: CalculatedKpis | null;
+  /** Summary Bridge si l'utilisateur a une connexion bancaire active. Null
+   *  quand l'onglet Trésorerie est masqué de toute façon. */
+  bankingSummary?: BankingSummary | null;
 };
 
 export function DashboardFinancialTestContent({
   activeTab,
   kpis,
   mappedData,
-  previousKpis = null
+  previousKpis = null,
+  bankingSummary = null
 }: DashboardFinancialTestContentProps) {
   if (activeTab === "creation-valeur") {
     return <ValueCreationTest kpis={kpis} mappedData={mappedData} previousKpis={previousKpis} />;
@@ -38,9 +44,21 @@ export function DashboardFinancialTestContent({
     return <RentabilityTest kpis={kpis} previousKpis={previousKpis} />;
   }
 
+  if (activeTab === "tresorerie") {
+    if (!bankingSummary) {
+      return (
+        <TestPlaceholderCard
+          title="Trésorerie"
+          description="Connectez votre compte bancaire via Bridge pour afficher cette section."
+        />
+      );
+    }
+    return <BankingSummaryView summary={bankingSummary} />;
+  }
+
   return (
     <TestPlaceholderCard
-      title="Rentabilité"
+      title="Section inconnue"
       description="Cette section n'est pas encore intégrée."
     />
   );
