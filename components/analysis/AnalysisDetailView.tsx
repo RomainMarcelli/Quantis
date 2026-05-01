@@ -136,7 +136,12 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   //    précédent attaché à cette analyse, même si la connexion vient d'être
   //    supprimée — l'historique reste exploitable).
   const bridgeStatus = useBridgeStatus();
-  const bankingSummary = analysis?.bankingSummary ?? null;
+  // Fallback summary : si l'analyse courante n'a pas de bankingSummary
+  // attaché (cas typique : sync standalone effectué depuis Documents sans
+  // analysisId), on récupère celui de banking_summaries/{userId} via le
+  // status endpoint.
+  const bankingSummary =
+    analysis?.bankingSummary ?? bridgeStatus.status?.summary ?? null;
   const showTresorerie = Boolean(bridgeStatus.status?.connected) || bankingSummary !== null;
 
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.

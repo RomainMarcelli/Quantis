@@ -16,6 +16,7 @@
 "use client";
 
 import { useCallback, useEffect, useSyncExternalStore } from "react";
+import type { BankingSummary } from "@/types/banking";
 
 export type BridgeStatus = {
   connected: boolean;
@@ -27,6 +28,11 @@ export type BridgeStatus = {
   providerNames?: string[];
   lastSyncAt?: string | null;
   lastSyncStatus?: string;
+  /** Summary complet — disponible quand un /sync standalone a été effectué
+   *  (banking_summaries/{userId}). Permet aux pages dashboard d'afficher
+   *  l'onglet Trésorerie sans que le summary soit attaché à une analyse
+   *  spécifique. */
+  summary?: BankingSummary | null;
 };
 
 type Snapshot = {
