@@ -16,6 +16,9 @@ export type BridgeStatus = {
   connectionId?: string;
   accountsCount?: number;
   totalBalance?: number | null;
+  /** Noms de banques distinctes (providerName Bridge). Vide tant qu'aucun
+   *  sync n'a pas matérialisé de comptes. */
+  providerNames?: string[];
   lastSyncAt?: string | null;
   lastSyncStatus?: string;
 };

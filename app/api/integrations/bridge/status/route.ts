@@ -40,11 +40,19 @@ export async function GET(request: NextRequest) {
   const doc = await db.collection(BANKING_COLLECTION).doc(userId).get();
   const data = doc.data() as { summary?: BankingSummary; updatedAt?: string } | undefined;
 
+  // Liste DISTINCTE des banques (providerName). 1 banque la plupart du
+  // temps ; si l'utilisateur agrège plusieurs banques on les expose toutes
+  // pour que le front puisse afficher "BNP Paribas · Crédit Agricole".
+  const providerNames = Array.from(
+    new Set((data?.summary?.accounts ?? []).map((a) => a.providerName).filter(Boolean))
+  );
+
   return NextResponse.json({
     connected: true,
     connectionId: active.id,
     accountsCount: data?.summary?.accounts.length ?? 0,
     totalBalance: data?.summary?.totalBalance ?? null,
+    providerNames,
     lastSyncAt: data?.summary?.lastSyncAt ?? null,
     lastSyncStatus: active.lastSyncStatus ?? "never",
   });
