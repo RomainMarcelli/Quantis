@@ -6,24 +6,35 @@ export type DashboardTestTabId =
   | "creation-valeur"
   | "investissement-bfr"
   | "financement"
-  | "rentabilite";
+  | "rentabilite"
+  | "tresorerie";
 
 const TEST_TABS: Array<{ id: DashboardTestTabId; label: string }> = [
   { id: "creation-valeur", label: "Création de valeur" },
   { id: "investissement-bfr", label: "Investissement" },
   { id: "financement", label: "Financement" },
-  { id: "rentabilite", label: "Rentabilité" }
+  { id: "rentabilite", label: "Rentabilité" },
+  // L'onglet Trésorerie n'apparaît que quand Bridge est connecté
+  // (cf. `showTresorerie` ci-dessous). Sinon il est masqué entièrement.
+  { id: "tresorerie", label: "Trésorerie" }
 ];
 
 type DashboardFinancialTestMenuProps = {
   activeTab: DashboardTestTabId | null;
   onChange: (tab: DashboardTestTabId) => void;
+  /** Quand `false`, l'onglet Trésorerie est masqué. Par défaut `false`
+   *  (on n'affiche que si Bridge est connecté côté parent). */
+  showTresorerie?: boolean;
 };
 
 export function DashboardFinancialTestMenu({
   activeTab,
-  onChange
+  onChange,
+  showTresorerie = false
 }: DashboardFinancialTestMenuProps) {
+  const visibleTabs = showTresorerie
+    ? TEST_TABS
+    : TEST_TABS.filter((t) => t.id !== "tresorerie");
   return (
     <nav
       className="precision-card rounded-2xl p-2"
@@ -32,7 +43,7 @@ export function DashboardFinancialTestMenu({
     >
       <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
         <ul className="flex flex-wrap gap-2">
-          {TEST_TABS.map((tab) => {
+          {visibleTabs.map((tab) => {
             const isActive = tab.id === activeTab;
             return (
               <li key={tab.id}>
@@ -68,6 +79,9 @@ function getTourTabTargetId(tabId: DashboardTestTabId): string {
   }
   if (tabId === "financement") {
     return "tour-tab-financement";
+  }
+  if (tabId === "tresorerie") {
+    return "tour-tab-tresorerie";
   }
   return "tour-tab-rentabilite";
 }

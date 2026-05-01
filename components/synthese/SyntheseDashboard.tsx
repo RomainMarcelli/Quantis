@@ -4,12 +4,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, Download, Lightbulb, Receipt, Landmark } from "lucide-react";
+import { AlertTriangle, Download, Lightbulb, Receipt, Landmark, Radio } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { QuantisScoreCard } from "@/components/dashboard/QuantisScoreCard";
 import { SourceBadge } from "@/components/analysis/SourceBadge";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { formatCurrency } from "@/components/dashboard/formatting";
+import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
 import type { PremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
 import type { SyntheseFiscalTile, SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import type { SourceMetadata } from "@/types/connectors";
@@ -48,7 +49,22 @@ export function SyntheseDashboard({
   sourceMetadata,
   previousKpis,
 }: SyntheseDashboardProps) {
-  const cockpitKpis = useMemo(() => toCockpitKpis(synthese), [synthese]);
+  // Bridge connecté → on substitue le solde "Disponibilités" par le solde
+  // bancaire temps réel (au lieu du snapshot bilan comptable). Le badge
+  // "Live" apparaît dans le header pour signaler l'origine de la donnée.
+  // Le summary détaillé reste accessible dans l'onglet Trésorerie.
+  const bridgeStatus = useBridgeStatus();
+  const liveBalance =
+    bridgeStatus.status?.connected && typeof bridgeStatus.status.totalBalance === "number"
+      ? bridgeStatus.status.totalBalance
+      : null;
+
+  const cockpitKpis = useMemo(() => {
+    const base = toCockpitKpis(synthese);
+    return liveBalance !== null
+      ? { ...base, disponibilites: liveBalance }
+      : base;
+  }, [synthese, liveBalance]);
   // Conversion CalculatedKpis → PremiumKpis pour passer au DashboardLayout
   // (qui attend la forme premium avec ca/ebe/disponibilites/croissance/...).
   const previousCockpitKpis = useMemo<PremiumKpis | null>(() => {
@@ -76,6 +92,15 @@ export function SyntheseDashboard({
             {parserVersion === "v2" && (
               <span className="inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
                 Parser V2
+              </span>
+            )}
+            {liveBalance !== null && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300"
+                title="Soldes bancaires temps réel via Bridge"
+              >
+                <Radio className="h-3 w-3 animate-pulse" />
+                Live
               </span>
             )}
           </div>
