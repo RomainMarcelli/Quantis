@@ -1,14 +1,18 @@
 // File: components/ai/AiChatProvider.tsx
-// Role: contexte React global qui pilote l'ouverture du `AiChatPanel`.
+// Role: contexte React global qui PILOTE l'OUVERTURE du chat IA.
 //
-// Pourquoi un provider plutôt qu'un panel mounté dans chaque page ? Parce
-// qu'on veut pouvoir ouvrir le drawer depuis n'importe où (tooltip d'un
-// KPI, page Assistant IA, header global) sans dupliquer la logique
-// d'ouverture/auth. Un seul `AiChatPanel` est mounté à la racine de l'app
-// (via `app/layout.tsx`) et tout consommateur appelle `useAiChat().open(…)`.
+// Avant : le provider rendait `<AiChatPanel />` à la racine et le toggle
+// `open()` montait le tiroir latéral. Refonte produit : le chat est
+// désormais une PAGE PLEIN ÉCRAN (`/assistant-ia/chat`) avec la sidebar
+// principale toujours visible — pattern LLM classique (ChatGPT, Claude,
+// Perplexity). L'effet "je peux revenir en arrière" est préservé.
 //
-// L'`analysisId` courant est un état du provider — l'app le met à jour
-// quand l'utilisateur change d'analyse via `useAiChat().setAnalysisContext`.
+// Le provider continue d'exister pour deux raisons :
+//   1. Compat — tous les call-sites existants (KpiTooltip, page Assistant
+//      conversations, etc.) appellent `useAiChat().open(payload)` ; on garde
+//      cette API mais elle fait maintenant un `router.push(/assistant-ia/chat?...)`.
+//   2. Garder un point central pour `setAnalysisContext` (l'analysisId courant
+//      est passé en query param à chaque ouverture).
 "use client";
 
 import {
@@ -19,27 +23,30 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { AiChatPanel } from "@/components/ai/AiChatPanel";
+import { useRouter } from "next/navigation";
 import type { ChatMessage } from "@/lib/ai/types";
 
 type OpenChatPayload = {
   /** KPI focus (ou null pour un chat libre). */
   kpiId?: string | null;
-  /** Valeur actuelle du KPI — alimente le header mini-cockpit. */
+  /** Valeur actuelle du KPI — alimente le header de la page chat. */
   kpiValue?: number | null;
-  /** Valeur N-1 du KPI — calcule la variation affichée dans le header. */
+  /** Valeur N-1 du KPI — réservé pour la variation (non utilisé pour l'instant). */
   kpiPreviousValue?: number | null;
   /** Question pré-remplie qui sera envoyée automatiquement. */
   initialQuestion?: string | null;
   /** Conversation existante à reprendre. */
   conversationId?: string | null;
-  /** Messages déjà connus (évite un GET supplémentaire si on les a). */
+  /** Messages déjà connus (non transmis pour l'instant — la page va lire
+   *  la conversation depuis Firestore via `conversationId`). */
   initialMessages?: ChatMessage[];
 };
 
 type AiChatContextValue = {
   open: (payload?: OpenChatPayload) => void;
+  /** Ferme = retour navigateur (équivalent à un back). Conservé pour compat. */
   close: () => void;
+  /** Toujours false — le provider ne gère plus d'overlay. Conservé pour compat. */
   isOpen: boolean;
   /** Met à jour l'analysisId courant (consommé par les pages d'analyse). */
   setAnalysisContext: (analysisId: string | null) => void;
@@ -48,61 +55,50 @@ type AiChatContextValue = {
 const AiChatContext = createContext<AiChatContextValue | null>(null);
 
 export function AiChatProvider({ children }: { children: ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [kpiId, setKpiId] = useState<string | null>(null);
-  const [kpiValue, setKpiValue] = useState<number | null>(null);
-  const [kpiPreviousValue, setKpiPreviousValue] = useState<number | null>(null);
-  const [initialQuestion, setInitialQuestion] = useState<string | null>(null);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [initialMessages, setInitialMessages] = useState<ChatMessage[]>([]);
+  const router = useRouter();
   const [analysisId, setAnalysisId] = useState<string | null>(null);
 
-  const open = useCallback((payload?: OpenChatPayload) => {
-    setKpiId(payload?.kpiId ?? null);
-    setKpiValue(payload?.kpiValue ?? null);
-    setKpiPreviousValue(payload?.kpiPreviousValue ?? null);
-    setInitialQuestion(payload?.initialQuestion ?? null);
-    setConversationId(payload?.conversationId ?? null);
-    setInitialMessages(payload?.initialMessages ?? []);
-    setIsOpen(true);
-  }, []);
+  const open = useCallback(
+    (payload?: OpenChatPayload) => {
+      const params = new URLSearchParams();
+      if (payload?.kpiId) params.set("kpiId", payload.kpiId);
+      if (payload?.initialQuestion) params.set("q", payload.initialQuestion);
+      if (
+        typeof payload?.kpiValue === "number" &&
+        Number.isFinite(payload.kpiValue)
+      ) {
+        params.set("kpiValue", String(payload.kpiValue));
+      }
+      if (payload?.conversationId) params.set("conversationId", payload.conversationId);
+      if (analysisId) params.set("analysisId", analysisId);
+      const qs = params.toString();
+      router.push(`/assistant-ia/chat${qs ? `?${qs}` : ""}`);
+    },
+    [router, analysisId]
+  );
 
   const close = useCallback(() => {
-    setIsOpen(false);
-  }, []);
+    router.back();
+  }, [router]);
 
   const setAnalysisContext = useCallback((id: string | null) => {
     setAnalysisId(id);
   }, []);
 
   const value = useMemo<AiChatContextValue>(
-    () => ({ open, close, isOpen, setAnalysisContext }),
-    [open, close, isOpen, setAnalysisContext]
+    () => ({ open, close, isOpen: false, setAnalysisContext }),
+    [open, close, setAnalysisContext]
   );
 
   return (
-    <AiChatContext.Provider value={value}>
-      {children}
-      <AiChatPanel
-        open={isOpen}
-        onClose={close}
-        kpiId={kpiId}
-        kpiValue={kpiValue}
-        kpiPreviousValue={kpiPreviousValue}
-        initialQuestion={initialQuestion}
-        analysisId={analysisId}
-        conversationId={conversationId}
-        initialMessages={initialMessages}
-      />
-    </AiChatContext.Provider>
+    <AiChatContext.Provider value={value}>{children}</AiChatContext.Provider>
   );
 }
 
 /**
- * Accède au provider. Si le hook est appelé hors d'un `AiChatProvider`,
- * on retourne un no-op pour ne pas casser les pages qui ne l'ont pas
- * (typiquement les pages publiques auth). Le clic sur un tooltip sans
- * provider mounté ne fera rien — comportement préférable à un crash.
+ * Accède au provider. Si appelé hors d'un `AiChatProvider`, on retourne un
+ * no-op pour ne pas casser les pages publiques (le clic sur un tooltip sans
+ * provider mounté ne fera rien — comportement préférable à un crash).
  */
 export function useAiChat(): AiChatContextValue {
   const ctx = useContext(AiChatContext);
