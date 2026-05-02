@@ -22,6 +22,7 @@ import { AnalysisCardGrid } from "@/components/documents/AnalysisCardGrid";
 import { EmptyFolderState } from "@/components/documents/EmptyFolderState";
 import { FolderDialog } from "@/components/documents/FolderDialog";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
+import { ConnectionsPanel } from "@/components/integrations/ConnectionsPanel";
 import { AccountingConnectCard } from "@/components/integrations/AccountingConnectCard";
 import { BridgeConnectCard } from "@/components/integrations/BridgeConnectCard";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -287,14 +288,12 @@ export function DocumentsView() {
 
         {/* ===== ZONE CONTENU ===== */}
         <div className="space-y-4">
-          {/* Card "Logiciel comptable" — collapsée par défaut, déplie pour
-              accéder à la liste des connexions + assistant Pennylane/MyUnisoft/
-              Odoo. Format aligné avec BridgeConnectCard pour montrer que les
-              deux sources sont au même niveau hiérarchique. */}
-          <AccountingConnectCard onChanged={() => void loadData()} />
+          {/* Bandeau résumé : liste de TOUTES les connexions actives
+              (comptables + bancaires). Vue d'ensemble persistante. */}
+          <ConnectionsPanel onChanged={() => void loadData()} />
 
-          {/* Connexion bancaire (Bridge / Open Banking) — source complémentaire
-              indépendante de la compta. */}
+          {/* Cards détail repliables — même format pour les 2 sources. */}
+          <AccountingConnectCard onChanged={() => void loadData()} />
           <BridgeConnectCard onChanged={() => void loadData()} />
 
           {/* Tabs dossiers */}
