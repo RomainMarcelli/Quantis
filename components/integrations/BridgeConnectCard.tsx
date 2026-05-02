@@ -131,15 +131,13 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
   //                  alors à cliquer "Synchroniser".
   const hasSynced = isConnected && accountsCount > 0;
   const pendingSync = isConnected && accountsCount === 0;
-  // Affichage du nom de banque : si une seule banque, on prend son nom ;
-  // si plusieurs, on les joint avec " · ". Fallback "Banque connectée"
-  // tant qu'aucun sync n'a peuplé providerNames.
+  // Titre TOUJOURS "Banques" (pluriel) pour signaler que plusieurs banques
+  // peuvent être connectées (BNP, CIC, Société Générale, etc.). Les noms
+  // précis des banques sont affichés en sous-texte si dispo.
   const providerNames = status?.providerNames ?? [];
-  const bankLabel =
+  const banksList =
     providerNames.length === 0
-      ? hasSynced
-        ? "Banque connectée"
-        : "Connexion en attente de synchronisation"
+      ? null
       : providerNames.length === 1
         ? providerNames[0]!
         : providerNames.join(" · ");
@@ -160,9 +158,7 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-semibold text-white">
-                {isConnected ? bankLabel : "Connecter ma banque"}
-              </h2>
+              <h2 className="text-base font-semibold text-white">Banques</h2>
               {hasSynced ? (
                 <span
                   className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium"
@@ -195,6 +191,8 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
             <p className="mt-1 max-w-[60ch] text-[13px] text-white/65">
               {hasSynced ? (
                 <>
+                  {banksList ? <strong className="text-white">{banksList}</strong> : null}
+                  {banksList ? " · " : null}
                   {accountsCount} compte{accountsCount > 1 ? "s" : ""} synchronisé{accountsCount > 1 ? "s" : ""}
                   {totalBalance !== null ? ` · solde total ${formatCurrency(totalBalance)}` : ""}.
                   <span className="ml-1 text-white/40">
@@ -210,8 +208,8 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
               ) : (
                 <>
                   Source <strong>complémentaire</strong> à votre comptabilité —
-                  récupère le cash temps réel, les flux et le runway via Bridge
-                  (Open Banking PSD2).
+                  cash temps réel, flux et runway. Plusieurs banques peuvent
+                  être connectées (BNP, CIC, Société Générale, etc.).
                 </>
               )}
             </p>

@@ -94,7 +94,7 @@ export function AccountingConnectCard({ onChanged }: AccountingConnectCardProps)
     ? providerNames.length === 1
       ? providerNames[0]!
       : providerNames.join(" · ")
-    : "Logiciel comptable";
+    : "Connectez votre logiciel comptable";
 
   return (
     <article className="precision-card rounded-2xl">
