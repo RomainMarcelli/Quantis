@@ -426,14 +426,14 @@ function BrandingPanel() {
         }}
       />
 
-      {/* Header : logo. */}
-      <div className="relative z-10">
+      {/* Header : logo centré. */}
+      <div className="relative z-10 flex justify-center">
         <QuantisLogo withText size={32} />
       </div>
 
-      {/* Contenu central — pousse le footer en bas et reste vertical-center. */}
-      <div className="relative z-10 flex flex-1 flex-col justify-center">
-        <div className="max-w-[480px]">
+      {/* Contenu central — centré horizontalement et verticalement. */}
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center text-center">
+        <div className="w-full max-w-[480px]">
           <p
             className="mb-5"
             style={{
@@ -462,7 +462,7 @@ function BrandingPanel() {
           </h2>
 
           <p
-            className="mt-5"
+            className="mx-auto mt-5"
             style={{
               color: "#C8CACE",
               fontSize: 16,
@@ -470,29 +470,29 @@ function BrandingPanel() {
               maxWidth: 440,
             }}
           >
-            Données comptables synchronisées, KPI calculés en continu et
-            assistant IA pour transformer vos chiffres en décisions.
+            Vos données comptables et bancaires réunies en un seul endroit,
+            avec un assistant qui transforme vos chiffres en décisions.
           </p>
 
-          <div className="mt-10 grid grid-cols-1 gap-3">
+          <div className="mx-auto mt-10 grid grid-cols-1 gap-3">
             <BenefitTile
-              title="Synchronisation comptable & bancaire"
-              subtitle="Pennylane, Sage, Bridge — vos flux à jour en temps réel."
+              title="Vos comptes & votre banque, toujours à jour"
+              subtitle="Connectez votre logiciel comptable et votre banque, on synchronise tout pour vous."
             />
             <BenefitTile
-              title="KPI & Quantis Score automatiques"
-              subtitle="Trésorerie, marges, BFR, DSO — analysés à chaque clôture."
+              title="Un tableau de bord clair, sans jargon"
+              subtitle="Trésorerie, rentabilité, créances clients : vos chiffres expliqués au quotidien."
             />
             <BenefitTile
-              title="Assistant IA explicatif"
-              subtitle="Posez la question, obtenez le diagnostic et les actions."
+              title="Un assistant qui répond à vos questions"
+              subtitle="Demandez « pourquoi ma trésorerie baisse ? » et recevez une réponse argumentée."
             />
           </div>
         </div>
       </div>
 
-      {/* Footer : confiance + © */}
-      <div className="relative z-10 mt-10 flex items-center justify-between">
+      {/* Footer : confiance + © (centré). */}
+      <div className="relative z-10 mt-10 flex flex-col items-center gap-3">
         <div className="flex items-center gap-4">
           <FooterPill icon="🔒" label="AES-256" />
           <FooterPill icon="🇫🇷" label="Hébergé en France" />
@@ -507,7 +507,7 @@ function BrandingPanel() {
 function BenefitTile({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div
-      className="rounded-xl px-4 py-3"
+      className="rounded-xl px-4 py-3.5 text-center"
       style={{
         backgroundColor: "rgba(255, 255, 255, 0.025)",
         border: "1px solid rgba(255, 255, 255, 0.06)",
@@ -519,7 +519,10 @@ function BenefitTile({ title, subtitle }: { title: string; subtitle: string }) {
       >
         {title}
       </p>
-      <p className="mt-0.5" style={{ color: "#9CA3AF", fontSize: 13, lineHeight: 1.45 }}>
+      <p
+        className="mx-auto mt-1"
+        style={{ color: "#9CA3AF", fontSize: 13, lineHeight: 1.5, maxWidth: 380 }}
+      >
         {subtitle}
       </p>
     </div>
