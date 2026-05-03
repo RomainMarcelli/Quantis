@@ -27,6 +27,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { LegalFooter } from "@/components/layout/LegalFooter";
 import { firebaseAuthGateway } from "@/services/auth";
 import {
   COMPANY_SIZE_OPTIONS,
@@ -491,14 +492,14 @@ function BrandingPanel() {
         </div>
       </div>
 
-      {/* Footer : confiance + © (centré). */}
+      {/* Footer : trust pills + liens légaux + © (centré). */}
       <div className="relative z-10 mt-10 flex flex-col items-center gap-3">
         <div className="flex items-center gap-4">
           <FooterPill icon="🔒" label="AES-256" />
           <FooterPill icon="🇫🇷" label="Hébergé en France" />
           <FooterPill icon="✓" label="RGPD" />
         </div>
-        <p style={{ color: "#6B7280", fontSize: 12 }}>© 2026 Vyzor</p>
+        <LegalFooter />
       </div>
     </aside>
   );
@@ -547,10 +548,15 @@ function FooterPill({ icon, label }: { icon: string; label: string }) {
 function FormPanel({ children }: { children: React.ReactNode }) {
   return (
     <section
-      className="flex min-h-screen items-center justify-center px-6 py-10 md:px-10"
+      className="relative flex min-h-screen flex-col items-center justify-center px-6 py-10 md:px-10"
       style={{ backgroundColor: "#0F0F12" }}
     >
       <div className="w-full max-w-[440px]">{children}</div>
+      {/* Footer légal en mobile uniquement — la colonne branding (qui porte
+          déjà ces liens) est cachée sous la breakpoint lg. */}
+      <div className="mt-10 lg:hidden">
+        <LegalFooter />
+      </div>
     </section>
   );
 }
