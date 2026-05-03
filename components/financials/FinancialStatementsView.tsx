@@ -121,30 +121,31 @@ export function FinancialStatementsView() {
   );
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
-      <AppSidebar activeRoute="etats-financiers" accountFirstName={greetingName} />
+    <section className="w-full space-y-4">
+      <AppHeader
+        companyName={companyName}
+        subtitle={
+          activeAnalysis
+            ? `États financiers · Exercice ${activeAnalysis.fiscalYear ?? "—"}`
+            : "États financiers"
+        }
+        contextBadge={activeAnalysis ? <ActiveSourceBadge analysis={activeAnalysis} /> : null}
+        actionSlot={
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Retour
+          </button>
+        }
+      />
 
-      <section className="space-y-5">
-        <AppHeader
-          companyName={companyName}
-          subtitle={
-            activeAnalysis
-              ? `États financiers · Exercice ${activeAnalysis.fiscalYear ?? "—"}`
-              : "États financiers"
-          }
-          contextBadge={activeAnalysis ? <ActiveSourceBadge analysis={activeAnalysis} /> : null}
-          actionSlot={
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Retour
-            </button>
-          }
-        />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <AppSidebar activeRoute="etats-financiers" accountFirstName={greetingName} />
 
+        <section className="space-y-5">
         {fetchState === "loading" && showSlowLoader && (
           <p className="precision-card rounded-2xl px-5 py-4 text-sm text-white/55">
             Chargement de votre analyse…
@@ -189,8 +190,9 @@ export function FinancialStatementsView() {
             </p>
           </>
         )}
-      </section>
-    </div>
+        </section>
+      </div>
+    </section>
   );
 }
 

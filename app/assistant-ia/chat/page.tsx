@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AiChatFullPage } from "@/components/ai/AiChatFullPage";
 import { firebaseAuthGateway } from "@/services/auth";
@@ -39,19 +40,21 @@ export default function AssistantIaChatPage() {
 
   return (
     <main className="premium-analysis-root relative min-h-screen w-full overflow-hidden px-3 py-4 md:px-4 lg:px-6">
-      <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
-        <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
-
-        <div className="min-w-0">
-          <AiChatFullPage
-            kpiId={kpiId}
-            kpiValue={kpiValue}
-            initialQuestion={initialQuestion}
-            analysisId={analysisId}
-            conversationId={conversationId}
-          />
+      <section className="w-full space-y-4">
+        <AppHeader companyName="Assistant IA Vyzor" subtitle="Chat" />
+        <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
+          <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
+          <div className="min-w-0">
+            <AiChatFullPage
+              kpiId={kpiId}
+              kpiValue={kpiValue}
+              initialQuestion={initialQuestion}
+              analysisId={analysisId}
+              conversationId={conversationId}
+            />
+          </div>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

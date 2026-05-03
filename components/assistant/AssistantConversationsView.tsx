@@ -116,10 +116,7 @@ function AssistantConversationsViewInner() {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
-      <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
-
-      <section className="space-y-6">
+    <section className="w-full space-y-4">
       <AppHeader
         companyName="Assistant IA Vyzor"
         subtitle={
@@ -139,6 +136,10 @@ function AssistantConversationsViewInner() {
         }
       />
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
+
+        <section className="space-y-6">
       {/* Bloc 5 questions modèles — toujours affichées en haut. */}
       <div className="precision-card rounded-2xl border-l-4 border-l-[#C5A059] bg-[#1A1A2E] p-6">
         <div className="mb-4 flex items-center gap-3">
@@ -266,8 +267,9 @@ function AssistantConversationsViewInner() {
           </ul>
         )}
       </div>
-      </section>
-    </div>
+        </section>
+      </div>
+    </section>
   );
 }
 
