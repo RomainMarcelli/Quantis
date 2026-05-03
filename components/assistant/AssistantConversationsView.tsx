@@ -14,7 +14,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, MessageCircle, Sparkles } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { useAiChat } from "@/components/ai/AiChatProvider";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -120,25 +120,24 @@ function AssistantConversationsViewInner() {
       <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
 
       <section className="space-y-6">
-      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
-        <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
-          <div>
-            <p className="text-sm font-semibold text-white">Assistant IA Vyzor</p>
-            <p className="text-xs text-white/55">
-              {quota ? `${quota.remaining}/${quota.total} questions disponibles aujourd'hui` : "Posez vos questions sur vos KPIs"}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Retour
-        </button>
-      </header>
+      <AppHeader
+        companyName="Assistant IA Vyzor"
+        subtitle={
+          quota
+            ? `${quota.remaining}/${quota.total} questions disponibles aujourd'hui`
+            : "Posez vos questions sur vos KPIs"
+        }
+        actionSlot={
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Retour
+          </button>
+        }
+      />
 
       {/* Bloc 5 questions modèles — toujours affichées en haut. */}
       <div className="precision-card rounded-2xl border-l-4 border-l-[#C5A059] bg-[#1A1A2E] p-6">

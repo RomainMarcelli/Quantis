@@ -6,15 +6,11 @@ import {
   FileText,
   Folder,
   LayoutDashboard,
-  Lock,
-  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Receipt,
-  Settings,
   Sparkles,
-  UserCircle2,
   Bot
 } from "lucide-react";
 import { FolderTabs } from "@/components/documents/FolderTabs";
@@ -27,7 +23,7 @@ import { AccountingConnectCard } from "@/components/integrations/AccountingConne
 import { BridgeConnectCard } from "@/components/integrations/BridgeConnectCard";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { DEFAULT_FOLDER_NAME } from "@/lib/folders/activeFolder";
 import {
   readSidebarCollapsedPreference,
@@ -224,17 +220,12 @@ export function DocumentsView() {
 
   return (
     <section className="w-full space-y-4">
-      {/* Header pleine largeur — hors de la grille sidebar */}
-      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
-        <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
-          <div>
-            <p className="text-sm font-semibold text-white">Documents</p>
-            <p className="text-xs text-white/55">Gestion de vos analyses financières</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
+      {/* Header global unifié */}
+      <AppHeader
+        companyName="Documents"
+        subtitle="Gestion de vos analyses financières"
+        searchPlaceholder="Rechercher un fichier, un dossier..."
+        actionSlot={
           <button
             type="button"
             onClick={() => router.push("/upload")}
@@ -243,44 +234,8 @@ export function DocumentsView() {
             <Plus className="h-3.5 w-3.5" />
             Nouvelle analyse
           </button>
-          <button
-            type="button"
-            onClick={() => router.push("/settings")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Paramètres"
-            title="Paramètres"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/pricing")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Offres"
-            title="Offre Free (verrouillée)"
-          >
-            <Lock className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Compte"
-            title="Compte"
-          >
-            <UserCircle2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleLogout()}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Se déconnecter"
-            title="Se déconnecter"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
-      </header>
+        }
+      />
 
       {/* Grille sidebar navigation + contenu */}
       <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
