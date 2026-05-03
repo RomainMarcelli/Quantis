@@ -56,27 +56,47 @@ const BLOCK_DELAYS = {
   followUp: 600,
 } as const;
 
+/** Mapping des 5 niveaux de diagnostic vers l'apparence UI. Les emojis
+ *  dupliquent l'icône lucide pour les utilisateurs qui scannent vite — la
+ *  couleur portait déjà l'info, l'emoji renforce. */
 const STATUS_TO_STYLE: Record<
   AiDiagnosticStatus,
-  { bg: string; border: string; color: string; Icon: typeof AlertTriangle }
+  { bg: string; border: string; color: string; Icon: typeof AlertTriangle; emoji: string }
 > = {
+  excellent: {
+    bg: "rgba(34, 197, 94, 0.10)",
+    border: "#22C55E",
+    color: "#86EFAC",
+    Icon: CheckCircle,
+    emoji: "✅",
+  },
+  good: {
+    bg: "rgba(197, 160, 89, 0.08)",
+    border: "#C5A059",
+    color: "#E8D9B8",
+    Icon: CheckCircle,
+    emoji: "👍",
+  },
+  warning: {
+    bg: "rgba(245, 158, 11, 0.08)",
+    border: "#F59E0B",
+    color: "#FCD34D",
+    Icon: AlertTriangle,
+    emoji: "⚠️",
+  },
   danger: {
     bg: "rgba(239, 68, 68, 0.08)",
     border: "#EF4444",
     color: "#FCA5A5",
     Icon: AlertTriangle,
-  },
-  good: {
-    bg: "rgba(34, 197, 94, 0.08)",
-    border: "#22C55E",
-    color: "#86EFAC",
-    Icon: CheckCircle,
+    emoji: "🚨",
   },
   neutral: {
-    bg: "rgba(197, 160, 89, 0.08)",
-    border: "#C5A059",
-    color: "#E8D9B8",
+    bg: "rgba(255, 255, 255, 0.04)",
+    border: "rgba(255, 255, 255, 0.2)",
+    color: "rgba(255, 255, 255, 0.85)",
     Icon: Lightbulb,
+    emoji: "💡",
   },
 };
 
@@ -108,6 +128,14 @@ export function AiResponseCard({ response, onFollowUp }: AiResponseCardProps) {
     if (action.type === "compare") {
       window.dispatchEvent(
         new CustomEvent("vyzor:temporality:set", { detail: { period: action.target } })
+      );
+      return;
+    }
+    if (action.type === "detail") {
+      // "detail" = ouvrir le détail d'un KPI/section (équivalent navigate
+      // mais sans hover sur l'onglet — focus direct sur la card du KPI).
+      window.dispatchEvent(
+        new CustomEvent("vyzor:kpi:focus", { detail: { kpiId: action.target } })
       );
       return;
     }
@@ -166,7 +194,6 @@ function DiagnosticBlock({
   delay: number;
 }) {
   const s = STATUS_TO_STYLE[status];
-  const Icon = s.Icon;
   return (
     <div
       className="vyzor-block-enter-12 flex items-start gap-2.5 rounded-lg px-3.5 py-2.5"
@@ -176,7 +203,9 @@ function DiagnosticBlock({
         animationDelay: `${delay}ms`,
       }}
     >
-      <Icon className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: s.color }} />
+      <span className="text-base leading-none flex-shrink-0" aria-hidden>
+        {s.emoji}
+      </span>
       <p className="text-[13px] font-semibold leading-snug" style={{ color: s.color }}>
         {message}
       </p>

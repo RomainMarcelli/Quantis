@@ -199,12 +199,14 @@ function NavRow({
       onClick={onClick}
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
-      className={`flex w-full items-center rounded-xl transition-colors ${
+      className={`flex w-full items-center rounded-xl transition-all duration-200 ${
         collapsed ? "group justify-center px-2 py-2" : "gap-2 px-3 py-2 text-left"
       } ${
         active
-          ? "bg-white/10 text-white"
-          : "text-white/75 hover:bg-white/10 hover:text-white"
+          // État actif (déplié) : fond doré 8 % + texte/icône or + bordure
+          // gauche or 3 px pour signaler clairement la page courante.
+          ? "border-l-[3px] border-quantis-gold bg-quantis-gold/[0.08] text-quantis-gold"
+          : "text-white/60 hover:bg-white/[0.04] hover:text-white"
       }`}
     >
       {collapsed ? (

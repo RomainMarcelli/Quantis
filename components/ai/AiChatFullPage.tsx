@@ -277,7 +277,10 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
           ) : null}
 
           {userLevel && messages.length === 0 && !loading && !autoSendQuestion ? (
-            <EmptyConversation definition={definition} />
+            <EmptyConversation
+              definition={definition}
+              onPick={(question) => void sendQuestion(question)}
+            />
           ) : null}
 
           {messages.map((m, idx) => (
@@ -383,31 +386,96 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
 
 // ─── Sous-composants ────────────────────────────────────────────────────
 
+/** Questions modèles affichées à l'état vide — alignées sur la liste de
+ *  AssistantConversationsView pour cohérence. Si un KPI focus est fourni,
+ *  on remplace les 3 premières par les `suggestedQuestions` du KPI. */
+const FALLBACK_SAMPLE_QUESTIONS: Array<{ icon: string; question: string }> = [
+  { icon: "📈", question: "Pourquoi mon EBITDA est-il négatif ce trimestre ?" },
+  { icon: "🔁", question: "Quels leviers prioriser pour faire baisser mon BFR ?" },
+  { icon: "⏱️", question: "Mon DSO est anormalement long — par où commencer ?" },
+  { icon: "🎯", question: "Combien rapporterait une hausse de prix de 5 % ?" },
+];
+
 function EmptyConversation({
   definition,
+  onPick,
 }: {
   definition: ReturnType<typeof getKpiDefinition>;
+  onPick: (question: string) => void;
 }) {
+  // Si on est focus sur un KPI, propose 2 questions tirées du registre +
+  // 2 questions génériques pour rester variées. Sinon prend le top 4 par défaut.
+  const questions: Array<{ icon: string; question: string }> = definition
+    ? [
+        { icon: "✨", question: definition.suggestedQuestions.whenBad },
+        { icon: "💡", question: definition.suggestedQuestions.whenGood },
+        ...FALLBACK_SAMPLE_QUESTIONS.slice(0, 2),
+      ]
+    : FALLBACK_SAMPLE_QUESTIONS;
+
   return (
-    <div className="py-12 text-center">
-      <div
-        className="mx-auto mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl"
-        style={{
-          backgroundColor: "rgba(197, 160, 89, 0.1)",
-          border: "1px solid rgba(197, 160, 89, 0.3)",
-          color: "#C5A059",
-        }}
-      >
-        <Sparkles className="h-6 w-6" />
+    <div className="py-12">
+      <div className="text-center">
+        <div
+          className="mx-auto mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl"
+          style={{
+            backgroundColor: "rgba(197, 160, 89, 0.1)",
+            border: "1px solid rgba(197, 160, 89, 0.3)",
+            color: "#C5A059",
+          }}
+        >
+          <Sparkles className="h-6 w-6" />
+        </div>
+        <h2 className="text-[20px] font-semibold text-white">
+          {definition
+            ? `Discutons de votre ${definition.shortLabel.toLowerCase()}`
+            : "Comment puis-je vous aider ?"}
+        </h2>
+        <p
+          className="mx-auto mt-2 max-w-[480px] text-[13px]"
+          style={{ color: "rgba(255,255,255,0.6)" }}
+        >
+          {definition
+            ? definition.tooltip.explanation
+            : "Posez votre question financière. Je m'appuie sur vos KPIs réels pour répondre — pas d'invention."}
+        </p>
       </div>
-      <h2 className="text-[20px] font-semibold text-white">
-        {definition ? `Discutons de votre ${definition.shortLabel.toLowerCase()}` : "Comment puis-je vous aider ?"}
-      </h2>
-      <p className="mx-auto mt-2 max-w-[480px] text-[13px]" style={{ color: "rgba(255,255,255,0.6)" }}>
-        {definition
-          ? definition.tooltip.explanation
-          : "Posez votre question financière. Je m'appuie sur vos KPIs réels pour répondre — pas d'invention."}
-      </p>
+
+      {/* Cards questions modèles — cliquables pour amorcer la conversation.
+       *  Disparaissent automatiquement dès qu'un message est envoyé (la card
+       *  EmptyConversation n'est rendue que si messages.length === 0). */}
+      <div className="mx-auto mt-8 grid max-w-[600px] gap-3 sm:grid-cols-2">
+        {questions.map((q) => (
+          <button
+            key={q.question}
+            type="button"
+            onClick={() => onPick(q.question)}
+            className="vyzor-fade-up group flex items-start gap-3 rounded-xl p-3 text-left transition"
+            style={{
+              backgroundColor: "rgba(15, 15, 18, 0.6)",
+              border: "1px solid rgba(255, 255, 255, 0.06)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "rgba(197, 160, 89, 0.4)";
+              e.currentTarget.style.boxShadow = "0 0 12px rgba(197, 160, 89, 0.12)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            <span className="text-lg flex-shrink-0" aria-hidden>
+              {q.icon}
+            </span>
+            <span
+              className="flex-1 text-[13px] leading-snug"
+              style={{ color: "rgba(255, 255, 255, 0.85)" }}
+            >
+              {q.question}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -28,12 +28,17 @@ type Ctx = {
 
 /**
  * Convertit le diagnostic interne (good/warning/danger/neutral) en statut
- * visuel (good/danger/neutral). Warning est traité comme neutral pour rester
- * visuellement calme — le bandeau coloré ne s'affiche que pour les vrais
- * extrêmes (cf. spec produit).
+ * visuel à 5 niveaux (excellent/good/warning/danger/neutral). Le niveau
+ * "excellent" est réservé aux cas où la valeur dépasse largement le seuil
+ * good — il s'écrase sinon en "good" classique.
+ *
+ * Pour l'instant on reste prudent : on remonte 1:1 le diagnostic interne
+ * (good→good, warning→warning, danger→danger). Le passage à "excellent"
+ * sera fait quand `kpiDiagnostic` exposera un seuil "excellent" dédié.
  */
 function toStatus(diag: string): AiDiagnosticStatus {
   if (diag === "good") return "good";
+  if (diag === "warning") return "warning";
   if (diag === "danger") return "danger";
   return "neutral";
 }
