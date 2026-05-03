@@ -1,6 +1,7 @@
 // File: app/login/page.tsx
-// Role: page dédiée à la connexion, avec accès direct à l'onglet inscription.
-import { LoginForm } from "@/components/LoginForm";
+// Role: page de connexion — bascule vers `AuthPage` (layout 2 colonnes,
+// branding gauche + form droit, modes login / register / forgot intégrés).
+import { AuthPage } from "@/components/auth/AuthPage";
 
 type LoginPageProps = {
   searchParams?: Promise<{
@@ -13,13 +14,5 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const rawNext = Array.isArray(params.next) ? params.next[0] ?? "" : params.next ?? "";
   const postLoginRedirect = rawNext.startsWith("/") ? rawNext : "/synthese";
 
-  return (
-    <main className="premium-analysis-root relative mx-auto flex min-h-screen w-full items-center justify-center overflow-hidden px-4 py-10">
-      <div className="noise-overlay" aria-hidden="true" />
-      <div className="spotlight" aria-hidden="true" />
-      <section className="relative z-10 w-full max-w-2xl">
-        <LoginForm initialMode="login" backHref="/" postLoginRedirect={postLoginRedirect} />
-      </section>
-    </main>
-  );
+  return <AuthPage initialMode="login" postLoginRedirect={postLoginRedirect} />;
 }
