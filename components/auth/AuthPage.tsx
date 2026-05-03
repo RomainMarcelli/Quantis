@@ -1,26 +1,50 @@
 // File: components/auth/AuthPage.tsx
-// Role: page de connexion / inscription épurée — layout 2 colonnes :
-//   - Gauche : branding sobre (logo, accroche, points de réassurance)
-//   - Droite : formulaire actif (login / register / forgot)
+// Role: page d'authentification (login / register / forgot) avec layout
+// 2 colonnes :
+//   - Gauche  : panneau branding centré verticalement, hiérarchie typo
+//               claire (kicker → titre → sous-titre → grille de bénéfices),
+//               glow radial discret en arrière-plan, footer en bas.
+//   - Droite  : formulaire actif, modes basculables en crossfade.
 //
-// Pas de hero marketing, pas de parcours — l'utilisateur arrive ici avec
-// l'intention de se connecter (depuis la landing publique).
+// L'inscription est un wizard 3 étapes :
+//   1. Identité           — prénom, nom, email, mot de passe
+//   2. Entreprise         — raison sociale, SIREN, taille, secteur
+//   3. Profil financier   — niveau, objectifs d'usage, CGU
 //
-// Stack auth : `firebaseAuthGateway` (signIn / register / sendPasswordReset).
-// Google Auth n'est pas configuré → pas de bouton Google (cf. spec : ne pas
-// laisser un bouton non fonctionnel).
-//
-// State local : pas de librairie de form. 3 modes via state, transitions
-// crossfade via opacity + translateY (vyzor-fade-up keyframe existant).
+// Toutes les données sont envoyées à `firebaseAuthGateway.register` en une
+// seule fois à la dernière étape ; le niveau de littératie financière est
+// persisté en `localStorage` (lu par l'AiChatPanel).
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Loader2,
+} from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { firebaseAuthGateway } from "@/services/auth";
+import {
+  COMPANY_SIZE_OPTIONS,
+  SECTOR_OPTIONS,
+  OTHER_SECTOR_OPTION_VALUE,
+  isCompanySizeValue,
+  isSectorValue,
+  type CompanySizeValue,
+} from "@/lib/onboarding/options";
+import {
+  ONBOARDING_OBJECTIVE_OPTIONS,
+  type OnboardingObjectiveValue,
+} from "@/lib/onboarding/objectives";
+import { setUserLevel, USER_LEVEL_META } from "@/lib/ai/userLevel";
+import type { UserLevel } from "@/lib/ai/types";
 
 type AuthMode = "login" | "register" | "forgot" | "forgot-sent";
+type RegisterStep = 1 | 2 | 3;
 
 type AuthPageProps = {
   /** Route de redirection après connexion réussie (défaut /synthese). */
@@ -36,23 +60,30 @@ export function AuthPage({
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>(initialMode);
 
-  // Champs formulaire — partagés entre les modes pour ne pas reset l'email
-  // quand l'utilisateur switche connexion ↔ inscription.
+  // Champs partagés (login / register / forgot).
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [fullName, setFullName] = useState("");
+
+  // Wizard d'inscription.
+  const [registerStep, setRegisterStep] = useState<RegisterStep>(1);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [siren, setSiren] = useState("");
+  const [companySize, setCompanySize] = useState<CompanySizeValue | "">("");
+  const [sector, setSector] = useState<string>("");
+  const [customSector, setCustomSector] = useState("");
+  const [userLevel, setUserLevelState] = useState<UserLevel | "">("");
+  const [usageObjectives, setUsageObjectives] = useState<OnboardingObjectiveValue[]>([]);
   const [acceptedCgu, setAcceptedCgu] = useState(false);
 
-  // États validation par champ — affichés au blur ou après submit.
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-
-  // État global (bandeau erreur en haut du form, ex. mauvais identifiants).
+  // Erreurs par champ + bandeau global.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Redirige si déjà connecté (même comportement que l'ancienne page).
+  // Redirige si déjà connecté.
   useEffect(() => {
     const unsubscribe = firebaseAuthGateway.subscribe((user) => {
       if (user?.emailVerified) {
@@ -65,29 +96,48 @@ export function AuthPage({
   function switchMode(next: AuthMode) {
     setMode(next);
     setGlobalError(null);
-    setEmailError(null);
-    setPasswordError(null);
+    setFieldErrors({});
+    if (next === "register") setRegisterStep(1);
   }
 
+  function setError(key: string, message: string | null) {
+    setFieldErrors((prev) => ({ ...prev, [key]: message }));
+  }
+
+  function clearErrors() {
+    setFieldErrors({});
+    setGlobalError(null);
+  }
+
+  // ─── Validations ────────────────────────────────────────────────────
   function validateEmail(value: string): string | null {
     const v = value.trim();
     if (!v) return "Adresse email requise";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Adresse email invalide";
     return null;
   }
-
   function validatePassword(value: string): string | null {
     if (!value) return "Mot de passe requis";
     if (value.length < 8) return "8 caractères minimum";
     return null;
   }
+  function validateSiren(value: string): string | null {
+    const v = value.replace(/\s/g, "");
+    if (!v) return "SIREN requis";
+    if (!/^\d{9}$/.test(v)) return "SIREN à 9 chiffres";
+    return null;
+  }
 
-  function mapFirebaseError(err: unknown, mode: AuthMode): {
+  function mapFirebaseError(err: unknown): {
     global?: string;
-    field?: { key: "email" | "password"; message: string };
+    field?: { key: string; message: string };
   } {
     const code = (err as { code?: string }).code ?? "";
-    if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+    if (
+      code === "auth/invalid-credential" ||
+      code === "auth/wrong-password" ||
+      code === "auth/user-not-found"
+    ) {
       return { global: "Email ou mot de passe incorrect" };
     }
     if (code === "auth/email-already-in-use") {
@@ -105,18 +155,16 @@ export function AuthPage({
     if (code === "auth/network-request-failed") {
       return { global: "Erreur de connexion. Réessayez." };
     }
-    if (mode === "forgot" && code === "auth/user-not-found") {
-      return { global: "Aucun compte n'existe avec cette adresse" };
-    }
     return { global: "Erreur de connexion. Réessayez." };
   }
 
+  // ─── Submits ────────────────────────────────────────────────────────
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
     const ee = validateEmail(email);
     const pe = validatePassword(password);
-    setEmailError(ee);
-    setPasswordError(pe);
+    setError("email", ee);
+    setError("password", pe);
     if (ee || pe) return;
     setSubmitting(true);
     setGlobalError(null);
@@ -124,50 +172,85 @@ export function AuthPage({
       await firebaseAuthGateway.signIn({ email, password });
       router.replace(postLoginRedirect);
     } catch (err) {
-      const mapped = mapFirebaseError(err, "login");
-      if (mapped.field?.key === "email") setEmailError(mapped.field.message);
-      else if (mapped.field?.key === "password") setPasswordError(mapped.field.message);
+      const mapped = mapFirebaseError(err);
+      if (mapped.field) setError(mapped.field.key, mapped.field.message);
       else setGlobalError(mapped.global ?? "Erreur de connexion. Réessayez.");
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function handleRegister(e: FormEvent) {
+  function handleNextStep() {
+    if (registerStep === 1) {
+      const errs: Record<string, string | null> = {
+        firstName: firstName.trim() ? null : "Prénom requis",
+        lastName: lastName.trim() ? null : "Nom requis",
+        email: validateEmail(email),
+        password: validatePassword(password),
+      };
+      setFieldErrors(errs);
+      if (Object.values(errs).some(Boolean)) return;
+      setRegisterStep(2);
+      return;
+    }
+    if (registerStep === 2) {
+      const errs: Record<string, string | null> = {
+        companyName: companyName.trim() ? null : "Raison sociale requise",
+        siren: validateSiren(siren),
+        companySize: companySize ? null : "Taille d'entreprise requise",
+        sector:
+          sector === ""
+            ? "Secteur requis"
+            : sector === OTHER_SECTOR_OPTION_VALUE && !customSector.trim()
+              ? "Précisez votre secteur"
+              : null,
+      };
+      setFieldErrors(errs);
+      if (Object.values(errs).some(Boolean)) return;
+      setRegisterStep(3);
+      return;
+    }
+  }
+
+  async function handleRegisterSubmit(e: FormEvent) {
     e.preventDefault();
-    const ee = validateEmail(email);
-    const pe = validatePassword(password);
-    setEmailError(ee);
-    setPasswordError(pe);
-    if (ee || pe) return;
-    if (!acceptedCgu) return;
-    const trimmed = fullName.trim();
-    const [firstName, ...rest] = trimmed.split(/\s+/);
+    const errs: Record<string, string | null> = {
+      userLevel: userLevel ? null : "Sélectionnez votre niveau",
+      usageObjectives:
+        usageObjectives.length === 0 ? "Choisissez au moins un objectif" : null,
+      cgu: acceptedCgu ? null : "Acceptez les CGU pour continuer",
+    };
+    setFieldErrors(errs);
+    if (Object.values(errs).some(Boolean)) return;
     setSubmitting(true);
     setGlobalError(null);
     try {
+      const finalSector =
+        sector === OTHER_SECTOR_OPTION_VALUE ? customSector.trim() : sector;
       await firebaseAuthGateway.register({
         email,
         password,
-        firstName: firstName ?? "",
-        lastName: rest.join(" "),
-        // Champs onboarding désormais collectés en aval (post-signup) — on
-        // crée le compte minimal puis le wizard onboarding complète le profil.
-        companyName: "",
-        siren: "",
-        companySize: "",
-        sector: "",
-        usageObjectives: [],
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        companyName: companyName.trim(),
+        siren: siren.replace(/\s/g, ""),
+        companySize,
+        sector: finalSector,
+        usageObjectives,
       });
-      // Le compte est créé, l'email de vérification est envoyé par Firebase.
-      // On bascule vers un état "compte créé" via le message global success.
-      setGlobalError(null);
-      switchMode("forgot-sent"); // réutilise l'écran "email envoyé" — message adapté
+      if (userLevel) setUserLevel(userLevel);
+      switchMode("forgot-sent");
     } catch (err) {
-      const mapped = mapFirebaseError(err, "register");
-      if (mapped.field?.key === "email") setEmailError(mapped.field.message);
-      else if (mapped.field?.key === "password") setPasswordError(mapped.field.message);
-      else setGlobalError(mapped.global ?? "Erreur de connexion. Réessayez.");
+      const mapped = mapFirebaseError(err);
+      if (mapped.field) {
+        setError(mapped.field.key, mapped.field.message);
+        // Si l'erreur concerne un champ d'une étape précédente, y revenir.
+        if (mapped.field.key === "email" || mapped.field.key === "password") {
+          setRegisterStep(1);
+        }
+      } else {
+        setGlobalError(mapped.global ?? "Erreur de connexion. Réessayez.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -176,7 +259,7 @@ export function AuthPage({
   async function handleForgot(e: FormEvent) {
     e.preventDefault();
     const ee = validateEmail(email);
-    setEmailError(ee);
+    setError("email", ee);
     if (ee) return;
     setSubmitting(true);
     setGlobalError(null);
@@ -184,7 +267,7 @@ export function AuthPage({
       await firebaseAuthGateway.sendPasswordReset(email);
       switchMode("forgot-sent");
     } catch (err) {
-      const mapped = mapFirebaseError(err, "forgot");
+      const mapped = mapFirebaseError(err);
       setGlobalError(mapped.global ?? "Erreur de connexion. Réessayez.");
     } finally {
       setSubmitting(false);
@@ -194,115 +277,269 @@ export function AuthPage({
   return (
     <main
       className="grid min-h-screen w-full"
-      style={{
-        backgroundColor: "#09090b",
-        gridTemplateColumns: "minmax(0, 1fr)",
-      }}
+      style={{ backgroundColor: "#09090b" }}
     >
       <div className="lg:grid lg:min-h-screen lg:grid-cols-2">
         <BrandingPanel />
         <FormPanel>
-          <FormShell
-            mode={mode}
-            email={email}
-            password={password}
-            showPassword={showPassword}
-            fullName={fullName}
-            acceptedCgu={acceptedCgu}
-            emailError={emailError}
-            passwordError={passwordError}
-            globalError={globalError}
-            submitting={submitting}
-            onEmailChange={setEmail}
-            onPasswordChange={setPassword}
-            onTogglePassword={() => setShowPassword((v) => !v)}
-            onFullNameChange={setFullName}
-            onAcceptedCguChange={setAcceptedCgu}
-            onEmailBlur={() => setEmailError(validateEmail(email))}
-            onPasswordBlur={() => setPasswordError(validatePassword(password))}
-            onSubmit={
-              mode === "login"
-                ? handleLogin
-                : mode === "register"
-                  ? handleRegister
-                  : mode === "forgot"
-                    ? handleForgot
-                    : undefined
-            }
-            onSwitchMode={switchMode}
-          />
+          <div key={`${mode}-${registerStep}`} className="vyzor-fade-up w-full">
+            {/* Logo mobile : la colonne branding est masquée → on remet un
+                logo en haut du form pour ne pas laisser l'écran nu. */}
+            <div className="mb-8 flex justify-center lg:hidden">
+              <QuantisLogo withText size={28} />
+            </div>
+
+            {mode === "login" && (
+              <LoginFormBody
+                email={email}
+                password={password}
+                showPassword={showPassword}
+                emailError={fieldErrors.email ?? null}
+                passwordError={fieldErrors.password ?? null}
+                globalError={globalError}
+                submitting={submitting}
+                onEmailChange={(v) => {
+                  setEmail(v);
+                  if (fieldErrors.email) setError("email", null);
+                }}
+                onPasswordChange={(v) => {
+                  setPassword(v);
+                  if (fieldErrors.password) setError("password", null);
+                }}
+                onTogglePassword={() => setShowPassword((v) => !v)}
+                onEmailBlur={() => setError("email", validateEmail(email))}
+                onPasswordBlur={() => setError("password", validatePassword(password))}
+                onSubmit={handleLogin}
+                onSwitchMode={(m) => {
+                  clearErrors();
+                  switchMode(m);
+                }}
+              />
+            )}
+
+            {mode === "register" && (
+              <RegisterWizard
+                step={registerStep}
+                firstName={firstName}
+                lastName={lastName}
+                email={email}
+                password={password}
+                showPassword={showPassword}
+                companyName={companyName}
+                siren={siren}
+                companySize={companySize}
+                sector={sector}
+                customSector={customSector}
+                userLevel={userLevel}
+                usageObjectives={usageObjectives}
+                acceptedCgu={acceptedCgu}
+                fieldErrors={fieldErrors}
+                globalError={globalError}
+                submitting={submitting}
+                onFirstNameChange={(v) => setFirstName(v)}
+                onLastNameChange={(v) => setLastName(v)}
+                onEmailChange={(v) => setEmail(v)}
+                onPasswordChange={(v) => setPassword(v)}
+                onTogglePassword={() => setShowPassword((v) => !v)}
+                onCompanyNameChange={(v) => setCompanyName(v)}
+                onSirenChange={(v) => setSiren(v.replace(/[^\d]/g, "").slice(0, 9))}
+                onCompanySizeChange={(v) =>
+                  setCompanySize(isCompanySizeValue(v) ? v : "")
+                }
+                onSectorChange={(v) => {
+                  setSector(v);
+                  if (v !== OTHER_SECTOR_OPTION_VALUE) setCustomSector("");
+                }}
+                onCustomSectorChange={setCustomSector}
+                onUserLevelChange={(v) => setUserLevelState(v)}
+                onObjectivesChange={setUsageObjectives}
+                onAcceptedCguChange={setAcceptedCgu}
+                onPrev={() =>
+                  setRegisterStep((s) => (s > 1 ? ((s - 1) as RegisterStep) : s))
+                }
+                onNext={handleNextStep}
+                onSubmit={handleRegisterSubmit}
+                onSwitchMode={(m) => {
+                  clearErrors();
+                  switchMode(m);
+                }}
+              />
+            )}
+
+            {mode === "forgot" && (
+              <ForgotFormBody
+                email={email}
+                emailError={fieldErrors.email ?? null}
+                globalError={globalError}
+                submitting={submitting}
+                onEmailChange={(v) => {
+                  setEmail(v);
+                  if (fieldErrors.email) setError("email", null);
+                }}
+                onEmailBlur={() => setError("email", validateEmail(email))}
+                onSubmit={handleForgot}
+                onSwitchMode={(m) => {
+                  clearErrors();
+                  switchMode(m);
+                }}
+              />
+            )}
+
+            {mode === "forgot-sent" && (
+              <ForgotSentBody
+                onSwitchMode={(m) => {
+                  clearErrors();
+                  switchMode(m);
+                }}
+              />
+            )}
+          </div>
         </FormPanel>
       </div>
     </main>
   );
 }
 
-// ─── Branding panel (gauche) ────────────────────────────────────────────
+// ─── Branding panel (gauche) ──────────────────────────────────────────────
 
 function BrandingPanel() {
   return (
     <aside
-      className="relative hidden flex-col justify-between p-8 lg:flex"
+      className="relative hidden flex-col overflow-hidden p-10 lg:flex"
       style={{ backgroundColor: "#09090b" }}
     >
-      <div>
+      {/* Glow radial discret derrière le contenu pour casser le noir uniforme. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 60% 55% at 30% 35%, rgba(197, 160, 89, 0.10), transparent 70%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 50% 40% at 80% 90%, rgba(197, 160, 89, 0.05), transparent 70%)",
+        }}
+      />
+
+      {/* Header : logo. */}
+      <div className="relative z-10">
         <QuantisLogo withText size={32} />
       </div>
 
-      <div className="max-w-[440px]">
-        <h2
-          className="text-white"
-          style={{
-            fontSize: 28,
-            fontWeight: 700,
-            letterSpacing: "-0.02em",
-            lineHeight: 1.15,
-          }}
-        >
-          Votre cockpit financier
-        </h2>
-        <p
-          className="mt-3"
-          style={{
-            color: "#9CA3AF",
-            fontSize: 15,
-            lineHeight: 1.6,
-            maxWidth: 380,
-          }}
-        >
-          Pilotez votre entreprise avec des données claires, des alertes
-          intelligentes et un assistant IA à vos côtés.
-        </p>
+      {/* Contenu central — pousse le footer en bas et reste vertical-center. */}
+      <div className="relative z-10 flex flex-1 flex-col justify-center">
+        <div className="max-w-[480px]">
+          <p
+            className="mb-5"
+            style={{
+              color: "#C5A059",
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+            }}
+          >
+            Vyzor · Cockpit financier
+          </p>
 
-        <ul className="mt-10 space-y-5">
-          <ReassuranceItem icon="🔒" label="Données chiffrées AES-256" />
-          <ReassuranceItem icon="⚡" label="Synchronisation automatique" />
-          <ReassuranceItem icon="🇫🇷" label="Hébergé en France · RGPD" />
-        </ul>
+          <h2
+            className="text-white"
+            style={{
+              fontSize: 44,
+              fontWeight: 700,
+              letterSpacing: "-0.025em",
+              lineHeight: 1.1,
+            }}
+          >
+            Pilotez votre entreprise
+            <br />
+            <span style={{ color: "#C5A059" }}>en confiance.</span>
+          </h2>
+
+          <p
+            className="mt-5"
+            style={{
+              color: "#C8CACE",
+              fontSize: 16,
+              lineHeight: 1.65,
+              maxWidth: 440,
+            }}
+          >
+            Données comptables synchronisées, KPI calculés en continu et
+            assistant IA pour transformer vos chiffres en décisions.
+          </p>
+
+          <div className="mt-10 grid grid-cols-1 gap-3">
+            <BenefitTile
+              title="Synchronisation comptable & bancaire"
+              subtitle="Pennylane, Sage, Bridge — vos flux à jour en temps réel."
+            />
+            <BenefitTile
+              title="KPI & Quantis Score automatiques"
+              subtitle="Trésorerie, marges, BFR, DSO — analysés à chaque clôture."
+            />
+            <BenefitTile
+              title="Assistant IA explicatif"
+              subtitle="Posez la question, obtenez le diagnostic et les actions."
+            />
+          </div>
+        </div>
       </div>
 
-      <p
-        className="absolute bottom-8 left-8"
-        style={{ color: "#6B7280", fontSize: 12 }}
-      >
-        © 2026 Vyzor
-      </p>
+      {/* Footer : confiance + © */}
+      <div className="relative z-10 mt-10 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <FooterPill icon="🔒" label="AES-256" />
+          <FooterPill icon="🇫🇷" label="Hébergé en France" />
+          <FooterPill icon="✓" label="RGPD" />
+        </div>
+        <p style={{ color: "#6B7280", fontSize: 12 }}>© 2026 Vyzor</p>
+      </div>
     </aside>
   );
 }
 
-function ReassuranceItem({ icon, label }: { icon: string; label: string }) {
+function BenefitTile({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <li className="flex items-center gap-2.5">
-      <span aria-hidden className="text-base leading-none">
-        {icon}
-      </span>
-      <span style={{ color: "#6B7280", fontSize: 13 }}>{label}</span>
-    </li>
+    <div
+      className="rounded-xl px-4 py-3"
+      style={{
+        backgroundColor: "rgba(255, 255, 255, 0.025)",
+        border: "1px solid rgba(255, 255, 255, 0.06)",
+      }}
+    >
+      <p
+        className="text-white"
+        style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.005em" }}
+      >
+        {title}
+      </p>
+      <p className="mt-0.5" style={{ color: "#9CA3AF", fontSize: 13, lineHeight: 1.45 }}>
+        {subtitle}
+      </p>
+    </div>
   );
 }
 
-// ─── Form panel (droite) ────────────────────────────────────────────────
+function FooterPill({ icon, label }: { icon: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden style={{ fontSize: 12 }}>
+        {icon}
+      </span>
+      <span style={{ color: "#9CA3AF", fontSize: 11, letterSpacing: "0.02em" }}>
+        {label}
+      </span>
+    </span>
+  );
+}
+
+// ─── Form panel (droite) ──────────────────────────────────────────────────
 
 function FormPanel({ children }: { children: React.ReactNode }) {
   return (
@@ -310,18 +547,17 @@ function FormPanel({ children }: { children: React.ReactNode }) {
       className="flex min-h-screen items-center justify-center px-6 py-10 md:px-10"
       style={{ backgroundColor: "#0F0F12" }}
     >
-      <div className="w-full max-w-[400px]">{children}</div>
+      <div className="w-full max-w-[440px]">{children}</div>
     </section>
   );
 }
 
-type FormShellProps = {
-  mode: AuthMode;
+// ─── Mode Login ───────────────────────────────────────────────────────────
+
+type LoginBodyProps = {
   email: string;
   password: string;
   showPassword: boolean;
-  fullName: string;
-  acceptedCgu: boolean;
   emailError: string | null;
   passwordError: string | null;
   globalError: string | null;
@@ -329,152 +565,42 @@ type FormShellProps = {
   onEmailChange: (v: string) => void;
   onPasswordChange: (v: string) => void;
   onTogglePassword: () => void;
-  onFullNameChange: (v: string) => void;
-  onAcceptedCguChange: (v: boolean) => void;
   onEmailBlur: () => void;
   onPasswordBlur: () => void;
-  onSubmit: ((e: FormEvent) => void) | undefined;
+  onSubmit: (e: FormEvent) => void;
   onSwitchMode: (m: AuthMode) => void;
 };
 
-function FormShell(props: FormShellProps) {
-  const {
-    mode,
-    email,
-    password,
-    showPassword,
-    fullName,
-    acceptedCgu,
-    emailError,
-    passwordError,
-    globalError,
-    submitting,
-    onEmailChange,
-    onPasswordChange,
-    onTogglePassword,
-    onFullNameChange,
-    onAcceptedCguChange,
-    onEmailBlur,
-    onPasswordBlur,
-    onSubmit,
-    onSwitchMode,
-  } = props;
-
+function LoginFormBody(props: LoginBodyProps) {
   return (
-    <div key={mode} className="vyzor-fade-up">
-      {/* Logo affiché en haut du formulaire en mobile (la colonne gauche
-       *  est masquée → on compense pour garder le branding visible). */}
-      <div className="mb-8 flex justify-center lg:hidden">
-        <QuantisLogo withText size={28} />
-      </div>
-
-      {mode === "login" && (
-        <LoginFormBody
-          email={email}
-          password={password}
-          showPassword={showPassword}
-          emailError={emailError}
-          passwordError={passwordError}
-          globalError={globalError}
-          submitting={submitting}
-          onEmailChange={onEmailChange}
-          onPasswordChange={onPasswordChange}
-          onTogglePassword={onTogglePassword}
-          onEmailBlur={onEmailBlur}
-          onPasswordBlur={onPasswordBlur}
-          onSubmit={onSubmit!}
-          onSwitchMode={onSwitchMode}
-        />
-      )}
-
-      {mode === "register" && (
-        <RegisterFormBody
-          email={email}
-          password={password}
-          showPassword={showPassword}
-          fullName={fullName}
-          acceptedCgu={acceptedCgu}
-          emailError={emailError}
-          passwordError={passwordError}
-          globalError={globalError}
-          submitting={submitting}
-          onEmailChange={onEmailChange}
-          onPasswordChange={onPasswordChange}
-          onTogglePassword={onTogglePassword}
-          onFullNameChange={onFullNameChange}
-          onAcceptedCguChange={onAcceptedCguChange}
-          onEmailBlur={onEmailBlur}
-          onPasswordBlur={onPasswordBlur}
-          onSubmit={onSubmit!}
-          onSwitchMode={onSwitchMode}
-        />
-      )}
-
-      {mode === "forgot" && (
-        <ForgotFormBody
-          email={email}
-          emailError={emailError}
-          globalError={globalError}
-          submitting={submitting}
-          onEmailChange={onEmailChange}
-          onEmailBlur={onEmailBlur}
-          onSubmit={onSubmit!}
-          onSwitchMode={onSwitchMode}
-        />
-      )}
-
-      {mode === "forgot-sent" && <ForgotSentBody onSwitchMode={onSwitchMode} />}
-    </div>
-  );
-}
-
-// ─── Mode Login ─────────────────────────────────────────────────────────
-
-function LoginFormBody({
-  email,
-  password,
-  showPassword,
-  emailError,
-  passwordError,
-  globalError,
-  submitting,
-  onEmailChange,
-  onPasswordChange,
-  onTogglePassword,
-  onEmailBlur,
-  onPasswordBlur,
-  onSubmit,
-  onSwitchMode,
-}: Omit<FormShellProps, "mode" | "fullName" | "acceptedCgu" | "onFullNameChange" | "onAcceptedCguChange">) {
-  return (
-    <form onSubmit={onSubmit} noValidate>
-      <h1 className="text-white" style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
+    <form onSubmit={props.onSubmit} noValidate>
+      <h1 className="text-white" style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.01em", marginBottom: 6 }}>
         Connexion
       </h1>
-      <p style={{ color: "#9CA3AF", fontSize: 14, marginBottom: 32 }}>
+      <p style={{ color: "#9CA3AF", fontSize: 14, marginBottom: 28 }}>
         Accédez à votre tableau de bord
       </p>
 
-      <ErrorBanner message={globalError} />
+      <ErrorBanner message={props.globalError} />
 
-      <Field label="Email" error={emailError}>
+      <Field label="Email" error={props.emailError}>
         <Input
           type="email"
-          value={email}
-          onChange={onEmailChange}
-          onBlur={onEmailBlur}
+          value={props.email}
+          onChange={props.onEmailChange}
+          onBlur={props.onEmailBlur}
           placeholder="nom@entreprise.com"
           autoComplete="email"
-          hasError={!!emailError}
+          hasError={!!props.emailError}
         />
       </Field>
 
       <div className="mt-4">
         <FieldHeader>
-          <span style={{ color: "#9CA3AF", fontSize: 13, fontWeight: 500 }}>Mot de passe</span>
+          <span style={fieldLabelStyle}>Mot de passe</span>
           <button
             type="button"
-            onClick={() => onSwitchMode("forgot")}
+            onClick={() => props.onSwitchMode("forgot")}
             style={{ color: "#C5A059", fontSize: 12 }}
             className="hover:underline"
           >
@@ -482,113 +608,483 @@ function LoginFormBody({
           </button>
         </FieldHeader>
         <PasswordInput
-          value={password}
-          onChange={onPasswordChange}
-          onBlur={onPasswordBlur}
-          show={showPassword}
-          onToggle={onTogglePassword}
+          value={props.password}
+          onChange={props.onPasswordChange}
+          onBlur={props.onPasswordBlur}
+          show={props.showPassword}
+          onToggle={props.onTogglePassword}
           autoComplete="current-password"
-          hasError={!!passwordError}
+          hasError={!!props.passwordError}
         />
-        {passwordError ? <FieldError message={passwordError} /> : null}
+        {props.passwordError ? <FieldError message={props.passwordError} /> : null}
       </div>
 
       <SubmitButton
         label="Se connecter"
         loadingLabel="Connexion…"
-        disabled={!email || !password}
-        submitting={submitting}
+        disabled={!props.email || !props.password}
+        submitting={props.submitting}
       />
 
       <SwitchLink
         text="Pas encore de compte ?"
         action="Créer un compte"
-        onClick={() => onSwitchMode("register")}
+        onClick={() => props.onSwitchMode("register")}
       />
     </form>
   );
 }
 
-// ─── Mode Register ──────────────────────────────────────────────────────
+// ─── Mode Register : wizard 3 étapes ──────────────────────────────────────
 
-function RegisterFormBody({
-  email,
-  password,
-  showPassword,
-  fullName,
-  acceptedCgu,
-  emailError,
-  passwordError,
-  globalError,
-  submitting,
-  onEmailChange,
-  onPasswordChange,
-  onTogglePassword,
-  onFullNameChange,
-  onAcceptedCguChange,
-  onEmailBlur,
-  onPasswordBlur,
-  onSubmit,
-  onSwitchMode,
-}: Omit<FormShellProps, "mode">) {
-  const strength = useMemo(() => computePasswordStrength(password), [password]);
-  const canSubmit =
-    fullName.trim().length > 0 && !!email && password.length >= 8 && acceptedCgu;
+type RegisterWizardProps = {
+  step: RegisterStep;
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  showPassword: boolean;
+  companyName: string;
+  siren: string;
+  companySize: CompanySizeValue | "";
+  sector: string;
+  customSector: string;
+  userLevel: UserLevel | "";
+  usageObjectives: OnboardingObjectiveValue[];
+  acceptedCgu: boolean;
+  fieldErrors: Record<string, string | null>;
+  globalError: string | null;
+  submitting: boolean;
+  onFirstNameChange: (v: string) => void;
+  onLastNameChange: (v: string) => void;
+  onEmailChange: (v: string) => void;
+  onPasswordChange: (v: string) => void;
+  onTogglePassword: () => void;
+  onCompanyNameChange: (v: string) => void;
+  onSirenChange: (v: string) => void;
+  onCompanySizeChange: (v: string) => void;
+  onSectorChange: (v: string) => void;
+  onCustomSectorChange: (v: string) => void;
+  onUserLevelChange: (v: UserLevel | "") => void;
+  onObjectivesChange: (vs: OnboardingObjectiveValue[]) => void;
+  onAcceptedCguChange: (v: boolean) => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onSubmit: (e: FormEvent) => void;
+  onSwitchMode: (m: AuthMode) => void;
+};
+
+function RegisterWizard(p: RegisterWizardProps) {
+  const strength = useMemo(() => computePasswordStrength(p.password), [p.password]);
+
+  function onFormSubmit(e: FormEvent) {
+    if (p.step < 3) {
+      e.preventDefault();
+      p.onNext();
+      return;
+    }
+    p.onSubmit(e);
+  }
 
   return (
-    <form onSubmit={onSubmit} noValidate>
-      <h1 className="text-white" style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
+    <form onSubmit={onFormSubmit} noValidate>
+      <h1
+        className="text-white"
+        style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.01em", marginBottom: 6 }}
+      >
         Créer un compte
       </h1>
-      <p style={{ color: "#9CA3AF", fontSize: 14, marginBottom: 32 }}>
-        Gratuit · Prêt en 30 secondes
+      <p style={{ color: "#9CA3AF", fontSize: 14, marginBottom: 20 }}>
+        {p.step === 1
+          ? "Étape 1 sur 3 · Identité"
+          : p.step === 2
+            ? "Étape 2 sur 3 · Votre entreprise"
+            : "Étape 3 sur 3 · Profil financier"}
       </p>
 
-      <ErrorBanner message={globalError} />
+      <Stepper step={p.step} />
 
-      <Field label="Nom complet">
-        <Input
-          type="text"
-          value={fullName}
-          onChange={onFullNameChange}
-          placeholder="Prénom Nom"
-          autoComplete="name"
+      <div className="mt-6">
+        <ErrorBanner message={p.globalError} />
+
+        {p.step === 1 && (
+          <RegisterStep1
+            firstName={p.firstName}
+            lastName={p.lastName}
+            email={p.email}
+            password={p.password}
+            showPassword={p.showPassword}
+            strength={strength}
+            firstNameError={p.fieldErrors.firstName ?? null}
+            lastNameError={p.fieldErrors.lastName ?? null}
+            emailError={p.fieldErrors.email ?? null}
+            passwordError={p.fieldErrors.password ?? null}
+            onFirstNameChange={p.onFirstNameChange}
+            onLastNameChange={p.onLastNameChange}
+            onEmailChange={p.onEmailChange}
+            onPasswordChange={p.onPasswordChange}
+            onTogglePassword={p.onTogglePassword}
+          />
+        )}
+
+        {p.step === 2 && (
+          <RegisterStep2
+            companyName={p.companyName}
+            siren={p.siren}
+            companySize={p.companySize}
+            sector={p.sector}
+            customSector={p.customSector}
+            companyNameError={p.fieldErrors.companyName ?? null}
+            sirenError={p.fieldErrors.siren ?? null}
+            companySizeError={p.fieldErrors.companySize ?? null}
+            sectorError={p.fieldErrors.sector ?? null}
+            onCompanyNameChange={p.onCompanyNameChange}
+            onSirenChange={p.onSirenChange}
+            onCompanySizeChange={p.onCompanySizeChange}
+            onSectorChange={p.onSectorChange}
+            onCustomSectorChange={p.onCustomSectorChange}
+          />
+        )}
+
+        {p.step === 3 && (
+          <RegisterStep3
+            userLevel={p.userLevel}
+            usageObjectives={p.usageObjectives}
+            acceptedCgu={p.acceptedCgu}
+            userLevelError={p.fieldErrors.userLevel ?? null}
+            objectivesError={p.fieldErrors.usageObjectives ?? null}
+            cguError={p.fieldErrors.cgu ?? null}
+            onUserLevelChange={p.onUserLevelChange}
+            onObjectivesChange={p.onObjectivesChange}
+            onAcceptedCguChange={p.onAcceptedCguChange}
+          />
+        )}
+      </div>
+
+      <div className="mt-6 flex items-center gap-3">
+        {p.step > 1 ? (
+          <button
+            type="button"
+            onClick={p.onPrev}
+            className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg px-4"
+            style={{
+              color: "#C5A059",
+              fontSize: 13,
+              fontWeight: 500,
+              border: "1px solid rgba(197, 160, 89, 0.25)",
+              backgroundColor: "rgba(197, 160, 89, 0.05)",
+            }}
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Retour
+          </button>
+        ) : null}
+
+        <SubmitButton
+          label={p.step < 3 ? "Continuer" : "Créer mon compte"}
+          loadingLabel={p.step < 3 ? "" : "Création…"}
+          disabled={false}
+          submitting={p.step === 3 ? p.submitting : false}
+          inline
         />
-      </Field>
+      </div>
+
+      <SwitchLink
+        text="Déjà un compte ?"
+        action="Se connecter"
+        onClick={() => p.onSwitchMode("login")}
+      />
+    </form>
+  );
+}
+
+function Stepper({ step }: { step: RegisterStep }) {
+  return (
+    <div className="flex items-center gap-2">
+      {[1, 2, 3].map((s) => {
+        const active = s === step;
+        const done = s < step;
+        return (
+          <div
+            key={s}
+            className="flex-1 rounded-full transition-colors"
+            style={{
+              height: 3,
+              backgroundColor:
+                done || active ? "#C5A059" : "rgba(255, 255, 255, 0.08)",
+              opacity: done ? 0.6 : 1,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+type Step1Props = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  showPassword: boolean;
+  strength: { score: number; label: string; color: string };
+  firstNameError: string | null;
+  lastNameError: string | null;
+  emailError: string | null;
+  passwordError: string | null;
+  onFirstNameChange: (v: string) => void;
+  onLastNameChange: (v: string) => void;
+  onEmailChange: (v: string) => void;
+  onPasswordChange: (v: string) => void;
+  onTogglePassword: () => void;
+};
+
+function RegisterStep1(p: Step1Props) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Prénom" error={p.firstNameError}>
+          <Input
+            type="text"
+            value={p.firstName}
+            onChange={p.onFirstNameChange}
+            placeholder="Marie"
+            autoComplete="given-name"
+            hasError={!!p.firstNameError}
+          />
+        </Field>
+        <Field label="Nom" error={p.lastNameError}>
+          <Input
+            type="text"
+            value={p.lastName}
+            onChange={p.onLastNameChange}
+            placeholder="Dupont"
+            autoComplete="family-name"
+            hasError={!!p.lastNameError}
+          />
+        </Field>
+      </div>
 
       <div className="mt-4">
-        <Field label="Email" error={emailError}>
+        <Field label="Email professionnel" error={p.emailError}>
           <Input
             type="email"
-            value={email}
-            onChange={onEmailChange}
-            onBlur={onEmailBlur}
-            placeholder="nom@entreprise.com"
+            value={p.email}
+            onChange={p.onEmailChange}
+            placeholder="marie@entreprise.com"
             autoComplete="email"
-            hasError={!!emailError}
+            hasError={!!p.emailError}
           />
         </Field>
       </div>
 
       <div className="mt-4">
         <FieldHeader>
-          <span style={{ color: "#9CA3AF", fontSize: 13, fontWeight: 500 }}>Mot de passe</span>
+          <span style={fieldLabelStyle}>Mot de passe</span>
         </FieldHeader>
         <PasswordInput
-          value={password}
-          onChange={onPasswordChange}
-          onBlur={onPasswordBlur}
-          show={showPassword}
-          onToggle={onTogglePassword}
+          value={p.password}
+          onChange={p.onPasswordChange}
+          show={p.showPassword}
+          onToggle={p.onTogglePassword}
           autoComplete="new-password"
-          hasError={!!passwordError}
+          hasError={!!p.passwordError}
         />
-        {passwordError ? <FieldError message={passwordError} /> : null}
-        {password ? <PasswordStrength strength={strength} /> : null}
+        {p.passwordError ? <FieldError message={p.passwordError} /> : null}
+        {p.password ? <PasswordStrength strength={p.strength} /> : null}
+      </div>
+    </div>
+  );
+}
+
+type Step2Props = {
+  companyName: string;
+  siren: string;
+  companySize: CompanySizeValue | "";
+  sector: string;
+  customSector: string;
+  companyNameError: string | null;
+  sirenError: string | null;
+  companySizeError: string | null;
+  sectorError: string | null;
+  onCompanyNameChange: (v: string) => void;
+  onSirenChange: (v: string) => void;
+  onCompanySizeChange: (v: string) => void;
+  onSectorChange: (v: string) => void;
+  onCustomSectorChange: (v: string) => void;
+};
+
+function RegisterStep2(p: Step2Props) {
+  return (
+    <div>
+      <Field label="Raison sociale" error={p.companyNameError}>
+        <Input
+          type="text"
+          value={p.companyName}
+          onChange={p.onCompanyNameChange}
+          placeholder="Acme SAS"
+          autoComplete="organization"
+          hasError={!!p.companyNameError}
+        />
+      </Field>
+
+      <div className="mt-4">
+        <Field label="SIREN" error={p.sirenError}>
+          <Input
+            type="text"
+            value={p.siren}
+            onChange={p.onSirenChange}
+            placeholder="123 456 789"
+            hasError={!!p.sirenError}
+          />
+        </Field>
       </div>
 
-      <label className="mt-4 flex cursor-pointer items-start gap-2.5">
-        <CguCheckbox checked={acceptedCgu} onChange={onAcceptedCguChange} />
+      <div className="mt-4">
+        <Field label="Taille de l'entreprise" error={p.companySizeError}>
+          <NativeSelect
+            value={p.companySize}
+            onChange={p.onCompanySizeChange}
+            placeholder="Sélectionner…"
+            hasError={!!p.companySizeError}
+            options={COMPANY_SIZE_OPTIONS.map((o) => ({
+              value: o.value,
+              label: `${o.label} · ${o.range}`,
+            }))}
+          />
+        </Field>
+      </div>
+
+      <div className="mt-4">
+        <Field label="Secteur d'activité" error={p.sectorError}>
+          <NativeSelect
+            value={p.sector}
+            onChange={p.onSectorChange}
+            placeholder="Sélectionner…"
+            hasError={!!p.sectorError}
+            options={[
+              ...SECTOR_OPTIONS.map((s) => ({ value: s, label: s })),
+              { value: OTHER_SECTOR_OPTION_VALUE, label: "Autre…" },
+            ]}
+          />
+        </Field>
+      </div>
+
+      {p.sector === OTHER_SECTOR_OPTION_VALUE ? (
+        <div className="mt-3">
+          <Input
+            type="text"
+            value={p.customSector}
+            onChange={p.onCustomSectorChange}
+            placeholder="Précisez votre secteur"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+type Step3Props = {
+  userLevel: UserLevel | "";
+  usageObjectives: OnboardingObjectiveValue[];
+  acceptedCgu: boolean;
+  userLevelError: string | null;
+  objectivesError: string | null;
+  cguError: string | null;
+  onUserLevelChange: (v: UserLevel | "") => void;
+  onObjectivesChange: (vs: OnboardingObjectiveValue[]) => void;
+  onAcceptedCguChange: (v: boolean) => void;
+};
+
+function RegisterStep3(p: Step3Props) {
+  function toggleObjective(value: OnboardingObjectiveValue) {
+    if (p.usageObjectives.includes(value)) {
+      p.onObjectivesChange(p.usageObjectives.filter((v) => v !== value));
+    } else {
+      p.onObjectivesChange([...p.usageObjectives, value]);
+    }
+  }
+
+  return (
+    <div>
+      <FieldHeader>
+        <span style={fieldLabelStyle}>Niveau de connaissance financière</span>
+      </FieldHeader>
+      <div className="space-y-2">
+        {(["beginner", "intermediate", "expert"] as UserLevel[]).map((lv) => {
+          const meta = USER_LEVEL_META[lv];
+          const active = p.userLevel === lv;
+          return (
+            <button
+              key={lv}
+              type="button"
+              onClick={() => p.onUserLevelChange(lv)}
+              className="block w-full rounded-lg px-3.5 py-3 text-left transition-colors"
+              style={{
+                backgroundColor: active
+                  ? "rgba(197, 160, 89, 0.08)"
+                  : "rgba(255, 255, 255, 0.03)",
+                border: active
+                  ? "1px solid rgba(197, 160, 89, 0.4)"
+                  : "1px solid rgba(255, 255, 255, 0.08)",
+              }}
+            >
+              <span
+                className="text-white"
+                style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.005em" }}
+              >
+                {meta.label}
+              </span>
+              <span
+                className="mt-0.5 block"
+                style={{ color: "#9CA3AF", fontSize: 12, lineHeight: 1.45 }}
+              >
+                {meta.description}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {p.userLevelError ? <FieldError message={p.userLevelError} /> : null}
+
+      <div className="mt-5">
+        <FieldHeader>
+          <span style={fieldLabelStyle}>Vos objectifs</span>
+          <span style={{ color: "#6B7280", fontSize: 11 }}>
+            (1 ou plusieurs)
+          </span>
+        </FieldHeader>
+        <div className="flex flex-wrap gap-2">
+          {ONBOARDING_OBJECTIVE_OPTIONS.map((o) => {
+            const active = p.usageObjectives.includes(o.value);
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => toggleObjective(o.value)}
+                className="rounded-full px-3 py-1.5 transition-colors"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  backgroundColor: active
+                    ? "rgba(197, 160, 89, 0.12)"
+                    : "rgba(255, 255, 255, 0.03)",
+                  color: active ? "#C5A059" : "#9CA3AF",
+                  border: active
+                    ? "1px solid rgba(197, 160, 89, 0.4)"
+                    : "1px solid rgba(255, 255, 255, 0.08)",
+                }}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+        {p.objectivesError ? <FieldError message={p.objectivesError} /> : null}
+      </div>
+
+      <label className="mt-5 flex cursor-pointer items-start gap-2.5">
+        <CguCheckbox checked={p.acceptedCgu} onChange={p.onAcceptedCguChange} />
         <span style={{ color: "#9CA3AF", fontSize: 12, lineHeight: 1.5 }}>
           J&apos;accepte les{" "}
           <a href="/cgu" target="_blank" rel="noreferrer" className="text-white hover:underline">
@@ -601,66 +1097,56 @@ function RegisterFormBody({
           .
         </span>
       </label>
-
-      <SubmitButton
-        label="Créer mon compte"
-        loadingLabel="Création…"
-        disabled={!canSubmit}
-        submitting={submitting}
-      />
-
-      <SwitchLink
-        text="Déjà un compte ?"
-        action="Se connecter"
-        onClick={() => onSwitchMode("login")}
-      />
-    </form>
+      {p.cguError ? <FieldError message={p.cguError} /> : null}
+    </div>
   );
 }
 
-// ─── Mode Forgot ────────────────────────────────────────────────────────
+// ─── Mode Forgot ──────────────────────────────────────────────────────────
 
-function ForgotFormBody({
-  email,
-  emailError,
-  globalError,
-  submitting,
-  onEmailChange,
-  onEmailBlur,
-  onSubmit,
-  onSwitchMode,
-}: Pick<FormShellProps, "email" | "emailError" | "globalError" | "submitting" | "onEmailChange" | "onEmailBlur" | "onSubmit" | "onSwitchMode">) {
+type ForgotBodyProps = {
+  email: string;
+  emailError: string | null;
+  globalError: string | null;
+  submitting: boolean;
+  onEmailChange: (v: string) => void;
+  onEmailBlur: () => void;
+  onSubmit: (e: FormEvent) => void;
+  onSwitchMode: (m: AuthMode) => void;
+};
+
+function ForgotFormBody(p: ForgotBodyProps) {
   return (
-    <form onSubmit={onSubmit} noValidate>
-      <h1 className="text-white" style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>
+    <form onSubmit={p.onSubmit} noValidate>
+      <h1 className="text-white" style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.01em", marginBottom: 6 }}>
         Réinitialisation
       </h1>
-      <p style={{ color: "#9CA3AF", fontSize: 14, marginBottom: 32 }}>
+      <p style={{ color: "#9CA3AF", fontSize: 14, marginBottom: 28 }}>
         Entrez votre email, on vous envoie un lien
       </p>
 
-      <ErrorBanner message={globalError} />
+      <ErrorBanner message={p.globalError} />
 
-      <Field label="Email" error={emailError}>
+      <Field label="Email" error={p.emailError}>
         <Input
           type="email"
-          value={email}
-          onChange={onEmailChange}
-          onBlur={onEmailBlur}
+          value={p.email}
+          onChange={p.onEmailChange}
+          onBlur={p.onEmailBlur}
           placeholder="nom@entreprise.com"
           autoComplete="email"
-          hasError={!!emailError}
+          hasError={!!p.emailError}
         />
       </Field>
 
       <SubmitButton
         label="Envoyer le lien"
         loadingLabel="Envoi…"
-        disabled={!email}
-        submitting={submitting}
+        disabled={!p.email}
+        submitting={p.submitting}
       />
 
-      <BackLink onClick={() => onSwitchMode("login")} />
+      <BackLink onClick={() => p.onSwitchMode("login")} />
     </form>
   );
 }
@@ -678,12 +1164,11 @@ function ForgotSentBody({ onSwitchMode }: { onSwitchMode: (m: AuthMode) => void 
       >
         <CheckCircle2 className="h-6 w-6" />
       </div>
-      <h1 className="text-white" style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>
+      <h1 className="text-white" style={{ fontSize: 22, fontWeight: 600, marginBottom: 8 }}>
         Email envoyé !
       </h1>
       <p style={{ color: "#9CA3AF", fontSize: 14, lineHeight: 1.5 }}>
-        Vérifiez votre boîte mail et suivez le lien pour réinitialiser votre
-        mot de passe.
+        Vérifiez votre boîte mail et suivez le lien pour finaliser.
       </p>
       <div className="mt-6">
         <BackLink onClick={() => onSwitchMode("login")} />
@@ -692,7 +1177,13 @@ function ForgotSentBody({ onSwitchMode }: { onSwitchMode: (m: AuthMode) => void 
   );
 }
 
-// ─── Champs réutilisables ──────────────────────────────────────────────
+// ─── Champs réutilisables ─────────────────────────────────────────────────
+
+const fieldLabelStyle = {
+  color: "#9CA3AF",
+  fontSize: 13,
+  fontWeight: 500,
+} as const;
 
 function Field({
   label,
@@ -706,7 +1197,7 @@ function Field({
   return (
     <div>
       <FieldHeader>
-        <span style={{ color: "#9CA3AF", fontSize: 13, fontWeight: 500 }}>{label}</span>
+        <span style={fieldLabelStyle}>{label}</span>
       </FieldHeader>
       {children}
       {error ? <FieldError message={error} /> : null}
@@ -781,6 +1272,65 @@ function Input({
   );
 }
 
+function NativeSelect({
+  value,
+  onChange,
+  placeholder,
+  options,
+  hasError,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  hasError?: boolean;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="block w-full appearance-none rounded-lg pl-3 pr-9 text-white"
+        style={{
+          height: 44,
+          fontSize: 14,
+          backgroundColor: "rgba(255, 255, 255, 0.04)",
+          border: hasError
+            ? "1px solid rgba(239, 68, 68, 0.5)"
+            : "1px solid rgba(255, 255, 255, 0.08)",
+          outline: "none",
+          colorScheme: "dark",
+        }}
+        onFocus={(e) => {
+          if (!hasError) {
+            e.currentTarget.style.borderColor = "rgba(197, 160, 89, 0.4)";
+            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(197, 160, 89, 0.08)";
+          }
+        }}
+        onBlurCapture={(e) => {
+          e.currentTarget.style.boxShadow = "none";
+          if (!hasError) {
+            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
+          }
+        }}
+      >
+        <option value="" disabled>
+          {placeholder}
+        </option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2"
+        style={{ color: "#6B7280" }}
+      />
+    </div>
+  );
+}
+
 function PasswordInput({
   value,
   onChange,
@@ -828,7 +1378,11 @@ function PasswordInput({
   );
 }
 
-function PasswordStrength({ strength }: { strength: { score: number; label: string; color: string } }) {
+function PasswordStrength({
+  strength,
+}: {
+  strength: { score: number; label: string; color: string };
+}) {
   return (
     <div className="mt-2">
       <div className="flex gap-[3px]">
@@ -838,7 +1392,8 @@ function PasswordStrength({ strength }: { strength: { score: number; label: stri
             className="flex-1 rounded-[2px]"
             style={{
               height: 3,
-              backgroundColor: i <= strength.score ? strength.color : "rgba(255,255,255,0.06)",
+              backgroundColor:
+                i <= strength.score ? strength.color : "rgba(255,255,255,0.06)",
               transition: "background-color 150ms",
             }}
           />
@@ -908,19 +1463,25 @@ function SubmitButton({
   loadingLabel,
   disabled,
   submitting,
+  inline,
 }: {
   label: string;
   loadingLabel: string;
   disabled: boolean;
   submitting: boolean;
+  inline?: boolean;
 }) {
   return (
     <button
       type="submit"
       disabled={disabled || submitting}
-      className="mt-6 inline-flex w-full items-center justify-center rounded-lg transition disabled:cursor-not-allowed"
+      className={`${
+        inline ? "" : "mt-6"
+      } inline-flex items-center justify-center rounded-lg transition disabled:cursor-not-allowed`}
       style={{
         height: 44,
+        flex: inline ? 1 : undefined,
+        width: inline ? undefined : "100%",
         backgroundColor: "#C5A059",
         color: "#09090b",
         fontSize: 14,
@@ -938,7 +1499,7 @@ function SubmitButton({
         }
       }}
     >
-      {submitting ? (
+      {submitting && loadingLabel ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           {loadingLabel}
@@ -987,7 +1548,7 @@ function BackLink({ onClick }: { onClick: () => void }) {
   );
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────
 
 function computePasswordStrength(password: string): {
   score: number;
