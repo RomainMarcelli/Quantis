@@ -1,137 +1,241 @@
 // File: app/privacy/page.tsx
-// Role: politique de confidentialité — structure RGPD (responsable de
-// traitement, données collectées, finalités, base légale, durée de
-// conservation, destinataires, droits). Contenu à finaliser par
-// l'équipe juridique avec le DPO.
+// Role: politique de confidentialité de Vyzor — version finalisée
+// (Loi Informatique et Libertés + RGPD). Hébergeur Firebase / Vercel,
+// LLM (Anthropic, OpenAI) en mode Zero Data Retention, sous-traitants
+// listés (Qonto, etc.). À mettre à jour si la stack ou les sous-traitants
+// évoluent.
 import type { Metadata } from "next";
 import { LegalPageShell } from "@/components/legal/LegalPageShell";
 
 export const metadata: Metadata = {
   title: "Politique de confidentialité · Vyzor",
-  description: "Politique de protection des données personnelles de Vyzor.",
+  description:
+    "Politique de confidentialité et de traitement des données de Vyzor (RGPD).",
 };
 
 export default function PrivacyPage() {
   return (
     <LegalPageShell
-      title="Politique de confidentialité"
+      title="Politique de confidentialité et de traitement des données"
       lastUpdated="03/05/2026"
     >
+      <h2>Article 1 – Préambule et champ d&apos;application</h2>
       <p>
-        Vyzor accorde une importance particulière à la protection de vos
-        données personnelles. La présente politique a pour objet de vous
-        informer, en application du Règlement (UE) 2016/679 (« RGPD ») et
-        de la loi Informatique et Libertés modifiée, des conditions dans
-        lesquelles vos données sont collectées et traitées.
+        La société <strong>VYZOR</strong> (en cours de formation) accorde une
+        importance majeure à la confidentialité et à la sécurité des données à
+        caractère personnel et des données financières traitées via sa
+        plateforme. La présente politique s&apos;inscrit dans le strict respect
+        de la <strong>Loi Informatique et Libertés du 6 janvier 1978 modifiée</strong>{" "}
+        et du <strong>Règlement (UE) 2016/679 (RGPD)</strong>.
       </p>
 
-      <h2>1. Responsable du traitement</h2>
+      <h2>Article 2 – Le responsable du traitement</h2>
       <p>
-        Le responsable du traitement est <strong>Vyzor</strong>, dont le
-        siège social est situé [Adresse]. Pour toute question relative à
-        vos données, vous pouvez contacter notre délégué à la protection
-        des données à l&apos;adresse{" "}
-        <a href="mailto:dpo@vyzor.fr">dpo@vyzor.fr</a>.
+        Le responsable du traitement des données collectées via le Site est la
+        société <strong>VYZOR</strong>, Société par Actions Simplifiée en cours
+        de formation, dont le siège social est situé au{" "}
+        <strong>2 rue Huguette Schwartz, 75014 Paris</strong>.
+      </p>
+      <p>
+        Pour toute question relative à la gestion de vos données, vous pouvez
+        nous contacter à l&apos;adresse suivante :{" "}
+        <a href="mailto:admin@vyzor.fr">admin@vyzor.fr</a>.
       </p>
 
-      <h2>2. Données collectées</h2>
+      <h2>Article 3 – Nature des données collectées</h2>
+      <p>
+        Dans le cadre de l&apos;exploitation de la plateforme, VYZOR est amenée
+        à collecter :
+      </p>
       <ul>
         <li>
-          <strong>Données d&apos;identification</strong> : nom, prénom,
-          adresse email, mot de passe (haché).
+          <strong>Données d&apos;identification</strong> : nom, prénom, adresse
+          email professionnelle, numéro de téléphone.
         </li>
         <li>
-          <strong>Données entreprise</strong> : raison sociale, SIREN,
-          taille, secteur, objectifs d&apos;usage.
+          <strong>Données professionnelles</strong> : nom du cabinet
+          d&apos;expertise comptable, fonction, nombre de collaborateurs,
+          logiciel de production comptable utilisé.
         </li>
         <li>
-          <strong>Données comptables et bancaires</strong> : importées via
-          les connecteurs activés par l&apos;utilisateur (logiciel comptable,
-          agrégateur bancaire).
+          <strong>Données financières et d&apos;exploitation</strong> : Fichiers
+          d&apos;Écritures Comptables (FEC), données de facturation et
+          indicateurs de performance (KPIs) des clients de l&apos;Utilisateur.
         </li>
         <li>
-          <strong>Données techniques</strong> : adresse IP, logs de
-          connexion, identifiant de session.
+          <strong>Données de navigation</strong> : adresse IP, type de
+          navigateur, pages visitées, durée de session (collectées via cookies
+          analytiques, cf. Article 9).
         </li>
       </ul>
 
-      <h2>3. Finalités</h2>
-      <p>Vos données sont traitées aux fins suivantes :</p>
+      <h2>Article 4 – Finalités et bases légales</h2>
+      <p>
+        Les traitements mis en œuvre répondent aux finalités suivantes :
+      </p>
       <ul>
-        <li>Création et gestion de votre compte utilisateur.</li>
-        <li>Calcul des indicateurs financiers et du Quantis Score.</li>
         <li>
-          Génération des analyses produites par l&apos;assistant IA, sur la
-          base des données que vous nous confiez.
+          <strong>Exécution du contrat</strong> (ou mesures précontractuelles) :
+          création du compte utilisateur, accès à l&apos;application, génération
+          des tableaux de bord automatisés, support technique.
         </li>
         <li>
-          Sécurité du Service (détection de fraudes, journalisation des
-          accès).
+          <strong>Intérêt légitime</strong> : amélioration de l&apos;interface
+          utilisateur, correction de bugs (debugging), statistiques d&apos;audience
+          du Site.
         </li>
         <li>
-          Communication avec vous (notifications produit, support, emails
-          transactionnels).
+          <strong>Consentement</strong> : envoi de newsletters, communications
+          marketing, dépôt de cookies non essentiels. L&apos;Utilisateur peut
+          retirer son consentement à tout moment sans que cela n&apos;affecte la
+          licéité du traitement fondé sur le consentement donné avant le retrait
+          de celui-ci.
         </li>
       </ul>
 
-      <h2>4. Base légale</h2>
+      <h2>Article 5 – Sécurité et protection des modèles d&apos;IA</h2>
       <p>
-        Les traitements reposent sur l&apos;exécution du contrat (CGU) que
-        vous concluez avec Vyzor, sur votre consentement explicite pour les
-        connecteurs tiers, et sur l&apos;intérêt légitime de Vyzor pour la
-        sécurité et l&apos;amélioration du Service.
+        VYZOR met en œuvre toutes les mesures techniques et organisationnelles
+        appropriées pour garantir un niveau de sécurité adapté au risque.
+      </p>
+      <p>
+        <strong>Clause stricte relative à l&apos;Intelligence Artificielle</strong> :
+        VYZOR s&apos;engage formellement. Aucune donnée financière (FEC, bilans,
+        liasses) importée par l&apos;Utilisateur n&apos;est, ni ne sera, utilisée
+        pour entraîner des modèles de langages (LLM) publics ou des
+        intelligences artificielles partagées avec des tiers. Les environnements
+        de calcul sont isolés.
+      </p>
+      <p>
+        <strong>Zero Data Retention (ZDR)</strong> : les appels API vers les
+        fournisseurs de modèles de langage sont effectués avec les options de
+        non-rétention des données (Zero Data Retention) lorsque celles-ci sont
+        disponibles. Cela signifie que les fournisseurs de LLM ne conservent pas
+        les données transmises par VYZOR après le traitement de chaque requête.
       </p>
 
-      <h2>5. Durée de conservation</h2>
+      <h2>Article 6 – Sous-traitants et transfert de données</h2>
       <p>
-        Vos données sont conservées pendant toute la durée de votre relation
-        contractuelle avec Vyzor, puis archivées en base intermédiaire pour
-        une durée maximale de 5 ans à des fins probatoires, sauf obligation
-        légale de conservation plus longue.
-      </p>
-
-      <h2>6. Destinataires</h2>
-      <p>
-        Vos données sont accessibles uniquement aux équipes habilitées de
-        Vyzor et à ses sous-traitants techniques (hébergeur, prestataires
-        d&apos;agrégation comptable et bancaire), sous engagement contractuel
-        de confidentialité. Aucun transfert hors de l&apos;Union Européenne
-        n&apos;est réalisé sans garanties appropriées.
-      </p>
-
-      <h2>7. Sécurité</h2>
-      <p>
-        Vos données sont chiffrées au repos (AES-256) et en transit (TLS
-        1.3). L&apos;hébergement est réalisé en France et les accès sont
-        journalisés.
-      </p>
-
-      <h2>8. Vos droits</h2>
-      <p>
-        Conformément au RGPD, vous disposez des droits suivants :
+        Dans le cadre de l&apos;exploitation de la plateforme, VYZOR fait appel
+        aux sous-traitants suivants :
       </p>
       <ul>
-        <li>Droit d&apos;accès à vos données.</li>
-        <li>Droit de rectification et d&apos;effacement.</li>
-        <li>Droit à la portabilité.</li>
-        <li>Droit d&apos;opposition et de limitation du traitement.</li>
         <li>
-          Droit de définir des directives sur le sort de vos données après
-          votre décès.
+          <strong>Hébergement de l&apos;application et des données financières</strong> :
+          Google Firebase (Google Cloud Platform), avec une configuration ciblant
+          les régions de l&apos;Union Européenne.
+        </li>
+        <li>
+          <strong>Hébergement du site vitrine</strong> : Vercel, Inc. (serveurs
+          pouvant être situés hors UE, transferts encadrés par les clauses
+          contractuelles types). Le site vitrine ne collecte pas de données
+          financières.
+        </li>
+        <li>
+          <strong>Fournisseurs de modèles de langage (LLM)</strong> : Anthropic
+          (API Claude) et/ou OpenAI (API GPT), utilisés exclusivement en inférence
+          (pas d&apos;entraînement). Les données sont transmises via API sécurisée
+          avec option Zero Data Retention activée.
+        </li>
+        <li>
+          <strong>Services bancaires</strong> : Qonto (gestion du compte
+          professionnel de la société).
         </li>
       </ul>
       <p>
-        Pour exercer ces droits, écrivez-nous à{" "}
-        <a href="mailto:dpo@vyzor.fr">dpo@vyzor.fr</a>. Vous disposez également
-        du droit d&apos;introduire une réclamation auprès de la CNIL
-        (www.cnil.fr).
+        Tous les sous-traitants de VYZOR sont soumis à des obligations de
+        confidentialité et de sécurité au moins aussi strictes que celles de la
+        présente politique. En cas de transfert de données hors de l&apos;Union
+        Européenne, VYZOR s&apos;assure que des garanties appropriées sont mises
+        en place (clauses contractuelles types de la Commission européenne, ou
+        décision d&apos;adéquation).
       </p>
 
-      <h2>9. Cookies</h2>
+      <h2>Article 7 – Durée de conservation</h2>
+      <ul>
+        <li>
+          <strong>Données prospects</strong> : 3 ans à compter du dernier contact
+          émanant du prospect.
+        </li>
+        <li>
+          <strong>Données clients (comptes actifs)</strong> : pendant toute la
+          durée de la relation contractuelle, puis archivées pour une durée de
+          5 ans (prescription légale).
+        </li>
+        <li>
+          <strong>Données financières (FEC)</strong> : conservées uniquement le
+          temps nécessaire à la génération du tableau de bord ou supprimées
+          immédiatement sur demande.
+        </li>
+        <li>
+          <strong>Cookies</strong> : durée maximale de 13 mois conformément aux
+          recommandations de la CNIL.
+        </li>
+      </ul>
+
+      <h2>Article 8 – Droits des personnes concernées</h2>
       <p>
-        Vyzor utilise uniquement les cookies strictement nécessaires au
-        fonctionnement du Service (session, préférences d&apos;affichage).
-        Aucun cookie publicitaire ou de mesure tierce n&apos;est déposé.
+        Vous disposez d&apos;un droit d&apos;accès, de rectification,
+        d&apos;effacement (droit à l&apos;oubli), de limitation, de portabilité
+        de vos données et du droit de vous opposer à leur traitement. Vous
+        disposez également du droit de retirer votre consentement à tout moment
+        pour les traitements fondés sur celui-ci.
+      </p>
+      <p>
+        Pour exercer ces droits, adressez votre demande à :{" "}
+        <a href="mailto:admin@vyzor.fr">admin@vyzor.fr</a>. Nous nous engageons à
+        répondre dans un délai d&apos;un (1) mois à compter de la réception de
+        la demande.
+      </p>
+      <p>
+        En cas de litige, vous pouvez introduire une réclamation auprès de la
+        CNIL (
+        <a href="https://www.cnil.fr" target="_blank" rel="noreferrer">
+          www.cnil.fr
+        </a>
+        ).
+      </p>
+
+      <h2>Article 9 – Cookies et traceurs</h2>
+      <p>
+        Le Site utilise des cookies, c&apos;est-à-dire de petits fichiers texte
+        déposés sur votre terminal lors de la consultation du Site. Les cookies
+        utilisés se répartissent en deux catégories :
+      </p>
+      <ul>
+        <li>
+          <strong>Cookies strictement nécessaires</strong> : ils permettent la
+          navigation sur le Site et l&apos;utilisation de ses fonctionnalités
+          essentielles (authentification, sécurité, préférences de session). Ces
+          cookies ne nécessitent pas votre consentement.
+        </li>
+        <li>
+          <strong>Cookies analytiques</strong> : ils permettent de mesurer
+          l&apos;audience du Site, de comprendre comment les Utilisateurs
+          interagissent avec la plateforme et d&apos;améliorer l&apos;expérience
+          utilisateur. Ces cookies sont soumis à votre consentement préalable.
+        </li>
+      </ul>
+      <p>
+        Vous pouvez à tout moment gérer vos préférences en matière de cookies
+        via le bandeau de gestion des cookies affiché lors de votre première
+        visite, ou en modifiant les paramètres de votre navigateur. Le refus des
+        cookies analytiques n&apos;a aucune incidence sur votre accès au Site et
+        à ses fonctionnalités.
+      </p>
+      <p>
+        <strong>Durée maximale des cookies</strong> : 13 mois conformément aux
+        recommandations de la CNIL. Les informations collectées via les cookies
+        sont conservées pour une durée maximale de 25 mois.
+      </p>
+
+      <h2>Article 10 – Mise à jour de la politique</h2>
+      <p>
+        VYZOR se réserve le droit de modifier la présente politique de
+        confidentialité à tout moment. En cas de modification substantielle, les
+        Utilisateurs seront informés par email ou par notification sur la
+        plateforme. La date de dernière mise à jour est indiquée en tête du
+        présent document.
       </p>
     </LegalPageShell>
   );
