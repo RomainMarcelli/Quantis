@@ -204,7 +204,10 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
 
   return (
     <section
-      className="relative flex h-[calc(100vh-2rem)] flex-col rounded-2xl"
+      // Hauteur ajustée pour laisser place au AppHeader (≈ 4 rem) + padding
+      // page (≈ 2 rem) + marge bas (≈ 1 rem). Sans ça l'input bar passait
+      // sous le viewport.
+      className="relative flex h-[calc(100vh-7.5rem)] flex-col rounded-2xl"
       style={{
         backgroundColor: "rgba(15, 15, 18, 0.6)",
         border: "1px solid rgba(255, 255, 255, 0.06)",
