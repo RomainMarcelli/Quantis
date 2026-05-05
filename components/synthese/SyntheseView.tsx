@@ -7,17 +7,21 @@ import { useRouter } from "next/navigation";
 import {
   FileText,
   LayoutDashboard,
-  Lock,
-  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
-  Settings,
+  Receipt,
   Sparkles,
-  UserCircle2
+  Bot
 } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
+<<<<<<< HEAD
+=======
+import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
+import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
+>>>>>>> 068a8ee78fae6391f1bee076d375af62a115cba9
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
@@ -38,6 +42,16 @@ import { useAuthenticatedUser } from "@/components/auth/AuthGate";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
+import { TemporalityBar } from "@/components/temporality/TemporalityBar";
+import { useTemporality } from "@/lib/temporality/temporalityContext";
+import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
+import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
+import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
+import { useAiChat } from "@/components/ai/AiChatProvider";
+import { resolveActiveAnalysis } from "@/lib/source/activeSource";
+import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
+import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
+import { SimulationToggleButton } from "@/components/simulation/SimulationWidget";
 import {
   consumeSearchTarget,
   routeMatchesPath,
@@ -61,9 +75,11 @@ export function SyntheseView() {
   const [selectedYearValue, setSelectedYearValue] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isSidebarPreferenceReady, setIsSidebarPreferenceReady] = useState(false);
   const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
+  // Le loader visible n'apparaît que si la requête dépasse 400 ms — sinon
+  // on évite un flash désagréable sur les chargements rapides.
+  const showSlowLoader = useDelayedFlag(loading);
+  // L'état replié de la sidebar est désormais géré par AppSidebar lui-même.
 
   // Référence utilisée pour l'option "Année en cours" dans le sélecteur de synthèse.
   const currentCalendarYear = new Date().getFullYear();
@@ -87,6 +103,7 @@ export function SyntheseView() {
   }, []);
 
   useEffect(() => {
+<<<<<<< HEAD
     setIsSidebarCollapsed(readSidebarCollapsedPreference());
     setIsSidebarPreferenceReady(true);
   }, []);
@@ -99,6 +116,31 @@ export function SyntheseView() {
   }, [isSidebarCollapsed, isSidebarPreferenceReady]);
 
   useEffect(() => {
+=======
+    const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
+      if (!nextUser) {
+        router.replace("/");
+        return;
+      }
+
+      if (!nextUser.emailVerified) {
+        void firebaseAuthGateway.signOut();
+        router.replace("/");
+        return;
+      }
+
+      setUser(nextUser);
+    });
+
+    return unsubscribe;
+  }, [router]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+>>>>>>> 068a8ee78fae6391f1bee076d375af62a115cba9
     void loadSyntheseData(user);
   }, [user]);
 
@@ -118,12 +160,23 @@ export function SyntheseView() {
     [currentCalendarYear, selectedYearValue, yearOptions]
   );
 
+  // Source active : si l'utilisateur a explicitement choisi une analyse via
+  // Documents → "Utiliser comme source active" (localStorage `quantis.activeAnalysis`),
+  // on la prend en priorité absolue. Sinon fallback : connexion dynamique > FEC > upload,
+  // la plus récente à priorité égale. Implémenté dans `resolveActiveAnalysis`.
+  const activeAnalysisId = useActiveAnalysisId();
+
   const analysisPair = useMemo(() => {
     if (!analysesBySelectedYear.length) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
 
-    const current = resolveCurrentAnalysis(analysesBySelectedYear, getActiveFolderName());
+    // Priorité 1 : analyse explicitement marquée active (si dans la sélection courante).
+    // Priorité 2 : règle métier source dynamique > FEC > upload (le plus récent gagne).
+    // Priorité 3 (fallback historique) : dossier actif → 1ère analyse triée fiscalYear desc.
+    const fromActive = resolveActiveAnalysis(analysesBySelectedYear, activeAnalysisId);
+    const current =
+      fromActive ?? resolveCurrentAnalysis(analysesBySelectedYear, getActiveFolderName());
     if (!current) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
@@ -135,14 +188,55 @@ export function SyntheseView() {
     });
 
     return { current, previous };
-  }, [allAnalyses, analysesBySelectedYear]);
+  }, [allAnalyses, analysesBySelectedYear, activeAnalysisId]);
+
+  // Pousse l'analyse courante au provider du chat IA — permet au backend
+  // d'enrichir les réponses Claude avec les données réelles (kpis, mappedData)
+  // sans que chaque tooltip ait à passer l'analysisId à la main.
+  const { setAnalysisContext } = useAiChat();
+  useEffect(() => {
+    setAnalysisContext(analysisPair.current?.id ?? null);
+    return () => setAnalysisContext(null);
+  }, [analysisPair.current?.id, setAnalysisContext]);
+
+  // Filtre temporel global. Si l'analyse a un dailyAccounting (source dynamique Pennylane),
+  // les KPI flow (CA, VA, EBITDA…) sont recalculés sur la période sélectionnée. Les KPI bilan
+  // (BFR, dispo, total_cp…) restent ceux du snapshot, car ils sont à un instant T.
+  const temporality = useTemporality();
+  const effective = useMemo(() => {
+    if (!analysisPair.current) return null;
+    return recomputeKpisForPeriod(
+      analysisPair.current,
+      temporality.periodStart,
+      temporality.periodEnd
+    );
+  }, [analysisPair.current, temporality.periodStart, temporality.periodEnd]);
+
+  // KPIs de la période ANTÉRIEURE de même durée — pour calculer la
+  // variation +/-X% sur chaque carte. On recalcule via la même fonction
+  // que la période courante. null si :
+  //   - pas d'analyse sélectionnée,
+  //   - pas de dailyAccounting (source statique : pas de variation
+  //     intra-exercice exploitable),
+  //   - bornes invalides.
+  const previousKpis = useMemo(() => {
+    if (!analysisPair.current) return null;
+    if (!shouldShowTemporalityBar(analysisPair.current)) return null;
+    const prev = computePreviousPeriod(temporality.periodStart, temporality.periodEnd);
+    if (!prev) return null;
+    return recomputeKpisForPeriod(
+      analysisPair.current,
+      prev.periodStart,
+      prev.periodEnd
+    ).kpis;
+  }, [analysisPair.current, temporality.periodStart, temporality.periodEnd]);
 
   const synthese = useMemo(() => {
-    if (!analysisPair.current) {
+    if (!analysisPair.current || !effective) {
       return null;
     }
-    return buildSyntheseViewModel(analysisPair.current.kpis, analysisPair.previous?.kpis ?? null, sector);
-  }, [analysisPair, sector]);
+    return buildSyntheseViewModel(effective.kpis, analysisPair.previous?.kpis ?? null, sector);
+  }, [analysisPair, effective, sector]);
 
   useEffect(() => {
     if (!yearOptions.length) return;
@@ -213,63 +307,14 @@ export function SyntheseView() {
 
   return (
     <section className="w-full space-y-4">
-      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
-        <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
-          <div>
-            <p className="text-sm font-semibold text-white">{companyName}</p>
-            <p className="text-xs text-white/55">Plateforme financière</p>
-          </div>
-        </div>
+      <AppHeader
+        companyName={companyName}
+        contextBadge={<ActiveSourceBadge analysis={analysisPair.current} />}
+      />
 
-        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
-          <GlobalSearchBar placeholder="Rechercher un KPI, une alerte ou une section..." />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/settings")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Paramètres"
-            title="Paramètres"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/pricing")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Offres"
-            title="Offre Free (verrouillée)"
-          >
-            <Lock className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Compte"
-            title="Compte"
-          >
-            <UserCircle2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void onLogout()}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Se déconnecter"
-            title="Se déconnecter"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
-      </header>
-      <div className="md:hidden">
-        <GlobalSearchBar placeholder="Rechercher..." />
-      </div>
-
-      {loading ? (
+      {/* Loader retardé : n'apparaît que si la requête dépasse 400 ms.
+          Évite le flash sous le header pour les chargements rapides. */}
+      {showSlowLoader ? (
         <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de la synthèse...</div>
       ) : null}
 
@@ -279,104 +324,74 @@ export function SyntheseView() {
         </div>
       ) : null}
 
-      <div
-        className={`relative grid gap-6 ${
-          isSidebarCollapsed ? "grid-cols-[88px_minmax(0,1fr)]" : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]"
-        }`}
-      >
-        <aside
-          data-scroll-reveal-ignore
-          className={`precision-card relative h-fit rounded-2xl lg:sticky lg:top-4 ${
-            isSidebarCollapsed ? "p-3" : "p-4"
-          }`}
-        >
-          <div className={`mb-2 flex ${isSidebarCollapsed ? "justify-center" : "justify-end"}`}>
-            <button
-              type="button"
-              onClick={() => setIsSidebarCollapsed((previous) => !previous)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white/85 transition hover:border-quantis-gold/60 hover:bg-black/80"
-              aria-label={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
-              title={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
-            >
-              {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </button>
-          </div>
-          <nav className="space-y-1 text-sm" data-tour-id="synthese-sidebar-nav">
-            <NavRow icon={<Sparkles className="h-4 w-4" />} active collapsed={isSidebarCollapsed}>
-              Synthèse
-            </NavRow>
-            <NavRow
-              icon={<LayoutDashboard className="h-4 w-4" />}
-              onClick={() => router.push("/analysis")}
-              collapsed={isSidebarCollapsed}
-            >
-              Tableau de bord
-            </NavRow>
-            <NavRow
-              icon={<FileText className="h-4 w-4" />}
-              onClick={() => router.push("/documents")}
-              collapsed={isSidebarCollapsed}
-            >
-              Documents
-            </NavRow>
-          </nav>
+      <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <AppSidebar
+          activeRoute="synthese"
+          accountFirstName={greetingName}
+          contextSlot={
+            yearOptions.length > 1 ? (
+              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <label htmlFor="sidebar-synthese-year" className="text-[10px] font-mono uppercase tracking-wide text-white/45">
+                  Année de synthèse
+                </label>
+                <select
+                  id="sidebar-synthese-year"
+                  value={selectedYearValue}
+                  onChange={(event) => setSelectedYearValue(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
+                >
+                  {yearOptions.map((option) => (
+                    <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null
+          }
+        />
 
-          {!isSidebarCollapsed && yearOptions.length > 1 ? (
-            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-              <label htmlFor="sidebar-synthese-year" className="text-[11px] uppercase tracking-wide text-white/50">
-                Année de synthèse
-              </label>
-              <select
-                id="sidebar-synthese-year"
-                value={selectedYearValue}
-                onChange={(event) => setSelectedYearValue(event.target.value)}
-                className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
-              >
-                {yearOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+        <div className="space-y-4">
+          {/* Filtre temporel global. On ne l'affiche que si l'analyse active a
+              du `dailyAccounting` exploitable — sinon (source statique PDF/Excel
+              avec un seul exercice annuel) la barre ne sert à rien et on
+              affiche juste "Exercice YYYY" en texte simple. */}
+          {shouldShowTemporalityBar(analysisPair.current) ? (
+            <TemporalityBar
+              availableRange={computeAvailableRange(analysisPair.current!)}
+              daysInPeriod={effective?.isFiltered ? effective.filterSummary.daysInPeriod : null}
+              rightLabel={
+                effective?.isFiltered
+                  ? `${effective.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
+                  : undefined
+              }
+            />
+          ) : analysisPair.current ? (
+            <div
+              className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70"
+              data-scroll-reveal-ignore
+            >
+              <span className="text-xs uppercase tracking-wider text-white/45">Période · </span>
+              <span className="font-semibold text-white">
+                Exercice {analysisPair.current.fiscalYear ?? "(non renseigné)"}
+              </span>
+              <span className="ml-2 text-xs text-white/45">— source statique, vue annuelle uniquement</span>
             </div>
           ) : null}
 
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className={`mt-4 rounded-xl border border-white/10 bg-black/20 transition-colors hover:bg-white/10 ${
-              isSidebarCollapsed ? "flex w-full justify-center p-2" : "w-full p-3 text-left"
-            }`}
-            aria-label="Ouvrir le compte"
-            title="Compte"
-          >
-            {isSidebarCollapsed ? (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                {greetingName.charAt(0).toUpperCase()}
-              </span>
-            ) : (
-              <>
-                <p className="text-[11px] uppercase tracking-wide text-white/50">Compte</p>
-                <div className="mt-2 flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                    {greetingName.charAt(0).toUpperCase()}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-white">{greetingName}</p>
-                    <p className="text-xs text-white/55">Free</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </button>
-        </aside>
+          {/* Simulation What-If : visible uniquement quand on a un mappedData
+              exploitable. SimulationToggleButton gère lui-même son propre
+              état ouvert/fermé pour rester découplé du parent. */}
+          {analysisPair.current && effective ? (
+            <SimulationToggleButton mappedData={effective.mappedData} />
+          ) : null}
 
-        <div>
           {analysisPair.current && synthese ? (
             <SyntheseDashboard
               greetingName={greetingName}
               companyName={companyName}
               analysisCreatedAt={analysisPair.current.createdAt}
+<<<<<<< HEAD
               getDownloadInput={() => ({
                 companyName,
                 greetingName,
@@ -386,10 +401,26 @@ export function SyntheseView() {
                 kpis: analysisPair.current!.kpis,
                 mappedData: analysisPair.current!.mappedData
               })}
+=======
+              onExportData={() => {
+                if (!analysisPair.current) return;
+                exportAnalysisDataAsJson({ analysis: analysisPair.current, companyName });
+              }}
+>>>>>>> 068a8ee78fae6391f1bee076d375af62a115cba9
               onReupload={() => router.push("/upload")}
               onManualEntry={() => router.push("/upload/manual")}
+              onDownloadFinancialReport={async () => {
+                if (!analysisPair.current) return;
+                const err = await downloadFinancialReport({ analysisId: analysisPair.current.id });
+                if (err) {
+                  // Erreur silencieuse — log debug, le bouton n'a pas de feedback UX dédié.
+                  console.warn("[financial-report] download failed", err);
+                }
+              }}
               synthese={synthese}
               parserVersion={analysisPair.current.parserVersion}
+              sourceMetadata={analysisPair.current.sourceMetadata ?? null}
+              previousKpis={previousKpis}
             />
           ) : (
             <section className="precision-card rounded-2xl p-5">
@@ -457,53 +488,5 @@ function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): s
   return "Utilisateur";
 }
 
-function NavRow({
-  children,
-  icon,
-  active,
-  collapsed,
-  disabled,
-  onClick
-}: {
-  children: ReactNode;
-  icon: ReactNode;
-  active?: boolean;
-  collapsed?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  const label = typeof children === "string" ? children : undefined;
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      aria-label={collapsed ? label : undefined}
-      title={collapsed ? label : undefined}
-      className={`flex w-full items-center rounded-xl transition-colors ${
-        collapsed ? "group justify-center px-2 py-2" : "gap-2 px-3 py-2 text-left"
-      } ${
-        active
-          ? "bg-white/10 text-white"
-          : disabled
-            ? "cursor-not-allowed text-white/40"
-            : "text-white/75 hover:bg-white/10 hover:text-white"
-      }`}
-    >
-      {collapsed ? (
-        <span
-          className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
-            active
-              ? "border-quantis-gold/60 bg-quantis-gold/15 text-quantis-gold"
-              : "border-white/15 bg-white/5 text-white/80 group-hover:border-white/30 group-hover:bg-white/10 group-hover:text-white"
-          }`}
-        >
-          {icon}
-        </span>
-      ) : (
-        icon
-      )}
-      {!collapsed ? <span>{children}</span> : null}
-    </button>
-  );
-}
+// (NavRow déplacé dans `components/layout/AppSidebar.tsx` — source unique
+// pour la navigation latérale.)

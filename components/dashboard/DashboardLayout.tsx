@@ -24,6 +24,12 @@ type DashboardLayoutProps = {
   companyName: string;
   greetingName: string;
   kpis: PremiumKpis;
+  /**
+   * KPIs de la période antérieure de même durée — passés aux KPIBlock /
+   * KPIWide pour calculer la variation +/-X% sur chaque card.
+   * Optionnel ; null/undefined = pas de variation affichée.
+   */
+  previousKpis?: PremiumKpis | null;
   children?: ReactNode;
   scoreCard?: ReactNode;
   title?: string;
@@ -40,6 +46,7 @@ export function DashboardLayout({
   companyName,
   greetingName,
   kpis,
+  previousKpis,
   children,
   scoreCard,
   title = "Cockpit financier",
@@ -57,7 +64,7 @@ export function DashboardLayout({
     subtitle ?? `Bonjour ${greetingName}, voici la vue d'ensemble de votre santé financière.`;
 
   const defaultAiMessage =
-    kpis.tresorerie !== null && kpis.tresorerie > 0
+    kpis.disponibilites !== null && kpis.disponibilites > 0
       ? `Flux de trésorerie disponible (${formatMonths(kpis.runway)}). Une projection RH reste soutenable.`
       : "Priorité liquidité détectée. Révision des décaissements recommandée avant tout engagement.";
 
@@ -110,30 +117,31 @@ export function DashboardLayout({
             title="Ce qui rentre"
             tag="Chiffre d'Affaires"
             value={kpis.ca}
+            previousValue={previousKpis?.ca ?? null}
             format="currency"
-            trendValue={kpis.croissance}
-            trendLabel="vs M-1"
-            icon={<ArrowUpRight className="h-4 w-4 text-white/40 group-hover:text-quantis-gold" />}
             searchId={searchIds?.revenue}
+            kpiId="ca"
           />
 
           <KPIBlock
             title="Sur le compte"
-            tag="Trésorerie nette"
-            value={kpis.tresorerie}
+            tag="Disponibilités"
+            value={kpis.disponibilites}
+            previousValue={previousKpis?.disponibilites ?? null}
             format="currency"
             sideLabel={`Runway: ${formatMonths(kpis.runway)}`}
-            trendLabel="LIQUIDITE"
-            icon={<Wallet className="h-4 w-4 text-white/40 group-hover:text-quantis-gold" />}
             searchId={searchIds?.cash}
+            kpiId="disponibilites"
           />
 
           <KPIWide
             title="Ce qu'il reste vraiment"
             tag="Excédent brut d'exploitation"
             value={kpis.ebe}
+            previousValue={previousKpis?.ebe ?? null}
             target={50000}
             searchId={searchIds?.ebe}
+            kpiId="ebe"
           />
 
           <AIInsight message={aiMessage ?? defaultAiMessage} ctaLabel={aiCtaLabel} searchId={searchIds?.recommendation} />

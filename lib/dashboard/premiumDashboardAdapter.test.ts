@@ -70,7 +70,7 @@ describe("toPremiumKpis", () => {
 
     expect(result).toEqual({
       ca: 100000,
-      tresorerie: 25000,
+      disponibilites: 25000,
       ebe: 14000,
       healthScore: 82,
       croissance: 0.12,

@@ -6,25 +6,31 @@ import {
   FileText,
   Folder,
   LayoutDashboard,
-  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  Settings,
+  Receipt,
   Sparkles,
-  UserCircle2
+  Bot
 } from "lucide-react";
 import { FolderTabs } from "@/components/documents/FolderTabs";
 import { AnalysisCardGrid } from "@/components/documents/AnalysisCardGrid";
 import { EmptyFolderState } from "@/components/documents/EmptyFolderState";
 import { FolderDialog } from "@/components/documents/FolderDialog";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { ConnectionsPanel } from "@/components/integrations/ConnectionsPanel";
+import { AccountingConnectCard } from "@/components/integrations/AccountingConnectCard";
+import { BridgeConnectCard } from "@/components/integrations/BridgeConnectCard";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { DEFAULT_FOLDER_NAME } from "@/lib/folders/activeFolder";
 import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
+import { clearActiveAnalysisId, resolveActiveAnalysis, writeActiveAnalysisId } from "@/lib/source/activeSource";
+import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import {
   listUserFolders,
   createUserFolder,
@@ -39,8 +45,8 @@ import {
   moveAnalysisToFolder
 } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
-import { useAuthenticatedUser } from "@/components/auth/AuthGate";
 import type { AnalysisRecord } from "@/types/analysis";
+import type { AuthenticatedUser } from "@/types/auth";
 
 type FolderDialogState = {
   isOpen: boolean;
@@ -56,16 +62,44 @@ type DeleteFolderConfirm = {
 
 export function DocumentsView() {
   const router = useRouter();
-  const { user } = useAuthenticatedUser();
+  const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
   const [loading, setLoading] = useState(true);
+  // Loader visible uniquement si le chargement dépasse 400 ms — évite le flash.
+  const showSlowLoader = useDelayedFlag(loading);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [folderNames, setFolderNames] = useState<string[]>([]);
   const [activeFolder, setActiveFolder] = useState(DEFAULT_FOLDER_NAME);
   const [dialog, setDialog] = useState<FolderDialogState>({ isOpen: false, mode: "create", targetName: "" });
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteFolderConfirm>({ isOpen: false, folderName: "", analysisCount: 0 });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
+  const explicitActiveId = useActiveAnalysisId();
+  // L'ID effectivement utilisé par le dashboard : si l'utilisateur n'a rien
+  // choisi explicitement, le résolveur retombe sur la priorité métier
+  // (dynamique > FEC > upload, plus récent en cas d'égalité). On l'affiche
+  // quand même comme "Active" pour expliciter le défaut côté UI.
+  const effectiveActiveId = useMemo(
+    () => resolveActiveAnalysis(analyses, explicitActiveId)?.id ?? null,
+    [analyses, explicitActiveId]
+  );
+
+  useEffect(() => {
+    return firebaseAuthGateway.subscribe(setUser);
+  }, []);
+
+  const greetingName = useMemo(() => {
+    if (!user) return "Utilisateur";
+    if (user.displayName?.trim()) return user.displayName.trim().split(" ")[0] || "Utilisateur";
+    if (user.email) return user.email.split("@")[0] || "Utilisateur";
+    return "Utilisateur";
+  }, [user]);
+
+  async function handleLogout() {
+    await firebaseAuthGateway.signOut();
+    router.replace("/login");
+  }
 
   const loadData = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     try {
       const [allAnalyses, folders] = await Promise.all([
@@ -160,6 +194,12 @@ export function DocumentsView() {
 
   async function handleDeleteAnalysis(id: string) {
     if (!user) return;
+    // Si on supprime l'analyse marquée comme source active, on vide le pointeur —
+    // sinon le résolveur retomberait dessus indéfiniment côté hook (l'event est
+    // émis mais l'ID disparaît côté DB seulement).
+    if (explicitActiveId === id) {
+      clearActiveAnalysisId();
+    }
     await deleteUserAnalysisById(user.uid, id);
     void loadData();
   }
@@ -170,74 +210,47 @@ export function DocumentsView() {
     void loadData();
   }
 
+  if (!user) {
+    return (
+      <section className="precision-card mx-auto max-w-5xl rounded-2xl p-8 text-center">
+        <p className="text-sm text-white/70">Connectez-vous pour accéder à vos documents.</p>
+      </section>
+    );
+  }
+
   return (
-    <section className="relative z-10 mx-auto w-full max-w-7xl space-y-4">
-      {/* Header pleine largeur — hors de la grille sidebar */}
-      <header className="precision-card flex w-full items-center justify-between rounded-2xl px-5 py-4">
-        <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={30} imageClassName="h-7 w-7 object-contain" />
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-quantis-gold">Documents</p>
-            <p className="text-sm text-white/50">Gestion de vos analyses financières</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => router.push("/upload")}
-          className="btn-gold-premium inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-semibold"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Nouvelle analyse
-        </button>
-      </header>
+    <section className="w-full space-y-4">
+      {/* Header global unifié */}
+      <AppHeader
+        companyName="Documents"
+        subtitle="Gestion de vos analyses financières"
+        searchPlaceholder="Rechercher un fichier, un dossier..."
+        actionSlot={
+          <button
+            type="button"
+            onClick={() => router.push("/upload")}
+            className="btn-gold-premium inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nouvelle analyse
+          </button>
+        }
+      />
 
       {/* Grille sidebar navigation + contenu */}
-      <div className={`grid gap-4 ${isSidebarCollapsed ? "grid-cols-[88px_minmax(0,1fr)]" : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]"}`}>
-
-        {/* ===== SIDEBAR NAVIGATION GLOBALE ===== */}
-        <aside className="precision-card relative h-fit rounded-2xl p-4 lg:sticky lg:top-4">
-          <div className={`mb-3 flex ${isSidebarCollapsed ? "justify-center" : "justify-end"}`}>
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white/85 transition hover:border-quantis-gold/60"
-              title={isSidebarCollapsed ? "Ouvrir le menu" : "Réduire le menu"}
-            >
-              {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </button>
-          </div>
-          <nav className="space-y-1 text-sm">
-            <NavRow icon={<LayoutDashboard className="h-4 w-4" />} onClick={() => router.push("/analysis")} collapsed={isSidebarCollapsed}>
-              Tableau de bord
-            </NavRow>
-            <NavRow icon={<Sparkles className="h-4 w-4" />} onClick={() => router.push("/synthese")} collapsed={isSidebarCollapsed}>
-              Synthèse
-            </NavRow>
-            <NavRow icon={<FileText className="h-4 w-4" />} active onClick={() => {}} collapsed={isSidebarCollapsed}>
-              Documents
-            </NavRow>
-          </nav>
-          {!isSidebarCollapsed ? (
-            <div className="mt-4 space-y-1 border-t border-white/10 pt-3">
-              <NavRow icon={<Settings className="h-4 w-4" />} onClick={() => router.push("/settings")} collapsed={false}>
-                Réglages
-              </NavRow>
-              <NavRow icon={<UserCircle2 className="h-4 w-4" />} onClick={() => router.push("/account")} collapsed={false}>
-                Compte
-              </NavRow>
-              <NavRow
-                icon={<LogOut className="h-4 w-4" />}
-                onClick={() => { void firebaseAuthGateway.signOut(); router.push("/login"); }}
-                collapsed={false}
-              >
-                Déconnexion
-              </NavRow>
-            </div>
-          ) : null}
-        </aside>
+      <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <AppSidebar activeRoute="documents" accountFirstName={greetingName} />
 
         {/* ===== ZONE CONTENU ===== */}
         <div className="space-y-4">
+          {/* Bandeau résumé : liste de TOUTES les connexions actives
+              (comptables + bancaires). Vue d'ensemble persistante. */}
+          <ConnectionsPanel onChanged={() => void loadData()} />
+
+          {/* Cards détail repliables — même format pour les 2 sources. */}
+          <AccountingConnectCard onChanged={() => void loadData()} />
+          <BridgeConnectCard onChanged={() => void loadData()} />
+
           {/* Tabs dossiers */}
           <div className="precision-card rounded-2xl">
             <FolderTabs
@@ -259,12 +272,12 @@ export function DocumentsView() {
             </p>
           </div>
 
-          {/* Cards */}
-          {loading ? (
+          {/* Cards — loader retardé pour éviter le flash <400ms. */}
+          {loading && showSlowLoader ? (
             <div className="py-20 text-center">
               <p className="text-sm text-white/50">Chargement des analyses...</p>
             </div>
-          ) : filteredAnalyses.length === 0 ? (
+          ) : filteredAnalyses.length === 0 && !loading ? (
             <EmptyFolderState
               folderName={activeFolder}
               onUpload={() => router.push("/upload")}
@@ -275,6 +288,8 @@ export function DocumentsView() {
               folders={folderNames}
               onDelete={(id) => void handleDeleteAnalysis(id)}
               onMove={(id, target) => void handleMoveAnalysis(id, target)}
+              activeAnalysisId={effectiveActiveId}
+              onSetActive={(id) => writeActiveAnalysisId(id)}
             />
           )}
         </div>
@@ -308,31 +323,54 @@ export function DocumentsView() {
   );
 }
 
+// NavRow — identique à celui de SyntheseView/AnalysisDetailView : texte hérite
+// du `text-sm` du parent <nav>, pas d'override de taille, mêmes couleurs/gaps.
 function NavRow({
+  children,
   icon,
   active,
-  onClick,
   collapsed,
-  children
+  disabled,
+  onClick
 }: {
+  children: React.ReactNode;
   icon: React.ReactNode;
   active?: boolean;
-  onClick: () => void;
-  collapsed: boolean;
-  children: React.ReactNode;
+  collapsed?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
 }) {
+  const label = typeof children === "string" ? children : undefined;
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
-      className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-xs transition-colors ${
+      aria-label={collapsed ? label : undefined}
+      title={collapsed ? label : undefined}
+      className={`flex w-full items-center rounded-xl transition-colors ${
+        collapsed ? "group justify-center px-2 py-2" : "gap-2 px-3 py-2 text-left"
+      } ${
         active
-          ? "bg-quantis-gold/10 font-semibold text-quantis-gold"
-          : "text-white/60 hover:bg-white/5 hover:text-white/85"
-      } ${collapsed ? "justify-center" : ""}`}
-      title={collapsed ? String(children) : undefined}
+          ? "bg-white/10 text-white"
+          : disabled
+            ? "cursor-not-allowed text-white/40"
+            : "text-white/75 hover:bg-white/10 hover:text-white"
+      }`}
     >
-      {icon}
+      {collapsed ? (
+        <span
+          className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
+            active
+              ? "border-quantis-gold/60 bg-quantis-gold/15 text-quantis-gold"
+              : "border-white/15 bg-white/5 text-white/80 group-hover:border-white/30 group-hover:bg-white/10 group-hover:text-white"
+          }`}
+        >
+          {icon}
+        </span>
+      ) : (
+        icon
+      )}
       {!collapsed ? <span>{children}</span> : null}
     </button>
   );

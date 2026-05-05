@@ -9,11 +9,13 @@ import {
   BarChart3,
   BarChartBig,
   Cpu,
-  Landmark,
   Layers,
   PieChart as PieChartIcon
 } from "lucide-react";
-import { formatPercent } from "@/components/dashboard/formatting";
+import { formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
+import { KpiTooltip } from "@/components/kpi/KpiTooltip";
+import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
+import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
 import { BreakEvenChart } from "@/components/dashboard/navigation/BreakEvenChart";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
@@ -115,15 +117,26 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
   const startRevenue = monthlySeries[0]?.revenue ?? 0;
   const endRevenue = monthlySeries[monthlySeries.length - 1]?.revenue ?? 0;
   const growthDelta = startRevenue > 0 ? ((endRevenue - startRevenue) / startRevenue) * 100 : 0;
-  const caLabel = kpis.ca === null ? "N/D" : formatCompactCurrency(animatedCa);
-  const tcamLabel = kpis.tcam === null ? "N/D" : formatPercent(animatedTcam);
-  const ebeLabel = kpis.ebe === null ? "N/D" : formatCompactCurrency(animatedEbe);
+  const caLabel = kpis.ca === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedCa);
+  const tcamLabel = kpis.tcam === null ? INSUFFICIENT_DATA_LABEL : formatPercent(animatedTcam);
+  const ebeLabel = kpis.ebe === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedEbe);
   const resultatNetLabel =
-    kpis.resultat_net === null ? "N/D" : formatCompactCurrency(animatedResultatNet);
-  const tmscvLabel = displayedTmscv === null ? "N/D" : formatPercent(animatedTmscv);
-  const vaLabel = kpis.va === null ? "N/D" : formatCompactCurrency(animatedVa);
-  const margeEbitdaLabel = kpis.marge_ebitda === null ? "N/D" : formatPercent(animatedMargeEbitda);
-  const pointMortLabel = kpis.point_mort === null ? "N/D" : formatCompactCurrency(animatedPointMort);
+    kpis.resultat_net === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedResultatNet);
+  // Marge nette = résultat net / CA × 100. Bug historique : on passait
+  // `kpis.netProfit` (en €) à formatPercent qui le considérait déjà en %,
+  // affichant des "-13 866 %" sur des résultats négatifs après filtrage temporel.
+  // CA et résultat net sont tous les deux des flux de la période → leur ratio
+  // est unitless et stable indépendamment de la longueur de la fenêtre.
+  const margeNettePct =
+    kpis.netProfit !== null && kpis.ca !== null && kpis.ca > 0
+      ? (kpis.netProfit / kpis.ca) * 100
+      : null;
+  const margeNetteLabel =
+    margeNettePct === null ? INSUFFICIENT_DATA_LABEL : formatPercent(margeNettePct, 1);
+  const tmscvLabel = displayedTmscv === null ? INSUFFICIENT_DATA_LABEL : formatPercent(animatedTmscv);
+  const vaLabel = kpis.va === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedVa);
+  const margeEbitdaLabel = kpis.marge_ebitda === null ? INSUFFICIENT_DATA_LABEL : formatPercent(animatedMargeEbitda);
+  const pointMortLabel = kpis.point_mort === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedPointMort);
   const caFooterLabel =
     kpis.ca === null ? "Donnée indisponible" : growthDelta >= 0 ? "Croissance validée" : "Sous surveillance";
   const simulationLabel = useMemo(() => {
@@ -197,16 +210,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
 
       <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <div className="interactive-badge flex h-8 w-8 items-center justify-center border border-quantis-gold/20 bg-quantis-base">
-              <span className="text-sm font-bold text-quantis-gold">Q</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white">Quantis</span>
-              <span className="text-[10px] font-mono text-quantis-muted">Financial Operating System</span>
-            </div>
-          </div>
-          <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
             Création de valeur
           </h2>
         </div>
@@ -237,6 +241,9 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={caTrend}
           icon={<Layers className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="Le chiffre d'affaires totalise l'ensemble des ventes de biens et services."
+          kpiId="ca"
+          kpiValue={kpis.ca}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={150}
@@ -249,6 +256,9 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={tcamTrend}
           icon={<Activity className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="Le TCAM mesure la dynamique de croissance moyenne annuelle."
+          kpiId="tcam"
+          kpiValue={kpis.tcam}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={200}
@@ -261,6 +271,9 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={ebeTrend}
           icon={<BarChartBig className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="L'EBE indique la richesse générée par l'exploitation."
+          kpiId="ebe"
+          kpiValue={kpis.ebe}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={220}
@@ -273,6 +286,9 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={undefined}
           icon={<Layers className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="La valeur ajoutée mesure la richesse réellement créée par l'entreprise."
+          kpiId="va"
+          kpiValue={kpis.va}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={240}
@@ -285,6 +301,9 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={undefined}
           icon={<PieChartIcon className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="Part de la production transformée en excédent brut d'exploitation."
+          kpiId="marge_ebitda"
+          kpiValue={kpis.marge_ebitda}
+          previousKpis={previousKpis}
         />
         <MetricCard
           delayMs={260}
@@ -297,6 +316,9 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           trend={undefined}
           icon={<Activity className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helpText="CA minimum pour couvrir l'ensemble des charges fixes."
+          kpiId="point_mort"
+          kpiValue={kpis.point_mort}
+          previousKpis={previousKpis}
         />
 
         <article
@@ -310,9 +332,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
                 <h3 className="text-sm font-semibold text-white">Ce qu&apos;il reste à la fin</h3>
                 <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">Résultat net</span>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-                <Landmark className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-              </div>
+              <KpiTooltip kpiId="resultat_net" value={kpis.resultat_net} />
             </div>
             <div className="mt-2 flex items-center justify-between gap-4">
               <div className="data-react tnum text-[2.6rem] font-semibold leading-none tracking-tight text-white">
@@ -321,13 +341,19 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
               <div className="flex flex-col items-end gap-2">
                 <span className="text-[10px] uppercase text-white/45">Marge nette</span>
                 <span className="tech-tag text-sm font-semibold text-white">
-                  {formatPercent(kpis.netProfit, 1)}
+                  {margeNetteLabel}
                 </span>
                 <KpiTrendPill trend={resultatNetTrend} compact />
               </div>
             </div>
+            <div className="mt-3">
+              <KpiBenchmarkAutoIndicator
+                kpiId="resultat_net"
+                value={kpis.resultat_net}
+                kpiLabel="Résultat net"
+              />
+            </div>
           </div>
-          <p className="edu-text">Le bénéfice final après toutes les charges et impôts.</p>
         </article>
 
         <article
@@ -343,9 +369,7 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
                   TMSCV
                 </span>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-                <PieChartIcon className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-              </div>
+              <KpiTooltip kpiId="tmscv" value={kpis.tmscv} />
             </div>
 
             <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -360,9 +384,6 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
               <KpiTrendPill trend={tmscvTrend} compact />
             </div>
           </div>
-          <p className="edu-text">
-            Le TMSCV mesure la marge disponible pour absorber les charges fixes.
-          </p>
         </article>
 
         <article
@@ -416,15 +437,29 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
 
 type MetricCardProps = {
   searchId?: string;
+  /** Titre vulgarisé (ligne 2). */
   title: string;
+  /** Nom officiel uppercase (ligne 1). */
   tag: string;
+  /** Valeur formatée affichée en grand. */
   value: string;
-  footerLabel: string;
-  footerCode: string;
-  trend?: KpiTrend;
-  icon: ReactNode;
-  helpText: string;
   delayMs: number;
+  /** id du KPI dans le registre — déclenche tooltip + diagnostic + badge. */
+  kpiId?: string;
+  /** Valeur numérique courante — sert au tooltip et au diagnostic. */
+  kpiValue?: number | null;
+  /**
+   * Tous les KPIs de la période précédente. La card va y chercher la
+   * valeur correspondant à son kpiId pour calculer la variation +/-X%.
+   * Plus pratique que de passer `kpiPreviousValue` à chaque call-site.
+   */
+  previousKpis?: CalculatedKpis | null;
+  /** Props legacy conservés pour compat — plus rendus. */
+  footerLabel?: string;
+  footerCode?: string;
+  trend?: KpiTrend;
+  icon?: ReactNode;
+  helpText?: string;
 };
 
 function MetricCard({
@@ -432,43 +467,31 @@ function MetricCard({
   title,
   tag,
   value,
-  footerLabel,
-  footerCode,
-  trend,
-  icon,
-  helpText,
-  delayMs
+  delayMs,
+  kpiId,
+  kpiValue,
+  previousKpis,
 }: MetricCardProps) {
+  const previousValue =
+    kpiId && previousKpis
+      ? (previousKpis as Record<string, number | null>)[kpiId] ?? null
+      : null;
   return (
-    <article
-      className="precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 md:col-span-4"
+    <div
+      className="col-span-1 md:col-span-4"
       style={{ animationDelay: `${delayMs}ms` }}
-      data-search-id={searchId}
     >
-      <div>
-        <div className="card-header flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-            <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-            {icon}
-          </div>
-        </div>
-        <p className="data-react tnum text-[2.2rem] font-medium leading-none tracking-tight text-white">{value}</p>
-        <div className="mt-5 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
-            <span className="text-[11px] text-white/80">{footerLabel}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {trend ? <KpiTrendPill trend={trend} /> : null}
-            <span className="text-[10px] font-mono text-white/35">{footerCode}</span>
-          </div>
-        </div>
-      </div>
-      <p className="edu-text">{helpText}</p>
-    </article>
+      <KpiCardLayout
+        kpiId={kpiId}
+        fullName={tag}
+        title={title}
+        value={kpiValue ?? null}
+        previousValue={previousValue}
+        formattedValue={value}
+        searchId={searchId}
+        className="fade-up"
+      />
+    </div>
   );
 }
 

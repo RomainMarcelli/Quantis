@@ -8,9 +8,10 @@ import {
   Award,
   BriefcaseBusiness,
   Cpu,
-  Scale,
 } from "lucide-react";
-import { formatNumber } from "@/components/dashboard/formatting";
+import { formatNumber, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
+import { KpiTooltip } from "@/components/kpi/KpiTooltip";
+import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
@@ -144,16 +145,7 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
 
       <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <div className="interactive-badge flex h-8 w-8 items-center justify-center border border-quantis-gold/20 bg-quantis-base">
-              <span className="text-sm font-bold text-quantis-gold">Q</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white">Quantis</span>
-              <span className="text-[10px] font-mono text-quantis-muted">Financial Operating System</span>
-            </div>
-          </div>
-          <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
             Rentabilité & valeur actionnariale
           </h2>
           <p className="text-sm text-quantis-muted">
@@ -169,10 +161,13 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
           searchId="analysis-rent-roe"
           title="Rentabilité actionnariale"
           tag="Return on Equity (ROE)"
-          value={roePercent === null ? "N/D" : `${formatNumber(animatedRoe, 1)}%`}
+          value={roePercent === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedRoe, 1)}%`}
           trend={roeTrend}
           icon={<Award className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
           helper="Rentabilité des fonds propres: mesure ce que l'actionnaire gagne pour chaque euro investi."
+          kpiId="roe"
+          kpiValue={kpis.roe}
+          previousKpis={previousKpis}
         />
 
         <RentabilityMetricCard
@@ -181,12 +176,15 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
           searchId="analysis-rent-roce"
           title="Rentabilité opérationnelle"
           tag="Return on Capital Employed (ROCE)"
-          value={rocePercent === null ? "N/D" : `${formatNumber(animatedRoce, 1)}%`}
+          value={rocePercent === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedRoce, 1)}%`}
           trend={roceTrend}
           icon={
             <BriefcaseBusiness className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
           }
           helper="Performance économique pure de l'exploitation, indépendamment du mode de financement."
+          kpiId="roce"
+          kpiValue={kpis.roce}
+          previousKpis={previousKpis}
         />
 
         <article
@@ -275,13 +273,6 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
             </div>
           </div>
 
-          <p className="edu-text mt-8">
-            {spread === null
-              ? "Impossible de conclure sans ROE/ROCE."
-              : spread >= 0
-                ? "Effet de levier positif: la dette amplifie la rentabilité actionnariale."
-                : "Effet de levier négatif: la dette pèse sur la rentabilité des fonds propres."}
-          </p>
         </article>
 
         <article
@@ -298,16 +289,13 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
                   Levier financier (dettes / fonds propres)
                 </span>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-                <Scale className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-              </div>
+              <KpiTooltip kpiId="effet_levier" value={kpis.effet_levier} />
             </div>
-            <p className="edu-text mt-0 border-t-0 pt-0">{leverageInterpretation.helper}</p>
           </div>
 
           <div className="w-full md:w-[32%]">
             <p className="tnum data-react text-right text-[3rem] font-semibold leading-none tracking-tight text-white">
-              {kpis.effet_levier === null ? "N/D" : `${formatNumber(animatedLeverage, 2)}x`}
+              {kpis.effet_levier === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedLeverage, 2)}x`}
             </p>
             <div className="mt-3 flex justify-end">
               <div className="flex items-center gap-2">
@@ -367,11 +355,16 @@ type RentabilityMetricCardProps = {
   title: string;
   tag: string;
   value: string;
-  helper: string;
-  trend: KpiTrend;
-  icon: ReactNode;
   delayMs: number;
   className?: string;
+  kpiId?: string;
+  kpiValue?: number | null;
+  /** Tous les KPIs de la période précédente — la card y cherche kpiId. */
+  previousKpis?: CalculatedKpis | null;
+  /** Props legacy conservés pour compat — plus rendus. */
+  helper?: string;
+  trend?: KpiTrend;
+  icon?: ReactNode;
 };
 
 function RentabilityMetricCard({
@@ -379,35 +372,32 @@ function RentabilityMetricCard({
   title,
   tag,
   value,
-  helper,
-  trend,
-  icon,
   delayMs,
-  className
+  className,
+  kpiId,
+  kpiValue,
+  previousKpis,
 }: RentabilityMetricCardProps) {
+  const previousValue =
+    kpiId && previousKpis
+      ? (previousKpis as Record<string, number | null>)[kpiId] ?? null
+      : null;
   return (
-    <article
-      className={`precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 ${className ?? ""}`}
+    <div
+      className={`col-span-1 ${className ?? ""}`}
       style={{ animationDelay: `${delayMs}ms` }}
-      data-search-id={searchId}
     >
-      <div>
-        <div className="card-header flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-            <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-            {icon}
-          </div>
-        </div>
-        <p className="tnum data-react text-[3rem] font-semibold leading-none tracking-tight text-white">{value}</p>
-        <div className="mt-5 flex items-center gap-2">
-          <KpiTrendPill trend={trend} compact />
-        </div>
-      </div>
-      <p className="edu-text">{helper}</p>
-    </article>
+      <KpiCardLayout
+        kpiId={kpiId}
+        fullName={tag}
+        title={title}
+        value={kpiValue ?? null}
+        previousValue={previousValue}
+        formattedValue={value}
+        searchId={searchId}
+        className="fade-up"
+      />
+    </div>
   );
 }
 

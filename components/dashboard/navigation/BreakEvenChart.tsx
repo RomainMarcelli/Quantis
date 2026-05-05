@@ -7,11 +7,12 @@ import {
   ComposedChart,
   Line,
   ReferenceArea,
+  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
-import { formatPercent } from "@/components/dashboard/formatting";
+import { formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { BreakEvenFullscreenModal } from "@/components/dashboard/navigation/BreakEvenFullscreenModal";
 import { BreakEvenPointGuide, BreakEvenPointMarker } from "@/components/dashboard/navigation/BreakEvenPointMarker";
 import { BreakEvenTooltip } from "@/components/dashboard/navigation/BreakEvenTooltip";
@@ -52,9 +53,6 @@ const FULLSCREEN_HEIGHT_CLASS = "min-h-[500px] h-[calc(100vh-12rem)]";
 function BreakEvenChartComponent({ model, isDark }: BreakEvenChartProps) {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const chartId = useId().replace(/:/g, "");
-  const noteClass = isDark
-    ? "!border-white/10 !text-white/70 group-hover:!text-white/80"
-    : "!border-slate-300/80 !text-slate-600 group-hover:!text-slate-700";
   const intersectionWithinYear = Boolean(model.intersection?.withinFiscalYear);
 
   return (
@@ -76,7 +74,7 @@ function BreakEvenChartComponent({ model, isDark }: BreakEvenChartProps) {
         />
         <SummaryCard
           label="TMSCV retenu"
-          value={model.metrics.tmscv === null ? "N/D" : formatPercent(model.metrics.tmscv, 1)}
+          value={model.metrics.tmscv === null ? INSUFFICIENT_DATA_LABEL : formatPercent(model.metrics.tmscv, 1)}
           hint="Calculé sur les ventes de marchandises + la production vendue."
           isDark={isDark}
           tone={model.metrics.tmscv !== null && model.metrics.tmscv > 0 ? "success" : "danger"}
@@ -90,8 +88,6 @@ function BreakEvenChartComponent({ model, isDark }: BreakEvenChartProps) {
         heightClass={INLINE_HEIGHT_CLASS}
         onOpenFullscreen={() => setIsFullscreenOpen(true)}
       />
-
-      <p className={`edu-text ${noteClass}`}>{buildBreakEvenInsight(model)}</p>
 
       <BreakEvenFullscreenModal
         isOpen={isFullscreenOpen}
@@ -199,10 +195,14 @@ function BreakEvenChartCanvas({
       ) : null}
 
       {model.hasUsableData ? (
+        // ResponsiveContainer (au lieu du `responsive` prop direct sur ComposedChart) :
+        // dans recharts 3.x avec React 19, le `responsive` prop déclenche une boucle
+        // ResizeObserver → setState → re-render → re-attach ref → setState → "Maximum
+        // update depth exceeded". ResponsiveContainer est l'API stable et utilise un debounce
+        // interne sur les changements de taille, ce qui supprime la boucle.
+        <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={model.points}
-          responsive
-          style={{ width: "100%", height: "100%", overflow: "visible" }}
           margin={CHART_MARGIN}
         >
           <defs>
@@ -344,6 +344,7 @@ function BreakEvenChartCanvas({
             />
           ) : null}
         </ComposedChart>
+        </ResponsiveContainer>
       ) : (
         <div className="flex h-full items-center justify-center px-6 text-center">
           <p className={`max-w-md text-sm ${isDark ? "text-white/60" : "text-slate-600"}`}>
@@ -420,7 +421,7 @@ function formatAxisCurrency(value: number): string {
 
 function formatCurrencyValue(value: number | null): string {
   if (value === null || Number.isNaN(value)) {
-    return "N/D";
+    return INSUFFICIENT_DATA_LABEL;
   }
 
   return new Intl.NumberFormat("fr-FR", {
@@ -495,22 +496,6 @@ function buildProfitBadgeLabel(model: BreakEvenModel): string {
   }
 
   return "Bénéfices après clôture";
-}
-
-function buildBreakEvenInsight(model: BreakEvenModel): string {
-  if (!model.hasUsableData) {
-    return "Le point mort s'appuie sur le CA retenu (ventes de marchandises + production vendue) face aux charges fixes et variables du mapping 2033SD.";
-  }
-
-  if (model.metrics.tmscv === null || model.metrics.tmscv <= 0) {
-    return "La marge sur coûts variables est insuffisante pour absorber les charges fixes : le point mort n'est pas atteignable dans le périmètre courant.";
-  }
-
-  if (model.intersection?.withinFiscalYear) {
-    return `Le point mort est atteint au jour ${Math.round(model.intersection.dayIndex)}. Avant ce repère, le CA reste sous les coûts totaux ; après, l'activité entre en zone de bénéfices.`;
-  }
-
-  return "Le point mort existe mathématiquement mais dépasse la clôture de l'exercice : la zone bénéfices n'est pas atteinte sur l'année.";
 }
 
 function clampNumber(value: number, min: number, max: number): number {
