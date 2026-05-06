@@ -6,15 +6,11 @@ import {
   FileText,
   Folder,
   LayoutDashboard,
-  Lock,
-  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
   Receipt,
-  Settings,
   Sparkles,
-  UserCircle2,
   Bot
 } from "lucide-react";
 import { FolderTabs } from "@/components/documents/FolderTabs";
@@ -23,11 +19,11 @@ import { EmptyFolderState } from "@/components/documents/EmptyFolderState";
 import { FolderDialog } from "@/components/documents/FolderDialog";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
 import { ConnectionsPanel } from "@/components/integrations/ConnectionsPanel";
-import { AccountingConnectionWizard } from "@/components/integrations/AccountingConnectionWizard";
+import { AccountingConnectCard } from "@/components/integrations/AccountingConnectCard";
 import { BridgeConnectCard } from "@/components/integrations/BridgeConnectCard";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { DEFAULT_FOLDER_NAME, setActiveFolderName } from "@/lib/folders/activeFolder";
 import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
 import {
@@ -224,17 +220,12 @@ export function DocumentsView() {
 
   return (
     <section className="w-full space-y-4">
-      {/* Header pleine largeur — hors de la grille sidebar */}
-      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
-        <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
-          <div>
-            <p className="text-sm font-semibold text-white">Documents</p>
-            <p className="text-xs text-white/55">Gestion de vos analyses financières</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
+      {/* Header global unifié */}
+      <AppHeader
+        companyName="Documents"
+        subtitle="Gestion de vos analyses financières"
+        searchPlaceholder="Rechercher un fichier, un dossier..."
+        actionSlot={
           <button
             type="button"
             onClick={() => router.push("/upload")}
@@ -243,44 +234,8 @@ export function DocumentsView() {
             <Plus className="h-3.5 w-3.5" />
             Nouvelle analyse
           </button>
-          <button
-            type="button"
-            onClick={() => router.push("/settings")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Paramètres"
-            title="Paramètres"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/pricing")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Offres"
-            title="Offre Free (verrouillée)"
-          >
-            <Lock className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Compte"
-            title="Compte"
-          >
-            <UserCircle2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleLogout()}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Se déconnecter"
-            title="Se déconnecter"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
-      </header>
+        }
+      />
 
       {/* Grille sidebar navigation + contenu */}
       <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
@@ -288,15 +243,12 @@ export function DocumentsView() {
 
         {/* ===== ZONE CONTENU ===== */}
         <div className="space-y-4">
-          {/* Liste des connections actives (Pennylane, MyUnisoft, Odoo…) — trace du token utilisé. */}
+          {/* Bandeau résumé : liste de TOUTES les connexions actives
+              (comptables + bancaires). Vue d'ensemble persistante. */}
           <ConnectionsPanel onChanged={() => void loadData()} />
 
-          {/* Assistant pas-à-pas pour connecter un logiciel comptable. */}
-          <AccountingConnectionWizard onSyncCompleted={() => void loadData()} />
-
-          {/* Connexion bancaire (Bridge / Open Banking) — source complémentaire
-              indépendante de la compta. Doit rester accessible même quand un
-              logiciel comptable est déjà connecté. */}
+          {/* Cards détail repliables — même format pour les 2 sources. */}
+          <AccountingConnectCard onChanged={() => void loadData()} />
           <BridgeConnectCard onChanged={() => void loadData()} />
 
           {/* Tabs dossiers */}
@@ -335,8 +287,6 @@ export function DocumentsView() {
                   type="button"
                   onClick={() => {
                     setActiveFolderName(activeFolder);
-                    // Clear l'override par analyse pour ne pas qu'une ancienne
-                    // sélection (Pennylane / liasse spécifique) gagne sur le folder.
                     clearActiveAnalysisId();
                   }}
                   className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/75 transition-colors hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"

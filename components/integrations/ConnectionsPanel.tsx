@@ -21,6 +21,12 @@ type ConnectionsPanelProps = {
    * Permet à la page parente de rafraîchir la liste d'analyses Firestore.
    */
   onChanged?: () => void | Promise<void>;
+  /**
+   * Providers à exclure de l'affichage (utile pour cacher `bridge` quand ce
+   * panel est utilisé dans la card "Logiciel comptable" — Bridge a sa
+   * propre card dédiée).
+   */
+  excludeProviders?: string[];
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -46,7 +52,7 @@ const SYNC_STATUS_LABEL: Record<string, string> = {
   failed: "Sync échoué",
 };
 
-export function ConnectionsPanel({ onChanged }: ConnectionsPanelProps) {
+export function ConnectionsPanel({ onChanged, excludeProviders }: ConnectionsPanelProps) {
   const [connections, setConnections] = useState<ConnectionDto[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,13 +75,17 @@ export function ConnectionsPanel({ onChanged }: ConnectionsPanelProps) {
       if (!res.ok) {
         throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
       }
-      setConnections((data as { connections: ConnectionDto[] }).connections);
+      const all = (data as { connections: ConnectionDto[] }).connections;
+      const filtered = excludeProviders && excludeProviders.length > 0
+        ? all.filter((c) => !excludeProviders.includes(c.provider))
+        : all;
+      setConnections(filtered);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [excludeProviders]);
 
   useEffect(() => {
     void refresh();
