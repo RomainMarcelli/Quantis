@@ -59,6 +59,24 @@ export type KpiCardLayoutProps = {
   searchId?: string;
   /** Classe CSS additionnelle pour ajuster la card. */
   className?: string;
+  /**
+   * Callback déclenché au clic sur la card. Sert à piloter le graphique
+   * d'évolution en haut des onglets dashboard (clic sur un KPI → courbe
+   * affichée pour ce KPI). Quand fourni, l'article devient un bouton.
+   */
+  onSelect?: () => void;
+  /**
+   * État sélectionné — affiche un anneau or autour de la card pour signaler
+   * que c'est ce KPI qui est tracé dans le graphique d'évolution top.
+   */
+  isSelected?: boolean;
+  /**
+   * Si true : on masque le KpiTooltip ✨ et le KpiBenchmarkAutoIndicator.
+   * Utilisé en mode édition du dashboard customizable — l'utilisateur veut
+   * un canevas neutre pour drag/drop/resize, pas de popup informatif au
+   * survol qui distrait du chrome d'édition.
+   */
+  disableTooltip?: boolean;
 };
 
 const HEADER_NAME_STYLE: React.CSSProperties = {
@@ -95,6 +113,9 @@ export function KpiCardLayout({
   extra,
   searchId,
   className,
+  onSelect,
+  isSelected = false,
+  disableTooltip = false,
 }: KpiCardLayoutProps) {
   const definition = kpiId ? getKpiDefinition(kpiId) : null;
   const resolvedFullName = (fullName ?? definition?.label ?? "").toUpperCase();
@@ -111,17 +132,40 @@ export function KpiCardLayout({
       ? computeVariation(value, previousValue)
       : null;
 
+  // Selectability : si onSelect est fourni, l'article devient cliquable +
+  // focusable. Anneau or quand `isSelected` pour signaler que cette carte
+  // pilote le graphique d'évolution en haut de la page.
+  const interactiveProps = onSelect
+    ? {
+        role: "button" as const,
+        tabIndex: 0,
+        onClick: onSelect,
+        onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect();
+          }
+        }
+      }
+    : {};
+  const selectionClass = onSelect
+    ? isSelected
+      ? "ring-2 ring-quantis-gold/70 cursor-pointer"
+      : "cursor-pointer hover:ring-1 hover:ring-white/20"
+    : "";
+
   return (
     <article
-      className={`precision-card group fade-up flex flex-col rounded-2xl p-6 ${className ?? ""}`}
+      className={`precision-card group fade-up flex h-full flex-col rounded-2xl p-6 transition ${selectionClass} ${className ?? ""}`}
       data-search-id={searchId}
+      {...interactiveProps}
     >
       {/* Ligne 1 — Header : nom complet uppercase + tooltip ✨ */}
       <div className="flex items-start justify-between">
         <span className="font-mono uppercase" style={HEADER_NAME_STYLE}>
           {resolvedFullName || " "}
         </span>
-        {kpiId ? <KpiTooltip kpiId={kpiId} value={value} /> : null}
+        {kpiId && !disableTooltip ? <KpiTooltip kpiId={kpiId} value={value} /> : null}
       </div>
 
       {/* Ligne 2 — Titre vulgarisé (4 px sous header) */}
@@ -162,7 +206,7 @@ export function KpiCardLayout({
           peut être "Excellent" sur les seuils internes mais "Médiane" sur le
           marché — confusion). Le tooltip ✨ continue d'expliquer le diagnostic
           textuellement si besoin. */}
-      {kpiId ? (
+      {kpiId && !disableTooltip ? (
         <div style={{ marginTop: "8px" }}>
           <KpiBenchmarkAutoIndicator kpiId={kpiId} value={value} kpiLabel={title} />
         </div>

@@ -20,12 +20,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bot,
+  ChevronDown,
   FileText,
   LayoutDashboard,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   Receipt,
   Sparkles,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -55,6 +58,15 @@ const PRIMARY_NAV: NavItem[] = [
   { id: "documents", label: "Documents", icon: FileText, href: "/documents" },
 ];
 
+// Sous-item rendu sous "Tableau de bord" quand le sous-menu est expandable.
+// Le `kind` permet de distinguer les onglets fixes des dashboards custom
+// (pour afficher le bouton de suppression uniquement sur les custom).
+export type DashboardSubmenuItem = {
+  id: string;
+  label: string;
+  kind: "fixed" | "custom";
+};
+
 type AppSidebarProps = {
   activeRoute: SidebarRoute;
   /**
@@ -72,6 +84,19 @@ type AppSidebarProps = {
   accountFirstName?: string;
   /** Plan affiché sous le prénom (par défaut "Free"). */
   accountPlan?: string;
+  /**
+   * Sous-menu expandable rendu sous l'item "Tableau de bord" quand fourni.
+   * Liste les onglets fixes (Création de valeur, Investissement…) + les
+   * dashboards custom de l'utilisateur, avec un bouton "+ Nouveau" en fin.
+   * Le sous-menu n'est rendu que sur la route `analysis`.
+   */
+  dashboardSubmenu?: {
+    items: DashboardSubmenuItem[];
+    activeId?: string;
+    onSelectItem: (id: string) => void;
+    onCreate?: () => void;
+    onDelete?: (id: string) => void;
+  };
 };
 
 export function AppSidebar({
@@ -79,10 +104,14 @@ export function AppSidebar({
   contextSlot,
   accountFirstName,
   accountPlan = "Free",
+  dashboardSubmenu,
 }: AppSidebarProps) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [ready, setReady] = useState(false);
+  // Sous-menu Tableau de bord : ouvert par défaut quand on est sur la route
+  // analysis (l'utilisateur voit immédiatement les sous-onglets disponibles).
+  const [dashboardSubmenuOpen, setDashboardSubmenuOpen] = useState(activeRoute === "analysis");
 
   useEffect(() => {
     setCollapsed(readSidebarCollapsedPreference());
@@ -123,16 +152,63 @@ export function AppSidebar({
         {PRIMARY_NAV.map((item) => {
           const Icon = item.icon;
           const active = item.id === activeRoute;
+          // Cas spécial : "Tableau de bord" reçoit un sous-menu expandable
+          // listant les sous-onglets (Création de valeur, Investissement…)
+          // et les dashboards custom utilisateur. Sous-menu caché en mode
+          // replié (les sous-items réapparaîtront en dépliant la sidebar).
+          const hasSubmenu =
+            item.id === "analysis" && dashboardSubmenu !== undefined && !collapsed;
+
           return (
-            <NavRow
-              key={item.id}
-              icon={<Icon className="h-4 w-4" />}
-              active={active}
-              collapsed={collapsed}
-              onClick={active ? undefined : () => router.push(item.href)}
-            >
-              {item.label}
-            </NavRow>
+            <div key={item.id}>
+              {/* Cas spécial : "Tableau de bord" avec sous-menu — rangée
+                  composée de 2 boutons FRÈRES (jamais imbriqués, sinon HTML
+                  invalide → écran noir sous React 19). Le clic sur la zone
+                  principale navigue, le clic sur la flèche déroule. */}
+              {hasSubmenu ? (
+                <div
+                  className={`flex w-full items-center gap-1 rounded-xl transition-colors ${
+                    active
+                      ? "bg-white/10 text-white"
+                      : "text-white/75 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={active ? undefined : () => router.push(item.href)}
+                    className="flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-left"
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="flex-1">{item.label}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDashboardSubmenuOpen((v) => !v)}
+                    aria-label={dashboardSubmenuOpen ? "Replier le sous-menu" : "Déplier le sous-menu"}
+                    className="mr-1 inline-flex h-6 w-6 items-center justify-center rounded text-white/45 hover:bg-white/10 hover:text-white/80"
+                  >
+                    <ChevronDown
+                      className={`h-3.5 w-3.5 transition-transform ${
+                        dashboardSubmenuOpen ? "rotate-0" : "-rotate-90"
+                      }`}
+                    />
+                  </button>
+                </div>
+              ) : (
+                <NavRow
+                  icon={<Icon className="h-4 w-4" />}
+                  active={active}
+                  collapsed={collapsed}
+                  onClick={active ? undefined : () => router.push(item.href)}
+                >
+                  {item.label}
+                </NavRow>
+              )}
+
+              {hasSubmenu && dashboardSubmenuOpen ? (
+                <DashboardSubmenuList submenu={dashboardSubmenu!} />
+              ) : null}
+            </div>
           );
         })}
       </nav>
@@ -220,7 +296,68 @@ function NavRow({
       ) : (
         icon
       )}
-      {!collapsed ? <span>{children}</span> : null}
+      {!collapsed ? <span className="flex-1">{children}</span> : null}
     </button>
+  );
+}
+
+// ─── Sous-menu Tableau de bord (Phase 4) ───────────────────────────────
+
+function DashboardSubmenuList({
+  submenu,
+}: {
+  submenu: NonNullable<AppSidebarProps["dashboardSubmenu"]>;
+}) {
+  return (
+    <ul className="ml-2 mt-1 space-y-0.5 border-l border-white/10 pl-3">
+      {submenu.items.map((item) => {
+        const isActive = item.id === submenu.activeId;
+        return (
+          <li key={item.id} className="group relative">
+            <button
+              type="button"
+              onClick={() => submenu.onSelectItem(item.id)}
+              className={`flex w-full items-center rounded-md px-2 py-1.5 pr-7 text-left text-[13px] transition-colors ${
+                isActive
+                  ? "bg-quantis-gold/10 text-quantis-gold"
+                  : "text-white/65 hover:bg-white/5 hover:text-white"
+              }`}
+              aria-pressed={isActive}
+            >
+              <span className="truncate">{item.label}</span>
+            </button>
+            {item.kind === "custom" && submenu.onDelete ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm(`Supprimer "${item.label}" ?`)) {
+                    submenu.onDelete?.(item.id);
+                  }
+                }}
+                aria-label={`Supprimer ${item.label}`}
+                title={`Supprimer "${item.label}"`}
+                className="absolute right-1 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-white/40 transition hover:bg-rose-500/20 hover:text-rose-300"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            ) : null}
+          </li>
+        );
+      })}
+
+      {submenu.onCreate ? (
+        <li>
+          <button
+            type="button"
+            onClick={submenu.onCreate}
+            className="inline-flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[12px] text-white/55 transition-colors hover:bg-quantis-gold/5 hover:text-quantis-gold"
+          >
+            <Plus className="h-3 w-3" />
+            <span>Nouveau tableau</span>
+          </button>
+        </li>
+      ) : null}
+    </ul>
   );
 }

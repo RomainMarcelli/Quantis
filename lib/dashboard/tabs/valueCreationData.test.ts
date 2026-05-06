@@ -98,14 +98,16 @@ describe("buildBreakEvenModel", () => {
       })
     );
 
-    expect(model.points).toHaveLength(13);
+    // 12 points (Mois 1 → Mois 12). Le point "Clôture" séparé a été retiré
+    // suite à la simplification UI : la courbe s'arrête franchement au mois 12.
+    expect(model.points).toHaveLength(12);
     expect(model.points[0]?.month).toBe("Mois 1");
     expect(model.points[0]?.ca).toBeCloseTo(25000, 2);
     expect(model.points[0]?.fixedCosts).toBe(120000);
     expect(model.points[0]?.totalCosts).toBeCloseTo(130833.33, 2);
-    expect(model.points[12]?.month).toBe("Clôture");
-    expect(model.points[12]?.ca).toBe(300000);
-    expect(model.points[12]?.totalCosts).toBe(250000);
+    expect(model.points[11]?.month).toBe("Mois 12");
+    expect(model.points[11]?.ca).toBe(300000);
+    expect(model.points[11]?.totalCosts).toBe(250000);
     expect(model.intersection?.withinFiscalYear).toBe(true);
     expect(model.intersection?.monthIndex).toBeCloseTo(8.47, 2);
     expect(model.intersection?.value).toBeCloseTo(211764.71, 2);
@@ -118,7 +120,7 @@ describe("buildBreakEvenModel", () => {
     expect(model.hasUsableData).toBe(false);
     expect(model.metrics.pointMort).toBeNull();
     expect(model.intersection).toBeNull();
-    expect(model.points).toHaveLength(13);
+    expect(model.points).toHaveLength(12);
     expect(
       model.points.every((point) => point.ca === 0 && point.fixedCosts === 0 && point.totalCosts === 0)
     ).toBe(true);

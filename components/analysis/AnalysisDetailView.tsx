@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   FileText,
   Bot,
+  Calendar,
   Folder,
   LayoutDashboard,
   Lock,
@@ -29,6 +30,8 @@ import {
   type DashboardTestTabId
 } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
 import { DashboardFinancialTestContent } from "@/components/dashboard/navigation/DashboardFinancialTestContent";
+import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashboardModal";
+import { useUserDashboards } from "@/hooks/useUserDashboards";
 import { clearLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import {
   DEFAULT_FOLDER_NAME,
@@ -146,6 +149,10 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
+  // Phase 4 — modale "Nouveau tableau de bord" pour créer un dashboard custom.
+  const [createDashboardOpen, setCreateDashboardOpen] = useState(false);
+  // Phase 4 — liste des dashboards custom de l'utilisateur (CRUD Firestore).
+  const userDashboards = useUserDashboards(user?.uid ?? null);
   // Le select du menu pilote l'année d'analyse affichée dans le dashboard.
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<string>("");
   const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
@@ -990,26 +997,45 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         <AppSidebar
           activeRoute={isDocumentsView ? "documents" : "analysis"}
           accountFirstName={greetingName}
-          contextSlot={
-            !isDocumentsView && dashboardYearOptions.length > 1 ? (
-              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <label htmlFor="sidebar-dashboard-year" className="text-[10px] font-mono uppercase tracking-wide text-white/45">
-                  Année de synthèse
-                </label>
-                <select
-                  id="sidebar-dashboard-year"
-                  value={selectedDashboardYear}
-                  onChange={(event) => setSelectedDashboardYear(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
-                >
-                  {dashboardYearOptions.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null
+          dashboardSubmenu={
+            isDocumentsView
+              ? undefined
+              : {
+                  // Sous-onglets fixes (Trésorerie conditionnel selon Bridge),
+                  // suivis des dashboards custom de l'utilisateur. Le bouton
+                  // "+ Nouveau" est exposé dans la liste si l'user est connecté.
+                  items: [
+                    { id: "creation-valeur", label: "Création de valeur", kind: "fixed" as const },
+                    { id: "investissement-bfr", label: "Investissement", kind: "fixed" as const },
+                    { id: "financement", label: "Financement", kind: "fixed" as const },
+                    { id: "rentabilite", label: "Rentabilité", kind: "fixed" as const },
+                    ...(showTresorerie
+                      ? [{ id: "tresorerie", label: "Trésorerie", kind: "fixed" as const }]
+                      : []),
+                    ...userDashboards.dashboards.map((d) => ({
+                      id: d.id,
+                      label: d.name,
+                      kind: "custom" as const
+                    }))
+                  ],
+                  activeId: activeDashboardTab,
+                  onSelectItem: (id) => {
+                    setActiveDashboardTab(id as DashboardTestTabId);
+                    // Bascule sur la page /analysis si l'utilisateur déclenche
+                    // le sous-menu depuis une autre route — sinon on reste
+                    // simplement sur la page courante avec le tab mis à jour.
+                    if (window.location.pathname !== "/analysis") {
+                      router.push("/analysis");
+                    }
+                  },
+                  onCreate: user ? () => setCreateDashboardOpen(true) : undefined,
+                  onDelete: async (id) => {
+                    await userDashboards.deleteDashboard(id);
+                    if (activeDashboardTab === id) {
+                      setActiveDashboardTab(DEFAULT_ANALYSIS_TAB);
+                    }
+                  }
+                }
           }
         />
 
@@ -1216,9 +1242,21 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             </>
           ) : analysis ? (
             <>
-              {/* Filtre temporel global — identique à /synthese. Caché si source
-                  statique (pas de dailyAccounting) car aucune granularité à
-                  proposer ; remplacé par "Exercice YYYY" en texte simple. */}
+              {/* Titre remonté en haut — l'utilisateur voit immédiatement le
+                  contexte. Le sélecteur de période vient juste dessous. */}
+              <div className="px-1">
+                <h1 className="text-2xl font-semibold text-white md:text-3xl">Tableau de bord</h1>
+                <p className="mt-1 text-sm text-white/65">
+                  Bonjour {greetingName}, voici la vue détaillée de vos indicateurs financiers.
+                </p>
+              </div>
+
+              {/* Sélecteur de période sous le titre :
+                   - Sources dynamiques (Pennylane/MyUnisoft/Odoo) → TemporalityBar
+                     complète (jour/semaine/mois/trimestre/année + nav).
+                   - Sources statiques (PDF/Excel) → mini-bar "Année" + dropdown
+                     pour switcher entre les exercices disponibles. Le sélecteur
+                     historique de la sidebar a été retiré (doublon). */}
               {shouldShowTemporalityBar(analysis) ? (
                 <TemporalityBar
                   availableRange={computeAvailableRange(analysis)}
@@ -1229,21 +1267,38 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                       : undefined
                   }
                 />
-              ) : (
-                <div
-                  className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70"
-                  data-scroll-reveal-ignore
-                >
-                  <span className="text-xs uppercase tracking-wider text-white/45">Période · </span>
-                  <span className="font-semibold text-white">
-                    Exercice {analysis.fiscalYear ?? "(non renseigné)"}
-                  </span>
-                  <span className="ml-2 text-xs text-white/45">— source statique, vue annuelle uniquement</span>
+              ) : dashboardYearOptions.length > 1 ? (
+                <div className="precision-card flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3" data-scroll-reveal-ignore>
+                  <div className="flex items-center gap-2 text-white/60">
+                    <Calendar className="h-4 w-4" />
+                    <span className="text-xs uppercase tracking-wider">Période</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+                    <button
+                      type="button"
+                      className="rounded-md bg-quantis-gold px-3 py-1 text-xs font-medium text-black"
+                      aria-pressed
+                    >
+                      Année
+                    </button>
+                  </div>
+                  <select
+                    id="dashboard-year-static"
+                    value={selectedDashboardYear}
+                    onChange={(event) => setSelectedDashboardYear(event.target.value)}
+                    className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white outline-none transition hover:bg-white/10 focus:border-quantis-gold/70"
+                  >
+                    {dashboardYearOptions.map((option) => (
+                      <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )}
+              ) : null}
 
-              {/* Bandeau utilisateur (identique au header de SyntheseDashboard) :
-                  nom de société + date d'analyse + boutons Télécharger / Exporter. */}
+              {/* Bandeau meta consolidé : société + date + source + période
+                  (statique uniquement) + actions. */}
               <header className="precision-card flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
                 <div>
                   <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
@@ -1253,6 +1308,11 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                       sourceMetadata={analysis.sourceMetadata ?? null}
                       analysisCreatedAt={analysis.createdAt}
                     />
+                    {!shouldShowTemporalityBar(analysis) && analysis.fiscalYear ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-white/75">
+                        Exercice {analysis.fiscalYear}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 self-start md:self-auto">
@@ -1284,18 +1344,19 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 </div>
               </header>
 
-              {/* Titre + sous-titre (analogue au DashboardLayout de /synthese). */}
-              <div className="px-1">
-                <h1 className="text-2xl font-semibold text-white md:text-3xl">Tableau de bord</h1>
-                <p className="mt-1 text-sm text-white/65">
-                  Bonjour {greetingName}, voici la vue détaillée de vos indicateurs financiers.
-                </p>
-              </div>
-
               <DashboardFinancialTestMenu
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}
                 showTresorerie={showTresorerie}
+                customDashboards={userDashboards.dashboards}
+                onCreateDashboard={user ? () => setCreateDashboardOpen(true) : undefined}
+                onDeleteDashboard={async (id) => {
+                  await userDashboards.deleteDashboard(id);
+                  // Si l'utilisateur supprime l'onglet courant, on retombe sur Création de valeur.
+                  if (activeDashboardTab === id) {
+                    setActiveDashboardTab(DEFAULT_ANALYSIS_TAB);
+                  }
+                }}
               />
               {/* previousKpis :
                    - Priorité 1 = KPIs de la période antérieure de même durée
@@ -1308,6 +1369,29 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 mappedData={effectiveAnalysis?.mappedData ?? analysis.mappedData}
                 previousKpis={previousPeriodKpis ?? previousAnalysis?.kpis ?? null}
                 bankingSummary={bankingSummary}
+                analyses={allAnalyses}
+                currentAnalysis={analysis}
+                analysisModeLabel={
+                  (analysis.dailyAccounting?.length ?? 0) > 0
+                    ? "Analyse dynamique"
+                    : "Analyse statique"
+                }
+                userId={user?.uid ?? null}
+                customDashboards={userDashboards.dashboards}
+              />
+
+              {/* Modal Phase 4 — création d'un dashboard custom nommé. */}
+              <CreateDashboardModal
+                open={createDashboardOpen}
+                onClose={() => setCreateDashboardOpen(false)}
+                onConfirm={async (name) => {
+                  const newId = await userDashboards.createDashboard(name);
+                  setCreateDashboardOpen(false);
+                  if (newId) {
+                    // Bascule directement sur le nouveau dashboard fraîchement créé.
+                    setActiveDashboardTab(newId as DashboardTestTabId);
+                  }
+                }}
               />
             </>
           ) : (

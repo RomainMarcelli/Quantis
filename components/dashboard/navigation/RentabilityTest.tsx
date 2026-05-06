@@ -13,7 +13,6 @@ import { formatNumber, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/fo
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
-import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
   buildRentabilitySeries,
@@ -22,11 +21,17 @@ import {
   normalizePercentInput
 } from "@/lib/dashboard/rentabilite/rentabilityViewModel";
 import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
-import type { CalculatedKpis } from "@/types/analysis";
+import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
+import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
+import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
+import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
 type RentabilityTestProps = {
   kpis: CalculatedKpis;
   previousKpis?: CalculatedKpis | null;
+  analyses?: AnalysisRecord[];
+  currentAnalysis?: AnalysisRecord | null;
+  analysisModeLabel?: string | null;
 };
 
 type ChartPoint = {
@@ -35,7 +40,28 @@ type ChartPoint = {
   roce: number;
 };
 
-export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestProps) {
+// Default layout — reproduit les 2 cartes existantes (ROE, ROCE) sous forme
+// de widgets customizable. L'utilisateur peut ajouter d'autres KPIs de la
+// catégorie "rentabilite" (effet_levier, marge_nette) via le picker.
+const DEFAULT_RENTABILITY_LAYOUT: DashboardLayout = {
+  id: "dashboard:rentabilite",
+  constrainedToCategory: "rentabilite",
+  widgets: [
+    { id: "rent-roe", kpiId: "roe", vizType: "kpiCard", size: "M" },
+    { id: "rent-roce", kpiId: "roce", vizType: "kpiCard", size: "M" }
+  ] as WidgetInstance[]
+};
+
+export function RentabilityTest({
+  kpis,
+  previousKpis = null,
+  analyses = [],
+  currentAnalysis = null,
+  analysisModeLabel = null
+}: RentabilityTestProps) {
+  // Le KPI sélectionné pilote la courbe top de la page. Par défaut le premier
+  // KPI de l'onglet (ROE = "rendement actionnaire").
+  const [selectedKpiId, setSelectedKpiId] = useState<string>("roe");
   // KPI rentabilité normalisés en % pour afficher une lecture homogène.
   const roePercent = normalizePercentInput(kpis.roe);
   const rocePercent = normalizePercentInput(kpis.roce);
@@ -138,11 +164,6 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 
-      {/* Badge top en flux normal pour un placement naturel. */}
-      <div className="relative z-[4] mb-6 flex">
-        <TestTopStatus label="Contrôle des flux" />
-      </div>
-
       <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
         <div className="flex flex-col gap-2">
           <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
@@ -152,40 +173,46 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
             Création de richesse, performance du capital et impact du levier.
           </p>
         </div>
+
+        {analysisModeLabel ? (
+          <div className="interactive-badge flex items-center gap-2 self-start rounded border border-white/10 bg-white/[0.02] px-3 py-1 md:self-auto">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">{analysisModeLabel}</span>
+          </div>
+        ) : null}
       </header>
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
-        <RentabilityMetricCard
-          className="md:col-span-6"
-          delayMs={100}
-          searchId="analysis-rent-roe"
-          title="Rentabilité actionnariale"
-          tag="Return on Equity (ROE)"
-          value={roePercent === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedRoe, 1)}%`}
-          trend={roeTrend}
-          icon={<Award className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Rentabilité des fonds propres: mesure ce que l'actionnaire gagne pour chaque euro investi."
-          kpiId="roe"
-          kpiValue={kpis.roe}
-          previousKpis={previousKpis}
-        />
+        {/* Graphique top : courbe d'évolution du KPI sélectionné. Défaut = ROE. */}
+        <div className="md:col-span-12">
+          <KpiEvolutionChart
+            kpiId={selectedKpiId}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+          />
+        </div>
 
-        <RentabilityMetricCard
-          className="md:col-span-6"
-          delayMs={150}
-          searchId="analysis-rent-roce"
-          title="Rentabilité opérationnelle"
-          tag="Return on Capital Employed (ROCE)"
-          value={rocePercent === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedRoce, 1)}%`}
-          trend={roceTrend}
-          icon={
-            <BriefcaseBusiness className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-          }
-          helper="Performance économique pure de l'exploitation, indépendamment du mode de financement."
-          kpiId="roce"
-          kpiValue={kpis.roce}
-          previousKpis={previousKpis}
-        />
+        {/* Cartes KPI customizable : par défaut ROE + ROCE, l'utilisateur peut
+            ajouter d'autres KPIs de la catégorie rentabilite (effet_levier,
+            marge_nette…) ou changer leur viz (gauge, lineChart…). Click sur
+            une carte met à jour le graphique top. */}
+        <div className="md:col-span-12">
+          <CustomizableDashboard
+            userId={null}
+            layoutId="dashboard:rentabilite"
+            defaultLayout={DEFAULT_RENTABILITY_LAYOUT}
+            kpis={kpis}
+            previousKpis={previousKpis}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+            mappedData={currentAnalysis?.mappedData ?? null}
+            lockedCategory="rentabilite"
+            kpiSelection={{
+              selectedKpiId,
+              onSelect: setSelectedKpiId
+            }}
+          />
+        </div>
 
         <article
           className="precision-card fade-up group col-span-1 rounded-2xl p-8 md:col-span-12"
@@ -361,6 +388,9 @@ type RentabilityMetricCardProps = {
   kpiValue?: number | null;
   /** Tous les KPIs de la période précédente — la card y cherche kpiId. */
   previousKpis?: CalculatedKpis | null;
+  /** Card cliquable → pilote la courbe d'évolution top de la page. */
+  onSelect?: () => void;
+  isSelected?: boolean;
   /** Props legacy conservés pour compat — plus rendus. */
   helper?: string;
   trend?: KpiTrend;
@@ -377,6 +407,8 @@ function RentabilityMetricCard({
   kpiId,
   kpiValue,
   previousKpis,
+  onSelect,
+  isSelected,
 }: RentabilityMetricCardProps) {
   const previousValue =
     kpiId && previousKpis
@@ -396,6 +428,8 @@ function RentabilityMetricCard({
         formattedValue={value}
         searchId={searchId}
         className="fade-up"
+        onSelect={onSelect}
+        isSelected={isSelected}
       />
     </div>
   );

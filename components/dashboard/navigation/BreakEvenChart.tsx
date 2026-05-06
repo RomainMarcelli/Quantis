@@ -400,7 +400,9 @@ function SummaryCard({ label, value, hint, isDark, tone = "neutral" }: SummaryCa
 }
 
 function formatBreakEvenTick(value: number): string {
-  return value > 12 ? "Clôture" : `${Math.round(value)}`;
+  // L'axe X s'arrête désormais au mois 12. Si une valeur > 12 surgit (legacy),
+  // on l'aligne à 12 plutôt que d'afficher "Clôture".
+  return `${Math.min(Math.round(value), 12)}`;
 }
 
 function formatAxisCurrency(value: number): string {

@@ -20,17 +20,39 @@ export function setActiveFolderName(folderName: string): void {
   const normalizedFolderName = normalizeFolderName(folderName);
   window.localStorage.setItem(ACTIVE_FOLDER_STORAGE_KEY, normalizedFolderName);
   registerKnownFolderName(normalizedFolderName);
+  // Notifie les composants montés dans le même onglet (StorageEvent natif ne
+  // tire pas pour la même fenêtre). Pendant exact de quantis:activeAnalysisChanged.
+  window.dispatchEvent(
+    new CustomEvent("quantis:activeFolderChanged", { detail: { folderName: normalizedFolderName } })
+  );
 }
 
 export function clearActiveFolderName(): void {
   if (typeof window === "undefined") {
     return;
   }
-  // Le dossier actif est stocke uniquement cote client: on le purge
-  // lors d'une suppression de donnees pour repartir sur un etat vierge.
+  // Reset complet : utilisé lors d'une purge de données (AccountView).
+  // Pour juste désactiver la sélection sans toucher à la liste des dossiers
+  // connus, utiliser `clearActiveFolderSelection` à la place.
   window.localStorage.removeItem(ACTIVE_FOLDER_STORAGE_KEY);
-  // Les dossiers connus sont aussi locaux: on les purge avec le dossier actif.
   window.localStorage.removeItem(KNOWN_FOLDERS_STORAGE_KEY);
+  window.dispatchEvent(
+    new CustomEvent("quantis:activeFolderChanged", { detail: { folderName: null } })
+  );
+}
+
+// Désactive la sélection de dossier sans purger la liste des dossiers connus.
+// Utilisé quand l'utilisateur bascule sur une connexion dynamique (Pennylane,
+// Bridge…) — on veut clear l'override statique mais garder ses dossiers
+// pour pouvoir y revenir plus tard.
+export function clearActiveFolderSelection(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+  window.localStorage.removeItem(ACTIVE_FOLDER_STORAGE_KEY);
+  window.dispatchEvent(
+    new CustomEvent("quantis:activeFolderChanged", { detail: { folderName: null } })
+  );
 }
 
 export function ensureFolderName(explicitFolderName?: string | null): string | null {

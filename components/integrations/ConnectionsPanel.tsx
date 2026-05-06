@@ -8,7 +8,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Plug, RefreshCw, Trash2 } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
-import { writeActiveAnalysisId } from "@/lib/source/activeSource";
+import { clearActiveAnalysisId, writeActiveAnalysisId } from "@/lib/source/activeSource";
+import { clearActiveFolderSelection } from "@/lib/folders/activeFolder";
+import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
 import type { ConnectionDto } from "@/app/api/integrations/connections/route";
 
 type PerConnectionStatus = "idle" | "syncing" | "disconnecting";
@@ -48,6 +50,10 @@ export function ConnectionsPanel({ onChanged }: ConnectionsPanelProps) {
   const [connections, setConnections] = useState<ConnectionDto[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Quand un dossier est actif, le badge "Source active" passe sur le panel
+  // au lieu d'être sur les connexions. Permet de basculer en clic.
+  const activeFolderName = useActiveFolderName();
+  const isConnectionActive = !activeFolderName;
   const [perConnection, setPerConnection] = useState<Record<string, PerConnectionStatus>>({});
 
   const refresh = useCallback(async () => {
@@ -261,7 +267,32 @@ export function ConnectionsPanel({ onChanged }: ConnectionsPanelProps) {
                 )}
               </div>
 
-              <div className="flex shrink-0 gap-2 md:justify-end">
+              <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
+                {/* Bouton de bascule "source active" — pour les sources
+                    dynamiques. Si un dossier statique est actuellement actif,
+                    on propose de basculer dessus. Sinon on signale qu'on est
+                    déjà sur la source dynamique (Pennylane / etc). */}
+                {isConnectionActive ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/40 bg-quantis-gold/10 px-3 py-1.5 text-xs font-semibold text-quantis-gold">
+                    <span className="h-1.5 w-1.5 rounded-full bg-quantis-gold" />
+                    Source active du dashboard
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Bascule statique → dynamique : on libère le dossier
+                      // et l'override par-analyse, le résolveur retombe sur
+                      // la priorité auto qui choisit cette connexion.
+                      clearActiveFolderSelection();
+                      clearActiveAnalysisId();
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/75 hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"
+                    title="Utiliser la connexion comme source du dashboard à la place du dossier statique"
+                  >
+                    Définir comme source active
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => void handleResync(c.id, c.provider)}

@@ -25,15 +25,45 @@ import {
   type FinancingSeverity
 } from "@/lib/dashboard/financement/financingViewModel";
 import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
-import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
-import type { CalculatedKpis } from "@/types/analysis";
+import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
+import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
+import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
+import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
+
+// Default layout pour l'onglet Financement : reproduit les 6 cartes existantes
+// (capacite_remboursement, caf, fte, solvabilite, gearing, tn). Toutes les
+// variations + benchmarks sont portés par chaque widget KpiCard.
+const DEFAULT_FINANCING_LAYOUT: DashboardLayout = {
+  id: "dashboard:financement",
+  constrainedToCategory: "financement",
+  widgets: [
+    { id: "fin-cap-remb", kpiId: "capacite_remboursement_annees", vizType: "kpiCard", size: "S" },
+    { id: "fin-caf", kpiId: "caf", vizType: "kpiCard", size: "S" },
+    { id: "fin-fte", kpiId: "fte", vizType: "kpiCard", size: "S" },
+    { id: "fin-solva", kpiId: "solvabilite", vizType: "kpiCard", size: "S" },
+    { id: "fin-gearing", kpiId: "gearing", vizType: "kpiCard", size: "S" },
+    { id: "fin-tn", kpiId: "tn", vizType: "kpiCard", size: "S" }
+  ] as WidgetInstance[]
+};
 
 type FinancingTestProps = {
   kpis: CalculatedKpis;
   previousKpis?: CalculatedKpis | null;
+  analyses?: AnalysisRecord[];
+  currentAnalysis?: AnalysisRecord | null;
+  analysisModeLabel?: string | null;
 };
 
-export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps) {
+export function FinancingTest({
+  kpis,
+  previousKpis = null,
+  analyses = [],
+  currentAnalysis = null,
+  analysisModeLabel = null
+}: FinancingTestProps) {
+  // KPI sélectionné → pilote la courbe d'évolution top. Défaut = capacité de
+  // remboursement qui est la 1re carte affichée.
+  const [selectedKpiId, setSelectedKpiId] = useState<string>("capacite_remboursement_annees");
   // Les compteurs sont animés côté React pour reproduire l'effet du design HTML source.
   const animatedDebtCapacity = useAnimatedNumber(kpis.capacite_remboursement_annees, { durationMs: 1200 });
   const animatedCaf = useAnimatedNumber(kpis.caf, { durationMs: 1350 });
@@ -141,11 +171,6 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 
-      {/* Badge de contexte en flux normal pour un rendu naturel et plus propre. */}
-      <div className="relative z-[4] mb-6 flex">
-        <TestTopStatus label="Contrôle des flux" />
-      </div>
-
       <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
         <div className="flex flex-col gap-2">
           <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
@@ -154,14 +179,15 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
           <p className="text-sm text-quantis-muted">Capacité d&apos;emprunt, génération de cash et liquidité court terme</p>
         </div>
 
-        <div className="mt-3 flex flex-col items-end gap-2 md:mt-0">
-          <div className="flex items-center gap-2">
-            <Scale className="h-3 w-3 text-white/30" />
-            <span className="text-[11px] font-mono uppercase text-white/40">Analyse bilancielle</span>
-          </div>
-          <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">
+        <div className="flex flex-col items-end gap-2 self-start md:self-auto">
+          {analysisModeLabel ? (
+            <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
+              <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">{analysisModeLabel}</span>
+            </div>
+          ) : null}
+          <div className="interactive-badge flex items-center gap-2 rounded border border-quantis-gold/20 bg-quantis-gold/[0.04] px-3 py-1">
+            <span className="text-[10px] font-medium uppercase tracking-widest text-quantis-gold">
               Score crédit : {creditBadge}
             </span>
           </div>
@@ -169,113 +195,36 @@ export function FinancingTest({ kpis, previousKpis = null }: FinancingTestProps)
       </header>
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
-        <FinancingMetricCard
-          delayMs={100}
-          searchId="analysis-fin-capacite-remboursement"
-          className="md:col-span-4"
-          title="Capacité de remboursement"
-          tag="Dette nette / CAF (années)"
-          value={kpis.capacite_remboursement_annees === null ? INSUFFICIENT_DATA_LABEL : `${animatedDebtCapacity.toFixed(1)} ans`}
-          trend={debtCapacityTrend}
-          icon={<ShieldCheck className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper={debtInterpretation.helper}
-          statusLabel={debtInterpretation.label}
-          severity={debtInterpretation.severity}
-          code="DEBT_RATIO"
-          kpiId="capacite_remboursement_annees"
-          kpiValue={kpis.capacite_remboursement_annees}
-          previousKpis={previousKpis}
-        />
+        {/* Chart top : courbe d'évolution du KPI sélectionné. */}
+        <div className="md:col-span-12">
+          <KpiEvolutionChart
+            kpiId={selectedKpiId}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+          />
+        </div>
 
-        <FinancingMetricCard
-          delayMs={150}
-          searchId="analysis-fin-caf"
-          className="md:col-span-4"
-          title="Autofinancement"
-          tag="Capacité d'autofinancement (CAF)"
-          value={kpis.caf === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedCaf)}
-          trend={cafTrend}
-          icon={<Landmark className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Cash théorique généré par l'exploitation avant variation du BFR."
-          statusLabel={kpis.caf === null ? INSUFFICIENT_DATA_LABEL : kpis.caf >= 0 ? "Création de cash" : "Cash négatif"}
-          severity={kpis.caf === null ? "na" : kpis.caf >= 0 ? "good" : "risk"}
-          code="CASH_FLOW_GEN"
-          kpiId="caf"
-          kpiValue={kpis.caf}
-          previousKpis={previousKpis}
-        />
-
-        <FinancingMetricCard
-          delayMs={200}
-          searchId="analysis-fin-fte"
-          className="md:col-span-4"
-          title="Cash réel d'exploitation"
-          tag="CAF - variation du BFR"
-          value={kpis.fte === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedFte)}
-          trend={fteTrend}
-          icon={<Waves className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Trésorerie réellement dégagée après absorption du besoin en fonds de roulement."
-          statusLabel={kpis.fte === null ? INSUFFICIENT_DATA_LABEL : kpis.fte >= 0 ? "Cash disponible" : "Cash consommé"}
-          severity={kpis.fte === null ? "na" : kpis.fte >= 0 ? "good" : "risk"}
-          code="OCF_NET"
-          kpiId="fte"
-          kpiValue={kpis.fte}
-          previousKpis={previousKpis}
-        />
-
-        <FinancingMetricCard
-          delayMs={220}
-          searchId="analysis-fin-solvabilite"
-          className="md:col-span-4"
-          title="Solidité du bilan"
-          tag="Capitaux propres / Total passif"
-          value={kpis.solvabilite === null ? INSUFFICIENT_DATA_LABEL : formatPercent(animatedSolvabilite * 100)}
-          trend={{ direction: "na", changePercent: null, label: INSUFFICIENT_DATA_LABEL, tone: "neutral" }}
-          icon={<ShieldCheck className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Mesure la proportion du bilan financée par les fonds propres."
-          statusLabel={kpis.solvabilite === null ? INSUFFICIENT_DATA_LABEL : kpis.solvabilite >= 0.3 ? "Bilan solide" : "Sous-capitalisé"}
-          severity={kpis.solvabilite === null ? "na" : kpis.solvabilite >= 0.3 ? "good" : "risk"}
-          code="SOLVENCY"
-          kpiId="solvabilite"
-          kpiValue={kpis.solvabilite}
-          previousKpis={previousKpis}
-        />
-
-        <FinancingMetricCard
-          delayMs={240}
-          searchId="analysis-fin-gearing"
-          className="md:col-span-4"
-          title="Poids de la dette"
-          tag="Ratio d'endettement"
-          value={kpis.gearing === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedGearing, 1)}x`}
-          trend={{ direction: "na", changePercent: null, label: INSUFFICIENT_DATA_LABEL, tone: "neutral" }}
-          icon={<Scale className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Nombre d'années d'EBITDA pour rembourser la dette nette."
-          statusLabel={kpis.gearing === null ? INSUFFICIENT_DATA_LABEL : kpis.gearing <= 3 ? "Endettement maîtrisé" : "Endettement élevé"}
-          severity={kpis.gearing === null ? "na" : kpis.gearing <= 3 ? "good" : "risk"}
-          code="GEARING"
-          kpiId="gearing"
-          kpiValue={kpis.gearing}
-          previousKpis={previousKpis}
-        />
-
-        <FinancingMetricCard
-          delayMs={260}
-          searchId="analysis-fin-tn"
-          className="md:col-span-4"
-          title="Position nette de trésorerie"
-          tag="Disponibilités - Emprunts"
-          value={kpis.tn === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedTn)}
-          trend={{ direction: "na", changePercent: null, label: INSUFFICIENT_DATA_LABEL, tone: "neutral" }}
-          icon={<Landmark className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Solde net entre la trésorerie disponible et les emprunts bancaires."
-          statusLabel={kpis.tn === null ? INSUFFICIENT_DATA_LABEL : kpis.tn >= 0 ? "Trésorerie positive" : "Trésorerie négative"}
-          severity={kpis.tn === null ? "na" : kpis.tn >= 0 ? "good" : "risk"}
-          code="NET_CASH"
-          kpiId="tn"
-          kpiValue={kpis.tn}
-          previousKpis={previousKpis}
-        />
+        {/* 6 cartes KPI customizable : par défaut Capacité de remboursement,
+            CAF, FTE, Solvabilité, Gearing, TN. L'utilisateur peut ajouter
+            d'autres KPIs financement (effet_levier, liq_red, liq_imm…) ou
+            changer la viz (gauge pour les ratios bornés, etc.). */}
+        <div className="md:col-span-12">
+          <CustomizableDashboard
+            userId={null}
+            layoutId="dashboard:financement"
+            defaultLayout={DEFAULT_FINANCING_LAYOUT}
+            kpis={kpis}
+            previousKpis={previousKpis}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+            mappedData={currentAnalysis?.mappedData ?? null}
+            lockedCategory="financement"
+            kpiSelection={{
+              selectedKpiId,
+              onSelect: setSelectedKpiId
+            }}
+          />
+        </div>
 
         <article
           className="precision-card fade-up group col-span-1 rounded-2xl p-8 md:col-span-8"
@@ -420,6 +369,9 @@ type FinancingMetricCardProps = {
   kpiValue?: number | null;
   /** Tous les KPIs de la période précédente — la card va y chercher kpiId. */
   previousKpis?: CalculatedKpis | null;
+  /** Card cliquable → pilote la courbe d'évolution top de la page. */
+  onSelect?: () => void;
+  isSelected?: boolean;
   /** Props legacy conservés pour compat — plus rendus. */
   trend?: KpiTrend;
   statusLabel?: string;
@@ -439,6 +391,8 @@ function FinancingMetricCard({
   kpiId,
   kpiValue,
   previousKpis,
+  onSelect,
+  isSelected,
 }: FinancingMetricCardProps) {
   const previousValue =
     kpiId && previousKpis
@@ -458,6 +412,8 @@ function FinancingMetricCard({
         formattedValue={value}
         searchId={searchId}
         className="fade-up"
+        onSelect={onSelect}
+        isSelected={isSelected}
       />
     </div>
   );

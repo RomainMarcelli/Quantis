@@ -8,7 +8,6 @@ import {
   ArrowRight,
   Building2,
   Cpu,
-  Layers,
   Lock,
   Package,
   Truck,
@@ -18,18 +17,44 @@ import { formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/f
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
+import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
+import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
+import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
+
+// Default layout pour l'onglet Investissement & BFR : reproduit les cartes
+// principales d'aujourd'hui (BFR, ratio_immo). La carte "Variation annuelle"
+// est retirée — l'info de variation est désormais portée par chaque widget
+// KpiCard (ligne N vs N-1 automatique via KpiCardLayout).
+const DEFAULT_INVESTMENT_LAYOUT: DashboardLayout = {
+  id: "dashboard:investissement",
+  constrainedToCategory: "investissement",
+  widgets: [
+    { id: "inv-bfr", kpiId: "bfr", vizType: "kpiCard", size: "M" },
+    { id: "inv-ratio-immo", kpiId: "ratio_immo", vizType: "kpiCard", size: "M" }
+  ] as WidgetInstance[]
+};
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import { buildKpiTrend, buildSignedTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
-import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
-import type { CalculatedKpis } from "@/types/analysis";
+import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
 
 type InvestmentTestProps = {
   kpis: CalculatedKpis;
   previousKpis?: CalculatedKpis | null;
+  analyses?: AnalysisRecord[];
+  currentAnalysis?: AnalysisRecord | null;
+  analysisModeLabel?: string | null;
 };
 
-export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProps) {
+export function InvestmentTest({
+  kpis,
+  previousKpis = null,
+  analyses = [],
+  currentAnalysis = null,
+  analysisModeLabel = null
+}: InvestmentTestProps) {
+  // KPI sélectionné → pilote la courbe d'évolution top. Défaut = BFR.
+  const [selectedKpiId, setSelectedKpiId] = useState<string>("bfr");
   // Compteurs animés pour conserver le rendu "data-react" de la maquette source.
   const animatedBfr = useAnimatedNumber(kpis.bfr, { durationMs: 1400 });
   const animatedRatioImmo = useAnimatedNumber(kpis.ratio_immo, { durationMs: 1200 });
@@ -106,11 +131,6 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 
-      {/* Badge de contexte en flux normal pour retirer l'effet "bandeau superposé". */}
-      <div className="relative z-[4] mb-6 flex">
-        <TestTopStatus label="Contrôle des flux" />
-      </div>
-
       <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
         <div className="flex flex-col gap-2">
           <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
@@ -119,88 +139,44 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
           <p className="text-sm text-quantis-muted">Cycle clients-fournisseurs et usure des immobilisations</p>
         </div>
 
-        <div className="mt-3 flex flex-col items-end gap-2 md:mt-0">
-          <div className="flex items-center gap-2">
-            <Layers className="h-3 w-3 text-white/30" />
-            <span className="text-[11px] font-mono uppercase text-white/40">
-              Pilotage du cycle d&apos;exploitation
-            </span>
-          </div>
-          <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
+        {analysisModeLabel ? (
+          <div className="interactive-badge flex items-center gap-2 self-start rounded border border-white/10 bg-white/[0.02] px-3 py-1 md:self-auto">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">Comparatif N vs N-1</span>
+            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">{analysisModeLabel}</span>
           </div>
-        </div>
+        ) : null}
       </header>
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
-        <InvestmentMetricCard
-          delayMs={100}
-          searchId="analysis-invest-bfr"
-          className="md:col-span-4"
-          title="BFR net à financer"
-          tag="Besoin en fonds de roulement"
-          value={kpis.bfr === null ? INSUFFICIENT_DATA_LABEL : formatCompactCurrency(animatedBfr)}
-          statusLabel={
-            kpis.bfr === null
-              ? "Donnée indisponible"
-              : kpis.bfr <= 0
-                ? "Cycle auto-financé"
-                : "Besoin à financer"
-          }
-          code="BFR_NET_01"
-          trend={bfrTrend}
-          icon={<Lock className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Montant immobilisé dans le cycle (stocks + créances - fournisseurs)."
-          kpiId="bfr"
-          kpiValue={kpis.bfr}
-          previousKpis={previousKpis}
-        />
+        {/* Chart top : courbe d'évolution du KPI sélectionné. */}
+        <div className="md:col-span-12">
+          <KpiEvolutionChart
+            kpiId={selectedKpiId}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+          />
+        </div>
 
-        <InvestmentMetricCard
-          delayMs={150}
-          searchId="analysis-invest-variation-bfr"
-          className="md:col-span-4"
-          title="Variation annuelle"
-          tag="Évolution du BFR (N vs N-1)"
-          value={formatSignedPercent(bfrYearlyVariation)}
-          statusLabel={
-            bfrYearlyVariation === null
-              ? "Donnée indisponible"
-              : bfrYearlyVariation <= 0
-                ? "Baisse du besoin"
-                : "Hausse du besoin"
-          }
-          code="VAR_BFR_YTD"
-          trend={bfrVariationTrend}
-          icon={<Activity className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Variation du besoin de financement entre l'exercice courant et le précédent."
-        />
-
-        <InvestmentMetricCard
-          delayMs={200}
-          searchId="analysis-invest-ratio-immo"
-          className="md:col-span-4"
-          title="État des immobilisations"
-          tag="Immobilisations nettes / brutes"
-          value={kpis.ratio_immo === null ? INSUFFICIENT_DATA_LABEL : formatPercent(animatedRatioImmo)}
-          statusLabel={
-            kpis.ratio_immo === null
-              ? "Donnée indisponible"
-              : kpis.ratio_immo >= 0.7
-                ? "Usure maîtrisée"
-                : kpis.ratio_immo >= 0.4
-                  ? "À surveiller"
-                  : "Usure élevée"
-          }
-          code="CAPEX_RATIO"
-          trend={ratioImmoTrend}
-          icon={<Building2 className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Part des immobilisations encore non amortie (net / brut)."
-          kpiId="ratio_immo"
-          kpiValue={kpis.ratio_immo}
-          previousKpis={previousKpis}
-        />
+        {/* KPI cards customizable : par défaut BFR + ratio_immo. L'utilisateur
+            peut ajouter d'autres KPIs de la catégorie "investissement" (rot_bfr,
+            dso, dpo, rot_stocks…) ou changer la viz (gauge, barChart…). */}
+        <div className="md:col-span-12">
+          <CustomizableDashboard
+            userId={null}
+            layoutId="dashboard:investissement"
+            defaultLayout={DEFAULT_INVESTMENT_LAYOUT}
+            kpis={kpis}
+            previousKpis={previousKpis}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+            mappedData={currentAnalysis?.mappedData ?? null}
+            lockedCategory="investissement"
+            kpiSelection={{
+              selectedKpiId,
+              onSelect: setSelectedKpiId
+            }}
+          />
+        </div>
 
         <article
           className="precision-card fade-up group col-span-1 rounded-2xl p-8 md:col-span-12"
@@ -258,6 +234,8 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
               }
               kpiId="dso"
               kpiValue={kpis.dso}
+              onSelect={() => setSelectedKpiId("dso")}
+              isSelected={selectedKpiId === "dso"}
             />
             <DelayCard
               title="Délai stocks (DIO)"
@@ -274,6 +252,8 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
               }
               kpiId="rot_stocks"
               kpiValue={kpis.rot_stocks}
+              onSelect={() => setSelectedKpiId("rot_stocks")}
+              isSelected={selectedKpiId === "rot_stocks"}
             />
             <DelayCard
               title="Délai fournisseurs (DPO)"
@@ -290,6 +270,8 @@ export function InvestmentTest({ kpis, previousKpis = null }: InvestmentTestProp
               }
               kpiId="dpo"
               kpiValue={kpis.dpo}
+              onSelect={() => setSelectedKpiId("dpo")}
+              isSelected={selectedKpiId === "dpo"}
             />
           </div>
 
@@ -336,6 +318,9 @@ type InvestmentMetricCardProps = {
   kpiValue?: number | null;
   /** Tous les KPIs de la période précédente — la card y cherche kpiId. */
   previousKpis?: CalculatedKpis | null;
+  /** Card cliquable → pilote la courbe d'évolution top de la page. */
+  onSelect?: () => void;
+  isSelected?: boolean;
   /** Props legacy conservés pour compat — plus rendus. */
   statusLabel?: string;
   code?: string;
@@ -354,6 +339,8 @@ function InvestmentMetricCard({
   kpiId,
   kpiValue,
   previousKpis,
+  onSelect,
+  isSelected,
 }: InvestmentMetricCardProps) {
   const previousValue =
     kpiId && previousKpis
@@ -373,6 +360,8 @@ function InvestmentMetricCard({
         formattedValue={value}
         searchId={searchId}
         className="fade-up"
+        onSelect={onSelect}
+        isSelected={isSelected}
       />
     </div>
   );
@@ -392,9 +381,24 @@ type DelayCardProps = {
   anomaly?: { message: string };
   kpiId?: string;
   kpiValue?: number | null;
+  /** Carte cliquable → pilote la courbe d'évolution top de la page. */
+  onSelect?: () => void;
+  isSelected?: boolean;
 };
 
-function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, anomaly, kpiId, kpiValue }: DelayCardProps) {
+function DelayCard({
+  title,
+  value,
+  trend,
+  hint,
+  badgeLabel,
+  badgeTone,
+  anomaly,
+  kpiId,
+  kpiValue,
+  onSelect,
+  isSelected
+}: DelayCardProps) {
   const badgeClass =
     badgeTone === "good"
       ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
@@ -403,8 +407,33 @@ function DelayCard({ title, value, trend, hint, badgeLabel, badgeTone, anomaly, 
     ? "tnum text-3xl font-medium text-rose-400"
     : "tnum text-3xl font-medium text-white";
 
+  // Selectability identique à KpiCardLayout : article cliquable + ring or quand
+  // sélectionné. DelayCard n'utilise pas KpiCardLayout (layout custom avec
+  // badge + hint), donc on duplique la logique d'interaction ici.
+  const interactiveProps = onSelect
+    ? {
+        role: "button" as const,
+        tabIndex: 0,
+        onClick: onSelect,
+        onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect();
+          }
+        }
+      }
+    : {};
+  const selectionClass = onSelect
+    ? isSelected
+      ? "ring-2 ring-quantis-gold/70 cursor-pointer"
+      : "cursor-pointer hover:ring-1 hover:ring-white/20"
+    : "";
+
   return (
-    <div className="interactive-badge rounded-xl border border-white/5 bg-white/[0.02] p-5 transition-all hover:border-quantis-gold/30 hover:bg-quantis-gold/[0.03]">
+    <div
+      className={`interactive-badge rounded-xl border border-white/5 bg-white/[0.02] p-5 transition-all hover:border-quantis-gold/30 hover:bg-quantis-gold/[0.03] ${selectionClass}`}
+      {...interactiveProps}
+    >
       <div className="mb-4 flex items-start justify-between">
         <span className="text-[10px] uppercase tracking-widest text-white/55">{title}</span>
         {kpiId ? <KpiTooltip kpiId={kpiId} value={kpiValue} /> : null}
