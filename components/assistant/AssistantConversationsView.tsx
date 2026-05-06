@@ -16,7 +16,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, MessageCircle, Sparkles } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
-import { useAiChat } from "@/components/ai/AiChatProvider";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import type { ConversationSummary } from "@/lib/ai/types";
@@ -34,7 +33,6 @@ type FetchState = "idle" | "loading" | "ready" | "error" | "unauth";
 function AssistantConversationsViewInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { open: openChat } = useAiChat();
   const kpiIdParam = searchParams.get("kpi");
   const initialQuestion = searchParams.get("q");
 
@@ -102,18 +100,37 @@ function AssistantConversationsViewInner() {
     void refresh();
   }, [refresh]);
 
-  // Ouverture automatique de l'AiChatPanel si on arrive depuis un tooltip
-  // (params ?kpi=...&q=...). Comportement non-bloquant : si l'utilisateur
-  // ferme le panel, il atterrit sur la liste normalement.
+  // Si on arrive depuis un tooltip avec ?kpi=…&q=…, on bascule directement
+  // sur la page plein écran /assistant-ia/chat. La liste des conversations
+  // n'a pas de raison d'être affichée quand l'utilisateur veut juste poser
+  // une question contextuelle.
   useEffect(() => {
-    if (kpiIdParam && initialQuestion) {
-      openChat({ kpiId: kpiIdParam, initialQuestion });
-    } else if (kpiIdParam) {
-      openChat({ kpiId: kpiIdParam });
-    }
+    if (!kpiIdParam) return;
+    const params = new URLSearchParams();
+    params.set("kpiId", kpiIdParam);
+    if (initialQuestion) params.set("q", initialQuestion);
+    router.replace(`/assistant-ia/chat?${params.toString()}`);
     // On ne déclenche qu'une fois au mount avec les params initiaux.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * Ouvre la page plein écran `/assistant-ia/chat` avec les bons query
+   * params. Centralisé pour ne pas dupliquer la logique d'encodage
+   * d'URL à chaque CTA (sample question / conversation existante).
+   */
+  function navigateToChat(payload: {
+    kpiId?: string | null;
+    initialQuestion?: string | null;
+    conversationId?: string | null;
+  }) {
+    const params = new URLSearchParams();
+    if (payload.kpiId) params.set("kpiId", payload.kpiId);
+    if (payload.initialQuestion) params.set("q", payload.initialQuestion);
+    if (payload.conversationId) params.set("conversationId", payload.conversationId);
+    const qs = params.toString();
+    router.push(`/assistant-ia/chat${qs ? `?${qs}` : ""}`);
+  }
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
@@ -161,7 +178,7 @@ function AssistantConversationsViewInner() {
             <li key={q.question}>
               <button
                 type="button"
-                onClick={() => openChat({ kpiId: q.kpiId, initialQuestion: q.question })}
+                onClick={() => navigateToChat({ kpiId: q.kpiId, initialQuestion: q.question })}
                 className="group flex w-full items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition hover:border-quantis-gold/60 hover:bg-quantis-gold/[0.06]"
               >
                 <span aria-hidden className="text-quantis-gold/70 group-hover:text-quantis-gold">
@@ -227,12 +244,9 @@ function AssistantConversationsViewInner() {
                 <button
                   type="button"
                   onClick={() =>
-                    openChat({
+                    navigateToChat({
                       kpiId: conv.kpiId,
                       conversationId: conv.id,
-                      // Les messages eux-mêmes seront chargés à l'ouverture
-                      // (pour l'instant on les laisse vides, le panel les
-                      // pousse au fil des nouveaux tours).
                     })
                   }
                   className="flex w-full items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-quantis-gold/40 hover:bg-quantis-gold/[0.05]"
