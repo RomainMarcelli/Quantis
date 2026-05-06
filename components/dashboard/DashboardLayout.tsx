@@ -52,7 +52,6 @@ type DashboardLayoutProps = {
   aiMessage?: string;
   aiCtaLabel?: string;
   searchIds?: DashboardLayoutSearchIds;
-  headerAction?: ReactNode;
 };
 
 export function DashboardLayout({
@@ -68,8 +67,7 @@ export function DashboardLayout({
   statusBadgeLabel,
   aiMessage,
   aiCtaLabel = "Ouvrir le simulateur strategique",
-  searchIds,
-  headerAction
+  searchIds
 }: DashboardLayoutProps) {
   const healthState = getPremiumHealthState(kpis.healthScore);
 
@@ -96,17 +94,14 @@ export function DashboardLayout({
           <p className="text-sm text-quantis-muted">{resolvedSubtitle}</p>
         </div>
 
-        {statusBadgeLabel || headerAction ? (
+        {statusBadgeLabel ? (
           <div className="flex flex-col items-end gap-2">
-            {statusBadgeLabel ? (
-              <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
-                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
-                <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">
-                  {statusBadgeLabel}
-                </span>
-              </div>
-            ) : null}
-            {headerAction ? <div className="mt-1">{headerAction}</div> : null}
+            <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
+              <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">
+                {statusBadgeLabel}
+              </span>
+            </div>
           </div>
         ) : null}
       </header>
