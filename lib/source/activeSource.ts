@@ -10,6 +10,7 @@
 // À niveau de priorité égal, la plus récente (createdAt desc) gagne.
 
 import type { AnalysisRecord } from "@/types/analysis";
+import { clearActiveFolderName } from "@/lib/folders/activeFolder";
 
 const STORAGE_KEY = "quantis.activeAnalysis";
 
@@ -27,6 +28,13 @@ export function writeActiveAnalysisId(analysisId: string): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(STORAGE_KEY, analysisId);
+    // Quand on bascule explicitement sur une analyse précise (typiquement une
+    // sync Pennylane / MyUnisoft / Odoo), on efface en miroir le pointeur
+    // « dossier actif » (sources statiques). Sinon, en cas de changement de
+    // year selector côté Synthèse / Tableau de bord, la priorité 2 (folder)
+    // peut se ré-imposer et l'utilisateur reste coincé sur Excel alors
+    // qu'il a explicitement choisi Pennylane (bug remonté le 06/05/2026).
+    clearActiveFolderName();
     // Notifie les autres composants montés dans le même onglet (le storage event
     // natif ne se déclenche pas pour la même fenêtre).
     window.dispatchEvent(new CustomEvent("quantis:activeAnalysisChanged", { detail: { analysisId } }));

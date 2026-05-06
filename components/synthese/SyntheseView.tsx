@@ -406,6 +406,7 @@ export function SyntheseView() {
               synthese={synthese}
               parserVersion={analysisPair.current.parserVersion}
               sourceMetadata={analysisPair.current.sourceMetadata ?? null}
+              currentKpis={effective?.kpis ?? null}
               previousKpis={previousKpis}
               analyses={allAnalyses}
               currentAnalysis={analysisPair.current}

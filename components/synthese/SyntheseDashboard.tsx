@@ -30,6 +30,13 @@ type SyntheseDashboardProps = {
   synthese: SyntheseViewModel;
   parserVersion?: "v1" | "v2";
   sourceMetadata?: SourceMetadata | null;
+  /**
+   * KPIs courants déjà filtrés sur la période sélectionnée par la
+   * TemporalityBar (recomputeKpisForPeriod côté SyntheseView). C'est *cette*
+   * structure qui doit alimenter les widgets — pas `currentAnalysis.kpis`
+   * qui contient les KPI annuels figés au moment du sync.
+   */
+  currentKpis?: CalculatedKpis | null;
   /** KPIs période antérieure pour la variation +/-X% sur les KpiCard widgets. */
   previousKpis?: CalculatedKpis | null;
   /** Historique du dossier — alimente le mode annuel des charts. */
@@ -100,6 +107,7 @@ export function SyntheseDashboard({
   synthese,
   parserVersion,
   sourceMetadata,
+  currentKpis,
   previousKpis,
   analyses = [],
   currentAnalysis = null,
@@ -121,15 +129,22 @@ export function SyntheseDashboard({
 
   // Surcharge des disponibilités quand Bridge est connecté — utilisé par les
   // widgets KpiCard qui affichent "disponibilites".
+  //
+  // CRITIQUE : on s'appuie sur `currentKpis` (KPI déjà filtrés sur la période
+  // sélectionnée par la TemporalityBar côté SyntheseView). Avant ce fix, on
+  // lisait `currentAnalysis.kpis` qui contient les KPI ANNUELS figés au sync —
+  // résultat, changer le mois sur la TemporalityBar n'avait aucun effet sur
+  // les valeurs affichées (bug remonté par Antoine le 06/05/2026).
   const effectiveKpis = useMemo<CalculatedKpis>(() => {
+    const baseKpis = currentKpis ?? currentAnalysis?.kpis ?? ({} as CalculatedKpis);
     if (liveBalance === null) {
-      return getKpisFromSynthese(synthese, currentAnalysis);
+      return baseKpis;
     }
     return {
-      ...getKpisFromSynthese(synthese, currentAnalysis),
+      ...baseKpis,
       disponibilites: liveBalance
     };
-  }, [synthese, currentAnalysis, liveBalance]);
+  }, [currentKpis, currentAnalysis, liveBalance]);
 
   // Mode édition — état lifté pour pouvoir mettre Personnaliser dans le
   // bandeau title haut (au lieu de near "Mes widgets" comme avant).
@@ -304,13 +319,6 @@ export function SyntheseDashboard({
 // seulement les 3 du cockpit. On utilise donc `currentAnalysis.kpis` comme
 // source de vérité, en surchargeant `disponibilites` plus tard si Bridge
 // est connecté (cf. effectiveKpis).
-function getKpisFromSynthese(
-  _synthese: SyntheseViewModel,
-  currentAnalysis: AnalysisRecord | null | undefined
-): CalculatedKpis {
-  return currentAnalysis?.kpis ?? ({} as CalculatedKpis);
-}
-
 // Choisit le badge à afficher en tête de page selon la nature de l'analyse :
 // "Analyse dynamique" si un dailyAccounting exploitable est présent (sources
 // synchronisées Pennylane / MyUnisoft / Odoo / FEC), "Analyse statique" pour
