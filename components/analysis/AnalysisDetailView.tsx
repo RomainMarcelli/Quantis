@@ -43,8 +43,7 @@ import {
   registerKnownFolderName,
   setActiveFolderName
 } from "@/lib/folders/activeFolder";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import {
@@ -911,63 +910,10 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
   return (
     <section className="w-full space-y-4">
-      {/* Bandeau d'actions globales conserve (settings/offres/compte/logout) avec skin premium dark. */}
-      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
-        <div className="flex items-center gap-3">
-          {/* Taille légèrement augmentée pour éviter l'effet visuel "logo coupé" dans le header. */}
-          <QuantisLogo withText={false} size={34} />
-          <div>
-            <p className="text-sm font-semibold text-white">{companyName}</p>
-            <p className="text-xs text-white/55">Plateforme financière</p>
-          </div>
-        </div>
-
-        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
-          <GlobalSearchBar placeholder="Rechercher un KPI, une section ou un document..." />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/settings")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Paramètres"
-            title="Paramètres"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/pricing")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Offres"
-            title="Offre Free (verrouille)"
-          >
-            <Lock className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Compte"
-            title="Compte"
-          >
-            <UserCircle2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Se deconnecter"
-            title="Se deconnecter"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
-      </header>
-      <div className="md:hidden">
-        <GlobalSearchBar placeholder="Rechercher..." />
-      </div>
+      <AppHeader
+        companyName={companyName}
+        searchPlaceholder="Rechercher un KPI, une section ou un document..."
+      />
 
       {/* Loader retardé : ne s'affiche que si le chargement dépasse 400 ms. */}
       {showAnalysisLoader ? (
