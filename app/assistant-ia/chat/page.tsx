@@ -9,16 +9,20 @@
 //   - kpiValue         : valeur courante (sert au header + au prompt)
 //   - analysisId       : analyse pour contextualiser la réponse côté serveur
 //   - conversationId   : reprise d'une conversation existante
+//
+// `useSearchParams()` doit être utilisé sous une frontière <Suspense> sinon
+// le build Next plante au prerendering ("Error occurred prerendering page").
+// On extrait donc le contenu dans `AssistantIaChatContent` et on wrappe.
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AiChatFullPage } from "@/components/ai/AiChatFullPage";
 import { firebaseAuthGateway } from "@/services/auth";
 
-export default function AssistantIaChatPage() {
+function AssistantIaChatContent() {
   const searchParams = useSearchParams();
   const [greetingName, setGreetingName] = useState("Utilisateur");
 
@@ -56,5 +60,13 @@ export default function AssistantIaChatPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+export default function AssistantIaChatPage() {
+  return (
+    <Suspense fallback={null}>
+      <AssistantIaChatContent />
+    </Suspense>
   );
 }
