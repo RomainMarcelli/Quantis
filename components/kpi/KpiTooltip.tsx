@@ -35,11 +35,11 @@
 "use client";
 
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { MessageCircle, Sparkles } from "lucide-react";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { getKpiDiagnostic, pickSuggestedQuestion } from "@/lib/kpi/kpiDiagnostic";
-import { useAiChat } from "@/components/ai/AiChatProvider";
 
 type KpiTooltipProps = {
   kpiId: string;
@@ -88,7 +88,7 @@ function findKpiCardAncestor(el: HTMLElement | null): HTMLElement | null {
 
 export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
   const definition = getKpiDefinition(kpiId);
-  const { open: openAiChat } = useAiChat();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
@@ -355,7 +355,14 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                     type="button"
                     onClick={() => {
                       setOpen(false);
-                      openAiChat({ kpiId, kpiValue: value ?? null, initialQuestion: question });
+                      const params = new URLSearchParams({
+                        kpiId,
+                        q: question,
+                      });
+                      if (value !== null && value !== undefined) {
+                        params.set("kpiValue", String(value));
+                      }
+                      router.push(`/assistant-ia/chat?${params.toString()}`);
                     }}
                     className="flex w-full items-center gap-2 rounded-lg border border-quantis-gold/60 bg-quantis-gold/10 px-3 py-2 text-left text-[12px] font-medium text-quantis-gold transition hover:border-quantis-gold/90 hover:bg-quantis-gold/20"
                   >
@@ -372,7 +379,11 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                     type="button"
                     onClick={() => {
                       setOpen(false);
-                      openAiChat({ kpiId, kpiValue: value ?? null });
+                      const params = new URLSearchParams({ kpiId });
+                      if (value !== null && value !== undefined) {
+                        params.set("kpiValue", String(value));
+                      }
+                      router.push(`/assistant-ia/chat?${params.toString()}`);
                     }}
                     className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium text-white/55 transition hover:text-quantis-gold"
                   >
