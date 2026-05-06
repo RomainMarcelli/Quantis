@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getReducedPdf } from "@/services/pdf-analysis/reducedPdfStore";
+import { AuthError, requireAdmin } from "@/lib/auth/requireAdmin";
 
 export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
+
   const requestId = request.nextUrl.searchParams.get("requestId")?.trim();
   if (!requestId) {
     return NextResponse.json(

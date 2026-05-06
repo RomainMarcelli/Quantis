@@ -46,8 +46,8 @@ import {
   moveAnalysisToFolder
 } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
+import { useAuthenticatedUser } from "@/components/auth/AuthGate";
 import type { AnalysisRecord } from "@/types/analysis";
-import type { AuthenticatedUser } from "@/types/auth";
 
 type FolderDialogState = {
   isOpen: boolean;
@@ -63,7 +63,7 @@ type DeleteFolderConfirm = {
 
 export function DocumentsView() {
   const router = useRouter();
-  const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
+  const { user } = useAuthenticatedUser();
   const [loading, setLoading] = useState(true);
   // Loader visible uniquement si le chargement dépasse 400 ms — évite le flash.
   const showSlowLoader = useDelayedFlag(loading);
@@ -82,24 +82,13 @@ export function DocumentsView() {
   // éviter qu'il pointe sur un fantôme.
   const explicitActiveId = useActiveAnalysisId();
 
-  useEffect(() => {
-    return firebaseAuthGateway.subscribe(setUser);
-  }, []);
-
   const greetingName = useMemo(() => {
-    if (!user) return "Utilisateur";
     if (user.displayName?.trim()) return user.displayName.trim().split(" ")[0] || "Utilisateur";
     if (user.email) return user.email.split("@")[0] || "Utilisateur";
     return "Utilisateur";
   }, [user]);
-
-  async function handleLogout() {
-    await firebaseAuthGateway.signOut();
-    router.replace("/login");
-  }
-
+  
   const loadData = useCallback(async () => {
-    if (!user) return;
     setLoading(true);
     try {
       const [allAnalyses, folders] = await Promise.all([
@@ -208,14 +197,6 @@ export function DocumentsView() {
     if (!user) return;
     await moveAnalysisToFolder(user.uid, id, targetFolder);
     void loadData();
-  }
-
-  if (!user) {
-    return (
-      <section className="precision-card mx-auto max-w-5xl rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Connectez-vous pour accéder à vos documents.</p>
-      </section>
-    );
   }
 
   return (

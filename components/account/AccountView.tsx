@@ -27,7 +27,7 @@ import {
 } from "@/services/accountService";
 import { firebaseAuthGateway } from "@/services/auth";
 import { logClientSecurityEvent } from "@/services/securityAuditClient";
-import type { AuthenticatedUser } from "@/types/auth";
+import { useAuthenticatedUser } from "@/components/auth/AuthGate";
 import type { UserProfileUpdateInput } from "@/types/profile";
 
 type ToastState = { type: "success" | "error" | "info"; message: string } | null;
@@ -40,7 +40,7 @@ type AccountViewProps = {
 export function AccountView({ fromAnalysis = false }: AccountViewProps) {
   const router = useRouter();
   const { isDark } = useTheme();
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const { user } = useAuthenticatedUser();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [deleteMode, setDeleteMode] = useState<DeleteMode>(null);
@@ -69,22 +69,6 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
   }, [toast]);
 
   useEffect(() => {
-    const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
-      if (!nextUser) {
-        router.replace("/");
-        return;
-      }
-      setUser(nextUser);
-    });
-
-    return unsubscribe;
-  }, [router]);
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-
     void (async () => {
       setLoading(true);
       try {

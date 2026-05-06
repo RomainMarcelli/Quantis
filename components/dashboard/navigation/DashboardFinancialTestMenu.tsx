@@ -1,10 +1,11 @@
-// File: components/dashboard/navigation/DashboardFinancialTestMenu.tsx
+﻿// File: components/dashboard/navigation/DashboardFinancialTestMenu.tsx
 // Role: menu horizontal des sections financières du Tableau de bord. Combine
 // les 5 sous-onglets fixes (Création de valeur, Investissement, Financement,
 // Rentabilité, Trésorerie conditionnel) et — Phase 4 — les dashboards
 // custom de l'utilisateur, accessibles à droite avec un bouton "+ Nouveau".
 "use client";
 
+import type { ReactNode } from "react";
 import { Plus, X } from "lucide-react";
 import type { CustomDashboardSummary } from "@/hooks/useUserDashboards";
 
@@ -41,6 +42,8 @@ type DashboardFinancialTestMenuProps = {
   onCreateDashboard?: () => void;
   /** Callback pour supprimer un dashboard custom. Affiche un X au survol. */
   onDeleteDashboard?: (id: string) => void;
+  /** Slot rendu à droite du menu (ex : bouton "Télécharger le rapport"). */
+  rightSlot?: ReactNode;
 };
 
 export function DashboardFinancialTestMenu({
@@ -49,7 +52,8 @@ export function DashboardFinancialTestMenu({
   showTresorerie = false,
   customDashboards = [],
   onCreateDashboard,
-  onDeleteDashboard
+  onDeleteDashboard,
+  rightSlot
 }: DashboardFinancialTestMenuProps) {
   const visibleFixed = showTresorerie
     ? FIXED_TABS
@@ -144,6 +148,7 @@ export function DashboardFinancialTestMenu({
             </li>
           ) : null}
         </ul>
+        {rightSlot ? <div className="flex items-center self-start xl:self-auto">{rightSlot}</div> : null}
       </div>
     </nav>
   );

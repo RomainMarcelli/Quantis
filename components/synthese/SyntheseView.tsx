@@ -2,30 +2,15 @@
 // Role: charge les données utilisateur + analyses et affiche la page /synthèse dans la DA premium existante.
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  FileText,
-  LayoutDashboard,
-  Lock,
-  LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Receipt,
-  Settings,
-  Sparkles,
-  UserCircle2,
-  Bot
-} from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashboardModal";
 import { useUserDashboards } from "@/hooks/useUserDashboards";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
-import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
@@ -39,9 +24,9 @@ import {
   normalizeAnalysisFolderName,
   sortAnalysesByFiscalYear
 } from "@/services/analysisHistory";
-import { firebaseAuthGateway } from "@/services/auth";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
+import { useAuthenticatedUser } from "@/components/auth/AuthGate";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
@@ -62,15 +47,11 @@ import {
   scrollToSearchTarget,
   type SearchNavigationTarget
 } from "@/lib/search/globalSearch";
-import {
-  readSidebarCollapsedPreference,
-  writeSidebarCollapsedPreference
-} from "@/lib/ui/sidebarPreference";
 
 export function SyntheseView() {
   const router = useRouter();
+  const { user } = useAuthenticatedUser();
 
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Quantis");
   const [sector, setSector] = useState<string | null>(null);
@@ -110,29 +91,6 @@ export function SyntheseView() {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
-      if (!nextUser) {
-        router.replace("/");
-        return;
-      }
-
-      if (!nextUser.emailVerified) {
-        void firebaseAuthGateway.signOut();
-        router.replace("/");
-        return;
-      }
-
-      setUser(nextUser);
-    });
-
-    return unsubscribe;
-  }, [router]);
-
-  useEffect(() => {
-    if (!user) {
-      return;
-    }
-
     void loadSyntheseData(user);
   }, [user]);
 
@@ -327,72 +285,14 @@ export function SyntheseView() {
       setLoading(false);
     }
   }
-
-  async function onLogout() {
-    await firebaseAuthGateway.signOut();
-    router.replace("/");
-  }
-
   return (
-    <section className="w-full space-y-4">
-      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
-        <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
-          <div>
-            <p className="text-sm font-semibold text-white">{companyName}</p>
-            <p className="text-xs text-white/55">Plateforme financière</p>
-          </div>
-          <div className="ml-2 hidden lg:block">
-            <ActiveSourceBadge analysis={analysisPair.current} />
-          </div>
-        </div>
-
-        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
-          <GlobalSearchBar placeholder="Rechercher un KPI, une alerte ou une section..." />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/settings")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Paramètres"
-            title="Paramètres"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/pricing")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Offres"
-            title="Offre Free (verrouillée)"
-          >
-            <Lock className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Compte"
-            title="Compte"
-          >
-            <UserCircle2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void onLogout()}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Se déconnecter"
-            title="Se déconnecter"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
-      </header>
-      <div className="md:hidden">
-        <GlobalSearchBar placeholder="Rechercher..." />
-      </div>
+      <section className="w-full space-y-4">
+      <AppHeader
+        companyName={companyName}
+        subtitle="Plateforme financière"
+        searchPlaceholder="Rechercher un KPI, une alerte ou une section..."
+        contextBadge={<ActiveSourceBadge analysis={analysisPair.current} />}
+      />
 
       {/* Loader retardé : n'apparaît que si la requête dépasse 400 ms.
           Évite le flash sous le header pour les chargements rapides. */}
@@ -453,10 +353,15 @@ export function SyntheseView() {
               greetingName={greetingName}
               companyName={companyName}
               analysisCreatedAt={analysisPair.current.createdAt}
-              onExportData={() => {
-                if (!analysisPair.current) return;
-                exportAnalysisDataAsJson({ analysis: analysisPair.current, companyName });
-              }}
+              getDownloadInput={() => ({
+                companyName,
+                greetingName,
+                analysisCreatedAt: analysisPair.current!.createdAt,
+                selectedYearLabel,
+                synthese,
+                kpis: analysisPair.current!.kpis,
+                mappedData: analysisPair.current!.mappedData
+              })}
               onReupload={() => router.push("/upload")}
               onManualEntry={() => router.push("/upload/manual")}
               onDownloadFinancialReport={async () => {

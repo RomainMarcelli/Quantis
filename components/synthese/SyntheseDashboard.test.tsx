@@ -59,7 +59,6 @@ describe("SyntheseDashboard", () => {
         greetingName="Romain"
         companyName="Quantis"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
-
         onReupload={() => {}}
         onManualEntry={() => {}}
         synthese={sampleSynthese}
@@ -77,7 +76,6 @@ describe("SyntheseDashboard", () => {
         greetingName="Romain"
         companyName="Quantis"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
-
         onReupload={() => {}}
         onManualEntry={() => {}}
         synthese={sampleSynthese}
@@ -113,7 +111,6 @@ describe("SyntheseDashboard", () => {
         greetingName="Romain"
         companyName="Quantis"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
-
         onReupload={() => {}}
         onManualEntry={() => {}}
         synthese={syntheseWithMissingMetric}

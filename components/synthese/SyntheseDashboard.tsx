@@ -7,8 +7,10 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Calendar, CalendarRange, Download, Radio } from "lucide-react";
+import { Calendar, CalendarRange, Radio } from "lucide-react";
 import { SourceBadge } from "@/components/analysis/SourceBadge";
+import { DownloadReportButton } from "@/components/analysis/DownloadReportButton";
+import type { DownloadSyntheseReportInput } from "@/lib/synthese/downloadSyntheseReport";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
 import {
   CustomizableDashboard,
@@ -24,7 +26,7 @@ type SyntheseDashboardProps = {
   companyName: string;
   analysisCreatedAt: string;
   onDownloadFinancialReport?: () => void;
-  onExportData?: () => void;
+  getDownloadInput?: () => DownloadSyntheseReportInput;
   onReupload: () => void;
   onManualEntry: () => void;
   synthese: SyntheseViewModel;
@@ -96,7 +98,9 @@ export function SyntheseDashboard({
   companyName,
   analysisCreatedAt,
   onDownloadFinancialReport,
-  onExportData,
+  getDownloadInput,
+  onReupload,
+  onManualEntry,
   synthese,
   parserVersion,
   sourceMetadata,
@@ -252,24 +256,11 @@ export function SyntheseDashboard({
         </div>
         <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
           {simulationSlot}
-          {onDownloadFinancialReport ? (
-            <button
-              type="button"
-              onClick={onDownloadFinancialReport}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Télécharger le rapport PDF
-            </button>
-          ) : null}
-          {onExportData ? (
-            <button
-              type="button"
-              onClick={onExportData}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
-            >
-              Exporter données
-            </button>
+          {getDownloadInput ? (
+            <DownloadReportButton
+              variant="primary"
+              getDownloadInput={getDownloadInput}
+            />
           ) : null}
         </div>
       </header>
