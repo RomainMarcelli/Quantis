@@ -263,6 +263,27 @@ export function SyntheseView() {
     setSelectedYearValue(String(resolveAnalysisYear(target)));
   }, [activeAnalysisId, allAnalyses]);
 
+  // Pendant statique : quand l'utilisateur passe à un dossier (Excel / PDF)
+  // alors que le year selector est resté sur l'année d'une connexion
+  // dynamique précédente (ex. Pennylane = 2026, Excel = 2024), aucun match
+  // → fallback sur la priorité auto qui re-choisit la connexion. L'utilisateur
+  // restait coincé sur Pennylane, incapable de visualiser l'Excel.
+  // Sync : on bascule le year selector vers la dernière liasse disponible
+  // dans le folder choisi, pour que le folder devienne immédiatement visible.
+  const previousActiveFolderRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeFolderName === previousActiveFolderRef.current) return;
+    previousActiveFolderRef.current = activeFolderName;
+    if (!activeFolderName) return;
+    const folderAnalyses = allAnalyses.filter(
+      (a) => normalizeAnalysisFolderName(a.folderName) === normalizeAnalysisFolderName(activeFolderName)
+    );
+    if (!folderAnalyses.length) return;
+    const latest = sortAnalysesByFiscalYear(folderAnalyses, "desc")[0];
+    if (!latest) return;
+    setSelectedYearValue(String(resolveAnalysisYear(latest)));
+  }, [activeFolderName, allAnalyses]);
+
   useEffect(() => {
     if (!pendingSearchTarget) {
       return;

@@ -24,7 +24,8 @@ import { BridgeConnectCard } from "@/components/integrations/BridgeConnectCard";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { DEFAULT_FOLDER_NAME, setActiveFolderName } from "@/lib/folders/activeFolder";
+import { DEFAULT_FOLDER_NAME } from "@/lib/folders/activeFolder";
+import { setActiveSource } from "@/lib/source/setActiveSource";
 import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
 import {
   readSidebarCollapsedPreference,
@@ -285,10 +286,7 @@ export function DocumentsView() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    setActiveFolderName(activeFolder);
-                    clearActiveAnalysisId();
-                  }}
+                  onClick={() => setActiveSource({ kind: "folder", folderName: activeFolder })}
                   className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/75 transition-colors hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"
                 >
                   Définir comme source active

@@ -4,7 +4,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { writeActiveAnalysisId } from "@/lib/source/activeSource";
+import { setActiveSource } from "@/lib/source/setActiveSource";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -377,7 +377,7 @@ function totalPersisted(data: unknown): number {
 function activateAnalysisFromSync(data: unknown): void {
   const analysisId = (data as { analysis?: { analysisId?: string } }).analysis?.analysisId;
   if (analysisId) {
-    writeActiveAnalysisId(analysisId);
+    setActiveSource({ kind: "analysis", analysisId });
   }
 }
 

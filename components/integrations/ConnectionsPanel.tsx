@@ -8,8 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Plug, RefreshCw, Trash2 } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
-import { clearActiveAnalysisId, writeActiveAnalysisId } from "@/lib/source/activeSource";
-import { clearActiveFolderSelection } from "@/lib/folders/activeFolder";
+import { setActiveSource } from "@/lib/source/setActiveSource";
 import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
 import type { ConnectionDto } from "@/app/api/integrations/connections/route";
 
@@ -111,7 +110,7 @@ export function ConnectionsPanel({ onChanged, excludeProviders }: ConnectionsPan
       // c'est le bug remonté par l'utilisateur le 30/04/2026.
       const analysisId = (data as { analysis?: { analysisId?: string } }).analysis?.analysisId;
       if (analysisId) {
-        writeActiveAnalysisId(analysisId);
+        setActiveSource({ kind: "analysis", analysisId });
       }
       await refresh();
       if (onChanged) await onChanged();
@@ -291,11 +290,11 @@ export function ConnectionsPanel({ onChanged, excludeProviders }: ConnectionsPan
                   <button
                     type="button"
                     onClick={() => {
-                      // Bascule statique → dynamique : on libère le dossier
-                      // et l'override par-analyse, le résolveur retombe sur
-                      // la priorité auto qui choisit cette connexion.
-                      clearActiveFolderSelection();
-                      clearActiveAnalysisId();
+                      // Bascule statique → dynamique : on libère les 2
+                      // overrides ; le résolveur retombe sur la priorité
+                      // métier (Pennylane/MyUnisoft/Odoo > FEC > upload)
+                      // qui choisit cette connexion automatiquement.
+                      setActiveSource({ kind: "auto" });
                     }}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/75 hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"
                     title="Utiliser la connexion comme source du dashboard à la place du dossier statique"
