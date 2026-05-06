@@ -6,14 +6,16 @@ const {
   mapToQuantisDataMock,
   verifyIdTokenMock,
   saveAnalysisMock,
-  getUserAnalysesMock
+  getUserAnalysesMock,
+  requireAdminMock
 } = vi.hoisted(() => ({
   processPdfWithDocumentAIMock: vi.fn(),
   analyzeFinancialDocumentMock: vi.fn(),
   mapToQuantisDataMock: vi.fn(),
   verifyIdTokenMock: vi.fn(),
   saveAnalysisMock: vi.fn(),
-  getUserAnalysesMock: vi.fn()
+  getUserAnalysesMock: vi.fn(),
+  requireAdminMock: vi.fn()
 }));
 vi.mock("@/services/documentAI", () => ({
   processPdfWithDocumentAI: processPdfWithDocumentAIMock,
@@ -37,12 +39,24 @@ vi.mock("@/services/pdfAnalysisStore", () => ({
   saveAnalysis: saveAnalysisMock,
   getUserAnalyses: getUserAnalysesMock
 }));
+vi.mock("@/lib/auth/requireAdmin", () => ({
+  requireAdmin: requireAdminMock,
+  AuthError: class AuthError extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.status = status;
+      this.name = "AuthError";
+    }
+  }
+}));
 import { GET, POST } from "@/app/api/pdf-parser/route";
 describe("POST /api/pdf-parser", () => {
   const previousDebugEnv = process.env.PDF_PARSER_DEBUG;
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.PDF_PARSER_DEBUG = "false";
+    requireAdminMock.mockResolvedValue({ uid: "user-1", email: "admin@test.fr" });
     processPdfWithDocumentAIMock.mockResolvedValue({
       rawText: "Extracted text",
       pages: [{ pageNumber: 1 }],
@@ -331,6 +345,7 @@ describe("POST /api/pdf-parser", () => {
 describe("GET /api/pdf-parser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    requireAdminMock.mockResolvedValue({ uid: "user-1", email: "admin@test.fr" });
     verifyIdTokenMock.mockResolvedValue({
       uid: "user-1"
     });

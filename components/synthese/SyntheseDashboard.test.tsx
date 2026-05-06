@@ -48,7 +48,8 @@ const sampleSynthese: SyntheseViewModel = {
     }
   ],
   actions: ["Sécuriser la trésorerie."],
-  alerts: [{ id: "bfr", label: "BFR élevé", severity: "high" }]
+  alerts: [{ id: "bfr", label: "BFR élevé", severity: "high" }],
+  fiscalTiles: []
 };
 
 describe("SyntheseDashboard", () => {
@@ -58,7 +59,6 @@ describe("SyntheseDashboard", () => {
         greetingName="Romain"
         companyName="Quantis"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
-        onDownloadReport={() => {}}
         onReupload={() => {}}
         onManualEntry={() => {}}
         synthese={sampleSynthese}
@@ -76,7 +76,6 @@ describe("SyntheseDashboard", () => {
         greetingName="Romain"
         companyName="Quantis"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
-        onDownloadReport={() => {}}
         onReupload={() => {}}
         onManualEntry={() => {}}
         synthese={sampleSynthese}
@@ -84,7 +83,7 @@ describe("SyntheseDashboard", () => {
     );
 
     expect(html).toContain("Chiffre d&#x27;Affaires");
-    expect(html).toContain("Trésorerie nette");
+    expect(html).toContain("Disponibilités");
     expect(html).toContain("Excédent brut d&#x27;exploitation");
   });
 
@@ -112,7 +111,6 @@ describe("SyntheseDashboard", () => {
         greetingName="Romain"
         companyName="Quantis"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
-        onDownloadReport={() => {}}
         onReupload={() => {}}
         onManualEntry={() => {}}
         synthese={syntheseWithMissingMetric}

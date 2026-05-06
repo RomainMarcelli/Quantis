@@ -67,6 +67,28 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
   const monthlyBurnRate = netProfit !== null && netProfit < 0 ? round(Math.abs(netProfit) / 12) : 0;
   const cashRunwayMonths = monthlyBurnRate > 0 ? div(data.dispo, monthlyBurnRate) : null;
 
+  // TVA à reverser à l'État : collectée (4457) − déductible (4456). Calcul
+  // annuel par défaut (12 mois) — le montant mensuel est juste une moyenne
+  // qui sert au front pour suggérer une mise de côté régulière.
+  const tva_a_payer =
+    typeof data.tva_collectee === "number" && typeof data.tva_deductible === "number"
+      ? data.tva_collectee - data.tva_deductible
+      : null;
+  const tva_provision_mensuelle = tva_a_payer !== null ? tva_a_payer / 12 : null;
+
+  // Provision IS — barème 2024 deux tranches (taux réduit PME jusqu'à 42 500 €,
+  // taux normal 25 % au-delà). Si résultat ≤ 0 → pas d'IS dû. Calcul brut sans
+  // tenir compte des crédits d'impôt ni de l'intégration fiscale (cf. note
+  // dans le kpiRegistry niveau expert).
+  const provision_is = computeIncomeTaxProvision(data.resultat_exercice);
+  const provision_is_mensuelle = provision_is !== null ? provision_is / 12 : null;
+
+  // Ratio masse salariale / CA — sur chaque euro de CA, combien part en
+  // rémunération (bruts + charges patronales). Au-delà de 60 % le poids
+  // de la main-d'œuvre devient un signal de fragilité opérationnelle.
+  const masseSalariale = sumPartial(data.salaires, data.charges_soc);
+  const ratio_masse_salariale = percent(div(masseSalariale, ca));
+
   return {
     tcam: roundOrNull(tcam),
     ca: roundOrNull(ca),
@@ -106,25 +128,66 @@ export function computeKpis(data: MappedFinancialData): CalculatedKpis {
     capacite_remboursement_annees: roundOrNull(capacite_remboursement_annees),
     etat_materiel_indice: roundOrNull(etat_materiel_indice),
     healthScore: scoreHealth({
+      ca,
       grossMarginRate,
       netProfit,
       workingCapital,
       cashRunwayMonths
-    })
+    }),
+    tva_a_payer: roundOrNull(tva_a_payer),
+    tva_provision_mensuelle: roundOrNull(tva_provision_mensuelle),
+    provision_is: roundOrNull(provision_is),
+    provision_is_mensuelle: roundOrNull(provision_is_mensuelle),
+    ratio_masse_salariale: roundOrNull(ratio_masse_salariale)
   };
 }
 
+/**
+ * Calcule l'IS estimé selon le barème 2024 (taux réduit PME).
+ *   - 15 % sur les premiers 42 500 € de bénéfice (article 219 CGI, taux réduit)
+ *   - 25 % au-delà (taux normal)
+ * Retourne 0 si résultat ≤ 0 (pas d'IS dû), null si pas de résultat connu.
+ */
+function computeIncomeTaxProvision(resultatExercice: number | null): number | null {
+  if (resultatExercice === null || !Number.isFinite(resultatExercice)) return null;
+  if (resultatExercice <= 0) return 0;
+  const reducedRateThreshold = 42500;
+  if (resultatExercice <= reducedRateThreshold) {
+    return resultatExercice * 0.15;
+  }
+  const reducedPart = reducedRateThreshold * 0.15;
+  const normalPart = (resultatExercice - reducedRateThreshold) * 0.25;
+  return reducedPart + normalPart;
+}
+
 function scoreHealth({
+  ca,
   grossMarginRate,
   netProfit,
   workingCapital,
   cashRunwayMonths
 }: {
+  ca: number | null;
   grossMarginRate: number | null;
   netProfit: number | null;
   workingCapital: number | null;
   cashRunwayMonths: number | null;
 }): number | null {
+  // Garde-fou : si le CA est à 0 mais qu'on a quand même reçu au moins un signal
+  // (workingCapital, netProfit...), c'est un parsing à moitié foiré. Un score
+  // de "100" calculé sur le seul fait que workingCapital ≥ 0 (ex. stocks
+  // aberrants après mauvaise extraction PDF) serait trompeur. On retourne null
+  // — l'UI affichera "Données insuffisantes" plutôt qu'un score faussement
+  // rassurant. À distinguer du cas ca=null où aucune extraction n'a eu lieu.
+  if (ca === 0 && (
+    grossMarginRate !== null ||
+    netProfit !== null ||
+    workingCapital !== null ||
+    cashRunwayMonths !== null
+  )) {
+    return null;
+  }
+
   let score = 0;
   let weights = 0;
 

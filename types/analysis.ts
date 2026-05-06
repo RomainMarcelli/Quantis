@@ -1,4 +1,4 @@
-export type SupportedUploadType = "excel" | "pdf";
+export type SupportedUploadType = "excel" | "pdf" | "fec";
 
 export type FileDescriptor = {
   name: string;
@@ -93,6 +93,11 @@ export type MappedFinancialData = {
   ca_n_minus_1: number | null;
   n: number | null;
   delta_bfr: number | null;
+  /** Solde créditeur du compte 4457 (TVA collectée sur ventes). Optionnel —
+   *  alimenté uniquement par les sources ayant accès à la trial balance. */
+  tva_collectee?: number | null;
+  /** Solde débiteur du compte 4456 (TVA déductible sur achats). */
+  tva_deductible?: number | null;
 };
 
 export type ParsedMetric = {
@@ -152,6 +157,21 @@ export type CalculatedKpis = {
   capacite_remboursement_annees: number | null;
   etat_materiel_indice: number | null;
   healthScore: number | null;
+  /** TVA nette à reverser à l'État sur la période (4457 − 4456). Null si les
+   *  soldes TVA ne sont pas dispos (sources sans trial balance, p.ex. PDF). */
+  tva_a_payer?: number | null;
+  /** Provision mensuelle de TVA à mettre de côté. Calculée depuis tva_a_payer
+   *  divisé par le nombre de mois de la période (par défaut 12). */
+  tva_provision_mensuelle?: number | null;
+  /** Estimation IS à provisionner sur le résultat courant. Barème 2024 :
+   *  15 % jusqu'à 42 500 €, 25 % au-delà. 0 si résultat ≤ 0. */
+  provision_is?: number | null;
+  /** Provision IS mensuelle (= provision_is / 12). */
+  provision_is_mensuelle?: number | null;
+  /** Ratio masse salariale (salaires + charges_soc) / CA × 100. Indicateur
+   *  d'intensité main-d'œuvre — alimente les scénarios "analyse masse salariale"
+   *  et "rémunération dirigeant". Optionnel pour ne pas casser les fixtures. */
+  ratio_masse_salariale?: number | null;
 };
 
 export type AnalysisRecord = {
@@ -183,6 +203,23 @@ export type AnalysisRecord = {
   } | null;
   parserVersion?: "v1" | "v2";
   pdfType?: "native_text" | "scanned_text" | "image_only";
+  // Extensions "donnée dynamique" (sync depuis logiciels comptables).
+  // Présents uniquement quand sourceMetadata.type === "dynamic".
+  // Le front continue de consommer mappedData/kpis/quantisScore comme avant ;
+  // les champs ci-dessous sont des bonus ignorables sans casse.
+  sourceMetadata?: import("@/types/connectors").SourceMetadata | null;
+  granularInsights?: import("@/types/connectors").GranularInsights | null;
+  kpisTimeSeries?: import("@/types/connectors").KpiTimeSeriesEntry[] | null;
+  vatInsights?: import("@/types/connectors").VatInsights | null;
+  // Nouveau format demandé par le PM : matière première pour les KPI calculés côté front.
+  // Présents uniquement quand sourceMetadata.type === "dynamic". Drafts exclus de fait
+  // (Pennylane n'émet d'écritures que pour les factures finalisées).
+  dailyAccounting?: import("@/types/connectors").DailyAccountingEntry[] | null;
+  balanceSheetSnapshot?: import("@/types/connectors").BalanceSheetSnapshot | null;
+  /** Vue d'ensemble bancaire (Bridge / Open Banking). Optionnel — alimenté
+   *  par /api/integrations/bridge/sync et indépendant du pipeline comptable.
+   *  Voir types/banking.ts pour le détail. */
+  bankingSummary?: import("@/types/banking").BankingSummary | null;
 };
 
 export type NewAnalysisRecord = Omit<AnalysisRecord, "id">;

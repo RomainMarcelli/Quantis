@@ -356,7 +356,30 @@ function toAnalysisRecord(id: string, data: Record<string, unknown>): AnalysisRe
           }
         : null,
     parserVersion: data.parserVersion === "v2" ? "v2" : "v1",
-    pdfType: (data.pdfType === "scanned_text" || data.pdfType === "image_only") ? data.pdfType : "native_text"
+    pdfType: (data.pdfType === "scanned_text" || data.pdfType === "image_only") ? data.pdfType : "native_text",
+    // Extensions donnée dynamique : pass-through si présent, null sinon.
+    sourceMetadata:
+      data.sourceMetadata && typeof data.sourceMetadata === "object"
+        ? (data.sourceMetadata as AnalysisRecord["sourceMetadata"])
+        : null,
+    granularInsights:
+      data.granularInsights && typeof data.granularInsights === "object"
+        ? (data.granularInsights as AnalysisRecord["granularInsights"])
+        : null,
+    kpisTimeSeries: Array.isArray(data.kpisTimeSeries)
+      ? (data.kpisTimeSeries as AnalysisRecord["kpisTimeSeries"])
+      : null,
+    vatInsights:
+      data.vatInsights && typeof data.vatInsights === "object"
+        ? (data.vatInsights as AnalysisRecord["vatInsights"])
+        : null,
+    dailyAccounting: Array.isArray(data.dailyAccounting)
+      ? (data.dailyAccounting as AnalysisRecord["dailyAccounting"])
+      : null,
+    balanceSheetSnapshot:
+      data.balanceSheetSnapshot && typeof data.balanceSheetSnapshot === "object"
+        ? (data.balanceSheetSnapshot as AnalysisRecord["balanceSheetSnapshot"])
+        : null
   };
 }
 

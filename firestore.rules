@@ -10,6 +10,14 @@ service cloud.firestore {
 
       allow delete: if request.auth != null
         && request.auth.uid == userId;
+
+      // Sous-collection des layouts dashboard personnalisables (Phase 1+).
+      // Path : users/{uid}/dashboards/{layoutId} — synthese / dashboard:* /
+      // custom:* (Phase 4). Strictement scopé à l'utilisateur authentifié.
+      match /dashboards/{layoutId} {
+        allow read, create, update, delete:
+          if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     match /analyses/{analysisId} {
@@ -43,6 +51,92 @@ service cloud.firestore {
 
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
+    }
+
+    // Connections aux logiciels comptables tiers (Pennylane, Chift, Bridge).
+    // Update autorisé pour le refresh des tokens et la mise à jour des cursors de sync.
+    // Les tokens sont chiffrés côté serveur (lib/server/tokenCrypto.ts) avant écriture.
+    match /connections/{connectionId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.provider is string
+        && request.resource.data.encryptedAccessToken is string;
+
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // Entités comptables persistées (un doc par écriture / facture / contact / etc.).
+    // Schéma générique : userId + connectionId + externalId pour idempotence + rawData JSON brut.
+    // Ces collections autorisent l'update car le sync incrémental peut mettre à jour des entités existantes
+    // (statut de facture qui passe de "sent" à "paid", par ex.).
+    match /accounting_entries/{entryId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.externalId is string;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /invoices/{invoiceId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.externalId is string;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /ledger_accounts/{accountId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.externalId is string;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /contacts/{contactId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.externalId is string;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /journals/{journalId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.externalId is string;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /bank_accounts/{bankAccountId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.externalId is string;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    match /bank_transactions/{transactionId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create, update: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.externalId is string;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
   }
 }

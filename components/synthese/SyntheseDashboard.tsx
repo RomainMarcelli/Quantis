@@ -1,188 +1,312 @@
 // File: components/synthese/SyntheseDashboard.tsx
-// Role: rend /synthese comme cockpit principal en reutilisant le layout /analysis
-// avec remplacement de l'indice de sante par le Quantis Score.
+// Role: Synthèse — vue cockpit principal, désormais 100% personnalisable.
+// Le seul élément fixe est le Quantis Score (forme variera en Phase 2).
+// Tous les autres blocs (chart d'évolution, KPI cards, recommandation,
+// alertes, plan d'action, tiles fiscales) sont des widgets ajoutables /
+// supprimables / réordonnables / redimensionnables via CustomizableDashboard.
 "use client";
 
-import { useMemo } from "react";
-import { AlertTriangle, Download, Lightbulb } from "lucide-react";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { QuantisScoreCard } from "@/components/dashboard/QuantisScoreCard";
-import type { PremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
+import { useMemo, useState, type ReactNode } from "react";
+import { Calendar, CalendarRange, Radio } from "lucide-react";
+import { SourceBadge } from "@/components/analysis/SourceBadge";
+import { DownloadReportButton } from "@/components/analysis/DownloadReportButton";
+import type { DownloadSyntheseReportInput } from "@/lib/synthese/downloadSyntheseReport";
+import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
+import {
+  CustomizableDashboard,
+  DashboardActions
+} from "@/components/dashboard/widgets/CustomizableDashboard";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
+import type { SourceMetadata } from "@/types/connectors";
+import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
+import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
 type SyntheseDashboardProps = {
   greetingName: string;
   companyName: string;
   analysisCreatedAt: string;
-  onDownloadReport: () => void;
-  onExportData?: () => void;
+  onDownloadFinancialReport?: () => void;
+  getDownloadInput?: () => DownloadSyntheseReportInput;
   onReupload: () => void;
   onManualEntry: () => void;
   synthese: SyntheseViewModel;
   parserVersion?: "v1" | "v2";
+  sourceMetadata?: SourceMetadata | null;
+  /** KPIs période antérieure pour la variation +/-X% sur les KpiCard widgets. */
+  previousKpis?: CalculatedKpis | null;
+  /** Historique du dossier — alimente le mode annuel des charts. */
+  analyses?: AnalysisRecord[];
+  /** Analyse courante — son dailyAccounting alimente le mode mensuel. */
+  currentAnalysis?: AnalysisRecord | null;
+  /** Libellé période ("Exercice 2026") pour les sources statiques. */
+  periodLabel?: string | null;
+  /** Slot bouton "Simuler un scénario" — placé dans le bandeau meta haut. */
+  simulationSlot?: ReactNode;
+  /** ID Firebase de l'utilisateur — clé de persistance Firestore du layout. */
+  userId?: string | null;
+  /**
+   * Sélecteur d'année rendu sous le titre pour les sources statiques (PDF /
+   * Excel). Quand fourni avec ≥ 2 options, on affiche une mini barre
+   * "Année" + dropdown ; sinon on n'affiche rien (cas dynamique : le parent
+   * passe `temporalitySlot` à la place avec la TemporalityBar complète).
+   */
+  yearOptions?: { value: string; label: string }[];
+  selectedYearValue?: string;
+  onYearChange?: (value: string) => void;
+  /**
+   * Slot pour la `TemporalityBar` (mode dynamique). Rendu sous le titre, à la
+   * place du sélecteur statique. Le parent décide lequel passer.
+   */
+  temporalitySlot?: ReactNode;
+};
+
+// ─── Default layout Synthèse ───────────────────────────────────────────
+// Reprend exactement le contenu de l'ancien cockpit fixe :
+//   - Quantis Score (fixe — non supprimable)
+//   - Courbe d'évolution multi-séries
+//   - 3 KPI cards (CA, Trésorerie, EBE)
+//   - Recommandation IA, plan d'action, alertes
+//   - Tiles fiscales TVA + IS
+// L'utilisateur peut tout réordonner / redimensionner ; seul le Quantis Score
+// est marqué `isFixed:true` pour être conservé en permanence sur la Synthèse.
+const DEFAULT_SYNTHESE_LAYOUT: DashboardLayout = {
+  id: "synthese",
+  widgets: [
+    // Quantis Score : viz composite (jauge + 4 piliers + message) — exige
+    // hauteur L (560 px+ natif) et largeur M minimum.
+    { id: "default-quantis-score", kpiId: "synthese:score", vizType: "quantisScore", size: "M", height: "L", isFixed: true },
+    // Charts pleine largeur sur 2 rangées (440 px) — confortable pour
+    // lire les axes + légende.
+    { id: "default-evolution", kpiId: "synthese:evolution", vizType: "evolutionChart", size: "L", height: "M" },
+    // 3 KPI cards en ligne (col-4 chacun, 1 rangée).
+    { id: "default-ca", kpiId: "ca", vizType: "kpiCard", size: "S", height: "S" },
+    { id: "default-tresorerie", kpiId: "disponibilites", vizType: "kpiCard", size: "S", height: "S" },
+    { id: "default-ebe", kpiId: "ebe", vizType: "kpiCard", size: "S", height: "S" },
+    // Bandeau IA pleine largeur, hauteur compacte.
+    { id: "default-reco", kpiId: "synthese:recommendation", vizType: "aiInsight", size: "L", height: "S" },
+    // Listes actions + alertes côte à côte (col-6 chacun, 2 rangées).
+    { id: "default-actions", kpiId: "synthese:actions", vizType: "actionList", size: "M", height: "M" },
+    { id: "default-alerts", kpiId: "synthese:alerts", vizType: "alertList", size: "M", height: "M" },
+    // Tiles fiscales (TVA + IS) en S × S.
+    { id: "default-tva", kpiId: "tva_a_payer", vizType: "kpiCard", size: "S", height: "S" },
+    { id: "default-is", kpiId: "provision_is", vizType: "kpiCard", size: "S", height: "S" }
+  ] as WidgetInstance[]
 };
 
 export function SyntheseDashboard({
   greetingName,
   companyName,
   analysisCreatedAt,
-  onDownloadReport,
-  onExportData,
+  onDownloadFinancialReport,
+  getDownloadInput,
   onReupload,
   onManualEntry,
   synthese,
-  parserVersion
+  parserVersion,
+  sourceMetadata,
+  previousKpis,
+  analyses = [],
+  currentAnalysis = null,
+  periodLabel = null,
+  simulationSlot = null,
+  userId = null,
+  yearOptions,
+  selectedYearValue,
+  onYearChange,
+  temporalitySlot = null,
 }: SyntheseDashboardProps) {
-  const cockpitKpis = useMemo(() => toCockpitKpis(synthese), [synthese]);
-  const strategicMessage = synthese.actions[0] ?? "Maintenir la trajectoire actuelle et suivre les KPI chaque semaine.";
-  const hasMissingMetric = synthese.metrics.some((metric) => metric.value === null);
+  // Bridge connecté → on substitue le solde "Disponibilités" par le solde
+  // bancaire temps réel. Le badge "Live" apparaît dans le bandeau meta.
+  const bridgeStatus = useBridgeStatus();
+  const liveBalance =
+    bridgeStatus.status?.connected && typeof bridgeStatus.status.totalBalance === "number"
+      ? bridgeStatus.status.totalBalance
+      : null;
+
+  // Surcharge des disponibilités quand Bridge est connecté — utilisé par les
+  // widgets KpiCard qui affichent "disponibilites".
+  const effectiveKpis = useMemo<CalculatedKpis>(() => {
+    if (liveBalance === null) {
+      return getKpisFromSynthese(synthese, currentAnalysis);
+    }
+    return {
+      ...getKpisFromSynthese(synthese, currentAnalysis),
+      disponibilites: liveBalance
+    };
+  }, [synthese, currentAnalysis, liveBalance]);
+
+  // Mode édition — état lifté pour pouvoir mettre Personnaliser dans le
+  // bandeau title haut (au lieu de near "Mes widgets" comme avant).
+  const [isEditing, setIsEditing] = useState(false);
+  // L'ouverture du picker reste interne à CustomizableDashboard, mais on
+  // tracke aussi le `isSaving` via un nudge state. Pour V1 : pas de feedback
+  // visuel custom dans le header — l'animation interne au CustomizableDashboard
+  // suffit.
+  const analysisModeLabel = resolveAnalysisModeLabel(currentAnalysis);
+
+  // Sélecteur d'année statique (sources PDF/Excel) — rendu UNIQUEMENT si le
+  // parent ne fournit pas déjà un `temporalitySlot` (mode dynamique). Un
+  // sélecteur statique n'a de sens qu'à partir de 2 années comparables.
+  const showStaticYearBar =
+    !temporalitySlot &&
+    yearOptions !== undefined &&
+    yearOptions.length > 1 &&
+    selectedYearValue !== undefined &&
+    onYearChange !== undefined;
 
   return (
     <section className="space-y-4">
+      {/* Bandeau titre Synthèse — remonté en haut (avant le meta) pour donner
+          immédiatement le contexte de la page. Le toggle Personnaliser est
+          ici uniquement (pas de bouton "+ Ajouter un widget" pour éviter le
+          doublon avec celui rendu par CustomizableDashboard quand isEditing). */}
+      <header className="fade-up relative z-10 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">Synthèse</h1>
+          <p className="text-sm text-quantis-muted">
+            Bonjour {greetingName}, voici la vue d&apos;ensemble de vos indicateurs clés.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">
+              {analysisModeLabel}
+            </span>
+          </div>
+
+          <DashboardActions
+            isEditing={isEditing}
+            isSaving={false}
+            onToggleEditing={() => setIsEditing(!isEditing)}
+            onOpenPicker={() => {
+              // No-op : "+ Ajouter un widget" est rendu par CustomizableDashboard
+              // (showAddButton=false ici pour éviter le doublon).
+            }}
+            showAddButton={false}
+          />
+        </div>
+      </header>
+
+      {/* Sélecteur de période — soit la TemporalityBar complète (sources
+          dynamiques : Pennylane/MyUnisoft/Odoo), soit une mini-bar "Année"
+          (sources statiques PDF/Excel). Placée juste sous le titre — le
+          sélecteur jadis présent dans la sidebar a été retiré (doublon). */}
+      {temporalitySlot ? temporalitySlot : null}
+      {showStaticYearBar ? (
+        <div className="precision-card flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3" data-scroll-reveal-ignore>
+          <div className="flex items-center gap-2 text-white/60">
+            <Calendar className="h-4 w-4" />
+            <span className="text-xs uppercase tracking-wider">Période</span>
+          </div>
+          <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+            <button
+              type="button"
+              className="rounded-md bg-quantis-gold px-3 py-1 text-xs font-medium text-black"
+              aria-pressed
+            >
+              Année
+            </button>
+          </div>
+          <select
+            id="synthese-year-static"
+            value={selectedYearValue}
+            onChange={(event) => onYearChange?.(event.target.value)}
+            className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white outline-none transition hover:bg-white/10 focus:border-quantis-gold/70"
+          >
+            {yearOptions!.map((option) => (
+              <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
+      {/* Bandeau meta consolidé (entreprise / date / source / actions) —
+          repositionné après le titre+période pour libérer le haut de page. */}
       <header className="precision-card fade-up relative z-10 flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
-          <p className="mt-1 text-sm text-white/70">
-            Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
+            <span>Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}</span>
+            <SourceBadge sourceMetadata={sourceMetadata} analysisCreatedAt={analysisCreatedAt} />
+            {periodLabel ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-white/75">
+                <CalendarRange className="h-3 w-3 text-white/55" />
+                {periodLabel}
+              </span>
+            ) : null}
             {parserVersion === "v2" && (
-              <span className="ml-2 inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
+              <span className="inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
                 Parser V2
               </span>
             )}
-          </p>
+            {liveBalance !== null && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300"
+                title="Soldes bancaires temps réel via Bridge"
+              >
+                <Radio className="h-3 w-3 animate-pulse" />
+                Live
+              </span>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <button
-            type="button"
-            onClick={onDownloadReport}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Télécharger le rapport
-          </button>
-          {onExportData ? (
-            <button
-              type="button"
-              onClick={onExportData}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
-            >
-              Exporter données
-            </button>
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          {simulationSlot}
+          {getDownloadInput ? (
+            <DownloadReportButton
+              variant="primary"
+              getDownloadInput={getDownloadInput}
+            />
           ) : null}
         </div>
       </header>
 
-      <DashboardLayout
-        companyName={companyName}
-        greetingName={greetingName}
-        kpis={cockpitKpis}
-        title="Cockpit financier"
-        subtitle={`Bonjour ${greetingName}, voici la vue d'ensemble de vos indicateurs clés.`}
-        statusLabel="Vue consolidée - Exercice en cours"
-        statusBadgeLabel="Analyse dynamique"
-        aiMessage={strategicMessage}
-        aiCtaLabel="Ouvrir le plan d'action"
-        scoreCard={
-          <QuantisScoreCard
-            score={synthese.score}
-            scoreLabel={synthese.scoreLabel}
-            scorePiliers={synthese.scorePiliers}
-            alerteInvestissement={synthese.alerteInvestissement}
-            searchId="synthese-quantis-score"
-          />
-        }
-        searchIds={{
-          revenue: "synthese-kpi-ca",
-          cash: "synthese-kpi-cash",
-          ebe: "synthese-kpi-ebe",
-          recommendation: "synthese-actions"
-        }}
-      >
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr]">
-          <article className="precision-card fade-up rounded-2xl p-5" style={{ animationDelay: "0.22s" }} data-search-id="synthese-actions-details">
-            <div className="card-header flex items-center gap-2">
-              <Lightbulb className="h-4 w-4 text-quantis-gold" />
-              <h2 className="text-xl font-semibold text-white">Plan d&apos;action détaillé</h2>
-            </div>
-            <ul className="space-y-2">
-              {synthese.actions.map((action, index) => (
-                <li
-                  key={`${action}-${index}`}
-                  className="rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-sm text-white/80"
-                >
-                  {action}
-                </li>
-              ))}
-            </ul>
-
-            {hasMissingMetric ? (
-              <div className="mt-4 rounded-xl border border-amber-300/25 bg-amber-500/10 p-3">
-                <p className="text-xs text-amber-100">
-                  Certaines données sont manquantes. Complétez vos informations pour fiabiliser l&apos;analyse.
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={onReupload}
-                    className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-white/85 hover:bg-white/20"
-                  >
-                    Importer un nouveau fichier
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onManualEntry}
-                    className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-white/85 hover:bg-white/20"
-                  >
-                    Saisie manuelle
-                  </button>
-                </div>
-              </div>
-            ) : null}
-          </article>
-
-          <article className="precision-card fade-up rounded-2xl p-5" style={{ animationDelay: "0.26s" }} data-search-id="synthese-alertes">
-            <div className="card-header flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-300" />
-              <h2 className="text-xl font-semibold text-white">Alertes</h2>
-            </div>
-            <ul className="space-y-2">
-              {synthese.alerts.map((alert) => (
-                <li
-                  key={alert.id}
-                  className={`rounded-xl border px-3 py-2 text-sm ${alertSeverityClass(alert.severity)}`}
-                >
-                  {alert.label}
-                </li>
-              ))}
-            </ul>
-          </article>
-        </section>
-      </DashboardLayout>
+      {/* Grille widgets pleine largeur : aucun élément n'est pinned hors-grille,
+          le Quantis Score est lui-même un widget marqué `isFixed:true` dans le
+          default layout (non supprimable, repositionnable). L'utilisateur peut
+          mettre des widgets au-dessus, à côté ou en-dessous du score. */}
+      <CustomizableDashboard
+        userId={userId}
+        layoutId="synthese"
+        defaultLayout={DEFAULT_SYNTHESE_LAYOUT}
+        kpis={effectiveKpis}
+        previousKpis={previousKpis}
+        analyses={analyses}
+        currentAnalysis={currentAnalysis}
+        mappedData={currentAnalysis?.mappedData ?? null}
+        synthese={synthese}
+        controlledIsEditing={isEditing}
+        onEditingChange={setIsEditing}
+        hideHeaderTitle
+      />
     </section>
   );
 }
 
-function toCockpitKpis(synthese: SyntheseViewModel): PremiumKpis {
-  const revenue = synthese.metrics.find((metric) => metric.id === "ca");
-  const ebe = synthese.metrics.find((metric) => metric.id === "ebe");
-  const cash = synthese.metrics.find((metric) => metric.id === "cash");
+// ─── Helpers ────────────────────────────────────────────────────────────
 
-  return {
-    ca: revenue?.value ?? null,
-    tresorerie: cash?.value ?? null,
-    ebe: ebe?.value ?? null,
-    healthScore: synthese.score,
-    croissance: revenue?.trend.changePercent ?? null,
-    runway: null
-  };
+// Construit un CalculatedKpis "complet" à partir du SyntheseViewModel + de
+// l'analyse courante. Les widgets KpiCard ont besoin de l'objet complet
+// (pour pouvoir rendre n'importe quel KPI ajouté par l'utilisateur), pas
+// seulement les 3 du cockpit. On utilise donc `currentAnalysis.kpis` comme
+// source de vérité, en surchargeant `disponibilites` plus tard si Bridge
+// est connecté (cf. effectiveKpis).
+function getKpisFromSynthese(
+  _synthese: SyntheseViewModel,
+  currentAnalysis: AnalysisRecord | null | undefined
+): CalculatedKpis {
+  return currentAnalysis?.kpis ?? ({} as CalculatedKpis);
 }
 
-function alertSeverityClass(severity: "high" | "medium" | "low"): string {
-  if (severity === "high") {
-    return "border-rose-400/35 bg-rose-500/15 text-rose-100";
-  }
-  if (severity === "medium") {
-    return "border-amber-300/35 bg-amber-500/15 text-amber-100";
-  }
-  return "border-emerald-300/35 bg-emerald-500/15 text-emerald-100";
+// Choisit le badge à afficher en tête de page selon la nature de l'analyse :
+// "Analyse dynamique" si un dailyAccounting exploitable est présent (sources
+// synchronisées Pennylane / MyUnisoft / Odoo / FEC), "Analyse statique" pour
+// les uploads PDF / Excel.
+function resolveAnalysisModeLabel(analysis: AnalysisRecord | null | undefined): string {
+  const hasDaily = (analysis?.dailyAccounting?.length ?? 0) > 0;
+  return hasDaily ? "Analyse dynamique" : "Analyse statique";
 }

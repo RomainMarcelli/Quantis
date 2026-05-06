@@ -8,11 +8,11 @@ import {
   Award,
   BriefcaseBusiness,
   Cpu,
-  Scale,
 } from "lucide-react";
-import { formatNumber } from "@/components/dashboard/formatting";
+import { formatNumber, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
+import { KpiTooltip } from "@/components/kpi/KpiTooltip";
+import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
-import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import {
   buildRentabilitySeries,
@@ -21,11 +21,17 @@ import {
   normalizePercentInput
 } from "@/lib/dashboard/rentabilite/rentabilityViewModel";
 import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
-import type { CalculatedKpis } from "@/types/analysis";
+import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
+import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
+import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
+import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
 type RentabilityTestProps = {
   kpis: CalculatedKpis;
   previousKpis?: CalculatedKpis | null;
+  analyses?: AnalysisRecord[];
+  currentAnalysis?: AnalysisRecord | null;
+  analysisModeLabel?: string | null;
 };
 
 type ChartPoint = {
@@ -34,7 +40,28 @@ type ChartPoint = {
   roce: number;
 };
 
-export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestProps) {
+// Default layout — reproduit les 2 cartes existantes (ROE, ROCE) sous forme
+// de widgets customizable. L'utilisateur peut ajouter d'autres KPIs de la
+// catégorie "rentabilite" (effet_levier, marge_nette) via le picker.
+const DEFAULT_RENTABILITY_LAYOUT: DashboardLayout = {
+  id: "dashboard:rentabilite",
+  constrainedToCategory: "rentabilite",
+  widgets: [
+    { id: "rent-roe", kpiId: "roe", vizType: "kpiCard", size: "M" },
+    { id: "rent-roce", kpiId: "roce", vizType: "kpiCard", size: "M" }
+  ] as WidgetInstance[]
+};
+
+export function RentabilityTest({
+  kpis,
+  previousKpis = null,
+  analyses = [],
+  currentAnalysis = null,
+  analysisModeLabel = null
+}: RentabilityTestProps) {
+  // Le KPI sélectionné pilote la courbe top de la page. Par défaut le premier
+  // KPI de l'onglet (ROE = "rendement actionnaire").
+  const [selectedKpiId, setSelectedKpiId] = useState<string>("roe");
   // KPI rentabilité normalisés en % pour afficher une lecture homogène.
   const roePercent = normalizePercentInput(kpis.roe);
   const rocePercent = normalizePercentInput(kpis.roce);
@@ -137,57 +164,55 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 
-      {/* Badge top en flux normal pour un placement naturel. */}
-      <div className="relative z-[4] mb-6 flex">
-        <TestTopStatus label="Contrôle des flux" />
-      </div>
-
       <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <div className="interactive-badge flex h-8 w-8 items-center justify-center border border-quantis-gold/20 bg-quantis-base">
-              <span className="text-sm font-bold text-quantis-gold">Q</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white">Quantis</span>
-              <span className="text-[10px] font-mono text-quantis-muted">Financial Operating System</span>
-            </div>
-          </div>
-          <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
             Rentabilité & valeur actionnariale
           </h2>
           <p className="text-sm text-quantis-muted">
             Création de richesse, performance du capital et impact du levier.
           </p>
         </div>
+
+        {analysisModeLabel ? (
+          <div className="interactive-badge flex items-center gap-2 self-start rounded border border-white/10 bg-white/[0.02] px-3 py-1 md:self-auto">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">{analysisModeLabel}</span>
+          </div>
+        ) : null}
       </header>
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
-        <RentabilityMetricCard
-          className="md:col-span-6"
-          delayMs={100}
-          searchId="analysis-rent-roe"
-          title="Rentabilité actionnariale"
-          tag="Return on Equity (ROE)"
-          value={roePercent === null ? "N/D" : `${formatNumber(animatedRoe, 1)}%`}
-          trend={roeTrend}
-          icon={<Award className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helper="Rentabilité des fonds propres: mesure ce que l'actionnaire gagne pour chaque euro investi."
-        />
+        {/* Graphique top : courbe d'évolution du KPI sélectionné. Défaut = ROE. */}
+        <div className="md:col-span-12">
+          <KpiEvolutionChart
+            kpiId={selectedKpiId}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+          />
+        </div>
 
-        <RentabilityMetricCard
-          className="md:col-span-6"
-          delayMs={150}
-          searchId="analysis-rent-roce"
-          title="Rentabilité opérationnelle"
-          tag="Return on Capital Employed (ROCE)"
-          value={rocePercent === null ? "N/D" : `${formatNumber(animatedRoce, 1)}%`}
-          trend={roceTrend}
-          icon={
-            <BriefcaseBusiness className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-          }
-          helper="Performance économique pure de l'exploitation, indépendamment du mode de financement."
-        />
+        {/* Cartes KPI customizable : par défaut ROE + ROCE, l'utilisateur peut
+            ajouter d'autres KPIs de la catégorie rentabilite (effet_levier,
+            marge_nette…) ou changer leur viz (gauge, lineChart…). Click sur
+            une carte met à jour le graphique top. */}
+        <div className="md:col-span-12">
+          <CustomizableDashboard
+            userId={null}
+            layoutId="dashboard:rentabilite"
+            defaultLayout={DEFAULT_RENTABILITY_LAYOUT}
+            kpis={kpis}
+            previousKpis={previousKpis}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+            mappedData={currentAnalysis?.mappedData ?? null}
+            lockedCategory="rentabilite"
+            kpiSelection={{
+              selectedKpiId,
+              onSelect: setSelectedKpiId
+            }}
+          />
+        </div>
 
         <article
           className="precision-card fade-up group col-span-1 rounded-2xl p-8 md:col-span-12"
@@ -275,13 +300,6 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
             </div>
           </div>
 
-          <p className="edu-text mt-8">
-            {spread === null
-              ? "Impossible de conclure sans ROE/ROCE."
-              : spread >= 0
-                ? "Effet de levier positif: la dette amplifie la rentabilité actionnariale."
-                : "Effet de levier négatif: la dette pèse sur la rentabilité des fonds propres."}
-          </p>
         </article>
 
         <article
@@ -298,16 +316,13 @@ export function RentabilityTest({ kpis, previousKpis = null }: RentabilityTestPr
                   Levier financier (dettes / fonds propres)
                 </span>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-                <Scale className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />
-              </div>
+              <KpiTooltip kpiId="effet_levier" value={kpis.effet_levier} />
             </div>
-            <p className="edu-text mt-0 border-t-0 pt-0">{leverageInterpretation.helper}</p>
           </div>
 
           <div className="w-full md:w-[32%]">
             <p className="tnum data-react text-right text-[3rem] font-semibold leading-none tracking-tight text-white">
-              {kpis.effet_levier === null ? "N/D" : `${formatNumber(animatedLeverage, 2)}x`}
+              {kpis.effet_levier === null ? INSUFFICIENT_DATA_LABEL : `${formatNumber(animatedLeverage, 2)}x`}
             </p>
             <div className="mt-3 flex justify-end">
               <div className="flex items-center gap-2">
@@ -367,11 +382,19 @@ type RentabilityMetricCardProps = {
   title: string;
   tag: string;
   value: string;
-  helper: string;
-  trend: KpiTrend;
-  icon: ReactNode;
   delayMs: number;
   className?: string;
+  kpiId?: string;
+  kpiValue?: number | null;
+  /** Tous les KPIs de la période précédente — la card y cherche kpiId. */
+  previousKpis?: CalculatedKpis | null;
+  /** Card cliquable → pilote la courbe d'évolution top de la page. */
+  onSelect?: () => void;
+  isSelected?: boolean;
+  /** Props legacy conservés pour compat — plus rendus. */
+  helper?: string;
+  trend?: KpiTrend;
+  icon?: ReactNode;
 };
 
 function RentabilityMetricCard({
@@ -379,35 +402,36 @@ function RentabilityMetricCard({
   title,
   tag,
   value,
-  helper,
-  trend,
-  icon,
   delayMs,
-  className
+  className,
+  kpiId,
+  kpiValue,
+  previousKpis,
+  onSelect,
+  isSelected,
 }: RentabilityMetricCardProps) {
+  const previousValue =
+    kpiId && previousKpis
+      ? (previousKpis as Record<string, number | null>)[kpiId] ?? null
+      : null;
   return (
-    <article
-      className={`precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 ${className ?? ""}`}
+    <div
+      className={`col-span-1 ${className ?? ""}`}
       style={{ animationDelay: `${delayMs}ms` }}
-      data-search-id={searchId}
     >
-      <div>
-        <div className="card-header flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-            <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-            {icon}
-          </div>
-        </div>
-        <p className="tnum data-react text-[3rem] font-semibold leading-none tracking-tight text-white">{value}</p>
-        <div className="mt-5 flex items-center gap-2">
-          <KpiTrendPill trend={trend} compact />
-        </div>
-      </div>
-      <p className="edu-text">{helper}</p>
-    </article>
+      <KpiCardLayout
+        kpiId={kpiId}
+        fullName={tag}
+        title={title}
+        value={kpiValue ?? null}
+        previousValue={previousValue}
+        formattedValue={value}
+        searchId={searchId}
+        className="fade-up"
+        onSelect={onSelect}
+        isSelected={isSelected}
+      />
+    </div>
   );
 }
 

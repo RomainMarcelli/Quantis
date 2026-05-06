@@ -6,7 +6,7 @@ import { buildPdfReportData } from "@/lib/synthese/pdfReportModel";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
-type DownloadSyntheseReportInput = {
+export type DownloadSyntheseReportInput = {
   companyName: string;
   greetingName: string;
   analysisCreatedAt: string;

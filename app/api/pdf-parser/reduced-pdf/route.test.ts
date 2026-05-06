@@ -1,5 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+
+const { requireAdminMock } = vi.hoisted(() => ({
+  requireAdminMock: vi.fn()
+}));
+
+vi.mock("@/lib/auth/requireAdmin", () => ({
+  requireAdmin: requireAdminMock,
+  AuthError: class AuthError extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.status = status;
+      this.name = "AuthError";
+    }
+  }
+}));
+
 import { GET } from "./route";
 import {
   __clearReducedPdfStoreForTests,
@@ -13,6 +30,8 @@ function makeRequest(url: string): NextRequest {
 describe("GET /api/pdf-parser/reduced-pdf", () => {
   beforeEach(() => {
     __clearReducedPdfStoreForTests();
+    requireAdminMock.mockReset();
+    requireAdminMock.mockResolvedValue({ uid: "user-1", email: "admin@test.fr" });
   });
 
   afterEach(() => {

@@ -2,9 +2,13 @@
 // Vue client des offres commerciales avec DA premium (dark/gold) alignee sur les ecrans dashboard.
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ShieldCheck, Sparkles } from "lucide-react";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { FeedbackToast } from "@/components/ui/FeedbackToast";
+import { firebaseAuthGateway } from "@/services/auth";
+import type { AuthenticatedUser } from "@/types/auth";
 
 type Offer = {
   name: string;
@@ -14,6 +18,10 @@ type Offer = {
   highlighted: boolean;
   badge?: string;
 };
+
+type ToastState = { type: "success" | "error" | "info"; message: string } | null;
+
+const CONTACT_EMAIL = "contact@vyzor.fr";
 
 const OFFERS: Offer[] = [
   {
@@ -43,7 +51,7 @@ const OFFERS: Offer[] = [
     badge: "Recommande"
   },
   {
-    name: "Enterprise",
+    name: "Entreprise",
     price: "Sur devis",
     description: "Pour les organisations multi-entites avec exigences de gouvernance.",
     features: [
@@ -59,9 +67,51 @@ const OFFERS: Offer[] = [
 
 export function PricingView() {
   const router = useRouter();
+  const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
+  const [toast, setToast] = useState<ToastState>(null);
+
+  useEffect(() => {
+    const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
+      setUser(nextUser);
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timeout);
+  }, [toast]);
+
+  function handleChooseOffer(offerName: string) {
+    if (offerName === "Free") {
+      if (!user) {
+        router.push("/register");
+        return;
+      }
+      setToast({ type: "info", message: "Vous êtes déjà sur l'offre Free." });
+      return;
+    }
+
+    if (offerName === "Pro") {
+      setToast({
+        type: "info",
+        message: `Paiement bientôt disponible — contactez-nous à ${CONTACT_EMAIL} pour démarrer un essai Pro.`
+      });
+      return;
+    }
+
+    if (offerName === "Entreprise") {
+      const subject = encodeURIComponent("Demande offre Entreprise Vyzor");
+      window.location.href = `mailto:${CONTACT_EMAIL}?subject=${subject}`;
+      return;
+    }
+  }
 
   return (
     <section className="relative z-10 mx-auto w-full max-w-6xl space-y-6">
+      {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
+
       <header className="precision-card rounded-2xl p-5 md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -76,11 +126,11 @@ export function PricingView() {
               <span className="text-quantis-gold">Quantis</span>
             </h1>
             <p className="mt-2 text-sm text-white/65">
-              {"Choisissez le niveau adapt\u00E9 \u00E0 votre cadence de pilotage financier."}
+              {"Choisissez le niveau adapté à votre cadence de pilotage financier."}
             </p>
             <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-xs text-white/70">
               <ShieldCheck className="h-3.5 w-3.5 text-quantis-gold" />
-              {"Paiement non actif pour le moment (mode d\u00E9monstration)."}
+              {"Paiement non actif pour le moment (mode démonstration)."}
             </div>
           </div>
 
@@ -137,6 +187,7 @@ export function PricingView() {
 
             <button
               type="button"
+              onClick={() => handleChooseOffer(offer.name)}
               className={`mt-6 w-full rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
                 offer.highlighted
                   ? "btn-gold-premium"

@@ -18,7 +18,7 @@ describe("premium dashboard components", () => {
       />
     );
 
-    expect(html).toContain("N/D");
+    expect(html).toContain("Données insuffisantes");
   });
 
   it("renders KPIWide target label and value zone", () => {
@@ -31,7 +31,8 @@ describe("premium dashboard components", () => {
     );
 
     expect(html).toContain("Objectif");
-    expect(html).toContain("Excédent brut d&#x27;exploitation");
+    // Le nom officiel est rendu en UPPERCASE depuis la refonte des cartes.
+    expect(html).toContain("EXCÉDENT BRUT D&#x27;EXPLOITATION");
   });
 
   it("keeps child sections rendered inside DashboardLayout", () => {
@@ -41,7 +42,7 @@ describe("premium dashboard components", () => {
         greetingName="Romain"
         kpis={{
           ca: 100000,
-          tresorerie: 23000,
+          disponibilites: 23000,
           ebe: 20000,
           healthScore: 85,
           croissance: 0.12,

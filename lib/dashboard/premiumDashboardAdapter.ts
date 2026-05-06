@@ -6,7 +6,7 @@ import type { CalculatedKpis } from "@/types/analysis";
 // sans exposer toute la structure KPI metier au composant de presentation.
 export type PremiumKpis = {
   ca: number | null;
-  tresorerie: number | null;
+  disponibilites: number | null;
   ebe: number | null;
   healthScore: number | null;
   croissance: number | null;
@@ -23,11 +23,11 @@ export type PremiumHealthState = {
 const DIAL_DEFAULT_RADIUS = 130;
 
 // Mapping strict demande par le produit:
-// ca -> kpis.ca, tresorerie -> kpis.disponibilites, etc.
+// ca -> kpis.ca, disponibilites -> kpis.disponibilites, etc.
 export function toPremiumKpis(kpis: CalculatedKpis): PremiumKpis {
   return {
     ca: kpis.ca,
-    tresorerie: kpis.disponibilites,
+    disponibilites: kpis.disponibilites,
     ebe: kpis.ebe,
     healthScore: kpis.healthScore,
     croissance: kpis.tcam,
@@ -39,7 +39,7 @@ export function toPremiumKpis(kpis: CalculatedKpis): PremiumKpis {
 export function getPremiumHealthState(score: number | null): PremiumHealthState {
   if (score === null) {
     return {
-      label: "Indéterminée",
+      label: "Données insuffisantes",
       message: "Données insuffisantes pour établir la santé globale.",
       colorHex: "#8b8b93",
       severity: "neutral"

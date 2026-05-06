@@ -86,12 +86,8 @@ export function LoginForm({
   const [loginErrors, setLoginErrors] = useState<LoginValidationErrors>(EMPTY_LOGIN_ERRORS);
   const [registerErrors, setRegisterErrors] = useState<RegisterValidationErrors>(EMPTY_REGISTER_ERRORS);
 
-  // Verification immediate d'une session deja active.
-  const [isCheckingSession] = useState(() => {
-    const currentUser = firebaseAuthGateway.getCurrentUser();
-    return Boolean(currentUser?.emailVerified);
-  });
-
+  // Le formulaire est affiche immediatement. Si une session deja active est detectee par
+  // le subscribe Firebase ci-dessous, on redirige (flash formulaire acceptable).
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [authInfoMessage, setAuthInfoMessage] = useState<string | null>(null);
@@ -102,11 +98,12 @@ export function LoginForm({
   const passwordRules = useMemo(() => getPasswordRuleChecks(password), [password]);
 
   useEffect(() => {
-    const currentUser = firebaseAuthGateway.getCurrentUser();
-
-    if (currentUser?.emailVerified) {
-      router.replace(safePostLoginRedirect);
-    }
+    const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
+      if (nextUser?.emailVerified) {
+        router.replace(safePostLoginRedirect);
+      }
+    });
+    return unsubscribe;
   }, [router, safePostLoginRedirect]);
 
   useEffect(() => {
@@ -325,14 +322,6 @@ export function LoginForm({
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
     }
-  }
-
-  if (isCheckingSession) {
-    return (
-      <section className="precision-card relative z-10 w-full max-w-xl rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Vérification de session...</p>
-      </section>
-    );
   }
 
   return (

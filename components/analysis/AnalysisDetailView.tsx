@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   FileText,
+  Bot,
+  Calendar,
   Folder,
   LayoutDashboard,
   Lock,
@@ -15,6 +17,7 @@ import {
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
+  Receipt,
   RefreshCcw,
   Settings,
   Sparkles,
@@ -27,6 +30,8 @@ import {
   type DashboardTestTabId
 } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
 import { DashboardFinancialTestContent } from "@/components/dashboard/navigation/DashboardFinancialTestContent";
+import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashboardModal";
+import { useUserDashboards } from "@/hooks/useUserDashboards";
 import { clearLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import {
   DEFAULT_FOLDER_NAME,
@@ -38,8 +43,11 @@ import {
   registerKnownFolderName,
   setActiveFolderName
 } from "@/lib/folders/activeFolder";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
@@ -61,8 +69,17 @@ import {
   renameUserFoldersByName
 } from "@/services/folderStore";
 import { firebaseAuthGateway } from "@/services/auth";
+import { useAuthenticatedUser } from "@/components/auth/AuthGate";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
+import { useTemporality } from "@/lib/temporality/temporalityContext";
+import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
+import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
+import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
+import { TemporalityBar } from "@/components/temporality/TemporalityBar";
+import { SourceBadge } from "@/components/analysis/SourceBadge";
+import { resolveActiveAnalysis } from "@/lib/source/activeSource";
+import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import {
@@ -77,9 +94,11 @@ import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
-import { downloadSyntheseReport } from "@/lib/synthese/downloadSyntheseReport";
+import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
+import { useAiChat } from "@/components/ai/AiChatProvider";
+import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
 import { buildSyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
-import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
+import { DownloadReportButton } from "@/components/analysis/DownloadReportButton";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
@@ -100,23 +119,53 @@ const DEFAULT_ANALYSIS_TAB: DashboardTestTabId = "creation-valeur";
 
 export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: AnalysisDetailViewProps) {
   const router = useRouter();
+  const activeAnalysisIdFromStorage = useActiveAnalysisId();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const currentCalendarYear = new Date().getFullYear();
   const isDocumentsView = viewMode === "documents";
 
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const { user } = useAuthenticatedUser();
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
+
+  // Pousse l'analyse courante au provider du chat IA — permet au backend
+  // d'enrichir les réponses Claude avec les données réelles (kpis, mappedData)
+  // sans que chaque tooltip ait à passer l'analysisId à la main.
+  const { setAnalysisContext } = useAiChat();
+  useEffect(() => {
+    setAnalysisContext(analysis?.id ?? null);
+    return () => setAnalysisContext(null);
+  }, [analysis?.id, setAnalysisContext]);
+
+  // L'onglet Trésorerie n'apparaît que si :
+  //  - une connexion Bridge active existe (useBridgeStatus polle /status)
+  //  - OU l'analyse courante porte un bankingSummary (résultat d'un sync
+  //    précédent attaché à cette analyse, même si la connexion vient d'être
+  //    supprimée — l'historique reste exploitable).
+  const bridgeStatus = useBridgeStatus();
+  // Fallback summary : si l'analyse courante n'a pas de bankingSummary
+  // attaché (cas typique : sync standalone effectué depuis Documents sans
+  // analysisId), on récupère celui de banking_summaries/{userId} via le
+  // status endpoint.
+  const bankingSummary =
+    analysis?.bankingSummary ?? bridgeStatus.status?.summary ?? null;
+  const showTresorerie = Boolean(bridgeStatus.status?.connected) || bankingSummary !== null;
+
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
+  // Phase 4 — modale "Nouveau tableau de bord" pour créer un dashboard custom.
+  const [createDashboardOpen, setCreateDashboardOpen] = useState(false);
+  // Phase 4 — liste des dashboards custom de l'utilisateur (CRUD Firestore).
+  const userDashboards = useUserDashboards(user?.uid ?? null);
   // Le select du menu pilote l'année d'analyse affichée dans le dashboard.
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<string>("");
   const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Quantis");
-  const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  // Loader visible uniquement si le chargement dépasse 400 ms (cf. hook).
+  const showAnalysisLoader = useDelayedFlag(loadingAnalysis);
   const [uploading, setUploading] = useState(false);
   const [folderActionName, setFolderActionName] = useState<string | null>(null);
   const [folderDialogMode, setFolderDialogMode] = useState<FolderDialogMode>(null);
@@ -156,37 +205,15 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     writeSidebarCollapsedPreference(isSidebarCollapsed);
   }, [isSidebarCollapsed, isSidebarPreferenceReady]);
 
-  useEffect(() => {
-    const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
-      if (!nextUser) {
-        setUser(null);
-        setLoadingAuth(false);
-        router.replace("/login");
-        return;
-      }
-
-      if (!nextUser.emailVerified) {
-        void firebaseAuthGateway.signOut();
-        setUser(null);
-        setLoadingAuth(false);
-        router.replace("/login");
-        return;
-      }
-
-      setUser(nextUser);
-      setLoadingAuth(false);
-    });
-
-    return unsubscribe;
-  }, [router]);
-
-  useEffect(() => {
+    useEffect(() => {
     if (!user) {
       return;
     }
-
-    void loadDashboardData(user, analysisId);
-  }, [user, analysisId]);
+    // Priorité 2 : l'analyse marquée active dans localStorage.
+    // Priorité 3 (fallback dans loadDashboardData) : dossier actif → history[0].
+    const target = analysisId ?? activeAnalysisIdFromStorage ?? undefined;
+    void loadDashboardData(user, target);
+  }, [user, analysisId, activeAnalysisIdFromStorage]);
 
   useEffect(() => {
     if (currentFolder.trim()) {
@@ -255,6 +282,27 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     [allAnalyses, analysis]
   );
 
+  // Filtre temporel global : si l'analyse possède du dailyAccounting (source dynamique
+  // Pennylane), on recalcule les KPI flow (CA, VA, EBITDA, charges…) sur la période
+  // sélectionnée par la TemporalityBar. Les KPI bilan (BFR, dispo, total_cp…) restent
+  // ceux du snapshot car ils sont à un instant T.
+  // Source statique (PDF) : recomputeKpisForPeriod renvoie l'annuel inchangé.
+  const temporality = useTemporality();
+  const effectiveAnalysis = useMemo(() => {
+    if (!analysis) return null;
+    return recomputeKpisForPeriod(analysis, temporality.periodStart, temporality.periodEnd);
+  }, [analysis, temporality.periodStart, temporality.periodEnd]);
+
+  // KPIs de la période ANTÉRIEURE de même durée — pour la variation
+  // +/-X% sur les cartes de chaque onglet du tableau de bord.
+  const previousPeriodKpis = useMemo(() => {
+    if (!analysis) return null;
+    if (!shouldShowTemporalityBar(analysis)) return null;
+    const prev = computePreviousPeriod(temporality.periodStart, temporality.periodEnd);
+    if (!prev) return null;
+    return recomputeKpisForPeriod(analysis, prev.periodStart, prev.periodEnd).kpis;
+  }, [analysis, temporality.periodStart, temporality.periodEnd]);
+
   useEffect(() => {
     if (!pendingSearchTarget) {
       return;
@@ -313,18 +361,35 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         setAnalysis(analysesInCurrentFolder[0]);
         return;
       }
-      setAnalysis(analysesFilteredByYear[0]);
+      // Aucune analyse dans le dossier actif → on adopte la première analyse disponible
+      // ET on bascule sur son dossier (sinon le check de folder ci-dessous nullifierait
+      // l'analyse au prochain render, créant une boucle setAnalysis(null) ↔ setAnalysis(...)).
+      const fallback = analysesFilteredByYear[0]!;
+      setAnalysis(fallback);
+      if (normalizeFolderName(fallback.folderName) !== normalizeFolderName(currentFolder)) {
+        setCurrentFolder(fallback.folderName);
+      }
       return;
     }
 
     const analysisStillInSelectedYear = analysesFilteredByYear.some((item) => item.id === analysis.id);
     if (!analysisStillInSelectedYear) {
-      setAnalysis(analysesInCurrentFolder[0] ?? analysesFilteredByYear[0] ?? null);
+      const fallback = analysesInCurrentFolder[0] ?? analysesFilteredByYear[0] ?? null;
+      setAnalysis(fallback);
+      if (fallback && normalizeFolderName(fallback.folderName) !== normalizeFolderName(currentFolder)) {
+        setCurrentFolder(fallback.folderName);
+      }
       return;
     }
 
+    // Folder mismatch : si le dossier actif ne contient pas l'analyse, on switch
+    // le dossier au lieu de nullifier l'analyse (sinon oscillation).
     if (normalizeFolderName(analysis.folderName) !== normalizeFolderName(currentFolder)) {
-      setAnalysis(analysesInCurrentFolder[0] ?? null);
+      if (analysesInCurrentFolder.length) {
+        setAnalysis(analysesInCurrentFolder[0]);
+      } else {
+        setCurrentFolder(analysis.folderName);
+      }
     }
   }, [analysis, analysesFilteredByYear, analysesInCurrentFolder, allAnalyses, currentFolder]);
 
@@ -777,11 +842,6 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     void handleUploadFiles(filtered);
   }
 
-  async function handleLogout() {
-    await firebaseAuthGateway.signOut();
-    router.replace("/");
-  }
-
   async function handleDocumentsRefresh() {
     if (!user) {
       return;
@@ -789,90 +849,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     await loadDashboardData(user, analysis?.id);
   }
 
-  if (loadingAuth) {
-    return (
-      <section className="precision-card rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/70">Chargement de la session...</p>
-      </section>
-    );
-  }
-
-  if (!user) {
-    return (
-      <section className="precision-card rounded-2xl p-8 text-center">
-        <p className="text-sm text-white/80">Votre session est expirée. Reconnectez-vous pour continuer.</p>
-        <button
-          type="button"
-          onClick={() => router.replace("/login")}
-          className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm text-white/85 hover:bg-white/10"
-        >
-          Se connecter
-        </button>
-      </section>
-    );
-  }
-
   return (
     <section className="w-full space-y-4">
       {/* Bandeau d'actions globales conserve (settings/offres/compte/logout) avec skin premium dark. */}
-      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
-        <div className="flex items-center gap-3">
-          {/* Taille légèrement augmentée pour éviter l'effet visuel "logo coupé" dans le header. */}
-          <QuantisLogo withText={false} size={34} />
-          <div>
-            <p className="text-sm font-semibold text-white">{companyName}</p>
-            <p className="text-xs text-white/55">Plateforme financière</p>
-          </div>
-        </div>
-
-        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
-          <GlobalSearchBar placeholder="Rechercher un KPI, une section ou un document..." />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/settings")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Paramètres"
-            title="Paramètres"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/pricing")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Offres"
-            title="Offre Free (verrouille)"
-          >
-            <Lock className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Compte"
-            title="Compte"
-          >
-            <UserCircle2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Se deconnecter"
-            title="Se deconnecter"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
-      </header>
-      <div className="md:hidden">
-        <GlobalSearchBar placeholder="Rechercher..." />
-      </div>
-
-      {loadingAnalysis ? (
+       <AppHeader
+        companyName={companyName}
+        subtitle="Plateforme financière"
+        searchPlaceholder="Rechercher un KPI, une section ou un document..."
+      />
+      {/* Loader retardé : ne s'affiche que si le chargement dépasse 400 ms. */}
+      {showAnalysisLoader ? (
         <div className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70">Chargement de l&apos;analyse...</div>
       ) : null}
 
@@ -895,107 +881,51 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         </div>
       ) : null}
 
-      <div
-        className={`relative grid gap-6 ${
-          isSidebarCollapsed ? "grid-cols-[88px_minmax(0,1fr)]" : "grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)]"
-        }`}
-      >
-        {/* Sidebar metier: dossiers + fichiers + upload, conservee mais re-skinee premium. */}
-        <aside
-          data-scroll-reveal-ignore
-          className={`precision-card relative h-fit rounded-2xl lg:sticky lg:top-4 ${
-            isSidebarCollapsed ? "p-3" : "p-4"
-          }`}
-        >
-          <div className={`mb-2 flex ${isSidebarCollapsed ? "justify-center" : "justify-end"}`}>
-            <button
-              type="button"
-              onClick={() => setIsSidebarCollapsed((previous) => !previous)}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white/85 transition hover:border-quantis-gold/60 hover:bg-black/80"
-              aria-label={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
-              title={isSidebarCollapsed ? "Ouvrir le menu latéral" : "Réduire le menu latéral"}
-            >
-              {isSidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-            </button>
-          </div>
-          <nav className="space-y-1 text-sm">
-            <NavRow
-              icon={<LayoutDashboard className="h-4 w-4" />}
-              active={!isDocumentsView}
-              onClick={() => router.push("/analysis")}
-              collapsed={isSidebarCollapsed}
-            >
-              Tableau de bord
-            </NavRow>
-            {/* L'item "Analyses" est remplace par "Synthese" et devient navigable. */}
-            <NavRow
-              icon={<Sparkles className="h-4 w-4" />}
-              onClick={() => router.push("/synthese")}
-              collapsed={isSidebarCollapsed}
-            >
-              Synthèse
-            </NavRow>
-            <NavRow
-              icon={<FileText className="h-4 w-4" />}
-              active={isDocumentsView}
-              onClick={() => router.push("/documents")}
-              collapsed={isSidebarCollapsed}
-            >
-              Documents
-            </NavRow>
-          </nav>
-
-          {!isSidebarCollapsed && !isDocumentsView && dashboardYearOptions.length > 1 ? (
-            <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-              <label htmlFor="sidebar-dashboard-year" className="text-[11px] uppercase tracking-wide text-white/50">
-                Année de synthèse
-              </label>
-              <select
-                id="sidebar-dashboard-year"
-                value={selectedDashboardYear}
-                onChange={(event) => setSelectedDashboardYear(event.target.value)}
-                className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
-              >
-                {dashboardYearOptions.map((option) => (
-                  <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-
-          {/* Le bloc compte remplace le lien de navigation "Compte" pour eviter le doublon. */}
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className={`mt-4 rounded-xl border border-white/10 bg-black/20 transition-colors hover:bg-white/10 ${
-              isSidebarCollapsed ? "flex w-full justify-center p-2" : "w-full p-3 text-left"
-            }`}
-            aria-label="Ouvrir le compte"
-            title="Compte"
-          >
-            {isSidebarCollapsed ? (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                {greetingName.charAt(0).toUpperCase()}
-              </span>
-            ) : (
-              <>
-                <p className="text-[11px] uppercase tracking-wide text-white/50">Compte</p>
-                <div className="mt-2 flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm font-semibold text-white">
-                    {greetingName.charAt(0).toUpperCase()}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-white">{greetingName}</p>
-                    <p className="text-xs text-white/55">Free</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </button>
-
-        </aside>
+      <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
+        <AppSidebar
+          activeRoute={isDocumentsView ? "documents" : "analysis"}
+          accountFirstName={greetingName}
+          dashboardSubmenu={
+            isDocumentsView
+              ? undefined
+              : {
+                  // Sous-onglets fixes (Trésorerie conditionnel selon Bridge),
+                  // suivis des dashboards custom de l'utilisateur. Le bouton
+                  // "+ Nouveau" est exposé dans la liste si l'user est connecté.
+                  items: [
+                    { id: "creation-valeur", label: "Création de valeur", kind: "fixed" as const },
+                    { id: "investissement-bfr", label: "Investissement", kind: "fixed" as const },
+                    { id: "financement", label: "Financement", kind: "fixed" as const },
+                    { id: "rentabilite", label: "Rentabilité", kind: "fixed" as const },
+                    ...(showTresorerie
+                      ? [{ id: "tresorerie", label: "Trésorerie", kind: "fixed" as const }]
+                      : []),
+                    ...userDashboards.dashboards.map((d) => ({
+                      id: d.id,
+                      label: d.name,
+                      kind: "custom" as const
+                    }))
+                  ],
+                  activeId: activeDashboardTab,
+                  onSelectItem: (id) => {
+                    setActiveDashboardTab(id as DashboardTestTabId);
+                    // Bascule sur la page /analysis si l'utilisateur déclenche
+                    // le sous-menu depuis une autre route — sinon on reste
+                    // simplement sur la page courante avec le tab mis à jour.
+                    if (window.location.pathname !== "/analysis") {
+                      router.push("/analysis");
+                    }
+                  },
+                  onCreate: user ? () => setCreateDashboardOpen(true) : undefined,
+                  onDelete: async (id) => {
+                    await userDashboards.deleteDashboard(id);
+                    if (activeDashboardTab === id) {
+                      setActiveDashboardTab(DEFAULT_ANALYSIS_TAB);
+                    }
+                  }
+                }
+          }
+        />
 
         <div className="space-y-6">
           {isDocumentsView ? (
@@ -1200,54 +1130,149 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             </>
           ) : analysis ? (
             <>
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div />
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!analysis) return;
-                      const synthese = buildSyntheseViewModel(
-                        analysis.kpis,
-                        previousAnalysis?.kpis ?? null,
-                        analysis.uploadContext?.sector ?? null
-                      );
-                      void downloadSyntheseReport({
-                        companyName,
-                        greetingName,
-                        analysisCreatedAt: analysis.createdAt,
-                        selectedYearLabel: selectedDashboardYear,
-                        synthese,
-                        kpis: analysis.kpis,
-                        mappedData: analysis.mappedData
-                      });
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-2 text-xs font-medium text-quantis-gold transition-colors hover:bg-quantis-gold/20"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    Télécharger le rapport
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!analysis) return;
-                      exportAnalysisDataAsJson({ analysis, companyName });
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
-                  >
-                    Exporter données
-                  </button>
-                </div>
+              {/* Titre remonté en haut — l'utilisateur voit immédiatement le
+                  contexte. Le sélecteur de période vient juste dessous. */}
+              <div className="px-1">
+                <h1 className="text-2xl font-semibold text-white md:text-3xl">Tableau de bord</h1>
+                <p className="mt-1 text-sm text-white/65">
+                  Bonjour {greetingName}, voici la vue détaillée de vos indicateurs financiers.
+                </p>
               </div>
+
+              {/* Sélecteur de période sous le titre :
+                   - Sources dynamiques (Pennylane/MyUnisoft/Odoo) → TemporalityBar
+                     complète (jour/semaine/mois/trimestre/année + nav).
+                   - Sources statiques (PDF/Excel) → mini-bar "Année" + dropdown
+                     pour switcher entre les exercices disponibles. Le sélecteur
+                     historique de la sidebar a été retiré (doublon). */}
+              {shouldShowTemporalityBar(analysis) ? (
+                <TemporalityBar
+                  availableRange={computeAvailableRange(analysis)}
+                  daysInPeriod={effectiveAnalysis?.isFiltered ? effectiveAnalysis.filterSummary.daysInPeriod : null}
+                  rightLabel={
+                    effectiveAnalysis?.isFiltered
+                      ? `${effectiveAnalysis.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
+                      : undefined
+                  }
+                />
+              ) : dashboardYearOptions.length > 1 ? (
+                <div className="precision-card flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3" data-scroll-reveal-ignore>
+                  <div className="flex items-center gap-2 text-white/60">
+                    <Calendar className="h-4 w-4" />
+                    <span className="text-xs uppercase tracking-wider">Période</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+                    <button
+                      type="button"
+                      className="rounded-md bg-quantis-gold px-3 py-1 text-xs font-medium text-black"
+                      aria-pressed
+                    >
+                      Année
+                    </button>
+                  </div>
+                  <select
+                    id="dashboard-year-static"
+                    value={selectedDashboardYear}
+                    onChange={(event) => setSelectedDashboardYear(event.target.value)}
+                    className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white outline-none transition hover:bg-white/10 focus:border-quantis-gold/70"
+                  >
+                    {dashboardYearOptions.map((option) => (
+                      <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+{/* Bandeau meta consolidé : société + date + source + période
+                  (statique uniquement). */}
+              <header className="precision-card flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
+                    <span>Analyse du {new Date(analysis.createdAt).toLocaleString("fr-FR")}</span>
+                    <SourceBadge
+                      sourceMetadata={analysis.sourceMetadata ?? null}
+                      analysisCreatedAt={analysis.createdAt}
+                    />
+                    {!shouldShowTemporalityBar(analysis) && analysis.fiscalYear ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-white/75">
+                        Exercice {analysis.fiscalYear}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </header>
+
               <DashboardFinancialTestMenu
                 activeTab={activeDashboardTab}
                 onChange={handleFinancialTabChange}
+                showTresorerie={showTresorerie}
+                customDashboards={userDashboards.dashboards}
+                onCreateDashboard={user ? () => setCreateDashboardOpen(true) : undefined}
+                onDeleteDashboard={async (id) => {
+                  await userDashboards.deleteDashboard(id);
+                  // Si l'utilisateur supprime l'onglet courant, on retombe sur Création de valeur.
+                  if (activeDashboardTab === id) {
+                    setActiveDashboardTab(DEFAULT_ANALYSIS_TAB);
+                  }
+                }}
+                rightSlot={
+                  <DownloadReportButton
+                    disabled={!analysis}
+                    getDownloadInput={() => {
+                      const synthese = buildSyntheseViewModel(
+                        analysis!.kpis,
+                        previousAnalysis?.kpis ?? null,
+                        analysis!.uploadContext?.sector ?? null
+                      );
+                      return {
+                        companyName,
+                        greetingName,
+                        analysisCreatedAt: analysis!.createdAt,
+                        selectedYearLabel: selectedDashboardYear,
+                        synthese,
+                        kpis: analysis!.kpis,
+                        mappedData: analysis!.mappedData
+                      };
+                    }}
+                  />
+                }
               />
+              {/* previousKpis :
+                   - Priorité 1 = KPIs de la période antérieure de même durée
+                     (Année → N-1, Mois → M-1…) calculés via dailyAccounting.
+                   - Priorité 2 = KPIs de l'exercice N-1 (fallback historique
+                     pour les sources statiques PDF/Excel sans daily). */}
               <DashboardFinancialTestContent
                 activeTab={activeDashboardTab}
-                kpis={analysis.kpis}
-                mappedData={analysis.mappedData}
-                previousKpis={previousAnalysis?.kpis ?? null}
+                kpis={effectiveAnalysis?.kpis ?? analysis.kpis}
+                mappedData={effectiveAnalysis?.mappedData ?? analysis.mappedData}
+                previousKpis={previousPeriodKpis ?? previousAnalysis?.kpis ?? null}
+                bankingSummary={bankingSummary}
+                analyses={allAnalyses}
+                currentAnalysis={analysis}
+                analysisModeLabel={
+                  (analysis.dailyAccounting?.length ?? 0) > 0
+                    ? "Analyse dynamique"
+                    : "Analyse statique"
+                }
+                userId={user?.uid ?? null}
+                customDashboards={userDashboards.dashboards}
+              />
+
+              {/* Modal Phase 4 — création d'un dashboard custom nommé. */}
+              <CreateDashboardModal
+                open={createDashboardOpen}
+                onClose={() => setCreateDashboardOpen(false)}
+                onConfirm={async (name) => {
+                  const newId = await userDashboards.createDashboard(name);
+                  setCreateDashboardOpen(false);
+                  if (newId) {
+                    // Bascule directement sur le nouveau dashboard fraîchement créé.
+                    setActiveDashboardTab(newId as DashboardTestTabId);
+                  }
+                }}
               />
             </>
           ) : (

@@ -9,6 +9,7 @@ import {
   getPremiumHealthState
 } from "@/lib/dashboard/premiumDashboardAdapter";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
+import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 
 type HealthScoreProps = {
   score: number | null;
@@ -37,7 +38,10 @@ export function HealthScore({ score, tag = "SCORE_01", searchId }: HealthScorePr
           <ShieldCheck className="h-4 w-4" />
           <h2 className="text-[11px] font-bold uppercase tracking-widest">Indice de santé</h2>
         </div>
-        <span className="tech-tag text-[9px] font-mono text-white/40">{tag}</span>
+        <div className="flex items-center gap-2">
+          <KpiTooltip kpiId="healthScore" value={score} align="right" />
+          <span className="tech-tag text-[9px] font-mono text-white/40">{tag}</span>
+        </div>
       </div>
 
       <div className="relative mx-auto mt-2 flex h-[286px] w-[286px] items-center justify-center transition-transform duration-700 group-hover:scale-[1.02] md:h-[304px] md:w-[304px]">
@@ -77,9 +81,19 @@ export function HealthScore({ score, tag = "SCORE_01", searchId }: HealthScorePr
         </svg>
 
         <div className="absolute flex flex-col items-center gap-3">
-          <span className="tnum data-react text-[6.8rem] font-semibold leading-none text-white md:text-[7.2rem]">
-            {Math.round(animatedScore)}
-          </span>
+          {score === null ? (
+            // Quand le score est indisponible (ex. parsing partiel : ca=0 mais
+            // d'autres signaux présents), afficher un tiret plutôt qu'un "0"
+            // qui se lit comme un score réel de 0/100. Le badge + le message
+            // ci-dessous portent le texte "Données insuffisantes".
+            <span className="tnum text-[6.8rem] font-semibold leading-none text-white/40 md:text-[7.2rem]">
+              —
+            </span>
+          ) : (
+            <span className="tnum data-react text-[6.8rem] font-semibold leading-none text-white md:text-[7.2rem]">
+              {Math.round(animatedScore)}
+            </span>
+          )}
           <div className="interactive-badge flex items-center gap-2 rounded border border-white/15 bg-white/[0.03] px-3 py-1">
             <div
               className="h-1.5 w-1.5 rounded-full"
@@ -99,10 +113,6 @@ export function HealthScore({ score, tag = "SCORE_01", searchId }: HealthScorePr
         <div className="rounded-xl border border-white/10 bg-black/25 px-4 py-3">
           <p className="text-[13px] font-medium leading-relaxed text-white/85">{healthState.message}</p>
         </div>
-        <p className="edu-text mt-0 border-t-0 pt-0 text-left">
-          L&apos;indice de santé synthétise la liquidité, la rentabilité et la solvabilité pour piloter la
-          résilience financière.
-        </p>
       </div>
     </article>
   );

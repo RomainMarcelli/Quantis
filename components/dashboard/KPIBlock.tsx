@@ -1,24 +1,51 @@
 // File: components/dashboard/KPIBlock.tsx
-// Role: rend une carte KPI standard (valeur principale + variation/runway) dans la grille premium.
+// Role: carte KPI standard du cockpit Synthèse. Délègue la mise en page
+// au composant partagé `KpiCardLayout` (header uppercase + titre vulgarisé
+// + valeur + variation conditionnelle + badge de statut).
+//
+// Convention props héritée du legacy (`title` = vulgarisé, `tag` = nom
+// officiel) — préservée pour ne pas casser les call-sites existants. Les
+// props désormais inutiles (`icon`, `trendValue`, `trendLabel`, `sideLabel`)
+// sont conservées dans la signature avec un commentaire pour permettre une
+// suppression progressive.
 "use client";
 
 import type { ReactNode } from "react";
-import { Clock, TrendingUp } from "lucide-react";
-import { formatCurrency, formatMonths, formatPercent } from "@/components/dashboard/formatting";
+import {
+  formatCurrency,
+  formatMonths,
+  formatPercent,
+  INSUFFICIENT_DATA_LABEL,
+} from "@/components/dashboard/formatting";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
+import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 
 type KPIBlockFormat = "currency" | "percent";
 
 type KPIBlockProps = {
+  /** Titre vulgarisé (ex. "Ce qui rentre"). Rendu sur la ligne 2. */
   title: string;
+  /** Nom officiel (ex. "Chiffre d'Affaires"). Rendu uppercase sur la ligne 1. */
   tag: string;
   value: number | null;
   format: KPIBlockFormat;
-  icon: ReactNode;
+  /**
+   * Valeur du même KPI sur la période précédente. Activée par le parent
+   * (SyntheseView / AnalysisDetailView) qui calcule `previousKpis` via
+   * `recomputeKpisForPeriod` sur la période antérieure.
+   */
+  previousValue?: number | null;
+  searchId?: string;
+  /** id du KPI dans le registre — déclenche tooltip + diagnostic + badge. */
+  kpiId?: string;
+  /**
+   * Props legacy conservées dans la signature pour compatibilité — plus
+   * rendues. Le KpiTooltip ✨ et le badge de statut couvrent les besoins.
+   */
+  icon?: ReactNode;
   trendValue?: number | null;
   trendLabel?: string;
   sideLabel?: string;
-  searchId?: string;
 };
 
 export function KPIBlock({
@@ -26,53 +53,23 @@ export function KPIBlock({
   tag,
   value,
   format,
-  icon,
-  trendValue,
-  trendLabel = "vs période précédente",
-  sideLabel,
-  searchId
+  previousValue,
+  searchId,
+  kpiId,
 }: KPIBlockProps) {
-  // Le compteur anime uniquement la valeur principale de la carte.
+  // Le compteur anime uniquement la valeur principale.
   const animatedValue = useAnimatedNumber(value, { durationMs: 1200 });
 
   return (
-    <article className="precision-card group fade-up flex flex-col justify-between rounded-2xl p-6" data-search-id={searchId}>
-      <div>
-        <div className="card-header flex items-start justify-between">
-          <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-semibold text-white">{title}</h3>
-            <span className="tech-tag self-start text-[10px] font-mono uppercase text-white/60">{tag}</span>
-          </div>
-          <div className="flex h-8 w-8 items-center justify-center rounded border border-white/10 bg-white/5 transition-all duration-300 group-hover:scale-110 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
-            {icon}
-          </div>
-        </div>
-
-        <div>
-          <div className="tnum data-react text-[2.5rem] font-medium leading-none tracking-tight text-white">
-            {formatKpiValue(animatedValue, value, format)}
-          </div>
-          <div className="mt-5 flex items-center justify-between">
-            {trendValue !== undefined ? (
-              <div className="interactive-badge flex items-center gap-2 rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-1">
-                <TrendingUp className="h-3 w-3 text-emerald-500" />
-                <span className="text-[11px] font-bold text-emerald-500">{formatPercent(trendValue)}</span>
-              </div>
-            ) : (
-              <div className="interactive-badge tech-tag flex items-center gap-2 border-none bg-transparent">
-                <Clock className="h-3 w-3 text-white/50" />
-                <span className="text-[11px] font-medium text-white/70">{sideLabel ?? "N/D"}</span>
-              </div>
-            )}
-            <span className="text-[10px] font-mono uppercase text-white/30">{trendLabel}</span>
-          </div>
-        </div>
-      </div>
-
-      <p className="edu-text">
-        {title} constitue un indicateur prioritaire de pilotage. La dynamique est mise à jour après chaque analyse.
-      </p>
-    </article>
+    <KpiCardLayout
+      kpiId={kpiId}
+      fullName={tag}
+      title={title}
+      value={value}
+      previousValue={previousValue}
+      formattedValue={formatKpiValue(animatedValue, value, format)}
+      searchId={searchId}
+    />
   );
 }
 
@@ -81,18 +78,12 @@ function formatKpiValue(
   originalValue: number | null,
   format: KPIBlockFormat
 ): string {
-  if (originalValue === null) {
-    return "N/D";
-  }
-
-  if (format === "currency") {
-    return formatCurrency(animatedValue);
-  }
-
+  if (originalValue === null) return INSUFFICIENT_DATA_LABEL;
+  if (format === "currency") return formatCurrency(animatedValue);
   return formatPercent(animatedValue);
 }
 
-// Helper expose pour d'autres cartes qui souhaitent afficher un runway en lecture directe.
+// Helper exposé pour d'autres cartes qui souhaitent afficher un runway.
 export function formatRunwayLabel(value: number | null): string {
   return formatMonths(value);
 }

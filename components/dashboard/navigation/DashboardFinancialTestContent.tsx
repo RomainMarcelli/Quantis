@@ -6,41 +6,120 @@ import { FinancingTest } from "@/components/dashboard/navigation/FinancingTest";
 import { InvestmentTest } from "@/components/dashboard/navigation/InvestmentTest";
 import { RentabilityTest } from "@/components/dashboard/navigation/RentabilityTest";
 import { ValueCreationTest } from "@/components/dashboard/navigation/ValueCreationTest";
+import { TreasuryTab } from "@/components/banking/TreasuryTab";
+import { TreasuryEmptyState } from "@/components/banking/TreasuryEmptyState";
+import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
 import type { DashboardTestTabId } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
-import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
+import type { CustomDashboardSummary } from "@/hooks/useUserDashboards";
+import type { AnalysisRecord, CalculatedKpis, MappedFinancialData } from "@/types/analysis";
+import type { BankingSummary } from "@/types/banking";
+import type { DashboardLayout } from "@/types/dashboard";
 
 type DashboardFinancialTestContentProps = {
   activeTab: DashboardTestTabId;
   kpis: CalculatedKpis;
   mappedData: MappedFinancialData;
   previousKpis?: CalculatedKpis | null;
+  /** Summary Bridge si l'utilisateur a une connexion bancaire active. Null
+   *  quand l'onglet Trésorerie est masqué de toute façon. */
+  bankingSummary?: BankingSummary | null;
+  /** Historique du dossier — alimente la courbe d'évolution KPI top de chaque onglet. */
+  analyses?: AnalysisRecord[];
+  /** Analyse courante — son `dailyAccounting` alimente le mode mensuel. */
+  currentAnalysis?: AnalysisRecord | null;
+  /** Libellé de mode "Analyse dynamique / statique" affiché dans chaque onglet. */
+  analysisModeLabel?: string | null;
+  /** UID Firebase pour persister les layouts. Null = mode invité (no save). */
+  userId?: string | null;
+  /** Liste des dashboards custom — utilisée pour résoudre le `name` quand
+   *  l'utilisateur clique sur un onglet custom (`custom:<uuid>`). */
+  customDashboards?: CustomDashboardSummary[];
 };
 
 export function DashboardFinancialTestContent({
   activeTab,
   kpis,
   mappedData,
-  previousKpis = null
+  previousKpis = null,
+  bankingSummary = null,
+  analyses = [],
+  currentAnalysis = null,
+  analysisModeLabel = null,
+  userId = null,
+  customDashboards = []
 }: DashboardFinancialTestContentProps) {
+  // Props partagés entre les 4 onglets KPI : identiques pour tous, on les
+  // factorise ici pour éviter la duplication de 12 lignes.
+  const sharedTabProps = {
+    previousKpis,
+    analyses,
+    currentAnalysis,
+    analysisModeLabel
+  } as const;
+
   if (activeTab === "creation-valeur") {
-    return <ValueCreationTest kpis={kpis} mappedData={mappedData} previousKpis={previousKpis} />;
+    return <ValueCreationTest kpis={kpis} mappedData={mappedData} {...sharedTabProps} />;
   }
 
   if (activeTab === "investissement-bfr") {
-    return <InvestmentTest kpis={kpis} previousKpis={previousKpis} />;
+    return <InvestmentTest kpis={kpis} {...sharedTabProps} />;
   }
 
   if (activeTab === "financement") {
-    return <FinancingTest kpis={kpis} previousKpis={previousKpis} />;
+    return <FinancingTest kpis={kpis} {...sharedTabProps} />;
   }
 
   if (activeTab === "rentabilite") {
-    return <RentabilityTest kpis={kpis} previousKpis={previousKpis} />;
+    return <RentabilityTest kpis={kpis} {...sharedTabProps} />;
+  }
+
+  if (activeTab === "tresorerie") {
+    if (!bankingSummary) {
+      // Empty state contextuel (pas connecté vs connecté en attente de sync).
+      return <TreasuryEmptyState />;
+    }
+    return <TreasuryTab summary={bankingSummary} />;
+  }
+
+  // Phase 4 — onglet custom : `custom:<uuid>`. Rend un CustomizableDashboard
+  // 100% libre (pas de lockedCategory) avec persistance Firestore.
+  if (activeTab.startsWith("custom:")) {
+    const dashboard = customDashboards.find((d) => d.id === activeTab);
+    const defaultLayout: DashboardLayout = {
+      id: activeTab,
+      name: dashboard?.name,
+      widgets: []
+    };
+    return (
+      <section className="space-y-4">
+        <header className="precision-card rounded-2xl px-4 py-3">
+          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/45">
+            Dashboard personnalisé
+          </p>
+          <h2 className="text-2xl font-semibold text-white">
+            {dashboard?.name ?? "Dashboard sans nom"}
+          </h2>
+          <p className="mt-1 text-xs text-white/55">
+            Compose librement ton tableau avec n&apos;importe quel widget.
+          </p>
+        </header>
+        <CustomizableDashboard
+          userId={userId}
+          layoutId={activeTab}
+          defaultLayout={defaultLayout}
+          kpis={kpis}
+          previousKpis={previousKpis}
+          analyses={analyses}
+          currentAnalysis={currentAnalysis}
+          mappedData={mappedData}
+        />
+      </section>
+    );
   }
 
   return (
     <TestPlaceholderCard
-      title="Rentabilité"
+      title="Section inconnue"
       description="Cette section n'est pas encore intégrée."
     />
   );

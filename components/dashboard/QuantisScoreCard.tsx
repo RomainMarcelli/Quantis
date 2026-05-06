@@ -38,7 +38,7 @@ export function QuantisScoreCard({
 
   return (
     <article
-      className="precision-card group fade-up relative flex min-h-[560px] flex-col rounded-2xl px-6 pb-6 pt-7 lg:col-span-5"
+      className="precision-card group fade-up relative flex h-full flex-col rounded-2xl px-6 pb-6 pt-7"
       data-search-id={searchId}
     >
       <div className="card-header mb-5 flex w-full items-center justify-between">
@@ -46,7 +46,6 @@ export function QuantisScoreCard({
           <Gauge className="h-4 w-4" />
           <h2 className="text-[11px] font-bold uppercase tracking-widest">Quantis Score</h2>
         </div>
-        <span className="tech-tag text-[9px] font-mono text-white/40">QS_V1</span>
       </div>
 
       <div className="relative mx-auto mt-2 flex h-[286px] w-[286px] items-center justify-center transition-transform duration-700 group-hover:scale-[1.02] md:h-[304px] md:w-[304px]">
@@ -86,9 +85,18 @@ export function QuantisScoreCard({
         </svg>
 
         <div className="absolute flex flex-col items-center gap-3">
-          <span className="tnum data-react text-[6.8rem] font-semibold leading-none text-white md:text-[7.2rem]">
-            {score === null ? "N/D" : Math.round(animatedScore)}
-          </span>
+          {score === null ? (
+            // Cohérent avec HealthScore : tiret au lieu d'un "N/D" en gros qui
+            // se lit mal dans le cadran. Le label "Données insuffisantes" est
+            // porté par scoreState.label dans le badge ci-dessous.
+            <span className="tnum text-[6.8rem] font-semibold leading-none text-white/40 md:text-[7.2rem]">
+              —
+            </span>
+          ) : (
+            <span className="tnum data-react text-[6.8rem] font-semibold leading-none text-white md:text-[7.2rem]">
+              {Math.round(animatedScore)}
+            </span>
+          )}
           <div className="interactive-badge flex items-center gap-2 rounded border border-white/15 bg-white/[0.03] px-3 py-1">
             <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: scoreState.colorHex }} />
             <span
@@ -125,7 +133,7 @@ export function QuantisScoreCard({
 
 function getQuantisScoreState(score: number | null): { label: string; colorHex: string } {
   if (score === null) {
-    return { label: "Indéterminé", colorHex: "#8b8b93" };
+    return { label: "Données insuffisantes", colorHex: "#8b8b93" };
   }
   if (score > 80) {
     return { label: "Excellent", colorHex: "#10B981" };

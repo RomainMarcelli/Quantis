@@ -1,6 +1,7 @@
 "use client";
 
 import type { TooltipContentProps } from "recharts";
+import { INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import type { BreakEvenPoint } from "@/lib/dashboard/tabs/valueCreationData";
 
 type BreakEvenTooltipProps = TooltipContentProps & {
@@ -81,7 +82,7 @@ function TooltipRow({ color, label, value }: { color: string; label: string; val
 
 function formatCurrencyValue(value: number | null): string {
   if (value === null || Number.isNaN(value)) {
-    return "N/D";
+    return INSUFFICIENT_DATA_LABEL;
   }
 
   return new Intl.NumberFormat("fr-FR", {

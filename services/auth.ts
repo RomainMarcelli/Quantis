@@ -136,7 +136,6 @@ const realFirebaseAuthGateway: AuthGateway = {
 
   getCurrentUser() {
     if (!auth.currentUser) {
-      clearSessionLifetimeContext();
       return null;
     }
 

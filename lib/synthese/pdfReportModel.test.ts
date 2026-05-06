@@ -47,7 +47,8 @@ const baseSynthese: SyntheseViewModel = {
     }
   ],
   actions: ["Sécuriser la trésorerie hebdomadaire."],
-  alerts: [{ id: "a1", label: "BFR élevé", severity: "medium" }]
+  alerts: [{ id: "a1", label: "BFR élevé", severity: "medium" }],
+  fiscalTiles: []
 };
 
 const baseKpis: CalculatedKpis = {

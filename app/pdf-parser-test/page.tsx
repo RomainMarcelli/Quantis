@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AdminGate } from "@/components/admin/AdminGate";
 import { AnalysisResultPanel } from "@/components/pdf-parser/AnalysisResultPanel";
 import { ProcessingLoader } from "@/components/ProcessingLoader";
 import { useProcessingMetrics } from "@/hooks/useProcessingMetrics";
@@ -196,6 +197,7 @@ export default function PdfParserTestPage() {
   }
 
   return (
+    <AdminGate>
     <main className="premium-analysis-root relative mx-auto min-h-screen w-full overflow-hidden px-4 py-10">
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
@@ -367,6 +369,7 @@ export default function PdfParserTestPage() {
         </article>
       </section>
     </main>
+    </AdminGate>
   );
 }
 

@@ -2,9 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, ChevronDown, FileSpreadsheet, FileText, FolderInput, Trash2 } from "lucide-react";
-import { formatCurrency } from "@/components/dashboard/formatting";
+import {
+  BarChart3,
+  FileSpreadsheet,
+  FileText,
+  FolderInput,
+  Plug,
+  Trash2,
+} from "lucide-react";
+import { formatCurrency, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
+import {
+  describeAnalysisSource,
+  getAnalysisSourceKind,
+} from "@/lib/source/activeSource";
 import type { AnalysisRecord } from "@/types/analysis";
 
 type AnalysisCardProps = {
@@ -12,18 +23,47 @@ type AnalysisCardProps = {
   folders: string[];
   onDelete: (id: string) => void;
   onMove: (id: string, targetFolder: string) => void;
+  /** True si cette analyse appartient au DOSSIER actif (highlight doré). */
+  isActive?: boolean;
 };
 
-export function AnalysisCard({ analysis, folders, onDelete, onMove }: AnalysisCardProps) {
+export function AnalysisCard({ analysis, folders, onDelete, onMove, isActive = false }: AnalysisCardProps) {
   const router = useRouter();
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Détermine la "présentation" de la source : un fichier uploadé garde son
+  // nom et son icône type-fichier ; une source dynamique (Pennylane / MyUnisoft
+  // / Odoo) prend l'icône Plug + le label provider — sinon l'utilisateur voit
+  // "Analyse sans fichier" et ne sait pas que c'est sa sync Pennylane.
+  const sourceKind = getAnalysisSourceKind(analysis);
+  const isDynamic =
+    sourceKind === "pennylane" || sourceKind === "myunisoft" || sourceKind === "odoo";
   const sourceFile = analysis.sourceFiles[0];
-  const fileName = sourceFile?.name ?? "Analyse sans fichier";
-  const fileType = sourceFile?.type ?? "pdf";
+  const description = describeAnalysisSource(analysis);
+  const fileName = isDynamic
+    ? description.label
+    : sourceFile?.name ?? "Analyse sans fichier";
+  const fileType: "pdf" | "excel" | "fec" | "pennylane" | "myunisoft" | "odoo" = isDynamic
+    ? sourceKind
+    : (sourceFile?.type ?? "pdf");
   const ca = analysis.kpis.ca;
   const score = analysis.quantisScore?.quantis_score ?? null;
+
+  // Couleurs par type — étendues aux sources dynamiques pour qu'elles ne
+  // ressemblent pas à un PDF (palette rouge) par accident.
+  const TYPE_VISUALS: Record<
+    typeof fileType,
+    { iconClass: string; bgClass: string; badge: string; badgeClass: string }
+  > = {
+    pdf: { iconClass: "text-rose-400", bgClass: "bg-rose-500/10", badge: "PDF", badgeClass: "bg-rose-500/15 text-rose-300" },
+    excel: { iconClass: "text-emerald-400", bgClass: "bg-emerald-500/10", badge: "EXCEL", badgeClass: "bg-emerald-500/15 text-emerald-300" },
+    fec: { iconClass: "text-cyan-400", bgClass: "bg-cyan-500/10", badge: "FEC", badgeClass: "bg-cyan-500/15 text-cyan-300" },
+    pennylane: { iconClass: "text-quantis-gold", bgClass: "bg-quantis-gold/10", badge: "PENNYLANE", badgeClass: "bg-quantis-gold/15 text-quantis-gold" },
+    myunisoft: { iconClass: "text-violet-300", bgClass: "bg-violet-500/10", badge: "MYUNISOFT", badgeClass: "bg-violet-500/15 text-violet-300" },
+    odoo: { iconClass: "text-fuchsia-300", bgClass: "bg-fuchsia-500/10", badge: "ODOO", badgeClass: "bg-fuchsia-500/15 text-fuchsia-300" },
+  };
+  const visuals = TYPE_VISUALS[fileType];
 
   const scoreColor =
     score === null
@@ -38,7 +78,7 @@ export function AnalysisCard({ analysis, folders, onDelete, onMove }: AnalysisCa
 
   const scoreLabel =
     score === null
-      ? "N/D"
+      ? INSUFFICIENT_DATA_LABEL
       : score >= 80
         ? "Excellent"
         : score >= 60
@@ -59,25 +99,39 @@ export function AnalysisCard({ analysis, folders, onDelete, onMove }: AnalysisCa
     (f) => f.toLowerCase() !== analysis.folderName.toLowerCase()
   );
 
+  // Bordure dorée si la card appartient au dossier actif (highlight uniforme
+  // sur toutes les liasses du dossier — la sélection se fait au niveau
+  // dossier, pas par card individuelle).
+  const containerClasses = [
+    "group relative flex flex-col rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5",
+    isActive
+      ? "border-quantis-gold/40 bg-quantis-gold/[0.04] hover:border-quantis-gold/60"
+      : "border-white/10 bg-white/[0.04] hover:border-amber-400/40 hover:bg-white/[0.06] hover:shadow-[0_4px_24px_rgba(245,158,11,0.08)]",
+  ].join(" ");
+
   return (
     <>
-      <div className="group flex flex-col rounded-2xl border border-white/10 bg-white/[0.04] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/40 hover:bg-white/[0.06] hover:shadow-[0_4px_24px_rgba(245,158,11,0.08)]">
+      <div className={containerClasses}>
         <div className="mb-4 flex items-start gap-3">
-          <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${fileType === "pdf" ? "bg-rose-500/10" : "bg-emerald-500/10"}`}>
-            {fileType === "pdf" ? (
-              <FileText className="h-5 w-5 text-rose-400" />
+          <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${visuals.bgClass}`}>
+            {isDynamic ? (
+              <Plug className={`h-5 w-5 ${visuals.iconClass}`} />
+            ) : fileType === "excel" ? (
+              <FileSpreadsheet className={`h-5 w-5 ${visuals.iconClass}`} />
             ) : (
-              <FileSpreadsheet className="h-5 w-5 text-emerald-400" />
+              <FileText className={`h-5 w-5 ${visuals.iconClass}`} />
             )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="line-clamp-2 text-sm font-medium leading-snug text-white" title={fileName}>
               {fileName}
             </p>
-            <p className="mt-1 text-xs text-white/40">{formattedDate}</p>
+            <p className="mt-1 text-xs text-white/40">
+              {isDynamic ? description.detail : formattedDate}
+            </p>
           </div>
-          <span className={`flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${fileType === "pdf" ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300"}`}>
-            {fileType}
+          <span className={`flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${visuals.badgeClass}`}>
+            {visuals.badge}
           </span>
         </div>
 
