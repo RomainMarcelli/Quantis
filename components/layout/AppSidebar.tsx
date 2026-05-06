@@ -35,6 +35,7 @@ import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference,
 } from "@/lib/ui/sidebarPreference";
+import { LegalFooter } from "@/components/layout/LegalFooter";
 
 export type SidebarRoute =
   | "synthese"
@@ -248,6 +249,16 @@ export function AppSidebar({
             </>
           )}
         </button>
+      ) : null}
+
+      {/* Liens légaux : visibles uniquement en mode déplié, en bas de la
+          sidebar avec un séparateur fin. Masqués en mode replié pour
+          économiser la verticalité — ils restent accessibles via le footer
+          de la page d'auth ou directement par URL (/cgu, /privacy). */}
+      {!collapsed ? (
+        <div className="mt-4 border-t border-white/[0.06] pt-3">
+          <LegalFooter variant="stacked" tone="subtle" showCopyright />
+        </div>
       ) : null}
     </aside>
   );
