@@ -6,7 +6,6 @@ import { ScrollRevealInitializer } from "@/components/ui/ScrollRevealInitializer
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { ProductTourProvider } from "@/components/product-tour/ProductTourProvider";
 import { TemporalityProvider } from "@/lib/temporality/temporalityContext";
-import { AiChatProvider } from "@/components/ai/AiChatProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -40,10 +39,8 @@ export default function RootLayout({
         <ThemeProvider>
           <ProductTourProvider>
             <TemporalityProvider>
-              <AiChatProvider>
-                <ScrollRevealInitializer />
-                {children}
-              </AiChatProvider>
+              <ScrollRevealInitializer />
+              {children}
             </TemporalityProvider>
           </ProductTourProvider>
         </ThemeProvider>

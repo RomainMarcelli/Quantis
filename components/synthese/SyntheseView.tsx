@@ -17,8 +17,7 @@ import {
   UserCircle2,
   Bot
 } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashboardModal";
 import { useUserDashboards } from "@/hooks/useUserDashboards";
@@ -50,7 +49,6 @@ import { useTemporality } from "@/lib/temporality/temporalityContext";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
-import { useAiChat } from "@/components/ai/AiChatProvider";
 import { resolveActiveAnalysis } from "@/lib/source/activeSource";
 import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
@@ -201,15 +199,6 @@ export function SyntheseView() {
     return { current, previous };
   }, [allAnalyses, analysesBySelectedYear, activeAnalysisId, activeFolderName]);
 
-  // Pousse l'analyse courante au provider du chat IA — permet au backend
-  // d'enrichir les réponses Claude avec les données réelles (kpis, mappedData)
-  // sans que chaque tooltip ait à passer l'analysisId à la main.
-  const { setAnalysisContext } = useAiChat();
-  useEffect(() => {
-    setAnalysisContext(analysisPair.current?.id ?? null);
-    return () => setAnalysisContext(null);
-  }, [analysisPair.current?.id, setAnalysisContext]);
-
   // Filtre temporel global. Si l'analyse a un dailyAccounting (source dynamique Pennylane),
   // les KPI flow (CA, VA, EBITDA…) sont recalculés sur la période sélectionnée. Les KPI bilan
   // (BFR, dispo, total_cp…) restent ceux du snapshot, car ils sont à un instant T.
@@ -335,64 +324,11 @@ export function SyntheseView() {
 
   return (
     <section className="w-full space-y-4">
-      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
-        <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
-          <div>
-            <p className="text-sm font-semibold text-white">{companyName}</p>
-            <p className="text-xs text-white/55">Plateforme financière</p>
-          </div>
-          <div className="ml-2 hidden lg:block">
-            <ActiveSourceBadge analysis={analysisPair.current} />
-          </div>
-        </div>
-
-        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
-          <GlobalSearchBar placeholder="Rechercher un KPI, une alerte ou une section..." />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/settings")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Paramètres"
-            title="Paramètres"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/pricing")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Offres"
-            title="Offre Free (verrouillée)"
-          >
-            <Lock className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Compte"
-            title="Compte"
-          >
-            <UserCircle2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void onLogout()}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Se déconnecter"
-            title="Se déconnecter"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
-      </header>
-      <div className="md:hidden">
-        <GlobalSearchBar placeholder="Rechercher..." />
-      </div>
+      <AppHeader
+        companyName={companyName}
+        contextBadge={<ActiveSourceBadge analysis={analysisPair.current} />}
+        searchPlaceholder="Rechercher un KPI, une alerte ou une section..."
+      />
 
       {/* Loader retardé : n'apparaît que si la requête dépasse 400 ms.
           Évite le flash sous le header pour les chargements rapides. */}
