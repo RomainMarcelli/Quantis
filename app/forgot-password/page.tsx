@@ -1,10 +1,7 @@
-import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
+// File: app/forgot-password/page.tsx
+// Role: page mot de passe oublié — bascule vers `AuthPage` en mode "forgot".
+import { AuthPage } from "@/components/auth/AuthPage";
 
 export default function ForgotPasswordPage() {
-  return (
-    <main className="mx-auto flex min-h-screen w-full items-center justify-center px-4 py-10">
-      <ForgotPasswordForm />
-    </main>
-  );
+  return <AuthPage initialMode="forgot" />;
 }
-
