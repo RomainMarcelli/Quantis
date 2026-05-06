@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { formatCurrency, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
+import { setActiveSource } from "@/lib/source/setActiveSource";
 import {
   describeAnalysisSource,
   getAnalysisSourceKind,
@@ -160,7 +161,16 @@ export function AnalysisCard({ analysis, folders, onDelete, onMove, isActive = f
         <div className="mt-auto flex items-center gap-2">
           <button
             type="button"
-            onClick={() => router.push(`/analysis/${analysis.id}`)}
+            onClick={() => {
+              // En cliquant "Voir l'analyse", on attend de l'utilisateur
+              // qu'il considère cette liasse comme sa source courante —
+              // sinon la navigation vers /synthese le ramènerait sur la
+              // source précédente (ex. Pennylane). On épingle donc cette
+              // analyse comme source active globale (clears folder en
+              // miroir via setActiveSource), puis on navigue.
+              setActiveSource({ kind: "analysis", analysisId: analysis.id });
+              router.push(`/analysis/${analysis.id}`);
+            }}
             className="flex-1 rounded-xl border border-quantis-gold/30 bg-quantis-gold/10 py-2.5 text-xs font-semibold text-quantis-gold transition-colors hover:bg-quantis-gold/20"
           >
             Voir l&apos;analyse
