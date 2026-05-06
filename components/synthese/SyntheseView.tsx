@@ -2,26 +2,31 @@
 // Role: charge les données utilisateur + analyses et affiche la page /synthèse dans la DA premium existante.
 "use client";
 
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FileText,
   LayoutDashboard,
+  Lock,
+  LogOut,
   PanelLeftClose,
   PanelLeftOpen,
   Receipt,
+  Settings,
   Sparkles,
+  UserCircle2,
   Bot
 } from "lucide-react";
-import { AppHeader } from "@/components/layout/AppHeader";
+import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashboardModal";
+import { useUserDashboards } from "@/hooks/useUserDashboards";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { getActiveFolderName } from "@/lib/folders/activeFolder";
-<<<<<<< HEAD
-=======
+import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
->>>>>>> 068a8ee78fae6391f1bee076d375af62a115cba9
 import {
   buildSyntheseYearOptions,
   filterAnalysesByYear,
@@ -76,6 +81,10 @@ export function SyntheseView() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingSearchTarget, setPendingSearchTarget] = useState<SearchNavigationTarget | null>(null);
+  const [createDashboardOpen, setCreateDashboardOpen] = useState(false);
+  // Liste des dashboards custom de l'user — alimente le sous-menu "Tableau de
+  // bord" de la sidebar (visible aussi depuis Synthèse pour navigation rapide).
+  const userDashboards = useUserDashboards(user?.uid ?? null);
   // Le loader visible n'apparaît que si la requête dépasse 400 ms — sinon
   // on évite un flash désagréable sur les chargements rapides.
   const showSlowLoader = useDelayedFlag(loading);
@@ -103,7 +112,6 @@ export function SyntheseView() {
   }, []);
 
   useEffect(() => {
-<<<<<<< HEAD
     setIsSidebarCollapsed(readSidebarCollapsedPreference());
     setIsSidebarPreferenceReady(true);
   }, []);
@@ -116,7 +124,6 @@ export function SyntheseView() {
   }, [isSidebarCollapsed, isSidebarPreferenceReady]);
 
   useEffect(() => {
-=======
     const unsubscribe = firebaseAuthGateway.subscribe((nextUser) => {
       if (!nextUser) {
         router.replace("/");
@@ -140,7 +147,6 @@ export function SyntheseView() {
       return;
     }
 
->>>>>>> 068a8ee78fae6391f1bee076d375af62a115cba9
     void loadSyntheseData(user);
   }, [user]);
 
@@ -165,18 +171,37 @@ export function SyntheseView() {
   // on la prend en priorité absolue. Sinon fallback : connexion dynamique > FEC > upload,
   // la plus récente à priorité égale. Implémenté dans `resolveActiveAnalysis`.
   const activeAnalysisId = useActiveAnalysisId();
+  // Dossier actif (sources statiques multi-exercices). Réactif → un changement
+  // dans Documents propage immédiatement la nouvelle source ici.
+  const activeFolderName = useActiveFolderName();
 
   const analysisPair = useMemo(() => {
     if (!analysesBySelectedYear.length) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
 
-    // Priorité 1 : analyse explicitement marquée active (si dans la sélection courante).
-    // Priorité 2 : règle métier source dynamique > FEC > upload (le plus récent gagne).
-    // Priorité 3 (fallback historique) : dossier actif → 1ère analyse triée fiscalYear desc.
-    const fromActive = resolveActiveAnalysis(analysesBySelectedYear, activeAnalysisId);
-    const current =
-      fromActive ?? resolveCurrentAnalysis(analysesBySelectedYear, getActiveFolderName());
+    // Priorité 1 : `activeAnalysisId` explicitement défini ET présent dans la
+    //              sélection courante → l'analyse spécifique gagne (override
+    //              utilisé pour connexion dynamique épinglée par exemple).
+    //              Si l'ID est null OU absent du filtre annuel, on saute.
+    // Priorité 2 : `activeFolderName` défini → la liasse de l'année courante
+    //              dans ce dossier gagne sur la priorité automatique. C'est
+    //              ce qui permet à un dossier statique d'écraser la connexion
+    //              Pennylane (qui sinon gagnerait par sa priorité métier).
+    // Priorité 3 : aucune source explicite → règle automatique
+    //              (dynamique > FEC > upload, plus récent en cas d'égalité).
+    let current: AnalysisRecord | null = null;
+    if (activeAnalysisId) {
+      current = analysesBySelectedYear.find((a) => a.id === activeAnalysisId) ?? null;
+    }
+    if (!current && activeFolderName) {
+      current = resolveCurrentAnalysis(analysesBySelectedYear, activeFolderName);
+    }
+    if (!current) {
+      // Pas de source explicite : on retombe sur le résolveur automatique
+      // (resolveActiveAnalysis avec id null applique la priorité métier).
+      current = resolveActiveAnalysis(analysesBySelectedYear, null);
+    }
     if (!current) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
@@ -188,7 +213,7 @@ export function SyntheseView() {
     });
 
     return { current, previous };
-  }, [allAnalyses, analysesBySelectedYear, activeAnalysisId]);
+  }, [allAnalyses, analysesBySelectedYear, activeAnalysisId, activeFolderName]);
 
   // Pousse l'analyse courante au provider du chat IA — permet au backend
   // d'enrichir les réponses Claude avec les données réelles (kpis, mappedData)
@@ -232,9 +257,7 @@ export function SyntheseView() {
   }, [analysisPair.current, temporality.periodStart, temporality.periodEnd]);
 
   const synthese = useMemo(() => {
-    if (!analysisPair.current || !effective) {
-      return null;
-    }
+    if (!analysisPair.current || !effective) return null;
     return buildSyntheseViewModel(effective.kpis, analysisPair.previous?.kpis ?? null, sector);
   }, [analysisPair, effective, sector]);
 
@@ -245,6 +268,25 @@ export function SyntheseView() {
       setSelectedYearValue(yearOptions[0]!.value);
     }
   }, [yearOptions, selectedYearValue]);
+
+  // Sync ponctuel de l'année lors d'un CHANGEMENT d'analyse active.
+  //
+  // L'utilisateur a cliqué "Utiliser comme source" sur une liasse — on sync
+  // l'année à celle de la liasse cliquée pour qu'elle soit immédiatement
+  // visible. Mais on ne re-sync PAS perpétuellement : si l'utilisateur change
+  // ensuite l'année à la main pour explorer une autre liasse du même dossier,
+  // on respecte ce choix (sinon le sélecteur d'année serait inutile pour les
+  // sources statiques multi-exercices). On utilise un ref pour ne déclencher
+  // l'effet qu'à la TRANSITION de la valeur, pas à chaque render.
+  const previousActiveAnalysisIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeAnalysisId === previousActiveAnalysisIdRef.current) return;
+    previousActiveAnalysisIdRef.current = activeAnalysisId;
+    if (!activeAnalysisId) return;
+    const target = allAnalyses.find((a) => a.id === activeAnalysisId);
+    if (!target) return;
+    setSelectedYearValue(String(resolveAnalysisYear(target)));
+  }, [activeAnalysisId, allAnalyses]);
 
   useEffect(() => {
     if (!pendingSearchTarget) {
@@ -307,10 +349,64 @@ export function SyntheseView() {
 
   return (
     <section className="w-full space-y-4">
-      <AppHeader
-        companyName={companyName}
-        contextBadge={<ActiveSourceBadge analysis={analysisPair.current} />}
-      />
+      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
+        <div className="flex items-center gap-3">
+          <QuantisLogo withText={false} size={28} />
+          <div>
+            <p className="text-sm font-semibold text-white">{companyName}</p>
+            <p className="text-xs text-white/55">Plateforme financière</p>
+          </div>
+          <div className="ml-2 hidden lg:block">
+            <ActiveSourceBadge analysis={analysisPair.current} />
+          </div>
+        </div>
+
+        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
+          <GlobalSearchBar placeholder="Rechercher un KPI, une alerte ou une section..." />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/settings")}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+            aria-label="Paramètres"
+            title="Paramètres"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/pricing")}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+            aria-label="Offres"
+            title="Offre Free (verrouillée)"
+          >
+            <Lock className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/account?from=analysis")}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+            aria-label="Compte"
+            title="Compte"
+          >
+            <UserCircle2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void onLogout()}
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+            aria-label="Se déconnecter"
+            title="Se déconnecter"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
+      </header>
+      <div className="md:hidden">
+        <GlobalSearchBar placeholder="Rechercher..." />
+      </div>
 
       {/* Loader retardé : n'apparaît que si la requête dépasse 400 ms.
           Évite le flash sous le header pour les chargements rapides. */}
@@ -328,70 +424,49 @@ export function SyntheseView() {
         <AppSidebar
           activeRoute="synthese"
           accountFirstName={greetingName}
-          contextSlot={
-            yearOptions.length > 1 ? (
-              <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                <label htmlFor="sidebar-synthese-year" className="text-[10px] font-mono uppercase tracking-wide text-white/45">
-                  Année de synthèse
-                </label>
-                <select
-                  id="sidebar-synthese-year"
-                  value={selectedYearValue}
-                  onChange={(event) => setSelectedYearValue(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-white/20 bg-black/35 px-3 py-2 text-sm text-white outline-none transition focus:border-quantis-gold/70"
-                >
-                  {yearOptions.map((option) => (
-                    <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null
-          }
+          dashboardSubmenu={{
+            // Sous-onglets fixes du Tableau de bord + dashboards custom user.
+            // Depuis Synthèse, cliquer redirige vers /analysis ; activeId est
+            // undefined car aucun onglet n'est "actif" sur cette page.
+            items: [
+              { id: "creation-valeur", label: "Création de valeur", kind: "fixed" as const },
+              { id: "investissement-bfr", label: "Investissement", kind: "fixed" as const },
+              { id: "financement", label: "Financement", kind: "fixed" as const },
+              { id: "rentabilite", label: "Rentabilité", kind: "fixed" as const },
+              ...userDashboards.dashboards.map((d) => ({
+                id: d.id,
+                label: d.name,
+                kind: "custom" as const
+              }))
+            ],
+            activeId: undefined,
+            onSelectItem: () => router.push("/analysis"),
+            onCreate: user ? () => setCreateDashboardOpen(true) : undefined,
+            onDelete: async (id) => {
+              await userDashboards.deleteDashboard(id);
+            }
+          }}
+        />
+
+        {/* Modale de création de dashboard custom — accessible depuis le
+            sous-menu de la sidebar. Après création on bascule directement
+            sur /analysis pour que l'user voie son nouveau dashboard. */}
+        <CreateDashboardModal
+          open={createDashboardOpen}
+          onClose={() => setCreateDashboardOpen(false)}
+          onConfirm={async (name) => {
+            const newId = await userDashboards.createDashboard(name);
+            setCreateDashboardOpen(false);
+            if (newId) router.push("/analysis");
+          }}
         />
 
         <div className="space-y-4">
-          {/* Filtre temporel global. On ne l'affiche que si l'analyse active a
-              du `dailyAccounting` exploitable — sinon (source statique PDF/Excel
-              avec un seul exercice annuel) la barre ne sert à rien et on
-              affiche juste "Exercice YYYY" en texte simple. */}
-          {shouldShowTemporalityBar(analysisPair.current) ? (
-            <TemporalityBar
-              availableRange={computeAvailableRange(analysisPair.current!)}
-              daysInPeriod={effective?.isFiltered ? effective.filterSummary.daysInPeriod : null}
-              rightLabel={
-                effective?.isFiltered
-                  ? `${effective.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
-                  : undefined
-              }
-            />
-          ) : analysisPair.current ? (
-            <div
-              className="precision-card rounded-2xl px-4 py-3 text-sm text-white/70"
-              data-scroll-reveal-ignore
-            >
-              <span className="text-xs uppercase tracking-wider text-white/45">Période · </span>
-              <span className="font-semibold text-white">
-                Exercice {analysisPair.current.fiscalYear ?? "(non renseigné)"}
-              </span>
-              <span className="ml-2 text-xs text-white/45">— source statique, vue annuelle uniquement</span>
-            </div>
-          ) : null}
-
-          {/* Simulation What-If : visible uniquement quand on a un mappedData
-              exploitable. SimulationToggleButton gère lui-même son propre
-              état ouvert/fermé pour rester découplé du parent. */}
-          {analysisPair.current && effective ? (
-            <SimulationToggleButton mappedData={effective.mappedData} />
-          ) : null}
-
           {analysisPair.current && synthese ? (
             <SyntheseDashboard
               greetingName={greetingName}
               companyName={companyName}
               analysisCreatedAt={analysisPair.current.createdAt}
-<<<<<<< HEAD
               getDownloadInput={() => ({
                 companyName,
                 greetingName,
@@ -401,12 +476,10 @@ export function SyntheseView() {
                 kpis: analysisPair.current!.kpis,
                 mappedData: analysisPair.current!.mappedData
               })}
-=======
               onExportData={() => {
                 if (!analysisPair.current) return;
                 exportAnalysisDataAsJson({ analysis: analysisPair.current, companyName });
               }}
->>>>>>> 068a8ee78fae6391f1bee076d375af62a115cba9
               onReupload={() => router.push("/upload")}
               onManualEntry={() => router.push("/upload/manual")}
               onDownloadFinancialReport={async () => {
@@ -421,6 +494,40 @@ export function SyntheseView() {
               parserVersion={analysisPair.current.parserVersion}
               sourceMetadata={analysisPair.current.sourceMetadata ?? null}
               previousKpis={previousKpis}
+              analyses={allAnalyses}
+              currentAnalysis={analysisPair.current}
+              periodLabel={
+                shouldShowTemporalityBar(analysisPair.current)
+                  ? null
+                  : analysisPair.current.fiscalYear
+                    ? `Exercice ${analysisPair.current.fiscalYear}`
+                    : null
+              }
+              simulationSlot={
+                effective ? <SimulationToggleButton mappedData={effective.mappedData} /> : null
+              }
+              userId={user?.uid ?? null}
+              // Sélecteur dynamique (TemporalityBar complète) sous le titre
+              // pour les sources Pennylane/MyUnisoft/Odoo qui ont un
+              // dailyAccounting. Pour les sources statiques on passe à la
+              // place yearOptions/selectedYearValue/onYearChange — la
+              // SyntheseDashboard rend alors une mini-bar "Année" simple.
+              temporalitySlot={
+                shouldShowTemporalityBar(analysisPair.current) ? (
+                  <TemporalityBar
+                    availableRange={computeAvailableRange(analysisPair.current!)}
+                    daysInPeriod={effective?.isFiltered ? effective.filterSummary.daysInPeriod : null}
+                    rightLabel={
+                      effective?.isFiltered
+                        ? `${effective.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
+                        : undefined
+                    }
+                  />
+                ) : null
+              }
+              yearOptions={yearOptions}
+              selectedYearValue={selectedYearValue}
+              onYearChange={setSelectedYearValue}
             />
           ) : (
             <section className="precision-card rounded-2xl p-5">

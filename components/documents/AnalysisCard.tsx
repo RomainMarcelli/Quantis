@@ -4,12 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BarChart3,
-  CheckCircle2,
   FileSpreadsheet,
   FileText,
   FolderInput,
   Plug,
-  Star,
   Trash2,
 } from "lucide-react";
 import { formatCurrency, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
@@ -17,7 +15,6 @@ import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
 import {
   describeAnalysisSource,
   getAnalysisSourceKind,
-  writeActiveAnalysisId,
 } from "@/lib/source/activeSource";
 import type { AnalysisRecord } from "@/types/analysis";
 
@@ -26,11 +23,11 @@ type AnalysisCardProps = {
   folders: string[];
   onDelete: (id: string) => void;
   onMove: (id: string, targetFolder: string) => void;
+  /** True si cette analyse appartient au DOSSIER actif (highlight doré). */
   isActive?: boolean;
-  onSetActive?: (id: string) => void;
 };
 
-export function AnalysisCard({ analysis, folders, onDelete, onMove, isActive = false, onSetActive }: AnalysisCardProps) {
+export function AnalysisCard({ analysis, folders, onDelete, onMove, isActive = false }: AnalysisCardProps) {
   const router = useRouter();
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -102,31 +99,19 @@ export function AnalysisCard({ analysis, folders, onDelete, onMove, isActive = f
     (f) => f.toLowerCase() !== analysis.folderName.toLowerCase()
   );
 
-  // Bordure dorée + halo si active. Opacité réduite si non-active (toujours
-  // consultable via "Voir l'analyse" mais visuellement reléguée).
+  // Bordure dorée si la card appartient au dossier actif (highlight uniforme
+  // sur toutes les liasses du dossier — la sélection se fait au niveau
+  // dossier, pas par card individuelle).
   const containerClasses = [
     "group relative flex flex-col rounded-2xl border p-5 transition-all duration-200 hover:-translate-y-0.5",
     isActive
-      ? "border-quantis-gold/60 bg-quantis-gold/[0.06] shadow-[0_4px_28px_rgba(245,158,11,0.18)] hover:border-quantis-gold/80"
-      : onSetActive
-        ? "border-white/10 bg-white/[0.04] opacity-75 hover:border-amber-400/40 hover:bg-white/[0.06] hover:opacity-100 hover:shadow-[0_4px_24px_rgba(245,158,11,0.08)]"
-        : "border-white/10 bg-white/[0.04] hover:border-amber-400/40 hover:bg-white/[0.06] hover:shadow-[0_4px_24px_rgba(245,158,11,0.08)]",
+      ? "border-quantis-gold/40 bg-quantis-gold/[0.04] hover:border-quantis-gold/60"
+      : "border-white/10 bg-white/[0.04] hover:border-amber-400/40 hover:bg-white/[0.06] hover:shadow-[0_4px_24px_rgba(245,158,11,0.08)]",
   ].join(" ");
-
-  function handleSetActive() {
-    writeActiveAnalysisId(analysis.id);
-    onSetActive?.(analysis.id);
-  }
 
   return (
     <>
       <div className={containerClasses}>
-        {isActive ? (
-          <span className="absolute -top-2 left-4 inline-flex items-center gap-1 rounded-full border border-quantis-gold/60 bg-quantis-gold px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black shadow-md">
-            <Star className="h-2.5 w-2.5" />
-            Active
-          </span>
-        ) : null}
         <div className="mb-4 flex items-start gap-3">
           <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${visuals.bgClass}`}>
             {isDynamic ? (
@@ -171,29 +156,6 @@ export function AnalysisCard({ analysis, folders, onDelete, onMove, isActive = f
             </span>
           </div>
         </div>
-
-        {/* Bouton "source active" : visible uniquement si onSetActive câblé.
-            État active = bouton désactivé (déjà active, juste un repère visuel).
-            État inactive = bouton secondaire qui pousse l'id en localStorage
-            via writeActiveAnalysisId (déclenche un event que SyntheseView écoute). */}
-        {onSetActive ? (
-          isActive ? (
-            <div className="mb-2 inline-flex items-center justify-center gap-1.5 rounded-xl border border-quantis-gold/40 bg-quantis-gold/10 py-2 text-xs font-semibold text-quantis-gold">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Source active du dashboard
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSetActive}
-              className="mb-2 inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/15 bg-white/5 py-2 text-xs font-medium text-white/80 transition-colors hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"
-              title="Utiliser cette analyse comme source du dashboard"
-            >
-              <Star className="h-3.5 w-3.5" />
-              Utiliser comme source active
-            </button>
-          )
-        ) : null}
 
         <div className="mt-auto flex items-center gap-2">
           <button

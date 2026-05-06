@@ -25,7 +25,10 @@ export type ValueCreationMonthlyPoint = {
   netResult: number;
 };
 
-export const BREAK_EVEN_CLOSURE_INDEX = 12.6;
+// Index x-axis du dernier point du graphique point mort. Anciennement 12.6
+// avec un point dédié "Clôture" au-delà du mois 12 ; demande produit : la
+// courbe doit s'arrêter franchement au mois 12 sans label "Clôture" surnuméraire.
+export const BREAK_EVEN_CLOSURE_INDEX = 12;
 
 export type BreakEvenPoint = {
   month: string;
@@ -227,24 +230,22 @@ export function buildBreakEvenChartPoints(metrics: BreakEvenMetrics): BreakEvenP
   const monthlyRevenue = annualRevenue / 12;
   const monthlyVariableCosts = chargesVariables / 12;
 
+  // Suppression du point "Clôture" surnuméraire (anciennement à monthIndex
+  // 12.6) — la courbe s'arrête au mois 12 et le dernier point reflète la
+  // valeur annuelle. annualRevenue est utilisé pour caler la valeur du dernier
+  // mois sur le total de l'exercice.
   const points = Array.from({ length: 12 }, (_, index) => {
     const month = index + 1;
-
+    const isLastMonth = month === 12;
     return {
       month: `Mois ${month}`,
       monthIndex: month,
-      ca: monthlyRevenue * month,
+      ca: isLastMonth ? annualRevenue : monthlyRevenue * month,
       fixedCosts: chargesFixes,
-      totalCosts: chargesFixes + monthlyVariableCosts * month
+      totalCosts: isLastMonth
+        ? chargesFixes + chargesVariables
+        : chargesFixes + monthlyVariableCosts * month
     };
-  });
-
-  points.push({
-    month: "Clôture",
-    monthIndex: BREAK_EVEN_CLOSURE_INDEX,
-    ca: annualRevenue,
-    fixedCosts: chargesFixes,
-    totalCosts: chargesFixes + chargesVariables
   });
 
   return points;
@@ -297,7 +298,7 @@ export function buildBreakEvenModel(
     hasUsableData,
     closesAboveBreakEven,
     closureIndex: BREAK_EVEN_CLOSURE_INDEX,
-    xTicks: [...Array.from({ length: 12 }, (_, index) => index + 1), BREAK_EVEN_CLOSURE_INDEX]
+    xTicks: Array.from({ length: 12 }, (_, index) => index + 1)
   };
 }
 

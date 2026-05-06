@@ -38,7 +38,7 @@ export function QuantisScoreCard({
 
   return (
     <article
-      className="precision-card group fade-up relative flex min-h-[560px] flex-col rounded-2xl px-6 pb-6 pt-7 lg:col-span-5"
+      className="precision-card group fade-up relative flex h-full flex-col rounded-2xl px-6 pb-6 pt-7"
       data-search-id={searchId}
     >
       <div className="card-header mb-5 flex w-full items-center justify-between">
@@ -46,7 +46,6 @@ export function QuantisScoreCard({
           <Gauge className="h-4 w-4" />
           <h2 className="text-[11px] font-bold uppercase tracking-widest">Quantis Score</h2>
         </div>
-        <span className="tech-tag text-[9px] font-mono text-white/40">QS_V1</span>
       </div>
 
       <div className="relative mx-auto mt-2 flex h-[286px] w-[286px] items-center justify-center transition-transform duration-700 group-hover:scale-[1.02] md:h-[304px] md:w-[304px]">

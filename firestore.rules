@@ -10,6 +10,14 @@ service cloud.firestore {
 
       allow delete: if request.auth != null
         && request.auth.uid == userId;
+
+      // Sous-collection des layouts dashboard personnalisables (Phase 1+).
+      // Path : users/{uid}/dashboards/{layoutId} — synthese / dashboard:* /
+      // custom:* (Phase 4). Strictement scopé à l'utilisateur authentifié.
+      match /dashboards/{layoutId} {
+        allow read, create, update, delete:
+          if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     match /analyses/{analysisId} {

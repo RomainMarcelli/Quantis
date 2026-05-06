@@ -14,11 +14,11 @@ export function AIInsight({ message, ctaLabel, searchId }: AIInsightProps) {
   return (
     <button
       type="button"
-      className="precision-card group fade-up relative w-full overflow-hidden rounded-xl p-0 text-left md:col-span-2"
+      className="precision-card group fade-up relative flex h-full w-full overflow-hidden rounded-xl p-0 text-left md:col-span-2"
       aria-label="Recommendation IA"
       data-search-id={searchId}
     >
-      <div className="flex w-full flex-col items-start justify-between gap-6 agent-panel p-6 md:flex-row md:items-center">
+      <div className="flex h-full w-full flex-col items-start justify-between gap-6 agent-panel p-6 md:flex-row md:items-center">
         <div className="flex items-center gap-6">
           <div className="flex h-12 w-12 items-center justify-center rounded agent-icon-shell transition-all duration-300 group-hover:scale-105 group-hover:border-quantis-gold/30 group-hover:bg-quantis-gold/10">
             <Cpu className="h-5 w-5 text-white/60 group-hover:text-quantis-gold" />

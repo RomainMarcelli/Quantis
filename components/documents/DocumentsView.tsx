@@ -24,12 +24,13 @@ import { BridgeConnectCard } from "@/components/integrations/BridgeConnectCard";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { DEFAULT_FOLDER_NAME } from "@/lib/folders/activeFolder";
+import { DEFAULT_FOLDER_NAME, setActiveFolderName } from "@/lib/folders/activeFolder";
+import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
 import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
-import { clearActiveAnalysisId, resolveActiveAnalysis, writeActiveAnalysisId } from "@/lib/source/activeSource";
+import { clearActiveAnalysisId } from "@/lib/source/activeSource";
 import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import {
   listUserFolders,
@@ -72,15 +73,14 @@ export function DocumentsView() {
   const [dialog, setDialog] = useState<FolderDialogState>({ isOpen: false, mode: "create", targetName: "" });
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteFolderConfirm>({ isOpen: false, folderName: "", analysisCount: 0 });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
+  // Dossier actif (sources statiques multi-exercices). Réagit aux changements
+  // via le hook réactif — l'utilisateur peut activer un dossier depuis le
+  // bandeau ci-dessous et la sélection se propage immédiatement à Synthèse.
+  const activeFolderName = useActiveFolderName();
+  // Conservé pour le cleanup à la suppression d'une analyse — si l'analyse
+  // supprimée est l'override actif, on clear le pointeur localStorage pour
+  // éviter qu'il pointe sur un fantôme.
   const explicitActiveId = useActiveAnalysisId();
-  // L'ID effectivement utilisé par le dashboard : si l'utilisateur n'a rien
-  // choisi explicitement, le résolveur retombe sur la priorité métier
-  // (dynamique > FEC > upload, plus récent en cas d'égalité). On l'affiche
-  // quand même comme "Active" pour expliciter le défaut côté UI.
-  const effectiveActiveId = useMemo(
-    () => resolveActiveAnalysis(analyses, explicitActiveId)?.id ?? null,
-    [analyses, explicitActiveId]
-  );
 
   useEffect(() => {
     return firebaseAuthGateway.subscribe(setUser);
@@ -263,13 +263,38 @@ export function DocumentsView() {
             />
           </div>
 
-          {/* Stats */}
-          <div className="flex items-center gap-3 px-1">
-            <Folder className="h-4 w-4 text-quantis-gold/70" />
-            <p className="text-xs text-white/45">
-              {filteredAnalyses.length} analyse{filteredAnalyses.length !== 1 ? "s" : ""}
-              {lastUpdated ? ` · Dernière mise à jour le ${lastUpdated}` : ""}
-            </p>
+          {/* Stats + Bouton "Source active du dashboard" au niveau dossier.
+              Quand on clique, on enregistre `activeFolderName` (toutes les
+              liasses du dossier deviennent disponibles via le sélecteur de
+              période côté Synthèse) et on clear l'override par analyse — ça
+              force le résolveur à utiliser le dossier comme source statique. */}
+          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+            <div className="flex items-center gap-3">
+              <Folder className="h-4 w-4 text-quantis-gold/70" />
+              <p className="text-xs text-white/45">
+                {filteredAnalyses.length} analyse{filteredAnalyses.length !== 1 ? "s" : ""}
+                {lastUpdated ? ` · Dernière mise à jour le ${lastUpdated}` : ""}
+              </p>
+            </div>
+            {filteredAnalyses.length > 0 ? (
+              activeFolderName?.toLowerCase() === activeFolder.toLowerCase() ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-quantis-gold/40 bg-quantis-gold/10 px-3 py-1 text-[11px] font-semibold text-quantis-gold">
+                  <span className="h-1.5 w-1.5 rounded-full bg-quantis-gold" />
+                  Source active du dashboard
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveFolderName(activeFolder);
+                    clearActiveAnalysisId();
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/75 transition-colors hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"
+                >
+                  Définir comme source active
+                </button>
+              )
+            ) : null}
           </div>
 
           {/* Cards — loader retardé pour éviter le flash <400ms. */}
@@ -288,8 +313,7 @@ export function DocumentsView() {
               folders={folderNames}
               onDelete={(id) => void handleDeleteAnalysis(id)}
               onMove={(id, target) => void handleMoveAnalysis(id, target)}
-              activeAnalysisId={effectiveActiveId}
-              onSetActive={(id) => writeActiveAnalysisId(id)}
+              activeFolderName={activeFolderName}
             />
           )}
         </div>

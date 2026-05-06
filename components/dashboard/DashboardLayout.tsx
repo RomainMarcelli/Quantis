@@ -3,7 +3,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Activity, ArrowUpRight, Wallet } from "lucide-react";
+import { ArrowUpRight, Wallet } from "lucide-react";
 import type { PremiumKpis } from "@/lib/dashboard/premiumDashboardAdapter";
 import { getPremiumHealthState } from "@/lib/dashboard/premiumDashboardAdapter";
 import { formatMonths } from "@/components/dashboard/formatting";
@@ -32,10 +32,23 @@ type DashboardLayoutProps = {
   previousKpis?: PremiumKpis | null;
   children?: ReactNode;
   scoreCard?: ReactNode;
+  /**
+   * Carte rendue à droite du Quantis Score (graphique d'évolution typiquement).
+   * Quand non fourni, on retombe sur l'ancienne disposition Score + grille KPI.
+   * Quand fourni : Row 1 = [Score | Chart], Row 2 = grille KPIs en dessous.
+   */
+  chartCard?: ReactNode;
   title?: string;
   subtitle?: string;
+  /**
+   * Badge de mode rendu à droite du titre. Pass `null` ou `""` pour le masquer.
+   * Cas d'usage typique : "Analyse dynamique" (sources Pennylane / MyUnisoft /
+   * Odoo synchronisées) ou "Analyse statique" (uploads PDF / Excel).
+   */
+  statusBadgeLabel?: string | null;
+  /** @deprecated remplacé par le bandeau meta du SyntheseDashboard. Conservé
+   *  pour la compatibilité de la signature mais n'est plus rendu. */
   statusLabel?: string;
-  statusBadgeLabel?: string;
   aiMessage?: string;
   aiCtaLabel?: string;
   searchIds?: DashboardLayoutSearchIds;
@@ -49,10 +62,10 @@ export function DashboardLayout({
   previousKpis,
   children,
   scoreCard,
-  title = "Cockpit financier",
+  chartCard,
+  title = "Synthèse",
   subtitle,
-  statusLabel = "Vue d'ensemble - Temps réel",
-  statusBadgeLabel = "Synchronisation active",
+  statusBadgeLabel,
   aiMessage,
   aiCtaLabel = "Ouvrir le simulateur strategique",
   searchIds,
@@ -73,27 +86,24 @@ export function DashboardLayout({
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 
+      {/* Header allégé : titre + sous-titre à gauche, badge de mode (analyse
+          dynamique / statique) à droite. Les anciennes éléments — Q logo +
+          "QUANTIS" + companyName + statusLabel "VUE CONSOLIDÉE…" — étaient
+          redondants avec le bandeau meta du SyntheseDashboard et la sidebar. */}
       <header className="fade-up relative z-10 mb-12 flex w-full flex-col items-start justify-between gap-6 md:flex-row md:items-end">
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-3">
-            <div className="interactive-badge flex h-8 w-8 items-center justify-center border border-quantis-gold/20 bg-quantis-base">
-              <span className="text-sm font-bold text-quantis-gold">Q</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white">Quantis</span>
-              <span className="text-[10px] font-mono text-quantis-muted">
-                {companyName || "Système d'exploitation financier"}
-              </span>
-            </div>
-          </div>
           <h1 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">{title}</h1>
           <p className="text-sm text-quantis-muted">{resolvedSubtitle}</p>
         </div>
 
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
-            <Activity className="h-3 w-3 text-white/30" />
-            <span className="text-[11px] font-mono uppercase text-white/40">{statusLabel}</span>
+        {statusBadgeLabel ? (
+          <div className="flex flex-col items-end gap-2">
+            <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
+              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
+              <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">
+                {statusBadgeLabel}
+              </span>
+            </div>
           </div>
           <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
@@ -103,49 +113,59 @@ export function DashboardLayout({
           </div>
           {headerAction ? <div className="mt-1">{headerAction}</div> : null}
         </div>
+        ) : null}
       </header>
 
+      {/* Row 1 — Hero : Quantis Score (lg:col-span-5) + Chart d'évolution (lg:col-span-7).
+          Si pas de chartCard fourni, le Score occupe seul la première ligne et la
+          grille KPI ci-dessous remplit l'espace restant comme avant. */}
       <div className="relative z-10 grid grid-cols-1 gap-5 md:grid-cols-12">
         {scoreCard ?? <HealthScore score={kpis.healthScore} tag={healthState.severity.toUpperCase()} searchId={searchIds?.score} />}
 
-        <div
-          id="synthese-kpi-container"
-          data-tour-id="synthese-kpi-container"
-          className="grid grid-cols-1 gap-5 md:col-span-12 md:grid-cols-2 lg:col-span-7"
-        >
-          <KPIBlock
-            title="Ce qui rentre"
-            tag="Chiffre d'Affaires"
-            value={kpis.ca}
-            previousValue={previousKpis?.ca ?? null}
-            format="currency"
-            searchId={searchIds?.revenue}
-            kpiId="ca"
-          />
+        {chartCard ? (
+          <div className="md:col-span-12 lg:col-span-7">{chartCard}</div>
+        ) : null}
+      </div>
 
-          <KPIBlock
-            title="Sur le compte"
-            tag="Disponibilités"
-            value={kpis.disponibilites}
-            previousValue={previousKpis?.disponibilites ?? null}
-            format="currency"
-            sideLabel={`Runway: ${formatMonths(kpis.runway)}`}
-            searchId={searchIds?.cash}
-            kpiId="disponibilites"
-          />
+      {/* Row 2 — Grille KPIs : 2 colonnes desktop avec EBE en pleine largeur sur sa
+          rangée, AI insight au pied. Inchangé visuellement quand chartCard est absent. */}
+      <div
+        id="synthese-kpi-container"
+        data-tour-id="synthese-kpi-container"
+        className="relative z-10 mt-5 grid grid-cols-1 gap-5 md:grid-cols-2"
+      >
+        <KPIBlock
+          title="Ce qui rentre"
+          tag="Chiffre d'Affaires"
+          value={kpis.ca}
+          previousValue={previousKpis?.ca ?? null}
+          format="currency"
+          searchId={searchIds?.revenue}
+          kpiId="ca"
+        />
 
-          <KPIWide
-            title="Ce qu'il reste vraiment"
-            tag="Excédent brut d'exploitation"
-            value={kpis.ebe}
-            previousValue={previousKpis?.ebe ?? null}
-            target={50000}
-            searchId={searchIds?.ebe}
-            kpiId="ebe"
-          />
+        <KPIBlock
+          title="Sur le compte"
+          tag="Disponibilités"
+          value={kpis.disponibilites}
+          previousValue={previousKpis?.disponibilites ?? null}
+          format="currency"
+          sideLabel={`Runway: ${formatMonths(kpis.runway)}`}
+          searchId={searchIds?.cash}
+          kpiId="disponibilites"
+        />
 
-          <AIInsight message={aiMessage ?? defaultAiMessage} ctaLabel={aiCtaLabel} searchId={searchIds?.recommendation} />
-        </div>
+        <KPIWide
+          title="Ce qu'il reste vraiment"
+          tag="Excédent brut d'exploitation"
+          value={kpis.ebe}
+          previousValue={previousKpis?.ebe ?? null}
+          target={50000}
+          searchId={searchIds?.ebe}
+          kpiId="ebe"
+        />
+
+        <AIInsight message={aiMessage ?? defaultAiMessage} ctaLabel={aiCtaLabel} searchId={searchIds?.recommendation} />
       </div>
 
       {children ? <div className="relative z-10 mt-6">{children}</div> : null}

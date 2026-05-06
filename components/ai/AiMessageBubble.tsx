@@ -21,25 +21,19 @@ export function AiMessageBubble({ message, onFollowUp }: AiMessageBubbleProps) {
   if (message.role === "user") {
     return (
       <div className="vyzor-msg-enter flex flex-col items-end">
-        {/* Cadrage léger autour du message user — fond très subtil
-         *  (rgba blanc 0.03) + radius pour structurer visuellement sans
-         *  basculer en bulle prononcée. Préférence produit : éviter
-         *  l'effet "chat enfantin", garder une lecture sobre. */}
         <p
-          className="max-w-[88%] rounded-xl text-[14px] leading-relaxed"
+          className="max-w-[88%] text-[14px] leading-relaxed"
           style={{
-            color: "rgba(255, 255, 255, 0.85)",
-            backgroundColor: "rgba(255, 255, 255, 0.03)",
-            border: "1px solid rgba(255, 255, 255, 0.04)",
-            padding: "10px 16px",
+            color: "rgba(255, 255, 255, 0.6)",
+            paddingRight: 16,
             textAlign: "right",
           }}
         >
           {message.content}
         </p>
         <span
-          className="mt-1 mr-1 text-[10px] tabular-nums"
-          style={{ color: "rgba(255, 255, 255, 0.3)" }}
+          className="mt-1 text-[10px] tabular-nums"
+          style={{ color: "rgba(255, 255, 255, 0.3)", paddingRight: 16 }}
         >
           {formatTimestamp(message.timestamp)}
         </span>

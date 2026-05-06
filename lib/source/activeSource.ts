@@ -133,20 +133,24 @@ export function describeAnalysisSource(analysis: AnalysisRecord): AnalysisSource
       label = "Odoo";
       detail = `sync ${formatRelativeFrench(syncedAt)}`;
       break;
+    // Sources statiques : le badge du header reflète le DOSSIER actif (concept
+    // utilisateur : "j'ai sélectionné mon Dossier principal"), pas la liasse
+    // individuelle. C'est cohérent avec le sélecteur de période qui permet de
+    // basculer entre les exercices d'un même dossier.
     case "fec":
-      label = `FEC ${firstFile?.name ?? ""}`.trim();
-      detail = `importé ${formatRelativeFrench(syncedAt)}`;
+      label = analysis.folderName || `FEC ${firstFile?.name ?? ""}`.trim();
+      detail = `FEC · importé ${formatRelativeFrench(syncedAt)}`;
       break;
     case "pdf":
-      label = `PDF ${firstFile?.name ?? ""}`.trim();
-      detail = `uploadé ${formatRelativeFrench(syncedAt)}`;
+      label = analysis.folderName || `PDF ${firstFile?.name ?? ""}`.trim();
+      detail = `PDF · uploadé ${formatRelativeFrench(syncedAt)}`;
       break;
     case "excel":
-      label = `Excel ${firstFile?.name ?? ""}`.trim();
-      detail = `uploadé ${formatRelativeFrench(syncedAt)}`;
+      label = analysis.folderName || `Excel ${firstFile?.name ?? ""}`.trim();
+      detail = `Excel · uploadé ${formatRelativeFrench(syncedAt)}`;
       break;
     default:
-      label = firstFile?.name ?? "Source inconnue";
+      label = analysis.folderName || firstFile?.name || "Source inconnue";
       detail = formatRelativeFrench(syncedAt);
   }
 

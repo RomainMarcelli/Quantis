@@ -101,18 +101,7 @@ export type AiResponse = {
 
 // ─── Réponse structurée ────────────────────────────────────────────────
 
-/**
- * Niveau du diagnostic IA. 4 graduations alignées sur les seuils
- * `kpiDiagnostic` :
- *   - excellent : valeur très au-dessus du `good` (clairement positif)
- *   - good      : zone saine (≥ seuil good)
- *   - warning   : zone vigilance (entre warning et good)
- *   - danger    : zone alerte (≤ seuil danger)
- *   - neutral   : pas de seuil applicable / KPI non scoré
- *
- * Le rendu UI (couleurs + emoji) est mappé dans `AiResponseCard.tsx`.
- */
-export type AiDiagnosticStatus = "excellent" | "good" | "warning" | "danger" | "neutral";
+export type AiDiagnosticStatus = "danger" | "good" | "neutral";
 
 export type AiDataPoint = {
   label: string;
@@ -132,7 +121,7 @@ export type AiComparison = {
   reference: { label: string; value: number };
 };
 
-export type AiActionType = "simulate" | "navigate" | "compare" | "detail";
+export type AiActionType = "simulate" | "navigate" | "compare";
 /** Icônes lucide-react autorisées pour les chips d'action (tree-shaking). */
 export type AiActionIcon =
   | "Sliders"

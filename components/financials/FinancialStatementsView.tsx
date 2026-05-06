@@ -10,8 +10,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { AppHeader } from "@/components/layout/AppHeader";
+import { ArrowLeft, Lock, LogOut, Settings, UserCircle2 } from "lucide-react";
 import { listUserAnalyses } from "@/services/analysisStore";
 import { getUserProfile } from "@/services/userProfileStore";
 import { resolveActiveAnalysis } from "@/lib/source/activeSource";
@@ -121,31 +120,84 @@ export function FinancialStatementsView() {
   );
 
   return (
-    <section className="w-full space-y-4">
-      <AppHeader
-        companyName={companyName}
-        subtitle={
-          activeAnalysis
-            ? `États financiers · Exercice ${activeAnalysis.fiscalYear ?? "—"}`
-            : "États financiers"
-        }
-        contextBadge={activeAnalysis ? <ActiveSourceBadge analysis={activeAnalysis} /> : null}
-        actionSlot={
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Retour
-          </button>
-        }
-      />
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
+      <AppSidebar activeRoute="etats-financiers" accountFirstName={greetingName} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
-        <AppSidebar activeRoute="etats-financiers" accountFirstName={greetingName} />
+      <section className="space-y-5">
+        <header className="precision-card flex flex-wrap items-baseline justify-between gap-3 rounded-2xl px-5 py-4">
+          <div>
+            <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/45">
+              États financiers
+            </p>
+            <h1 className="mt-0.5 text-xl font-semibold text-white">{companyName}</h1>
+            {activeAnalysis ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-white/55">
+                <span>
+                  Exercice{" "}
+                  <span className="font-mono text-white/85">
+                    {activeAnalysis.fiscalYear ?? "—"}
+                  </span>
+                </span>
+                <span className="text-white/25">·</span>
+                <ActiveSourceBadge analysis={activeAnalysis} />
+              </div>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Boutons utilitaires alignés sur Synthèse / Tableau de bord :
+                Réglages, Premium, Mon compte, Déconnexion. La sidebar reste
+                dédiée à la navigation entre pages. */}
+            <button
+              type="button"
+              onClick={() => router.push("/settings")}
+              className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+              aria-label="Paramètres"
+              title="Paramètres"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/pricing")}
+              className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+              aria-label="Offres"
+              title="Offre Premium"
+            >
+              <Lock className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/account?from=app")}
+              className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+              aria-label="Compte"
+              title="Mon compte"
+            >
+              <UserCircle2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const { firebaseAuthGateway } = await import("@/services/auth");
+                await firebaseAuthGateway.signOut();
+                router.replace("/");
+              }}
+              className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
+              aria-label="Se déconnecter"
+              title="Se déconnecter"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Retour
+            </button>
+          </div>
+        </header>
 
-        <section className="space-y-5">
         {fetchState === "loading" && showSlowLoader && (
           <p className="precision-card rounded-2xl px-5 py-4 text-sm text-white/55">
             Chargement de votre analyse…
@@ -190,9 +242,8 @@ export function FinancialStatementsView() {
             </p>
           </>
         )}
-        </section>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }
 

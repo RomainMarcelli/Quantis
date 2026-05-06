@@ -16,11 +16,10 @@ describe("AiMessageBubble", () => {
       />
     );
     expect(html).toContain("Pourquoi mon CA baisse ?");
-    // Cadrage léger : texte aligné à droite + fond très subtil (rgba blanc
-    // 0.03) + rounded-xl. PAS de bulle prononcée type "rounded-2xl bg-…".
+    // Pas de background-color sur le bloc texte (text-align right + color 0.6)
     expect(html).toContain("text-align:right");
-    expect(html).toContain("rounded-xl");
-    expect(html).toContain("rgba(255, 255, 255, 0.03)");
+    expect(html).toContain("rgba(255, 255, 255, 0.6)");
+    // Pas de classe de fond type bg-[#2D2D3A] ni bulle arrondie
     expect(html).not.toContain("bg-[#2D2D3A]");
     expect(html).not.toContain("rounded-2xl");
   });

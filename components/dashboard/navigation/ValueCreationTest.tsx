@@ -2,11 +2,10 @@
 // Role: propose une variante "test" premium de la section Création de valeur avec les KPI réels de l'analyse.
 "use client";
 
-import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowRight,
-  BarChart3,
   BarChartBig,
   Cpu,
   Layers,
@@ -17,6 +16,24 @@ import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
 import { BreakEvenChart } from "@/components/dashboard/navigation/BreakEvenChart";
+import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
+import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
+import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
+
+// Default layout pour l'onglet Création de valeur : reproduit les 6 cartes
+// existantes (CA, TCAM, EBE, VA, marge_ebitda, point_mort).
+const DEFAULT_VALUE_CREATION_LAYOUT: DashboardLayout = {
+  id: "dashboard:creation_valeur",
+  constrainedToCategory: "creation_valeur",
+  widgets: [
+    { id: "vc-ca", kpiId: "ca", vizType: "kpiCard", size: "S" },
+    { id: "vc-tcam", kpiId: "tcam", vizType: "kpiCard", size: "S" },
+    { id: "vc-ebe", kpiId: "ebe", vizType: "kpiCard", size: "S" },
+    { id: "vc-va", kpiId: "va", vizType: "kpiCard", size: "S" },
+    { id: "vc-marge-ebitda", kpiId: "marge_ebitda", vizType: "kpiCard", size: "S" },
+    { id: "vc-point-mort", kpiId: "point_mort", vizType: "kpiCard", size: "S" }
+  ] as WidgetInstance[]
+};
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import { useTheme } from "@/hooks/useTheme";
@@ -25,17 +42,31 @@ import {
   buildBreakEvenModel,
   buildMonthlyRevenueSeries
 } from "@/lib/dashboard/tabs/valueCreationData";
-import { TestTopStatus } from "@/components/dashboard/navigation/TestTopStatus";
-import type { CalculatedKpis, MappedFinancialData } from "@/types/analysis";
+import type { AnalysisRecord, CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 
 type ValueCreationTestProps = {
   kpis: CalculatedKpis;
   mappedData: MappedFinancialData;
   previousKpis?: CalculatedKpis | null;
+  /** Historique du dossier — alimente le graphique d'évolution KPI en haut. */
+  analyses?: AnalysisRecord[];
+  /** Analyse courante — son dailyAccounting alimente la lecture mensuelle. */
+  currentAnalysis?: AnalysisRecord | null;
+  /** Libellé du mode "Analyse dynamique / statique" affiché en haut à droite. */
+  analysisModeLabel?: string | null;
 };
 
-export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: ValueCreationTestProps) {
+export function ValueCreationTest({
+  kpis,
+  mappedData,
+  previousKpis = null,
+  analyses = [],
+  currentAnalysis = null,
+  analysisModeLabel = null
+}: ValueCreationTestProps) {
   const { isDark } = useTheme();
+  // KPI sélectionné → pilote la courbe d'évolution top. Défaut = CA, le plus parlant.
+  const [selectedKpiId, setSelectedKpiId] = useState<string>("ca");
   // Les séries restent alimentées par les KPI backend: aucun recalcul métier côté UI.
   const monthlySeries = useMemo(
     () =>
@@ -203,11 +234,6 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 
-      {/* Badge de contexte en flux normal pour éviter la superposition visuelle du bandeau test. */}
-      <div className="relative z-[4] mb-6 flex">
-        <TestTopStatus label="Contrôle des flux" />
-      </div>
-
       <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
         <div className="flex flex-col gap-2">
           <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
@@ -215,111 +241,46 @@ export function ValueCreationTest({ kpis, mappedData, previousKpis = null }: Val
           </h2>
         </div>
 
-        <div className="mt-3 flex flex-col items-end gap-2 md:mt-0">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-3 w-3 text-white/30" />
-            <span className="text-[11px] font-mono uppercase text-white/40">
-              Vue consolidée - Exercice en cours
+        {analysisModeLabel ? (
+          <div className="interactive-badge flex items-center gap-2 self-start rounded border border-white/10 bg-white/[0.02] px-3 py-1 md:self-auto">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">
+              {analysisModeLabel}
             </span>
           </div>
-          <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">Analyse dynamique</span>
-          </div>
-        </div>
+        ) : null}
       </header>
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
-        <MetricCard
-          delayMs={100}
-          searchId="analysis-vc-ca"
-          title="Volume d'activité"
-          tag="Chiffre d'affaires"
-          value={caLabel}
-          footerLabel={caFooterLabel}
-          footerCode="SIG_CA_01"
-          trend={caTrend}
-          icon={<Layers className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helpText="Le chiffre d'affaires totalise l'ensemble des ventes de biens et services."
-          kpiId="ca"
-          kpiValue={kpis.ca}
-          previousKpis={previousKpis}
-        />
-        <MetricCard
-          delayMs={150}
-          searchId="analysis-vc-tcam"
-          title="Vitesse de développement"
-          tag="TCAM %"
-          value={tcamLabel}
-          footerLabel="Moy. secteur: 8.2%"
-          footerCode="GROWTH_RATE"
-          trend={tcamTrend}
-          icon={<Activity className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helpText="Le TCAM mesure la dynamique de croissance moyenne annuelle."
-          kpiId="tcam"
-          kpiValue={kpis.tcam}
-          previousKpis={previousKpis}
-        />
-        <MetricCard
-          delayMs={200}
-          searchId="analysis-vc-ebe"
-          title="Performance opérationnelle"
-          tag="Excédent Brut (EBE)"
-          value={ebeLabel}
-          footerLabel="+4.2% vs budget"
-          footerCode="EBITDA_M01"
-          trend={ebeTrend}
-          icon={<BarChartBig className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helpText="L'EBE indique la richesse générée par l'exploitation."
-          kpiId="ebe"
-          kpiValue={kpis.ebe}
-          previousKpis={previousKpis}
-        />
-        <MetricCard
-          delayMs={220}
-          searchId="analysis-vc-va"
-          title="Richesse créée"
-          tag="Valeur Ajoutée"
-          value={vaLabel}
-          footerLabel="Prod - Conso. intermédiaires"
-          footerCode="SIG_VA_01"
-          trend={undefined}
-          icon={<Layers className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helpText="La valeur ajoutée mesure la richesse réellement créée par l'entreprise."
-          kpiId="va"
-          kpiValue={kpis.va}
-          previousKpis={previousKpis}
-        />
-        <MetricCard
-          delayMs={240}
-          searchId="analysis-vc-marge-ebitda"
-          title="Efficacité opérationnelle"
-          tag="Marge EBITDA %"
-          value={margeEbitdaLabel}
-          footerLabel="EBITDA / Production"
-          footerCode="MARGIN_EBITDA"
-          trend={undefined}
-          icon={<PieChartIcon className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helpText="Part de la production transformée en excédent brut d'exploitation."
-          kpiId="marge_ebitda"
-          kpiValue={kpis.marge_ebitda}
-          previousKpis={previousKpis}
-        />
-        <MetricCard
-          delayMs={260}
-          searchId="analysis-vc-point-mort-val"
-          title="Seuil de rentabilité"
-          tag="Point mort"
-          value={pointMortLabel}
-          footerLabel="Charges fixes / TMSCV"
-          footerCode="BREAK_EVEN"
-          trend={undefined}
-          icon={<Activity className="h-4 w-4 text-white/40 transition-colors group-hover:text-quantis-gold" />}
-          helpText="CA minimum pour couvrir l'ensemble des charges fixes."
-          kpiId="point_mort"
-          kpiValue={kpis.point_mort}
-          previousKpis={previousKpis}
-        />
+        {/* Chart top : courbe d'évolution du KPI sélectionné. */}
+        <div className="md:col-span-12">
+          <KpiEvolutionChart
+            kpiId={selectedKpiId}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+          />
+        </div>
+
+        {/* 6 cartes KPI customizable : par défaut CA, TCAM, EBE, VA, marge
+            EBITDA, point mort. L'utilisateur peut ajouter d'autres KPIs de la
+            catégorie "creation_valeur" ou changer la viz. */}
+        <div className="md:col-span-12">
+          <CustomizableDashboard
+            userId={null}
+            layoutId="dashboard:creation_valeur"
+            defaultLayout={DEFAULT_VALUE_CREATION_LAYOUT}
+            kpis={kpis}
+            previousKpis={previousKpis}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+            mappedData={mappedData}
+            lockedCategory="creation_valeur"
+            kpiSelection={{
+              selectedKpiId,
+              onSelect: setSelectedKpiId
+            }}
+          />
+        </div>
 
         <article
           className="precision-card fade-up group col-span-1 flex flex-col justify-between rounded-2xl p-6 md:col-span-6"
@@ -454,6 +415,9 @@ type MetricCardProps = {
    * Plus pratique que de passer `kpiPreviousValue` à chaque call-site.
    */
   previousKpis?: CalculatedKpis | null;
+  /** Card cliquable → pilote la courbe d'évolution top de la page. */
+  onSelect?: () => void;
+  isSelected?: boolean;
   /** Props legacy conservés pour compat — plus rendus. */
   footerLabel?: string;
   footerCode?: string;
@@ -471,6 +435,8 @@ function MetricCard({
   kpiId,
   kpiValue,
   previousKpis,
+  onSelect,
+  isSelected,
 }: MetricCardProps) {
   const previousValue =
     kpiId && previousKpis
@@ -490,6 +456,8 @@ function MetricCard({
         formattedValue={value}
         searchId={searchId}
         className="fade-up"
+        onSelect={onSelect}
+        isSelected={isSelected}
       />
     </div>
   );

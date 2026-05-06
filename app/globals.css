@@ -876,3 +876,27 @@ body {
 .vyzor-fade-up {
   animation: vyzor-treasury-fade-up 480ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
+
+/* ─── Widget wiggle (mode édition Apple-style) ──────────────────────── */
+/* Animation très subtile rappelant l'iOS Springboard en mode "jiggle" :
+   chaque widget oscille de ±0.4° sur 250ms en boucle. Le délai random
+   par widget évite le synchronisme parfait qui ferait artificiel. */
+
+@keyframes widget-wiggle {
+  0%   { transform: rotate(-0.4deg); }
+  50%  { transform: rotate(0.4deg); }
+  100% { transform: rotate(-0.4deg); }
+}
+
+.widget-wiggle {
+  animation: widget-wiggle 250ms ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+/* Désactivation du wiggle pour les utilisateurs sensibles aux animations
+   (préférence système prefers-reduced-motion). */
+@media (prefers-reduced-motion: reduce) {
+  .widget-wiggle {
+    animation: none;
+  }
+}
