@@ -290,7 +290,7 @@ export function InvestmentTest({
               </div>
               <div className="flex flex-col gap-1">
                 <span className="agent-kicker text-[10px] font-mono">
-                  QUANTIS_AGENT {" > "} OPTIMISATION BFR
+                  VYZOR_AGENT {" > "} OPTIMISATION BFR
                 </span>
                 <p className="text-[14px] font-medium agent-message">
                   Priorité recommandée: sécuriser les encaissements clients et lisser les niveaux de stock.

@@ -12,7 +12,7 @@
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, MessageCircle, Sparkles } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { getKpiDefinition, type KpiDefinition } from "@/lib/kpi/kpiRegistry";
 
 const GLOBAL_SAMPLE_QUESTIONS = [
@@ -54,7 +54,7 @@ function AssistantPlaceholderInner() {
     <section className="mx-auto w-full max-w-3xl space-y-6">
       <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
         <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
+          <VyzorLogo withText={false} size={28} />
           <div>
             <p className="text-sm font-semibold text-white">Assistant IA Vyzor</p>
             <p className="text-xs text-white/55">Bientôt disponible</p>

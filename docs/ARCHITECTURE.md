@@ -1,4 +1,4 @@
-# Architecture Vyzor (repo Quantis)
+# Architecture Vyzor (repo Vyzor)
 
 > Document de référence pour comprendre l'état actuel du backend / data et la
 > trajectoire long terme. Lecture cible : Romain (front), nouveaux contributeurs.

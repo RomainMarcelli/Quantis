@@ -1,6 +1,6 @@
 // File: components/synthese/SyntheseDashboard.tsx
 // Role: Synthèse — vue cockpit principal, désormais 100% personnalisable.
-// Le seul élément fixe est le Quantis Score (forme variera en Phase 2).
+// Le seul élément fixe est le Vyzor Score (forme variera en Phase 2).
 // Tous les autres blocs (chart d'évolution, KPI cards, recommandation,
 // alertes, plan d'action, tiles fiscales) sont des widgets ajoutables /
 // supprimables / réordonnables / redimensionnables via CustomizableDashboard.
@@ -77,17 +77,17 @@ type SyntheseDashboardProps = {
 
 // ─── Default layout Synthèse ───────────────────────────────────────────
 // Reprend exactement le contenu de l'ancien cockpit fixe :
-//   - Quantis Score (fixe — non supprimable)
+//   - Vyzor Score (fixe — non supprimable)
 //   - Courbe d'évolution multi-séries
 //   - 3 KPI cards (CA, Trésorerie, EBE)
 //   - Recommandation IA, plan d'action, alertes
 //   - Tiles fiscales TVA + IS
-// L'utilisateur peut tout réordonner / redimensionner ; seul le Quantis Score
+// L'utilisateur peut tout réordonner / redimensionner ; seul le Vyzor Score
 // est marqué `isFixed:true` pour être conservé en permanence sur la Synthèse.
 const DEFAULT_SYNTHESE_LAYOUT: DashboardLayout = {
   id: "synthese",
   widgets: [
-    // Quantis Score : viz composite (jauge + 4 piliers + message) — exige
+    // Vyzor Score : viz composite (jauge + 4 piliers + message) — exige
     // hauteur L (560 px+ natif) et largeur M minimum.
     { id: "default-quantis-score", kpiId: "synthese:score", vizType: "quantisScore", size: "M", height: "L", isFixed: true },
     // Charts pleine largeur sur 2 rangées (440 px) — confortable pour
@@ -311,7 +311,7 @@ export function SyntheseDashboard({
       </header>
 
       {/* Grille widgets pleine largeur : aucun élément n'est pinned hors-grille,
-          le Quantis Score est lui-même un widget marqué `isFixed:true` dans le
+          le Vyzor Score est lui-même un widget marqué `isFixed:true` dans le
           default layout (non supprimable, repositionnable). L'utilisateur peut
           mettre des widgets au-dessus, à côté ou en-dessous du score. */}
       <CustomizableDashboard

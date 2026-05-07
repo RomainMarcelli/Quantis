@@ -33,7 +33,7 @@ type DashboardLayoutProps = {
   children?: ReactNode;
   scoreCard?: ReactNode;
   /**
-   * Carte rendue à droite du Quantis Score (graphique d'évolution typiquement).
+   * Carte rendue à droite du Vyzor Score (graphique d'évolution typiquement).
    * Quand non fourni, on retombe sur l'ancienne disposition Score + grille KPI.
    * Quand fourni : Row 1 = [Score | Chart], Row 2 = grille KPIs en dessous.
    */
@@ -86,7 +86,7 @@ export function DashboardLayout({
 
       {/* Header allégé : titre + sous-titre à gauche, badge de mode (analyse
           dynamique / statique) à droite. Les anciennes éléments — Q logo +
-          "QUANTIS" + companyName + statusLabel "VUE CONSOLIDÉE…" — étaient
+          "VYZOR" + companyName + statusLabel "VUE CONSOLIDÉE…" — étaient
           redondants avec le bandeau meta du SyntheseDashboard et la sidebar. */}
       <header className="fade-up relative z-10 mb-12 flex w-full flex-col items-start justify-between gap-6 md:flex-row md:items-end">
         <div className="flex flex-col gap-3">
@@ -106,7 +106,7 @@ export function DashboardLayout({
         ) : null}
       </header>
 
-      {/* Row 1 — Hero : Quantis Score (lg:col-span-5) + Chart d'évolution (lg:col-span-7).
+      {/* Row 1 — Hero : Vyzor Score (lg:col-span-5) + Chart d'évolution (lg:col-span-7).
           Si pas de chartCard fourni, le Score occupe seul la première ligne et la
           grille KPI ci-dessous remplit l'espace restant comme avant. */}
       <div className="relative z-10 grid grid-cols-1 gap-5 md:grid-cols-12">

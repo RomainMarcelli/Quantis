@@ -1,4 +1,4 @@
-# Projet Quantis - Suivi Principal
+# Projet Vyzor - Suivi Principal
 
 ## Mise a jour (2026-04-09)
 
@@ -16,7 +16,7 @@
 
 ## Vision du projet
 
-Quantis est un copilote financier B2B pour PME.
+Vyzor est un copilote financier B2B pour PME.
 Le produit convertit des donnees comptables (Excel/PDF) en decisions exploitables via un pipeline clair:
 Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 
@@ -28,11 +28,11 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 4. Saisie obligatoire du contexte avant analyse:
    - nombre d’employés
    - secteur d’activité
-5. Parsing + calcul KPI + calcul `Quantis Score` côté pipeline serveur.
+5. Parsing + calcul KPI + calcul `Vyzor Score` côté pipeline serveur.
 6. Persistance Firestore dans `analyses`:
    - fichiers sources
    - KPI calculés
-   - score Quantis et piliers
+   - score Vyzor et piliers
    - contexte d’upload
 7. Redirection vers `/synthese` après traitement.
 8. Gestion des données manquantes sur les KPI:
@@ -51,7 +51,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
 - DA "premium fintech" appliquee sur login et dashboard:
   - fond clair, anthracite, accent or
   - cartes sobrement bordees
-  - hierarchie visuelle type landing Quantis
+  - hierarchie visuelle type landing Vyzor
   - logo de marque centralise dans `public/images/LogoV3.png` et integre aux ecrans principaux
 - Authentification Firebase complete:
   - login email/password
@@ -60,7 +60,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
     - page `/forgot-password` (envoi lien de reset via Resend + lien Firebase Admin)
     - page `/reset-password` (validation lien + nouveau mot de passe)
     - messages generiques pour ne jamais exposer si un email existe
-  - emails transactionnels custom en DA Quantis:
+  - emails transactionnels custom en DA Vyzor:
     - confirmation de compte
     - reinitialisation mot de passe
     - envoi via Resend avec endpoints serveur dedies
@@ -101,7 +101,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - parser PDF liasse fiscale dedie:
     - extraction Google Document AI (`services/documentAI.ts`)
     - analyse structuree (`services/pdfAnalysis.ts`)
-    - mapping donnees Quantis (`services/financialMapping.ts`)
+    - mapping donnees Vyzor (`services/financialMapping.ts`)
     - persistance Firestore (`services/pdfAnalysisStore.ts`)
     - progression par requete (`services/pdfParserProgressStore.ts`)
     - endpoint API (`app/api/pdf-parser/route.ts`)
@@ -139,7 +139,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
     - suppression synchronisee de l'analyse associee avec rafraichissement immediat des donnees
   - nouvelle page `/synthese` (DA premium coherente avec `/analysis`):
     - item sidebar `Synthese` cliquable (remplace `Analyses`)
-    - bloc principal `Quantis Score` (score /100 + statut de sante globale)
+    - bloc principal `Vyzor Score` (score /100 + statut de sante globale)
     - selecteur d'annee en haut a droite (option `Annee en cours` + annees historiques disponibles)
     - ligne KPI principale: chiffre d'affaires, EBE, cash disponible
     - indicateurs de tendance vs periode precedente (hausse/baisse/stable + couleurs)
@@ -259,7 +259,7 @@ Upload -> Parsing -> Calcul KPI -> Stockage -> Affichage.
   - nouveaux tests unitaires Synthese:
     - logique de tendance (up/down/na)
     - construction view-model (score, KPI, alertes, actions)
-    - rendu composant (Quantis Score + KPI principaux)
+    - rendu composant (Vyzor Score + KPI principaux)
   - nouveaux tests unitaires dashboard tabs:
     - logique de preparation des donnees graphiques (mensuel, TMSCV, point mort)
     - rendu des composants chart
@@ -374,7 +374,7 @@ Purge automatique mensuelle des logs sécurité pour maîtriser la volumétrie F
 ## Mise à jour 2026-03-23
 
 - Logo applicatif unifié sur toute l’application avec `public/images/LogoV3.png`:
-  - composant central `components/ui/QuantisLogo.tsx`
+  - composant central `components/ui/VyzorLogo.tsx`
   - icônes metadata Next (`app/layout.tsx`)
   - logo export PDF (`lib/synthese/downloadSyntheseReport.ts`)
 - Stabilité session renforcée:
@@ -401,9 +401,9 @@ Purge automatique mensuelle des logs sécurité pour maîtriser la volumétrie F
   - `buildCompleteKpis(input)` calcule automatiquement marges, rotation BFR, liquidité, solvabilité, gearing, FCF, point mort et usure actifs
   - protections anti division par zéro et anti NaN
 - Pipeline manuel aligné produit:
-  - `input utilisateur -> buildCompleteKpis -> calculateQuantisScore -> sauvegarde analyse`
+  - `input utilisateur -> buildCompleteKpis -> calculateVyzorScore -> sauvegarde analyse`
 - Tests unitaires ajoutés:
-  - `lib/kpiBuilder.test.ts` (marges, rot_bfr, liquidité, robustesse valeurs manquantes, intégration Quantis Score).
+  - `lib/kpiBuilder.test.ts` (marges, rot_bfr, liquidité, robustesse valeurs manquantes, intégration Vyzor Score).
 
 ## Mise à jour 2026-03-23 (persistance analyse post-inscription)
 

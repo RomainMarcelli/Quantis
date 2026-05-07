@@ -1,4 +1,4 @@
-﻿# Sécurité Quantis
+﻿# Sécurité Vyzor
 
 <!--
 Ce document est la source de vérité sécurité.

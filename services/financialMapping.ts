@@ -1,6 +1,6 @@
 import type { ParsedFinancialData } from "@/services/pdfAnalysis";
 
-export type QuantisFinancialData = {
+export type VyzorFinancialData = {
   ca: number | null;
   totalCharges: number | null;
   netResult: number | null;
@@ -9,7 +9,7 @@ export type QuantisFinancialData = {
   debts: number | null;
 };
 
-export function mapToQuantisData(financialData: ParsedFinancialData): QuantisFinancialData {
+export function mapToVyzorData(financialData: ParsedFinancialData): VyzorFinancialData {
   const turnover = safeNumber(financialData.incomeStatement.netTurnover);
   const salesGoods = safeNumber(financialData.incomeStatement.salesGoods);
   const productionGoods = safeNumber(financialData.incomeStatement.productionSoldGoods);
@@ -17,7 +17,7 @@ export function mapToQuantisData(financialData: ParsedFinancialData): QuantisFin
   const legacyRevenue = safeNumber(financialData.incomeStatement.revenue);
   const legacyProduction = safeNumber(financialData.incomeStatement.production);
 
-  const quantisData: QuantisFinancialData = {
+  const quantisData: VyzorFinancialData = {
     ca: computeCa({
       turnover,
       salesGoods,
@@ -26,7 +26,7 @@ export function mapToQuantisData(financialData: ParsedFinancialData): QuantisFin
       legacyRevenue,
       legacyProduction
     }),
-    totalCharges: selectQuantisTotalCharges(financialData),
+    totalCharges: selectVyzorTotalCharges(financialData),
     netResult: safeNumber(financialData.incomeStatement.netResult),
     totalAssets: safeNumber(financialData.balanceSheet.totalAssets),
     equity: safeNumber(financialData.balanceSheet.equity),
@@ -34,19 +34,19 @@ export function mapToQuantisData(financialData: ParsedFinancialData): QuantisFin
   };
 
   const missingFieldsCount = Object.values(quantisData).filter((value) => value === null).length;
-  console.info("[financial-mapping] Quantis data computed", {
+  console.info("[financial-mapping] Vyzor data computed", {
     missingFieldsCount,
     hasCa: quantisData.ca !== null
   });
 
   if (isPdfParserDebugEnabled()) {
-    console.info("[financial-mapping] Quantis payload", quantisData);
+    console.info("[financial-mapping] Vyzor payload", quantisData);
   }
 
   return quantisData;
 }
 
-function selectQuantisTotalCharges(financialData: ParsedFinancialData): number | null {
+function selectVyzorTotalCharges(financialData: ParsedFinancialData): number | null {
   const operatingCharges = safeNumber(financialData.incomeStatement.totalOperatingCharges);
   if (operatingCharges !== null) {
     return operatingCharges;

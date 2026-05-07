@@ -14,7 +14,7 @@ import {
   Sun
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { useProductTour } from "@/hooks/useProductTour";
 import { useTheme } from "@/hooks/useTheme";
@@ -87,10 +87,10 @@ export function SettingsView() {
 
       <header className="precision-card relative z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-5">
         <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={24} />
+          <VyzorLogo withText={false} size={24} />
           <div>
             <h1 className="text-2xl font-semibold text-white">Paramètres</h1>
-            <p className="text-sm text-white/60">Configuration essentielle de votre espace Quantis.</p>
+            <p className="text-sm text-white/60">Configuration essentielle de votre espace Vyzor.</p>
           </div>
         </div>
 

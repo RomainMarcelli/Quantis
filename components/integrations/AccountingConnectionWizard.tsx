@@ -709,7 +709,7 @@ function MyUnisoftStep({
     <div className="flex flex-col gap-4">
       <Header title="Connectez votre MyUnisoft" subtitle="Synchronisation en lecture seule depuis votre dossier." />
       <Instruction>
-        Dans MyUnisoft, allez dans <strong className="text-white">Paramètres → Connecteurs dossier → Sélectionnez Quantis → Cliquez Générer</strong>.
+        Dans MyUnisoft, allez dans <strong className="text-white">Paramètres → Connecteurs dossier → Sélectionnez Vyzor → Cliquez Générer</strong>.
       </Instruction>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <SecureField

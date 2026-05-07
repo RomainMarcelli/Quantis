@@ -1,12 +1,12 @@
 // Orchestrateur post-sync : agrège les entités persistées en un AnalysisDraft complet
-// (mappedData + KPI + Quantis Score + insights granulaires + time series + VAT) puis
+// (mappedData + KPI + Vyzor Score + insights granulaires + time series + VAT) puis
 // l'écrit dans la collection "analyses".
 //
 // Appelé à la fin de runSync() pour matérialiser les données fraîches dans le format que
 // le front consomme déjà (AnalysisRecord).
 
 import { computeKpis } from "@/services/kpiEngine";
-import { calculateQuantisScore } from "@/lib/quantisScore";
+import { calculateVyzorScore } from "@/lib/vyzorScore";
 import { mapParsedFinancialDataToMappedFinancialData } from "@/services/mapping/parsedFinancialDataBridge";
 import { mapMappedDataToFinancialFacts } from "@/services/mapping/financialDataMapper";
 import { aggregateEntriesToParsedFinancialData } from "@/services/integrations/aggregations/pcgAggregator";
@@ -130,7 +130,7 @@ export async function buildAndPersistAnalysisFromSync(
       }
     : mappedDataRaw;
   const kpis = computeKpis(mappedData);
-  const quantisScore = calculateQuantisScore(kpis);
+  const quantisScore = calculateVyzorScore(kpis);
   const financialFacts = mapMappedDataToFinancialFacts(mappedData);
 
   // ─── 4. Insights granulaires + time series + VAT ──────────────────────────

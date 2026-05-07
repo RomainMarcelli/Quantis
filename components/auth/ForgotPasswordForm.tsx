@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { requestPasswordReset, validateForgotPasswordInput } from "@/lib/auth/passwordReset";
 import { firebaseAuthGateway } from "@/services/auth";
 
@@ -58,7 +58,7 @@ export function ForgotPasswordForm() {
   return (
     <section className="quantis-panel mesh-gradient relative w-full max-w-xl p-8">
       {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
-      <QuantisLogo className="mb-1" />
+      <VyzorLogo className="mb-1" />
       <h1 className="mt-2 text-3xl font-semibold leading-tight text-quantis-carbon">
         Mot de passe
         <span className="ml-2 text-quantis-gold">oublié</span>

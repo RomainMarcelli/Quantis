@@ -52,7 +52,7 @@ Le front ne distingue jamais la source : il lit `dailyAccounting[]` (variables 2
        OU aggregateEntriesToParsedFinancialData (fallback)
     → mapParsedFinancialDataToMappedFinancialData → mappedData
     → computeKpis(mappedData) → KPI legacy
-    → calculateQuantisScore(kpis) → score
+    → calculateVyzorScore(kpis) → score
     → buildGranularInsights(invoices, contacts) → top clients/fournisseurs/secteurs
     → buildKpisTimeSeries(entries) → KPI 12 mois
     → buildVatInsights(entries) → TVA collectée/déductible/due
@@ -226,7 +226,7 @@ npx tsx --env-file=.env scripts/seed-sandbox.mts
 npx tsx --env-file=.env scripts/smoke-e2e.mts
 ```
 
-Le smoke E2E imprime les KPI principaux (CA, EBITDA, BFR, DSO, DPO, Quantis Score), les insights granulaires (top clients, secteurs, timeline 12 mois), et un dump complet de `dailyAccounting` + `balanceSheetSnapshot`.
+Le smoke E2E imprime les KPI principaux (CA, EBITDA, BFR, DSO, DPO, Vyzor Score), les insights granulaires (top clients, secteurs, timeline 12 mois), et un dump complet de `dailyAccounting` + `balanceSheetSnapshot`.
 
 ### Idempotence
 

@@ -1,4 +1,4 @@
-# Journal de bord UI — Vyzor (ex-Quantis)
+# Journal de bord UI — Vyzor (ex-Vyzor)
 
 Ce fichier trace les avancées du chantier UI/UX mené depuis l'audit `AUDIT_UI.md`.
 Append-only : les entrées sont ajoutées, jamais modifiées.

@@ -69,7 +69,7 @@ export function SyntheseView() {
 
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [greetingName, setGreetingName] = useState("Utilisateur");
-  const [companyName, setCompanyName] = useState("Quantis");
+  const [companyName, setCompanyName] = useState("Vyzor");
   const [sector, setSector] = useState<string | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
   const [selectedYearValue, setSelectedYearValue] = useState<string>("");
@@ -299,7 +299,7 @@ export function SyntheseView() {
       ]);
 
       setGreetingName(resolveFirstName(currentUser, profile?.firstName));
-      setCompanyName(profile?.companyName?.trim() || "Quantis");
+      setCompanyName(profile?.companyName?.trim() || "Vyzor");
       setSector(profile?.sector ?? null);
       setAllAnalyses(history);
 

@@ -94,7 +94,7 @@ export function UploadLanding({ loading, onUpload }: UploadLandingProps) {
           </div>
 
           <p className="mt-4 text-sm text-white/65 md:text-base">
-            {"D\u00E9posez vos documents Excel ou PDF. Quantis parse, calcule les KPI, stocke dans Firestore, puis alimente votre tableau de bord financier."}
+            {"D\u00E9posez vos documents Excel ou PDF. Vyzor parse, calcule les KPI, stocke dans Firestore, puis alimente votre tableau de bord financier."}
           </p>
           <p className="mt-2 text-xs text-white/45">
             {"Pipeline : D\u00E9p\u00F4t -> Parsing -> KPI -> Stockage -> Dashboard"}

@@ -12,7 +12,7 @@ function validInput(): UserProfileUpdateInput {
   return {
     firstName: "Marie",
     lastName: "Dupont",
-    companyName: "Quantis SAS",
+    companyName: "Vyzor SAS",
     siren: "123456789",
     companySize: "pme",
     sector: "SaaS & Edition de Logiciels"

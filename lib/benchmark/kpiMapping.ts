@@ -1,5 +1,5 @@
 // File: lib/benchmark/kpiMapping.ts
-// Role: relie chaque KPI Quantis (CalculatedKpis) à son triplet de colonnes dans la vue Vyzor.
+// Role: relie chaque KPI Vyzor (CalculatedKpis) à son triplet de colonnes dans la vue Vyzor.
 import type { CalculatedKpis } from "@/types/analysis";
 import type { VyzorBenchmarkRow, BenchmarkValueFormat, VyzorKpiPrefix } from "@/types/benchmark";
 
@@ -29,7 +29,7 @@ function triple(prefix: VyzorKpiPrefix): ColumnTriple {
   };
 }
 
-// Mapping explicite. KPI Quantis non listé = pas d'indicateur (graceful fallback côté UI).
+// Mapping explicite. KPI Vyzor non listé = pas d'indicateur (graceful fallback côté UI).
 // Choix de mapping documentés dans le plan : EBE→ebitda, MSCV→marge_brute, FTE→effectif…
 export const KPI_BENCHMARK_MAPPING: Partial<Record<BenchmarkableKpiKey, KpiBenchmarkMapping>> = {
   // Performance

@@ -155,7 +155,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [currentFolder, setCurrentFolder] = useState<string>(DEFAULT_FOLDER_NAME);
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
-  const [companyName, setCompanyName] = useState("Quantis");
+  const [companyName, setCompanyName] = useState("Vyzor");
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   // Loader visible uniquement si le chargement dépasse 400 ms (cf. hook).
@@ -517,7 +517,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
       setAllAnalyses(history);
       setGreetingName(resolveFirstName(currentUser, profile?.firstName));
-      setCompanyName(profile?.companyName?.trim() || "Quantis");
+      setCompanyName(profile?.companyName?.trim() || "Vyzor");
       const persistedFolderNames = persistedFolders.map((folder) => normalizeFolderName(folder.name));
       persistedFolderNames.forEach((folderName) => registerKnownFolderName(folderName));
       setKnownFolders(getKnownFolderNames());

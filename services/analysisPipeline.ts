@@ -1,5 +1,5 @@
 import { computeKpis } from "@/services/kpiEngine";
-import { calculateQuantisScore } from "@/lib/quantisScore";
+import { calculateVyzorScore } from "@/lib/vyzorScore";
 import {
   applyLegacyFinancialFactsToMappedData,
   mapMappedDataToFinancialFacts,
@@ -154,7 +154,7 @@ export async function runAnalysisPipeline(params: {
   }
 
   const kpis = computeKpis(mappedData);
-  const quantisScore = calculateQuantisScore(kpis);
+  const quantisScore = calculateVyzorScore(kpis);
   const facts = mapMappedDataToFinancialFacts(mappedData);
 
   const candidateYears = parsedData
@@ -278,7 +278,7 @@ async function runFecPipeline(
     );
   }
   const kpis = computeKpis(mappedData);
-  const quantisScore = calculateQuantisScore(kpis);
+  const quantisScore = calculateVyzorScore(kpis);
   const facts = mapMappedDataToFinancialFacts(mappedData);
 
   // 4. Format unifié front (matière première).

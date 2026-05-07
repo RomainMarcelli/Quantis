@@ -34,7 +34,7 @@ const VIZ_LABELS: Record<WidgetVizType, string> = {
   donut: "Donut",
   waterfall: "Cascade",
   comparison: "Comparaison marché",
-  quantisScore: "Score Quantis (radial)",
+  quantisScore: "Score Vyzor (radial)",
   aiInsight: "Recommandation IA",
   alertList: "Liste d'alertes",
   actionList: "Plan d'action",

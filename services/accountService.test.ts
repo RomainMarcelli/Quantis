@@ -35,7 +35,7 @@ describe("accountService", () => {
     const profile: UserProfile = {
       firstName: "Marie",
       lastName: "Dupont",
-      companyName: "Quantis SAS",
+      companyName: "Vyzor SAS",
       siren: "123456789",
       companySize: "pme",
       sector: "SaaS & Edition de Logiciels",
@@ -84,7 +84,7 @@ describe("accountService", () => {
     await saveAccountProfile("uid-1", {
       firstName: "Marie",
       lastName: "Dupont",
-      companyName: "Quantis SAS",
+      companyName: "Vyzor SAS",
       siren: "123456789",
       companySize: "pme",
       sector: "SaaS & Edition de Logiciels"
@@ -93,7 +93,7 @@ describe("accountService", () => {
     expect(updateUserProfile).toHaveBeenCalledWith("uid-1", {
       firstName: "Marie",
       lastName: "Dupont",
-      companyName: "Quantis SAS",
+      companyName: "Vyzor SAS",
       siren: "123456789",
       companySize: "pme",
       sector: "SaaS & Edition de Logiciels"

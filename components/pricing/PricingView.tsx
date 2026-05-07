@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, ShieldCheck, Sparkles } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { firebaseAuthGateway } from "@/services/auth";
 import type { AuthenticatedUser } from "@/types/auth";
@@ -27,7 +27,7 @@ const OFFERS: Offer[] = [
   {
     name: "Free",
     price: "0 EUR / mois",
-    description: "Pour decouvrir Quantis et structurer un premier pilotage financier.",
+    description: "Pour decouvrir Vyzor et structurer un premier pilotage financier.",
     features: [
       "1 dossier actif",
       "Dashboard essentiel",
@@ -116,14 +116,14 @@ export function PricingView() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <QuantisLogo withText={false} size={28} />
+              <VyzorLogo withText={false} size={28} />
               <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/70">
                 Pricing
               </span>
             </div>
             <h1 className="mt-3 text-3xl font-semibold text-white md:text-4xl">
               {"Offres "}
-              <span className="text-quantis-gold">Quantis</span>
+              <span className="text-quantis-gold">Vyzor</span>
             </h1>
             <p className="mt-2 text-sm text-white/65">
               {"Choisissez le niveau adapté à votre cadence de pilotage financier."}

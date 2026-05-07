@@ -1,4 +1,4 @@
-# PARSER_KPI_COVERAGE.md — Couverture KPIs Quantis
+# PARSER_KPI_COVERAGE.md — Couverture KPIs Vyzor
 
 > Dernière mise à jour : 2026-04-13 (Lot 2)
 

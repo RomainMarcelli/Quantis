@@ -292,7 +292,7 @@ function buildReportPayload(analysis: AnalysisRecord, options: BuildPayloadOptio
   const summaryRows = buildSummaryRows(k, balance, ca);
 
   // Score + piliers (cover).
-  const score = analysis.quantisScore?.quantis_score ?? null;
+  const score = analysis.quantisScore?.vyzor_score ?? null;
   const pil = analysis.quantisScore?.piliers ?? null;
   const piliers = [
     { label: "Rentabilité",  value: pil?.rentabilite ?? null, valueLabel: pil?.rentabilite != null ? `${Math.round(pil.rentabilite)} / 100` : null },

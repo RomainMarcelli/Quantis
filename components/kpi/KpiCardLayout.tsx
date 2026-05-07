@@ -204,7 +204,7 @@ export function KpiCardLayout({
           de position). Auto-résolu via le `kpiId` quand un mapping Vyzor existe
           pour ce KPI ; rien rendu sinon (graceful — KPIs banking, point_mort,
           healthScore...). Voir lib/benchmark/kpiMapping.ts pour la couverture.
-          Le badge "Excellent / Critique" basé sur les seuils Quantis a été
+          Le badge "Excellent / Critique" basé sur les seuils Vyzor a été
           retiré : sa lecture entre en conflit avec la position marché (un KPI
           peut être "Excellent" sur les seuils internes mais "Médiane" sur le
           marché — confusion). Le tooltip ✨ continue d'expliquer le diagnostic
