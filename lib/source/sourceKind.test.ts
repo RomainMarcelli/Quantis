@@ -1,16 +1,18 @@
+// File: lib/source/sourceKind.test.ts
+// Tests pour les utilitaires de classification d'analyse (kind + description).
+// L'ancien `resolveActiveAnalysis` n'existe plus — la résolution de la
+// source active passe désormais par `useActiveDataSource` (cf. tests
+// dans hooks/useActiveDataSource.test.ts).
+
 import { describe, expect, it } from "vitest";
-import {
-  describeAnalysisSource,
-  getAnalysisSourceKind,
-  resolveActiveAnalysis,
-} from "@/lib/source/activeSource";
+import { describeAnalysisSource, getAnalysisSourceKind } from "@/lib/source/sourceKind";
 import type { AnalysisRecord } from "@/types/analysis";
 
 function makeAnalysis(overrides: Partial<AnalysisRecord>): AnalysisRecord {
   return {
     id: overrides.id ?? "x",
     userId: "u",
-    folderName: "Documents",
+    folderName: "Dossier principal",
     createdAt: overrides.createdAt ?? "2026-01-01T00:00:00.000Z",
     fiscalYear: 2025,
     sourceFiles: overrides.sourceFiles ?? [],
@@ -46,53 +48,14 @@ describe("getAnalysisSourceKind", () => {
   });
 });
 
-describe("resolveActiveAnalysis", () => {
-  const pennylane = makeAnalysis({
-    id: "p",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    sourceMetadata: { type: "dynamic", provider: "pennylane" } as never,
-  });
-  const fec = makeAnalysis({
-    id: "f",
-    createdAt: "2026-04-01T00:00:00.000Z",
-    sourceMetadata: { type: "dynamic", provider: "fec" } as never,
-  });
-  const pdf = makeAnalysis({
-    id: "d",
-    createdAt: "2026-04-15T00:00:00.000Z",
-    sourceFiles: [{ name: "x.pdf", mimeType: "application/pdf", size: 1, type: "pdf" }],
-  });
-
-  it("respects explicit ID when present", () => {
-    const result = resolveActiveAnalysis([pdf, pennylane, fec], "f");
-    expect(result?.id).toBe("f");
-  });
-
-  it("falls back to priority when explicit ID is unknown", () => {
-    // Pennylane > FEC > PDF, donc Pennylane gagne même s'il est le moins récent.
-    const result = resolveActiveAnalysis([pdf, fec, pennylane], "missing-id");
-    expect(result?.id).toBe("p");
-  });
-
-  it("most recent wins at equal priority", () => {
-    const oldPdf = makeAnalysis({
-      id: "old",
-      createdAt: "2025-01-01T00:00:00.000Z",
-      sourceFiles: [{ name: "old.pdf", mimeType: "application/pdf", size: 1, type: "pdf" }],
-    });
-    const result = resolveActiveAnalysis([oldPdf, pdf], null);
-    expect(result?.id).toBe("d"); // = "d" plus récent
-  });
-
-  it("returns null when list is empty", () => {
-    expect(resolveActiveAnalysis([], "any")).toBeNull();
-  });
-});
-
 describe("describeAnalysisSource", () => {
   it("labels Pennylane with sync prefix", () => {
     const a = makeAnalysis({
-      sourceMetadata: { type: "dynamic", provider: "pennylane", syncedAt: new Date().toISOString() } as never,
+      sourceMetadata: {
+        type: "dynamic",
+        provider: "pennylane",
+        syncedAt: new Date().toISOString(),
+      } as never,
     });
     const desc = describeAnalysisSource(a);
     expect(desc.kind).toBe("pennylane");
@@ -102,6 +65,7 @@ describe("describeAnalysisSource", () => {
 
   it("labels PDF with filename", () => {
     const a = makeAnalysis({
+      folderName: "soretole.pdf",
       sourceFiles: [{ name: "soretole.pdf", mimeType: "application/pdf", size: 1, type: "pdf" }],
     });
     const desc = describeAnalysisSource(a);

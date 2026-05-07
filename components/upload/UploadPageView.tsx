@@ -26,7 +26,7 @@ import {
   SECTOR_OPTIONS
 } from "@/lib/onboarding/options";
 import type { CompanySizeValue } from "@/lib/onboarding/options";
-import { DEFAULT_FOLDER_NAME, ensureFolderName, setActiveFolderName } from "@/lib/folders/activeFolder";
+import { DEFAULT_FOLDER_NAME, registerKnownFolderName } from "@/lib/folders/folderRegistry";
 import { validateUploadInput } from "@/lib/upload/uploadValidation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firebaseStorage } from "@/lib/firebase";
@@ -179,7 +179,8 @@ export function UploadPageView() {
     sectorValue: string,
     filesToSubmit: File[]
   ): Promise<AnalysisDraft> {
-    const folderName = ensureFolderName(DEFAULT_FOLDER_NAME) ?? DEFAULT_FOLDER_NAME;
+    const folderName = DEFAULT_FOLDER_NAME;
+    registerKnownFolderName(folderName);
 
     const uploadedFiles: { pdfUrl: string; fileName: string; fileSize: number }[] = [];
     const nonPdfFiles: File[] = [];
@@ -289,7 +290,9 @@ export function UploadPageView() {
         filesToSubmit
       );
       await saveAnalysisDraft(persistedDraft);
-      setActiveFolderName(persistedDraft.folderName);
+      // L'activation comme source active reste manuelle via le toggle binaire
+      // de /documents — on ne force plus la bascule automatique post-upload.
+      registerKnownFolderName(persistedDraft.folderName);
       setLocalAnalysisHint(true);
       setIsAnalysisComplete(true);
       setSuccessMessage("Analyse créée avec succès. Redirection vers la synthèse...");

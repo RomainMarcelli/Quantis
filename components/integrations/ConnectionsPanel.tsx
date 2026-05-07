@@ -8,9 +8,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Plug, RefreshCw, Trash2 } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
-import { clearActiveAnalysisId, writeActiveAnalysisId } from "@/lib/source/activeSource";
-import { clearActiveFolderSelection } from "@/lib/folders/activeFolder";
-import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
 import type { ConnectionDto } from "@/app/api/integrations/connections/route";
 
 type PerConnectionStatus = "idle" | "syncing" | "disconnecting";
@@ -56,10 +53,6 @@ export function ConnectionsPanel({ onChanged, excludeProviders }: ConnectionsPan
   const [connections, setConnections] = useState<ConnectionDto[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Quand un dossier est actif, le badge "Source active" passe sur le panel
-  // au lieu d'être sur les connexions. Permet de basculer en clic.
-  const activeFolderName = useActiveFolderName();
-  const isConnectionActive = !activeFolderName;
   const [perConnection, setPerConnection] = useState<Record<string, PerConnectionStatus>>({});
 
   const refresh = useCallback(async () => {
@@ -105,14 +98,9 @@ export function ConnectionsPanel({ onChanged, excludeProviders }: ConnectionsPan
       if (!res.ok) {
         throw new Error((data as { error?: string }).error ?? `Resync échoué (HTTP ${res.status})`);
       }
-      // Auto-activation : la sync a généré une nouvelle analyse → on la
-      // pose comme source active du dashboard. Sans ça l'utilisateur reste
-      // sur sa source précédente (ex. Excel) sans s'en rendre compte —
-      // c'est le bug remonté par l'utilisateur le 30/04/2026.
-      const analysisId = (data as { analysis?: { analysisId?: string } }).analysis?.analysisId;
-      if (analysisId) {
-        writeActiveAnalysisId(analysisId);
-      }
+      // L'activation comme source active reste MANUELLE via le toggle binaire
+      // de /documents (cf. useActiveDataSource). Une sync ne force plus la
+      // bascule automatique pour respecter le choix explicite de l'utilisateur.
       await refresh();
       if (onChanged) await onChanged();
     } catch (err) {
@@ -282,27 +270,10 @@ export function ConnectionsPanel({ onChanged, excludeProviders }: ConnectionsPan
                     dynamiques. Si un dossier statique est actuellement actif,
                     on propose de basculer dessus. Sinon on signale qu'on est
                     déjà sur la source dynamique (Pennylane / etc). */}
-                {isConnectionActive ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/40 bg-quantis-gold/10 px-3 py-1.5 text-xs font-semibold text-quantis-gold">
-                    <span className="h-1.5 w-1.5 rounded-full bg-quantis-gold" />
-                    Source active du dashboard
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Bascule statique → dynamique : on libère le dossier
-                      // et l'override par-analyse, le résolveur retombe sur
-                      // la priorité auto qui choisit cette connexion.
-                      clearActiveFolderSelection();
-                      clearActiveAnalysisId();
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/75 hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"
-                    title="Utiliser la connexion comme source du dashboard à la place du dossier statique"
-                  >
-                    Définir comme source active
-                  </button>
-                )}
+                {/* L'activation comme source active a été déplacée sur la
+                    card de connexion dédiée (toggle binaire vert/rouge dans
+                    /documents). Ce panel ne gère plus que le statut technique
+                    de la connexion (sync, déconnexion). */}
                 <button
                   type="button"
                   onClick={() => void handleResync(c.id, c.provider)}

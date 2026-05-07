@@ -24,14 +24,12 @@ import { BridgeConnectCard } from "@/components/integrations/BridgeConnectCard";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { DEFAULT_FOLDER_NAME, setActiveFolderName } from "@/lib/folders/activeFolder";
-import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
+import { DEFAULT_FOLDER_NAME } from "@/lib/folders/folderRegistry";
 import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
-import { clearActiveAnalysisId } from "@/lib/source/activeSource";
-import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
 import {
   listUserFolders,
   createUserFolder,
@@ -74,13 +72,14 @@ export function DocumentsView() {
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteFolderConfirm>({ isOpen: false, folderName: "", analysisCount: 0 });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
   // Dossier actif (sources statiques multi-exercices). Réagit aux changements
-  // via le hook réactif — l'utilisateur peut activer un dossier depuis le
-  // bandeau ci-dessous et la sélection se propage immédiatement à Synthèse.
-  const activeFolderName = useActiveFolderName();
-  // Conservé pour le cleanup à la suppression d'une analyse — si l'analyse
-  // supprimée est l'override actif, on clear le pointeur localStorage pour
-  // éviter qu'il pointe sur un fantôme.
-  const explicitActiveId = useActiveAnalysisId();
+  // Source active globale (Firestore via useActiveDataSource). Mise à jour
+  // par les toggles binaires de cette page. `activeFolderName` ici reflète
+  // uniquement la sous-sélection FEC (multi-clients) ; les autres sources
+  // (Pennylane, MyUnisoft, Odoo, Bridge) n'ont pas de notion de folder.
+  const {
+    activeAccountingSource,
+    activeFecFolderName: activeFolderName,
+  } = useActiveDataSource();
 
   useEffect(() => {
     return firebaseAuthGateway.subscribe(setUser);
@@ -194,12 +193,10 @@ export function DocumentsView() {
 
   async function handleDeleteAnalysis(id: string) {
     if (!user) return;
-    // Si on supprime l'analyse marquée comme source active, on vide le pointeur —
-    // sinon le résolveur retomberait dessus indéfiniment côté hook (l'event est
-    // émis mais l'ID disparaît côté DB seulement).
-    if (explicitActiveId === id) {
-      clearActiveAnalysisId();
-    }
+    // La source active étant désormais une "kind" (pennylane/myunisoft/odoo/fec),
+    // pas un id, on n'a pas de pointeur à nettoyer ici. Si l'utilisateur
+    // supprime sa dernière liasse d'une source active, le dashboard affichera
+    // un état vide jusqu'à ce qu'il bascule via le toggle binaire.
     await deleteUserAnalysisById(user.uid, id);
     void loadData();
   }
@@ -276,25 +273,17 @@ export function DocumentsView() {
                 {lastUpdated ? ` · Dernière mise à jour le ${lastUpdated}` : ""}
               </p>
             </div>
-            {filteredAnalyses.length > 0 ? (
-              activeFolderName?.toLowerCase() === activeFolder.toLowerCase() ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-quantis-gold/40 bg-quantis-gold/10 px-3 py-1 text-[11px] font-semibold text-quantis-gold">
-                  <span className="h-1.5 w-1.5 rounded-full bg-quantis-gold" />
-                  Source active du dashboard
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveFolderName(activeFolder);
-                    clearActiveAnalysisId();
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/75 transition-colors hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"
-                >
-                  Définir comme source active
-                </button>
-              )
+            {filteredAnalyses.length > 0 &&
+            activeAccountingSource === "fec" &&
+            (activeFolderName ?? "").toLowerCase() === activeFolder.toLowerCase() ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-quantis-gold/40 bg-quantis-gold/10 px-3 py-1 text-[11px] font-semibold text-quantis-gold">
+                <span className="h-1.5 w-1.5 rounded-full bg-quantis-gold" />
+                Source active
+              </span>
             ) : null}
+            {/* Le toggle d'activation binaire (vert/rouge) est rendu sur la
+                card FEC dédiée (cf. components/integrations/* dans le commit
+                suivant) — pas de bouton dupliqué ici. */}
           </div>
 
           {/* Cards — loader retardé pour éviter le flash <400ms. */}

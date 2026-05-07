@@ -5,7 +5,7 @@
 
 import { useRouter } from "next/navigation";
 import { Database, FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
-import { describeAnalysisSource } from "@/lib/source/activeSource";
+import { describeAnalysisSource } from "@/lib/source/sourceKind";
 import type { AnalysisRecord } from "@/types/analysis";
 
 type ActiveSourceBadgeProps = {

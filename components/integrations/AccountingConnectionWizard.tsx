@@ -4,7 +4,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { writeActiveAnalysisId } from "@/lib/source/activeSource";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -365,21 +364,11 @@ function totalPersisted(data: unknown): number {
   return report?.entities?.reduce((s, e) => s + e.itemsPersisted, 0) ?? 0;
 }
 
-/**
- * Si la réponse du sync contient une analyse fraîchement persistée (champ
- * `analysis.analysisId`), bascule l'analyse active sur celle-ci.
- *
- * Pourquoi ici plutôt que côté serveur : la notion de "source active" est
- * locale au navigateur (localStorage `quantis.activeAnalysis`) — un sync
- * réussi ne doit pas forcer ce changement pour les autres devices de
- * l'utilisateur. C'est uniquement la session courante qui bascule.
- */
-function activateAnalysisFromSync(data: unknown): void {
-  const analysisId = (data as { analysis?: { analysisId?: string } }).analysis?.analysisId;
-  if (analysisId) {
-    writeActiveAnalysisId(analysisId);
-  }
-}
+// L'auto-activation post-sync a été retirée : avec le nouveau modèle
+// "source active" stocké en Firestore, l'activation est explicite via le
+// toggle binaire vert/rouge de /documents (cf. useActiveDataSource).
+// Une sync ne doit plus forcer la bascule pour respecter le choix
+// utilisateur (notamment cross-device).
 
 type ConnectedHandler = (recap: ConnectedRecap) => void;
 
@@ -489,7 +478,7 @@ function PennylaneStep({
       // dashboard. Sans ça l'utilisateur sync mais reste sur sa source précédente
       // (PDF, Excel) sans s'en rendre compte — c'est exactement la friction
       // qu'on cherche à éliminer.
-      activateAnalysisFromSync(sync.data);
+
       onConnected({
         provider: "pennylane",
         connectionId,
@@ -521,7 +510,7 @@ function PennylaneStep({
       // Idem que handleConnect : on bascule la source active sur la nouvelle
       // analyse Pennylane générée par ce resync, pour que le dashboard reflète
       // immédiatement les chiffres frais.
-      activateAnalysisFromSync(sync.data);
+
       onConnected({
         provider: "pennylane",
         connectionId: existing.id,

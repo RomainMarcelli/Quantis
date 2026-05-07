@@ -7,7 +7,7 @@ import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import { buildCompleteKpis, type ManualKpiInput } from "@/lib/kpiBuilder";
 import { calculateQuantisScore } from "@/lib/quantisScore";
-import { DEFAULT_FOLDER_NAME, setActiveFolderName } from "@/lib/folders/activeFolder";
+import { DEFAULT_FOLDER_NAME, registerKnownFolderName } from "@/lib/folders/folderRegistry";
 import { createEmptyMappedFinancialData } from "@/services/mapping/financialDataMapper";
 import { saveAnalysisDraft } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
@@ -198,7 +198,7 @@ export function ManualKpiEntryView() {
 
       await saveAnalysisDraft(draft);
       setLocalAnalysisHint(true);
-      setActiveFolderName(DEFAULT_FOLDER_NAME);
+      registerKnownFolderName(DEFAULT_FOLDER_NAME);
       router.push("/synthese");
     } catch (error) {
       setErrorMessage(

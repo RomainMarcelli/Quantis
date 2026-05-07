@@ -14,8 +14,7 @@ import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { listUserAnalyses } from "@/services/analysisStore";
 import { getUserProfile } from "@/services/userProfileStore";
-import { resolveActiveAnalysis } from "@/lib/source/activeSource";
-import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
@@ -41,7 +40,9 @@ export function FinancialStatementsView() {
   const [companyName, setCompanyName] = useState("Quantis");
   const [greetingName, setGreetingName] = useState("Utilisateur");
 
-  const activeAnalysisId = useActiveAnalysisId();
+  const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
+    analyses,
+  });
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -90,9 +91,25 @@ export function FinancialStatementsView() {
   }
 
   const activeAnalysis = useMemo<AnalysisRecord | null>(() => {
-    if (!analyses.length) return null;
-    return resolveActiveAnalysis(analyses, activeAnalysisId);
-  }, [analyses, activeAnalysisId]);
+    if (!analyses.length || !activeAccountingSource) return null;
+    const matching = analyses.filter((a) => {
+      const provider = a.sourceMetadata?.provider ?? null;
+      if (activeAccountingSource === "fec") {
+        if (provider !== "fec" && provider !== "upload") return false;
+        if (activeFecFolderName) {
+          return (
+            (a.folderName ?? "").trim().toLowerCase() ===
+            activeFecFolderName.toLowerCase()
+          );
+        }
+        return true;
+      }
+      return provider === activeAccountingSource;
+    });
+    return (
+      matching.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))[0] ?? null
+    );
+  }, [analyses, activeAccountingSource, activeFecFolderName]);
 
   const incomeStatement = useMemo(
     () =>

@@ -11,7 +11,7 @@ import { QuantisSelect } from "@/components/ui/QuantisSelect";
 import { useTheme } from "@/hooks/useTheme";
 import { deleteAccountData, updateAccountProfile } from "@/lib/account/account";
 import { clearLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
-import { clearActiveFolderName } from "@/lib/folders/activeFolder";
+import { clearKnownFolderNames } from "@/lib/folders/folderRegistry";
 import {
   COMPANY_SIZE_OPTIONS,
   OTHER_SECTOR_OPTION_VALUE,
@@ -187,7 +187,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
     // Les dossiers visibles dans l'UI dérivent des analyses + du dossier actif local.
     // On purge aussi le dossier actif local pour repartir sur une session propre.
-    clearActiveFolderName();
+    clearKnownFolderNames();
 
     // Les analyses étant supprimées, on retire aussi l'indicateur local utilisé sur /dashboard.
     clearLocalAnalysisHint();
@@ -242,7 +242,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
       });
 
       // Le compte est détruit: on nettoie aussi les traces locales.
-      clearActiveFolderName();
+      clearKnownFolderNames();
       clearLocalAnalysisHint();
       try {
         await firebaseAuthGateway.signOut();
