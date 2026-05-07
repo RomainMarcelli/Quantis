@@ -66,7 +66,7 @@ export function BankingDetailsPanel({
     <section
       className="rounded-2xl p-5"
       style={{
-        backgroundColor: "rgba(15, 15, 18, 0.85)",
+        backgroundColor: "var(--app-card-glass-bg)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
         border: "1px solid rgba(197, 160, 89, 0.25)",
@@ -86,7 +86,7 @@ export function BankingDetailsPanel({
             <CheckCircle2 className="h-4 w-4" />
           </span>
           <div>
-            <p style={{ color: "#FFFFFF", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>
+            <p style={{ color: "var(--app-text-primary)", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>
               Bridge
               {!isActive ? (
                 <span style={{ color: "#FCA5A5", fontWeight: 500, fontSize: 14 }}>
@@ -95,7 +95,7 @@ export function BankingDetailsPanel({
                 </span>
               ) : null}
             </p>
-            <p className="mt-0.5" style={{ color: "#9CA3AF", fontSize: 14 }}>
+            <p className="mt-0.5" style={{ color: "var(--app-text-secondary)", fontSize: 14 }}>
               {accountsCount > 0
                 ? `${accountsCount} compte${accountsCount > 1 ? "s" : ""} synchronisé${accountsCount > 1 ? "s" : ""}${
                     totalBalance !== null ? ` · solde ${formatCurrency(totalBalance)}` : ""
@@ -159,7 +159,7 @@ export function BankingDetailsPanel({
         {showTechnical ? (
           <dl
             className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-[12px] sm:grid-cols-2"
-            style={{ color: "#9CA3AF" }}
+            style={{ color: "var(--app-text-secondary)" }}
           >
             <TechRow label="Connecteur" value="Bridge (Open Banking PSD2)" />
             <TechRow label="Comptes" value={String(accountsCount)} mono />
@@ -223,7 +223,7 @@ function TechRow({ label, value, mono }: { label: string; value: string; mono?: 
   return (
     <>
       <dt style={{ color: "rgba(255, 255, 255, 0.4)" }}>{label}</dt>
-      <dd className={mono ? "font-mono" : ""} style={{ color: "#E5E7EB" }}>
+      <dd className={mono ? "font-mono" : ""} style={{ color: "var(--app-text-primary)" }}>
         {value}
       </dd>
     </>

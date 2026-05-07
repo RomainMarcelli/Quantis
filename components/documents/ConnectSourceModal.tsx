@@ -62,7 +62,7 @@ export function ConnectSourceModal({
       <div
         className="relative w-full max-w-2xl rounded-2xl"
         style={{
-          backgroundColor: "rgba(15, 15, 18, 0.95)",
+          backgroundColor: "var(--app-card-glass-bg)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           border: "1px solid rgba(255, 255, 255, 0.08)",

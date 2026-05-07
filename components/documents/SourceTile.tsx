@@ -63,7 +63,7 @@ export function SourceTile({
         isUnavailable ? "cursor-not-allowed" : "cursor-pointer hover:-translate-y-0.5"
       }`}
       style={{
-        backgroundColor: "rgba(15, 15, 18, 0.85)",
+        backgroundColor: "var(--app-card-glass-bg)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
         border: `1px solid ${borderColor}`,
@@ -90,7 +90,7 @@ export function SourceTile({
         <p
           className="truncate"
           style={{
-            color: isUnavailable ? "#6B7280" : "#FFFFFF",
+            color: isUnavailable ? "var(--app-text-tertiary)" : "var(--app-text-primary)",
             fontSize: 16,
             fontWeight: 600,
             letterSpacing: "-0.01em",
@@ -102,7 +102,7 @@ export function SourceTile({
           <p
             className="mt-0.5 truncate"
             style={{
-              color: isUnavailable ? "#4B5563" : "#9CA3AF",
+              color: isUnavailable ? "var(--app-text-tertiary)" : "var(--app-text-secondary)",
               fontSize: 12,
             }}
           >

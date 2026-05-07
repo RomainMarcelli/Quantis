@@ -65,7 +65,7 @@ export function SourceSwitchConfirmModal({
       <div
         className="relative w-full max-w-md rounded-2xl p-6"
         style={{
-          backgroundColor: "rgba(15, 15, 18, 0.95)",
+          backgroundColor: "var(--app-card-glass-bg)",
           backdropFilter: "blur(24px)",
           WebkitBackdropFilter: "blur(24px)",
           border: "1px solid rgba(255, 255, 255, 0.08)",

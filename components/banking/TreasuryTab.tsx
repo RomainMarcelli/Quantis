@@ -276,7 +276,7 @@ function HeroCard({
     <article
       className="vyzor-fade-up relative overflow-hidden rounded-2xl p-5"
       style={{
-        backgroundColor: "rgba(15, 15, 18, 0.85)",
+        backgroundColor: "var(--app-card-glass-bg)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
         border: "1px solid rgba(197, 160, 89, 0.18)",
