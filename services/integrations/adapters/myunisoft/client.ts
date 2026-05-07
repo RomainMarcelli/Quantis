@@ -7,6 +7,13 @@
 // Doc : https://partners.api.myunisoft.fr/
 
 import type { Connection } from "@/types/connectors";
+import {
+  MOCK_JOURNALS,
+  MOCK_ACCOUNTS,
+  MOCK_ENTRIES,
+  MOCK_BALANCE,
+  shouldUseMyUnisoftMock,
+} from "@/services/integrations/adapters/myunisoft/mock";
 
 const DEFAULT_BASE_URL = "https://api.myunisoft.fr/api/v1";
 const MAX_RETRIES = 4;
@@ -93,11 +100,49 @@ export type MyUnisoftRequestInit = {
   body?: unknown;
 };
 
+/**
+ * Mock router : quand `MYUNISOFT_THIRD_PARTY_SECRET` est absente, on
+ * renvoie des fixtures déterministes (cf. ./mock.ts) plutôt qu'une
+ * vraie requête. Permet le dev local sans credentials.
+ *
+ * Le routing est scopé aux endpoints utilisés par les fetchers réels —
+ * tout endpoint inconnu retombe sur un tableau vide (sécurité par
+ * défaut, jamais d'erreur silencieuse).
+ */
+function getMockResponse<T>(endpoint: string): T {
+  if (endpoint.startsWith("/diary") || endpoint.startsWith("/journal")) {
+    return MOCK_JOURNALS as T;
+  }
+  if (endpoint.startsWith("/account") || endpoint.startsWith("/accounts")) {
+    return MOCK_ACCOUNTS as T;
+  }
+  if (endpoint.startsWith("/entry") || endpoint.startsWith("/entries") || endpoint.startsWith("/mad/entries")) {
+    return MOCK_ENTRIES as T;
+  }
+  if (endpoint.startsWith("/balance") || endpoint.startsWith("/trial-balance")) {
+    return MOCK_BALANCE as T;
+  }
+  if (endpoint.startsWith("/exercice") || endpoint.startsWith("/me")) {
+    // Endpoints de vérification d'auth — renvoie un objet minimal valide.
+    return { ok: true } as T;
+  }
+  return [] as T;
+}
+
 export async function myUnisoftRequest<T>(
   connection: Connection,
   endpoint: string,
   init: MyUnisoftRequestInit = {}
 ): Promise<T> {
+  // Bascule mock — silencieuse en prod (la var est toujours présente),
+  // active en dev sans credentials. Log explicite pour que les devs
+  // remarquent qu'ils tapent sur le mock plutôt que sur l'API réelle.
+  if (shouldUseMyUnisoftMock()) {
+    // eslint-disable-next-line no-console -- monitoring temporaire dev
+    console.info(`[myunisoft/mock] ${init.method ?? "GET"} ${endpoint} (no credentials, using mock)`);
+    return getMockResponse<T>(endpoint);
+  }
+
   const url = new URL(`${getBaseUrl()}${endpoint}`);
   if (init.query) {
     for (const [key, value] of Object.entries(init.query)) {
