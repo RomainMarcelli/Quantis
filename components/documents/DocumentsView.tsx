@@ -102,7 +102,11 @@ export function DocumentsView() {
   const [bridgeBusy, setBridgeBusy] = useState<{ syncing: boolean; disconnecting: boolean }>(
     { syncing: false, disconnecting: false }
   );
-  // Dossier actif (sources statiques multi-exercices). Réagit aux changements
+  // "Changer de source ▾" — quand une source est active, la grille des
+  // 4 autres tuiles est masquée par défaut. L'utilisateur peut la
+  // déplier explicitement via ce toggle.
+  const [accountingSwitcherOpen, setAccountingSwitcherOpen] = useState(false);
+
   // Source active globale (Firestore via useActiveDataSource). Mise à jour
   // par les toggles binaires de cette page. `activeFolderName` ici reflète
   // uniquement la sous-sélection FEC (multi-clients) ; les autres sources
@@ -114,6 +118,13 @@ export function DocumentsView() {
     setActiveAccountingSource,
     setActiveBankingSource,
   } = useActiveDataSource();
+
+  // Auto-collapse du switcher dès que la source active change
+  // (l'utilisateur a basculé sur une nouvelle source → on cache la grille
+  // immédiatement, le panneau de détails se met à jour à sa place).
+  useEffect(() => {
+    setAccountingSwitcherOpen(false);
+  }, [activeAccountingSource]);
 
   useEffect(() => {
     return firebaseAuthGateway.subscribe(setUser);
@@ -472,73 +483,62 @@ export function DocumentsView() {
             d'onboarding entre Source comptable, Source bancaire (phase 2)
             et Dossiers & fichiers (phase 3 conditionnelle FEC). */}
         <div className="space-y-8">
-          {/* ─── BLOC 1 — Source comptable ──────────────────────────── */}
+          {/* ─── BLOC 1 — Source comptable ────────────────────────────
+              2 modes :
+              - Pas de source active → grille pleine vue (5 tuiles).
+              - Source active → panneau de détails uniquement. La grille
+                des 4 autres sources est dépliable via le bouton "Changer
+                de source ▾" du panneau (cf. AccountingDetailsPanel). */}
           <SourceBlock
             title="Source comptable"
-            subtitle="Choisissez votre source de données comptables. Une seule peut être active à la fois."
+            subtitle={
+              activeAccountingSource
+                ? undefined
+                : "Choisissez votre source de données comptables. Une seule peut être active à la fois."
+            }
           >
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-              <SourceTile
-                name="Pennylane"
-                subtitle="Connexion automatique"
-                logo={<TileLogo src="/images/integrations/pennylane.png" alt="Pennylane" />}
-                state={tileStateForAccounting("pennylane")}
-                onClick={() => handleAccountingTileClick("pennylane")}
+            {!activeAccountingSource ? (
+              <AccountingTilesGrid
+                excludeSource={null}
+                tileStateFor={tileStateForAccounting}
+                onTileClick={handleAccountingTileClick}
               />
-              <SourceTile
-                name="MyUnisoft"
-                subtitle="Connexion automatique"
-                logo={<TileLogo src="/images/integrations/myunisoft.png" alt="MyUnisoft" />}
-                state={tileStateForAccounting("myunisoft")}
-                onClick={() => handleAccountingTileClick("myunisoft")}
-              />
-              <SourceTile
-                name="Odoo"
-                subtitle="API key + URL"
-                logo={<TileLogo src="/images/integrations/odoo.svg" alt="Odoo" />}
-                state={tileStateForAccounting("odoo")}
-                onClick={() => handleAccountingTileClick("odoo")}
-              />
-              <SourceTile
-                name="Tiime"
-                subtitle="Bientôt disponible"
-                logo={<TileLogo src="/images/integrations/tiime.svg" alt="Tiime" />}
-                state="unavailable"
-                onClick={() => undefined}
-              />
-              <SourceTile
-                name="Documents"
-                subtitle="Upload Excel / FEC"
-                logo={<FileText className="h-5 w-5 text-quantis-gold" />}
-                state={tileStateForAccounting("fec")}
-                onClick={() => handleAccountingTileClick("fec")}
-              />
-            </div>
-
-            {/* Panneau détails si une source comptable est active. */}
-            {activeAccountingSource ? (
-              <AccountingDetailsPanel
-                source={activeAccountingSource}
-                connection={activeAccountingConnection()}
-                fecFolderName={activeFolderName}
-                fecAnalysisCount={
-                  activeAccountingSource === "fec"
-                    ? analyses.filter((a) => {
-                        const provider = a.sourceMetadata?.provider ?? null;
-                        if (provider !== "fec" && provider !== "upload") return false;
-                        if (!activeFolderName) return true;
-                        return (a.folderName ?? "").trim().toLowerCase() ===
-                          activeFolderName.toLowerCase();
-                      }).length
-                    : 0
-                }
-                onSync={handleAccountingSync}
-                onDeactivate={() => setActiveAccountingSource(null)}
-                onDisconnect={handleAccountingDisconnect}
-                syncing={actionBusy.syncing}
-                disconnecting={actionBusy.disconnecting}
-              />
-            ) : null}
+            ) : (
+              <>
+                <AccountingDetailsPanel
+                  source={activeAccountingSource}
+                  connection={activeAccountingConnection()}
+                  fecFolderName={activeFolderName}
+                  fecAnalysisCount={
+                    activeAccountingSource === "fec"
+                      ? analyses.filter((a) => {
+                          const provider = a.sourceMetadata?.provider ?? null;
+                          if (provider !== "fec" && provider !== "upload") return false;
+                          if (!activeFolderName) return true;
+                          return (a.folderName ?? "").trim().toLowerCase() ===
+                            activeFolderName.toLowerCase();
+                        }).length
+                      : 0
+                  }
+                  onSync={handleAccountingSync}
+                  onDeactivate={() => setActiveAccountingSource(null)}
+                  onDisconnect={handleAccountingDisconnect}
+                  syncing={actionBusy.syncing}
+                  disconnecting={actionBusy.disconnecting}
+                  switcherOpen={accountingSwitcherOpen}
+                  onToggleSwitcher={() => setAccountingSwitcherOpen((v) => !v)}
+                />
+                {accountingSwitcherOpen ? (
+                  <div className="vyzor-section-reveal">
+                    <AccountingTilesGrid
+                      excludeSource={activeAccountingSource}
+                      tileStateFor={tileStateForAccounting}
+                      onTileClick={handleAccountingTileClick}
+                    />
+                  </div>
+                ) : null}
+              </>
+            )}
           </SourceBlock>
 
           {/* ─── BLOC 2 — Source bancaire (phase 2 onboarding) ──────────
@@ -741,6 +741,96 @@ function SourceBlock({
       </header>
       <div className="space-y-3">{children}</div>
     </section>
+  );
+}
+
+/**
+ * Grille des tuiles de source comptable — réutilisée à 2 endroits :
+ *   - état "rien d'actif" (5 tuiles complètes)
+ *   - dépliage "Changer de source" (4 tuiles, source active exclue)
+ *
+ * Définit la liste canonique des sources et délègue le rendu au parent
+ * via `tileStateFor` + `onTileClick`. Garde un seul endroit qui sait que
+ * "Pennylane" est une tuile, "Tiime" est unavailable, etc.
+ */
+function AccountingTilesGrid({
+  excludeSource,
+  tileStateFor,
+  onTileClick,
+}: {
+  /** Si fourni, cette source n'apparaît pas dans la grille (mode switcher). */
+  excludeSource: AccountingSource | null;
+  tileStateFor: (target: AccountingSource) => SourceTileState;
+  onTileClick: (target: AccountingSource) => void;
+}) {
+  const tiles: Array<{
+    source: AccountingSource | "tiime";
+    name: string;
+    subtitle: string;
+    logo: React.ReactNode;
+    available: boolean;
+  }> = [
+    {
+      source: "pennylane",
+      name: "Pennylane",
+      subtitle: "Connexion automatique",
+      logo: <TileLogo src="/images/integrations/pennylane.png" alt="Pennylane" />,
+      available: true,
+    },
+    {
+      source: "myunisoft",
+      name: "MyUnisoft",
+      subtitle: "Connexion automatique",
+      logo: <TileLogo src="/images/integrations/myunisoft.png" alt="MyUnisoft" />,
+      available: true,
+    },
+    {
+      source: "odoo",
+      name: "Odoo",
+      subtitle: "API key + URL",
+      logo: <TileLogo src="/images/integrations/odoo.svg" alt="Odoo" />,
+      available: true,
+    },
+    {
+      source: "tiime",
+      name: "Tiime",
+      subtitle: "Bientôt disponible",
+      logo: <TileLogo src="/images/integrations/tiime.svg" alt="Tiime" />,
+      available: false,
+    },
+    {
+      source: "fec",
+      name: "Documents",
+      subtitle: "Upload Excel / FEC",
+      logo: <FileText className="h-5 w-5 text-quantis-gold" />,
+      available: true,
+    },
+  ];
+
+  // On garde Tiime visible aussi en mode switcher (l'utilisateur doit voir
+  // les options à venir), on exclut uniquement la source active courante.
+  const visible = tiles.filter((t) => t.source !== excludeSource);
+
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+      {visible.map((tile) => (
+        <SourceTile
+          key={tile.source}
+          name={tile.name}
+          subtitle={tile.subtitle}
+          logo={tile.logo}
+          state={
+            tile.available && tile.source !== "tiime"
+              ? tileStateFor(tile.source as AccountingSource)
+              : "unavailable"
+          }
+          onClick={() => {
+            if (!tile.available || tile.source === "tiime") return;
+            onTileClick(tile.source as AccountingSource);
+          }}
+        />
+      ))}
+    </div>
   );
 }
 

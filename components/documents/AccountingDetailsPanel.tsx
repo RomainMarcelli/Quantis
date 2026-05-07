@@ -39,6 +39,13 @@ type AccountingDetailsPanelProps = {
   onDisconnect: () => void | Promise<void>;
   syncing?: boolean;
   disconnecting?: boolean;
+  /**
+   * State du switcher "Changer de source" — la grille des autres sources
+   * est rendue par le parent (DocumentsView) en dessous du panneau, mais
+   * le bouton de toggle vit ici pour rester dans le flux des actions.
+   */
+  switcherOpen?: boolean;
+  onToggleSwitcher?: () => void;
 };
 
 const SOURCE_LABELS: Record<AccountingSource, string> = {
@@ -58,6 +65,8 @@ export function AccountingDetailsPanel({
   onDisconnect,
   syncing = false,
   disconnecting = false,
+  switcherOpen = false,
+  onToggleSwitcher,
 }: AccountingDetailsPanelProps) {
   const [showTechnical, setShowTechnical] = useState(false);
   const isFec = source === "fec";
@@ -143,6 +152,39 @@ export function AccountingDetailsPanel({
           </ActionButton>
         ) : null}
       </div>
+
+      {/* Bouton-lien "Changer de source ▾" — discret, aligné à droite,
+          au-dessus de la section "Détails techniques". Le rendu de la
+          grille dépliée est géré par le parent (DocumentsView). */}
+      {onToggleSwitcher ? (
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={onToggleSwitcher}
+            aria-expanded={switcherOpen}
+            className="inline-flex items-center gap-1 rounded text-[14px] transition-colors"
+            style={{
+              color: "rgba(255, 255, 255, 0.55)",
+              background: "transparent",
+              border: "none",
+              padding: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "rgba(255, 255, 255, 0.95)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "rgba(255, 255, 255, 0.55)";
+            }}
+          >
+            {switcherOpen ? "Masquer" : "Changer de source"}
+            {switcherOpen ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
+      ) : null}
 
       {/* Détails techniques repliables — sources dynamiques uniquement
           (FEC n'a pas de token / company ID) */}
