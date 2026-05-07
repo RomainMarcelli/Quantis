@@ -149,5 +149,14 @@ service cloud.firestore {
         && request.resource.data.externalId is string;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
+
+    // Journal d'audit des appels API tierces (MyUnisoft, Pennylane, Bridge,
+    // Odoo, FEC). Écriture EXCLUSIVEMENT côté serveur via Admin SDK
+    // (cf. lib/server/integrationAudit.ts). Aucune écriture client autorisée.
+    // Les ops peuvent lire pour débugger des cas utilisateur sans accès au
+    // compte ; les utilisateurs n'ont pas accès à cette collection.
+    match /integration_api_audit/{eventId} {
+      allow read, write: if false;
+    }
   }
 }

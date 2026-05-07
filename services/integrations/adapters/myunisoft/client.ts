@@ -134,12 +134,14 @@ export async function myUnisoftRequest<T>(
   endpoint: string,
   init: MyUnisoftRequestInit = {}
 ): Promise<T> {
+  const method = init.method ?? "GET";
+
   // Bascule mock — silencieuse en prod (la var est toujours présente),
   // active en dev sans credentials. Log explicite pour que les devs
   // remarquent qu'ils tapent sur le mock plutôt que sur l'API réelle.
   if (shouldUseMyUnisoftMock()) {
     // eslint-disable-next-line no-console -- monitoring temporaire dev
-    console.info(`[myunisoft/mock] ${init.method ?? "GET"} ${endpoint} (no credentials, using mock)`);
+    console.info(`[myunisoft/mock] ${method} ${endpoint} (no credentials, using mock)`);
     return getMockResponse<T>(endpoint);
   }
 
@@ -153,13 +155,78 @@ export async function myUnisoftRequest<T>(
   }
 
   const requestInit: RequestInit = {
-    method: init.method ?? "GET",
+    method,
     headers: buildHeaders(connection),
     body: init.body ? JSON.stringify(init.body) : undefined,
   };
 
-  const response = await fetchWithRetry(url.toString(), requestInit, endpoint);
+  // Audit Firestore : on chronomètre + on persiste un événement
+  // (succès OU échec) dans `integration_api_audit`. Permet de débugger
+  // les problèmes des bêta-testeurs sans accès à leur compte.
+  // Importé dynamiquement pour éviter de bundler firebase-admin côté
+  // client (il n'est jamais appelé hors serveur en pratique, mais c'est
+  // une protection supplémentaire).
+  const start = Date.now();
+  let response: Response;
+  let auditPromise: Promise<void> | null = null;
+
+  try {
+    response = await fetchWithRetry(url.toString(), requestInit, endpoint);
+  } catch (networkError) {
+    // Erreur réseau / timeout — pas de status HTTP. On logue avec -1.
+    if (typeof window === "undefined") {
+      const message = networkError instanceof Error ? networkError.message : String(networkError);
+      auditPromise = (async () => {
+        try {
+          const { safeLogIntegrationApiCall } = await import("@/lib/server/integrationAudit");
+          await safeLogIntegrationApiCall({
+            provider: "myunisoft",
+            endpoint,
+            method,
+            status: -1,
+            durationMs: Date.now() - start,
+            userId: connection.userId ?? null,
+            ok: false,
+            errorMessage: message,
+          });
+        } catch {
+          /* swallow */
+        }
+      })();
+    }
+    if (auditPromise) await auditPromise;
+    throw networkError;
+  }
+
   const text = await response.text();
+  const durationMs = Date.now() - start;
+
+  // Log côté serveur uniquement (Admin SDK indispo client).
+  if (typeof window === "undefined") {
+    auditPromise = (async () => {
+      try {
+        const { safeLogIntegrationApiCall } = await import("@/lib/server/integrationAudit");
+        await safeLogIntegrationApiCall({
+          provider: "myunisoft",
+          endpoint,
+          method,
+          status: response.status,
+          durationMs,
+          userId: connection.userId ?? null,
+          ok: response.ok,
+          errorMessage: response.ok ? null : text.slice(0, 400),
+        });
+      } catch {
+        /* swallow — never break the business call */
+      }
+    })();
+  }
+
+  // On ne `await` PAS le log avant de retourner pour ne pas pénaliser la
+  // latence de l'API métier. Le log finit en background.
+  if (auditPromise) {
+    void auditPromise;
+  }
 
   if (!response.ok) {
     throw new MyUnisoftApiError(response.status, endpoint, text);
