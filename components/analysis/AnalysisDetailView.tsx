@@ -73,6 +73,7 @@ import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporali
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
 import { SourceBadge } from "@/components/analysis/SourceBadge";
 import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import {
@@ -529,24 +530,13 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
       // Pas d'analyse ciblée par l'URL : on utilise la source active globale
       // (Firestore via useActiveDataSource) pour choisir la liasse à afficher.
+      // Le helper `resolveCurrentAnalysisForSource` est testé unitairement.
       if (!selected && activeAccountingSource) {
-        const matching = history.filter((item) => {
-          const provider = item.sourceMetadata?.provider ?? null;
-          if (activeAccountingSource === "fec") {
-            if (provider !== "fec" && provider !== "upload") return false;
-            if (activeFecFolderName) {
-              return (
-                (item.folderName ?? "").trim().toLowerCase() ===
-                activeFecFolderName.toLowerCase()
-              );
-            }
-            return true;
-          }
-          return provider === activeAccountingSource;
-        });
-        selected = matching.sort((a, b) =>
-          (b.createdAt ?? "").localeCompare(a.createdAt ?? "")
-        )[0] ?? null;
+        selected = resolveCurrentAnalysisForSource(
+          history,
+          activeAccountingSource,
+          activeFecFolderName
+        );
       }
 
       selected = selected ?? history[0];

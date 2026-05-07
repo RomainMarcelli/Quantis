@@ -15,6 +15,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { listUserAnalyses } from "@/services/analysisStore";
 import { getUserProfile } from "@/services/userProfileStore";
 import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
@@ -91,23 +92,10 @@ export function FinancialStatementsView() {
   }
 
   const activeAnalysis = useMemo<AnalysisRecord | null>(() => {
-    if (!analyses.length || !activeAccountingSource) return null;
-    const matching = analyses.filter((a) => {
-      const provider = a.sourceMetadata?.provider ?? null;
-      if (activeAccountingSource === "fec") {
-        if (provider !== "fec" && provider !== "upload") return false;
-        if (activeFecFolderName) {
-          return (
-            (a.folderName ?? "").trim().toLowerCase() ===
-            activeFecFolderName.toLowerCase()
-          );
-        }
-        return true;
-      }
-      return provider === activeAccountingSource;
-    });
-    return (
-      matching.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))[0] ?? null
+    return resolveCurrentAnalysisForSource(
+      analyses,
+      activeAccountingSource,
+      activeFecFolderName
     );
   }, [analyses, activeAccountingSource, activeFecFolderName]);
 

@@ -23,6 +23,7 @@ import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashb
 import { useUserDashboards } from "@/hooks/useUserDashboards";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import {
@@ -161,32 +162,16 @@ export function SyntheseView() {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
 
-    // Filtre par source comptable active. Pour FEC, on tient compte du
-    // sous-folder si défini (gestion du cas multi-clients d'un cabinet).
-    const matchingForSource = analysesBySelectedYear.filter((a) => {
-      const provider = a.sourceMetadata?.provider ?? null;
-      if (activeAccountingSource === "fec") {
-        if (provider !== "fec" && provider !== "upload") return false;
-        if (activeFecFolderName) {
-          return (
-            (a.folderName ?? "").trim().toLowerCase() ===
-            activeFecFolderName.toLowerCase()
-          );
-        }
-        return true;
-      }
-      return provider === activeAccountingSource;
-    });
+    // Filtre par source comptable active (helper pur, testé unitairement).
+    const current = resolveCurrentAnalysisForSource(
+      analysesBySelectedYear,
+      activeAccountingSource,
+      activeFecFolderName
+    );
 
-    if (!matchingForSource.length) {
+    if (!current) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
-
-    // À priorité égale (toutes de la même source), on prend la plus récente
-    // par createdAt — le year selector contrôle déjà le filtre annuel.
-    const current = [...matchingForSource].sort((a, b) =>
-      (b.createdAt ?? "").localeCompare(a.createdAt ?? "")
-    )[0]!;
 
     const previous = findPreviousAnalysisByFiscalYear({
       analyses: allAnalyses,
