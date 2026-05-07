@@ -89,7 +89,7 @@ export function BankingDetailsPanel({
             <p style={{ color: "var(--app-text-primary)", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>
               Bridge
               {!isActive ? (
-                <span style={{ color: "#FCA5A5", fontWeight: 500, fontSize: 14 }}>
+                <span style={{ color: "var(--app-danger-soft)", fontWeight: 500, fontSize: 14 }}>
                   {" · "}
                   Désactivée
                 </span>
@@ -151,7 +151,7 @@ export function BankingDetailsPanel({
           type="button"
           onClick={() => setShowTechnical((v) => !v)}
           className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider transition-colors"
-          style={{ color: "rgba(255, 255, 255, 0.45)" }}
+          style={{ color: "var(--app-text-secondary)" }}
         >
           {showTechnical ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           Détails techniques
@@ -196,12 +196,12 @@ function ActionButton({ icon: Icon, spinning, onClick, disabled, tone, children 
       border: "1px solid rgba(197, 160, 89, 0.4)",
     },
     neutral: {
-      color: "rgba(255, 255, 255, 0.85)",
+      color: "var(--app-text-primary)",
       backgroundColor: "rgba(255, 255, 255, 0.05)",
       border: "1px solid rgba(255, 255, 255, 0.1)",
     },
     danger: {
-      color: "#FCA5A5",
+      color: "var(--app-danger-soft)",
       backgroundColor: "rgba(239, 68, 68, 0.08)",
       border: "1px solid rgba(239, 68, 68, 0.25)",
     },
@@ -222,7 +222,7 @@ function ActionButton({ icon: Icon, spinning, onClick, disabled, tone, children 
 function TechRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <>
-      <dt style={{ color: "rgba(255, 255, 255, 0.4)" }}>{label}</dt>
+      <dt style={{ color: "var(--app-text-tertiary)" }}>{label}</dt>
       <dd className={mono ? "font-mono" : ""} style={{ color: "var(--app-text-primary)" }}>
         {value}
       </dd>
