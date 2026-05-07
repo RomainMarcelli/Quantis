@@ -467,8 +467,11 @@ export function DocumentsView() {
       <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
         <AppSidebar activeRoute="documents" accountFirstName={greetingName} />
 
-        {/* ===== ZONE CONTENU ===== */}
-        <div className="space-y-6">
+        {/* ===== ZONE CONTENU =====
+            space-y-8 (32 px) pour bien marquer la séparation des phases
+            d'onboarding entre Source comptable, Source bancaire (phase 2)
+            et Dossiers & fichiers (phase 3 conditionnelle FEC). */}
+        <div className="space-y-8">
           {/* ─── BLOC 1 — Source comptable ──────────────────────────── */}
           <SourceBlock
             title="Source comptable"
@@ -538,32 +541,63 @@ export function DocumentsView() {
             ) : null}
           </SourceBlock>
 
-          {/* ─── BLOC 2 — Source bancaire ───────────────────────────── */}
-          <SourceBlock
-            title="Source bancaire"
-            subtitle="Indépendante de la source comptable. Bridge agrège vos comptes bancaires en temps réel via Open Banking PSD2."
-          >
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-              <SourceTile
-                name="Bridge"
-                subtitle="Open Banking PSD2"
-                logo={<TileLogo src="/images/integrations/bridge.svg" alt="Bridge" fallback="🏦" />}
-                state={tileStateForBanking()}
-                onClick={handleBankingTileClick}
-              />
-            </div>
+          {/* ─── BLOC 2 — Source bancaire (phase 2 onboarding) ──────────
+              Visible UNIQUEMENT si une source comptable est active. Au
+              premier lancement, on n'affiche rien pour réduire le bruit
+              visuel. Le bloc apparaît avec une animation 200 ms quand
+              l'utilisateur active sa première source comptable, et
+              disparaît du DOM quand il la désactive (la connexion Bridge
+              persiste néanmoins en Firestore — toggle ≠ disconnect). */}
+          {activeAccountingSource !== null ? (
+            <SourceBlock
+              key="banking-block"
+              revealOnMount
+              title={
+                bridgeStatus.status?.connected ? (
+                  "Source bancaire"
+                ) : (
+                  <>
+                    Source bancaire{" "}
+                    <span
+                      style={{
+                        color: "rgba(255, 255, 255, 0.3)",
+                        fontWeight: 500,
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      (optionnelle)
+                    </span>
+                  </>
+                )
+              }
+              subtitle={
+                bridgeStatus.status?.connected
+                  ? "Indépendante de la source comptable. Bridge agrège vos comptes bancaires en temps réel via Open Banking PSD2."
+                  : "Connectez vos comptes bancaires pour enrichir vos analyses avec les flux en temps réel."
+              }
+            >
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+                <SourceTile
+                  name="Bridge"
+                  subtitle="Open Banking PSD2"
+                  logo={<TileLogo src="/images/integrations/bridge.svg" alt="Bridge" fallback="🏦" />}
+                  state={tileStateForBanking()}
+                  onClick={handleBankingTileClick}
+                />
+              </div>
 
-            {activeBankingSource === "bridge" ? (
-              <BankingDetailsPanel
-                status={bridgeStatus.status ?? null}
-                onSync={handleBridgeSync}
-                onDeactivate={() => setActiveBankingSource(null)}
-                onDisconnect={handleBridgeDisconnect}
-                syncing={bridgeBusy.syncing}
-                disconnecting={bridgeBusy.disconnecting}
-              />
-            ) : null}
-          </SourceBlock>
+              {activeBankingSource === "bridge" ? (
+                <BankingDetailsPanel
+                  status={bridgeStatus.status ?? null}
+                  onSync={handleBridgeSync}
+                  onDeactivate={() => setActiveBankingSource(null)}
+                  onDisconnect={handleBridgeDisconnect}
+                  syncing={bridgeBusy.syncing}
+                  disconnecting={bridgeBusy.disconnecting}
+                />
+              ) : null}
+            </SourceBlock>
+          ) : null}
 
           {/* ─── BLOC 3 conditionnel — Dossiers & fichiers (FEC) ────── */}
           {activeAccountingSource === "fec" ? (
@@ -666,18 +700,27 @@ export function DocumentsView() {
  * Bandeau d'un bloc (titre uppercase + sous-titre + contenu).
  * Pose la hiérarchie typo demandée par la spec : titre en uppercase petit
  * text-tertiary, contenu en dessous.
+ *
+ * `title` accepte un ReactNode pour permettre au caller de styler une
+ * portion différemment (ex. "(optionnelle)" en text-tertiary).
+ *
+ * `revealOnMount` déclenche une animation fade-in + slide-down ~200 ms
+ * — utilisée pour la phase 2 d'onboarding (apparition du bloc bancaire
+ * quand une source comptable devient active).
  */
 function SourceBlock({
   title,
   subtitle,
   children,
+  revealOnMount = false,
 }: {
-  title: string;
+  title: React.ReactNode;
   subtitle?: string;
   children: React.ReactNode;
+  revealOnMount?: boolean;
 }) {
   return (
-    <section className="space-y-3">
+    <section className={`space-y-3 ${revealOnMount ? "vyzor-section-reveal" : ""}`}>
       <header className="px-1">
         <p
           style={{
