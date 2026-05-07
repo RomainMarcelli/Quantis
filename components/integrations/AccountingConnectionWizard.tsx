@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
 
-type ProviderId = "pennylane" | "myunisoft" | "odoo" | "tiime" | "other";
+export type ProviderId = "pennylane" | "myunisoft" | "odoo" | "tiime" | "other";
 
 type ProviderCard = {
   id: ProviderId;
@@ -58,10 +58,19 @@ type ConnectedRecap = {
 type WizardProps = {
   /** Appelé après une synchro réussie pour rafraîchir le parent (analyses, panneau de connections, etc.). */
   onSyncCompleted?: () => void | Promise<void>;
+  /**
+   * Provider à pré-sélectionner. Court-circuite l'écran "choisir un
+   * logiciel" — utilisé quand le wizard est ouvert depuis une tuile
+   * spécifique de la grille /documents.
+   */
+  initialProvider?: ProviderId | null;
 };
 
-export function AccountingConnectionWizard({ onSyncCompleted }: WizardProps) {
-  const [chosen, setChosen] = useState<ProviderId | null>(null);
+export function AccountingConnectionWizard({
+  onSyncCompleted,
+  initialProvider = null,
+}: WizardProps) {
+  const [chosen, setChosen] = useState<ProviderId | null>(initialProvider);
   const [recap, setRecap] = useState<ConnectedRecap | null>(null);
 
   function reset() {
