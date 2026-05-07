@@ -22,7 +22,8 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashboardModal";
 import { useUserDashboards } from "@/hooks/useUserDashboards";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
-import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import {
@@ -49,8 +50,6 @@ import { useTemporality } from "@/lib/temporality/temporalityContext";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
-import { resolveActiveAnalysis } from "@/lib/source/activeSource";
-import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
 import { SimulationToggleButton } from "@/components/simulation/SimulationWidget";
 import {
@@ -150,42 +149,26 @@ export function SyntheseView() {
     [currentCalendarYear, selectedYearValue, yearOptions]
   );
 
-  // Source active : si l'utilisateur a explicitement choisi une analyse via
-  // Documents → "Utiliser comme source active" (localStorage `quantis.activeAnalysis`),
-  // on la prend en priorité absolue. Sinon fallback : connexion dynamique > FEC > upload,
-  // la plus récente à priorité égale. Implémenté dans `resolveActiveAnalysis`.
-  const activeAnalysisId = useActiveAnalysisId();
-  // Dossier actif (sources statiques multi-exercices). Réactif → un changement
-  // dans Documents propage immédiatement la nouvelle source ici.
-  const activeFolderName = useActiveFolderName();
+  // Source active : lue depuis Firestore via le hook unifié.
+  // Si l'utilisateur n'a rien sélectionné (toggle binaire vert/rouge dans
+  // /documents), `activeAccountingSource` est null → on n'affiche pas de
+  // dashboard, on guide l'utilisateur à choisir.
+  const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
+    analyses: allAnalyses,
+  });
 
   const analysisPair = useMemo(() => {
-    if (!analysesBySelectedYear.length) {
+    if (!analysesBySelectedYear.length || !activeAccountingSource) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
 
-    // Priorité 1 : `activeAnalysisId` explicitement défini ET présent dans la
-    //              sélection courante → l'analyse spécifique gagne (override
-    //              utilisé pour connexion dynamique épinglée par exemple).
-    //              Si l'ID est null OU absent du filtre annuel, on saute.
-    // Priorité 2 : `activeFolderName` défini → la liasse de l'année courante
-    //              dans ce dossier gagne sur la priorité automatique. C'est
-    //              ce qui permet à un dossier statique d'écraser la connexion
-    //              Pennylane (qui sinon gagnerait par sa priorité métier).
-    // Priorité 3 : aucune source explicite → règle automatique
-    //              (dynamique > FEC > upload, plus récent en cas d'égalité).
-    let current: AnalysisRecord | null = null;
-    if (activeAnalysisId) {
-      current = analysesBySelectedYear.find((a) => a.id === activeAnalysisId) ?? null;
-    }
-    if (!current && activeFolderName) {
-      current = resolveCurrentAnalysis(analysesBySelectedYear, activeFolderName);
-    }
-    if (!current) {
-      // Pas de source explicite : on retombe sur le résolveur automatique
-      // (resolveActiveAnalysis avec id null applique la priorité métier).
-      current = resolveActiveAnalysis(analysesBySelectedYear, null);
-    }
+    // Filtre par source comptable active (helper pur, testé unitairement).
+    const current = resolveCurrentAnalysisForSource(
+      analysesBySelectedYear,
+      activeAccountingSource,
+      activeFecFolderName
+    );
+
     if (!current) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
@@ -197,7 +180,7 @@ export function SyntheseView() {
     });
 
     return { current, previous };
-  }, [allAnalyses, analysesBySelectedYear, activeAnalysisId, activeFolderName]);
+  }, [allAnalyses, analysesBySelectedYear, activeAccountingSource, activeFecFolderName]);
 
   // Filtre temporel global. Si l'analyse a un dailyAccounting (source dynamique Pennylane),
   // les KPI flow (CA, VA, EBITDA…) sont recalculés sur la période sélectionnée. Les KPI bilan
@@ -244,24 +227,41 @@ export function SyntheseView() {
     }
   }, [yearOptions, selectedYearValue]);
 
-  // Sync ponctuel de l'année lors d'un CHANGEMENT d'analyse active.
+  // Sync ponctuel du year selector lors d'un CHANGEMENT de source active.
   //
-  // L'utilisateur a cliqué "Utiliser comme source" sur une liasse — on sync
-  // l'année à celle de la liasse cliquée pour qu'elle soit immédiatement
-  // visible. Mais on ne re-sync PAS perpétuellement : si l'utilisateur change
-  // ensuite l'année à la main pour explorer une autre liasse du même dossier,
-  // on respecte ce choix (sinon le sélecteur d'année serait inutile pour les
-  // sources statiques multi-exercices). On utilise un ref pour ne déclencher
-  // l'effet qu'à la TRANSITION de la valeur, pas à chaque render.
-  const previousActiveAnalysisIdRef = useRef<string | null>(null);
+  // Quand l'utilisateur bascule via le toggle binaire vert/rouge dans
+  // /documents (ex. Pennylane → FEC), on aligne le year selector sur le
+  // dernier exercice disponible dans la nouvelle source. Sinon le sélecteur
+  // resterait sur une année inexistante dans la nouvelle source.
+  // Ref pour ne déclencher qu'à la TRANSITION de la valeur, pas à chaque render.
+  const previousAccountingSourceRef = useRef<typeof activeAccountingSource>(null);
+  const previousFecFolderRef = useRef<string | null>(null);
   useEffect(() => {
-    if (activeAnalysisId === previousActiveAnalysisIdRef.current) return;
-    previousActiveAnalysisIdRef.current = activeAnalysisId;
-    if (!activeAnalysisId) return;
-    const target = allAnalyses.find((a) => a.id === activeAnalysisId);
-    if (!target) return;
-    setSelectedYearValue(String(resolveAnalysisYear(target)));
-  }, [activeAnalysisId, allAnalyses]);
+    const transitioned =
+      activeAccountingSource !== previousAccountingSourceRef.current ||
+      activeFecFolderName !== previousFecFolderRef.current;
+    previousAccountingSourceRef.current = activeAccountingSource;
+    previousFecFolderRef.current = activeFecFolderName;
+    if (!transitioned || !activeAccountingSource) return;
+    const matching = allAnalyses.filter((a) => {
+      const provider = a.sourceMetadata?.provider ?? null;
+      if (activeAccountingSource === "fec") {
+        if (provider !== "fec" && provider !== "upload") return false;
+        if (activeFecFolderName) {
+          return (
+            (a.folderName ?? "").trim().toLowerCase() ===
+            activeFecFolderName.toLowerCase()
+          );
+        }
+        return true;
+      }
+      return provider === activeAccountingSource;
+    });
+    if (!matching.length) return;
+    const latest = sortAnalysesByFiscalYear(matching, "desc")[0];
+    if (!latest) return;
+    setSelectedYearValue(String(resolveAnalysisYear(latest)));
+  }, [activeAccountingSource, activeFecFolderName, allAnalyses]);
 
   useEffect(() => {
     if (!pendingSearchTarget) {
@@ -471,25 +471,6 @@ export function SyntheseView() {
         </div>
       </div>
     </section>
-  );
-}
-
-// Sélectionne l'analyse courante en priorisant le dossier actif.
-function resolveCurrentAnalysis(
-  analyses: AnalysisRecord[],
-  activeFolderName: string | null
-): AnalysisRecord | null {
-  const sorted = sortAnalysesByFiscalYear(analyses, "desc");
-  if (!sorted.length) {
-    return null;
-  }
-
-  const normalizedActiveFolder = normalizeAnalysisFolderName(activeFolderName);
-
-  return (
-    sorted.find(
-      (analysis) => normalizeAnalysisFolderName(analysis.folderName) === normalizedActiveFolder
-    ) ?? sorted[0]
   );
 }
 

@@ -14,8 +14,8 @@ import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { listUserAnalyses } from "@/services/analysisStore";
 import { getUserProfile } from "@/services/userProfileStore";
-import { resolveActiveAnalysis } from "@/lib/source/activeSource";
-import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
@@ -41,7 +41,9 @@ export function FinancialStatementsView() {
   const [companyName, setCompanyName] = useState("Quantis");
   const [greetingName, setGreetingName] = useState("Utilisateur");
 
-  const activeAnalysisId = useActiveAnalysisId();
+  const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
+    analyses,
+  });
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -90,9 +92,12 @@ export function FinancialStatementsView() {
   }
 
   const activeAnalysis = useMemo<AnalysisRecord | null>(() => {
-    if (!analyses.length) return null;
-    return resolveActiveAnalysis(analyses, activeAnalysisId);
-  }, [analyses, activeAnalysisId]);
+    return resolveCurrentAnalysisForSource(
+      analyses,
+      activeAccountingSource,
+      activeFecFolderName
+    );
+  }, [analyses, activeAccountingSource, activeFecFolderName]);
 
   const incomeStatement = useMemo(
     () =>

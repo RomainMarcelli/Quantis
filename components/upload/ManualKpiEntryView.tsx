@@ -7,7 +7,8 @@ import { QuantisLogo } from "@/components/ui/QuantisLogo";
 import { setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import { buildCompleteKpis, type ManualKpiInput } from "@/lib/kpiBuilder";
 import { calculateQuantisScore } from "@/lib/quantisScore";
-import { DEFAULT_FOLDER_NAME, setActiveFolderName } from "@/lib/folders/activeFolder";
+import { DEFAULT_FOLDER_NAME, registerKnownFolderName } from "@/lib/folders/folderRegistry";
+import { writeActiveAccountingSource } from "@/services/dataSourcesStore";
 import { createEmptyMappedFinancialData } from "@/services/mapping/financialDataMapper";
 import { saveAnalysisDraft } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
@@ -198,7 +199,16 @@ export function ManualKpiEntryView() {
 
       await saveAnalysisDraft(draft);
       setLocalAnalysisHint(true);
-      setActiveFolderName(DEFAULT_FOLDER_NAME);
+      registerKnownFolderName(DEFAULT_FOLDER_NAME);
+      // Saisie manuelle = équivalent d'un upload FEC → on active la source
+      // pour que la synthèse affiche les données saisies (sinon
+      // activeAccountingSource = null → "Aucune synthèse disponible").
+      try {
+        await writeActiveAccountingSource(user.uid, "fec", DEFAULT_FOLDER_NAME);
+      } catch (err) {
+        // eslint-disable-next-line no-console -- monitoring temporaire
+        console.warn("[manual-entry] auto-activate FEC source failed", err);
+      }
       router.push("/synthese");
     } catch (error) {
       setErrorMessage(

@@ -15,7 +15,7 @@ import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
 import {
   describeAnalysisSource,
   getAnalysisSourceKind,
-} from "@/lib/source/activeSource";
+} from "@/lib/source/sourceKind";
 import type { AnalysisRecord } from "@/types/analysis";
 
 type AnalysisCardProps = {

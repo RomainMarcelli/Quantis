@@ -162,6 +162,18 @@ export async function runAnalysisPipeline(params: {
     .filter((year): year is number => year !== null && year <= 2030);
   const fiscalYear = candidateYears.length > 0 ? Math.max(...candidateYears) : null;
 
+  // Bornes de période pour le sourceMetadata — l'upload statique n'a pas de
+  // période réelle (un PDF/Excel = un point dans le temps), on prend les
+  // bornes de l'année fiscale détectée si disponible, sinon des fallbacks
+  // raisonnables. C'est juste de la metadata informative — les KPI sont
+  // calculés à partir de mappedData, pas de ces bornes.
+  const periodStart = fiscalYear
+    ? new Date(`${fiscalYear}-01-01T00:00:00.000Z`)
+    : new Date(`${new Date().getUTCFullYear()}-01-01T00:00:00.000Z`);
+  const periodEnd = fiscalYear
+    ? new Date(`${fiscalYear}-12-31T23:59:59.999Z`)
+    : new Date();
+
   return {
     userId: params.userId,
     folderName: params.folderName,
@@ -184,7 +196,22 @@ export async function runAnalysisPipeline(params: {
       sector: params.uploadContext?.sector?.trim() || null,
       source: params.uploadContext?.source ?? "dashboard"
     },
-    parserVersion
+    parserVersion,
+    // Pose le `sourceMetadata` même pour les uploads statiques (PDF / Excel),
+    // sinon `resolveCurrentAnalysisForSource("fec", …)` rejette l'analyse
+    // (provider undefined) et /synthese affiche "Aucune synthèse" malgré
+    // l'upload réussi. `provider: "upload"` est explicitement matché par
+    // `lib/source/resolveSourceAnalyses.ts` comme variante de FEC.
+    sourceMetadata: {
+      type: "static",
+      provider: "upload",
+      providerSub: null,
+      connectionId: null,
+      syncedAt: new Date().toISOString(),
+      periodStart: periodStart.toISOString(),
+      periodEnd: periodEnd.toISOString(),
+      currency: "EUR"
+    }
   };
 }
 

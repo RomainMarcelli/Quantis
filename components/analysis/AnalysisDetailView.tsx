@@ -35,14 +35,11 @@ import { useUserDashboards } from "@/hooks/useUserDashboards";
 import { clearLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import {
   DEFAULT_FOLDER_NAME,
-  ensureFolderName,
-  getActiveFolderName,
   getKnownFolderNames,
-  removeKnownFolderName,
-  renameKnownFolderName,
   registerKnownFolderName,
-  setActiveFolderName
-} from "@/lib/folders/activeFolder";
+  removeKnownFolderName,
+  renameKnownFolderName
+} from "@/lib/folders/folderRegistry";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
@@ -75,8 +72,8 @@ import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
 import { SourceBadge } from "@/components/analysis/SourceBadge";
-import { resolveActiveAnalysis } from "@/lib/source/activeSource";
-import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import {
@@ -144,7 +141,12 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const userDashboards = useUserDashboards(user?.uid ?? null);
   // Le select du menu pilote l'année d'analyse affichée dans le dashboard.
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<string>("");
-  const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
+  // currentFolder = sous-sélection locale dans la vue Documents (liste des
+  // fichiers d'un dossier). Distinct de `activeFecFolderName` (Firestore) qui
+  // est l'éventuel folder utilisé comme source active du dashboard. Initialisé
+  // à DEFAULT — sera resync'é depuis useActiveDataSource si une source FEC est
+  // active (cf. effet ci-dessous).
+  const [currentFolder, setCurrentFolder] = useState<string>(DEFAULT_FOLDER_NAME);
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Quantis");
@@ -215,14 +217,20 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     return unsubscribe;
   }, [router]);
 
-  // Source active globale (localStorage `quantis.activeAnalysis`). Mise à jour
-  // par le bouton "Synchroniser et activer" du panneau de connexions et par
-  // "Utiliser comme source active" sur les cards de /documents. Si l'URL ne
+  // Source active globale (Firestore via useActiveDataSource). Si l'URL ne
   // pointe pas explicitement sur une analyse (analysisId dans la prop), on
-  // se base dessus pour résoudre quelle analyse afficher dans le tableau de
-  // bord. Sans ça, /analysis restait coincé sur la première analyse de
-  // l'historique même après changement de source côté Synthèse.
-  const activeAnalysisIdFromStorage = useActiveAnalysisId();
+  // résout l'analyse à afficher en filtrant la liste par
+  // `activeAccountingSource` (et `activeFecFolderName` si FEC).
+  const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
+    analyses: allAnalyses,
+  });
+
+  // Sync currentFolder local avec l'éventuel folder FEC actif.
+  useEffect(() => {
+    if (activeAccountingSource === "fec" && activeFecFolderName) {
+      setCurrentFolder(activeFecFolderName);
+    }
+  }, [activeAccountingSource, activeFecFolderName]);
 
   useEffect(() => {
     if (!user) {
@@ -230,15 +238,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     }
 
     // Priorité 1 : l'analysisId explicite venant de l'URL (/analysis/{id}).
-    // Priorité 2 : l'analyse marquée active dans localStorage.
-    // Priorité 3 (fallback dans loadDashboardData) : dossier actif → history[0].
-    const target = analysisId ?? activeAnalysisIdFromStorage ?? undefined;
-    void loadDashboardData(user, target);
-  }, [user, analysisId, activeAnalysisIdFromStorage]);
+    // Priorité 2 : on laisse loadDashboardData résoudre via la source active
+    // (filtrage par provider + folder dans le matcher).
+    void loadDashboardData(user, analysisId ?? undefined);
+  }, [user, analysisId, activeAccountingSource, activeFecFolderName]);
 
   useEffect(() => {
     if (currentFolder.trim()) {
-      setActiveFolderName(currentFolder);
+      // On enregistre le folder dans le registre local (apparaît dans les
+      // menus de déplacement). L'activation comme source FEC se fait via
+      // le toggle binaire de /documents (cf. useActiveDataSource).
       setKnownFolders(registerKnownFolderName(currentFolder));
     }
   }, [currentFolder]);
@@ -500,7 +509,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         // Aucun historique: on retire l'indicateur local d'existence d'analyses.
         clearLocalAnalysisHint();
         setAnalysis(null);
-        setCurrentFolder(getActiveFolderName() ?? persistedFolderNames[0] ?? DEFAULT_FOLDER_NAME);
+        setCurrentFolder(persistedFolderNames[0] ?? DEFAULT_FOLDER_NAME);
         setErrorMessage(
           "Aucune analyse disponible pour le moment. Importez un fichier pour démarrer votre analyse financière."
         );
@@ -519,18 +528,24 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         }
       }
 
-      if (!selected) {
-        const storedFolder = getActiveFolderName();
-        if (storedFolder) {
-          selected = history.find((item) => normalizeFolderName(item.folderName) === normalizeFolderName(storedFolder)) ?? null;
-        }
+      // Pas d'analyse ciblée par l'URL : on utilise la source active globale
+      // (Firestore via useActiveDataSource) pour choisir la liasse à afficher.
+      // Le helper `resolveCurrentAnalysisForSource` est testé unitairement.
+      if (!selected && activeAccountingSource) {
+        selected = resolveCurrentAnalysisForSource(
+          history,
+          activeAccountingSource,
+          activeFecFolderName
+        );
       }
 
       selected = selected ?? history[0];
 
       setAnalysis(selected);
       setCurrentFolder(normalizeFolderName(selected.folderName));
-      setActiveFolderName(normalizeFolderName(selected.folderName));
+      // Note: on n'écrit PLUS dans le localStorage legacy "active folder" —
+      // l'écriture Firestore se fait explicitement via le toggle binaire de
+      // /documents (cf. useActiveDataSource).
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Erreur inattendue pendant le chargement."
@@ -545,11 +560,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       return;
     }
 
-    const folderName = ensureFolderName(currentFolder);
-    if (!folderName) {
-      setErrorMessage("Le nom de dossier est requis pour ajouter des fichiers.");
-      return;
-    }
+    const folderName = currentFolder.trim() || DEFAULT_FOLDER_NAME;
+    registerKnownFolderName(folderName);
 
     setUploading(true);
     setErrorMessage(null);

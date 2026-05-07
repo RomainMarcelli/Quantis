@@ -26,7 +26,8 @@ import {
   SECTOR_OPTIONS
 } from "@/lib/onboarding/options";
 import type { CompanySizeValue } from "@/lib/onboarding/options";
-import { DEFAULT_FOLDER_NAME, ensureFolderName, setActiveFolderName } from "@/lib/folders/activeFolder";
+import { DEFAULT_FOLDER_NAME, registerKnownFolderName } from "@/lib/folders/folderRegistry";
+import { writeActiveAccountingSource } from "@/services/dataSourcesStore";
 import { validateUploadInput } from "@/lib/upload/uploadValidation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firebaseStorage } from "@/lib/firebase";
@@ -179,7 +180,8 @@ export function UploadPageView() {
     sectorValue: string,
     filesToSubmit: File[]
   ): Promise<AnalysisDraft> {
-    const folderName = ensureFolderName(DEFAULT_FOLDER_NAME) ?? DEFAULT_FOLDER_NAME;
+    const folderName = DEFAULT_FOLDER_NAME;
+    registerKnownFolderName(folderName);
 
     const uploadedFiles: { pdfUrl: string; fileName: string; fileSize: number }[] = [];
     const nonPdfFiles: File[] = [];
@@ -289,7 +291,21 @@ export function UploadPageView() {
         filesToSubmit
       );
       await saveAnalysisDraft(persistedDraft);
-      setActiveFolderName(persistedDraft.folderName);
+      registerKnownFolderName(persistedDraft.folderName);
+      // L'utilisateur a explicitement uploadé un fichier → on active la
+      // source FEC avec le folder courant. Sans ça, /synthese affiche
+      // "Aucune synthèse" parce que activeAccountingSource reste null.
+      // L'auto-activation par sync (Pennylane/MyUnisoft/Odoo) a la même
+      // sémantique : choix explicite de l'user = source active.
+      // Si l'écriture Firestore échoue (rules manquantes, quota), on log
+      // mais on n'empêche PAS la redirection — la liste des analyses est
+      // sauvée, l'utilisateur pourra activer manuellement plus tard.
+      try {
+        await writeActiveAccountingSource(user.uid, "fec", persistedDraft.folderName);
+      } catch (err) {
+        // eslint-disable-next-line no-console -- monitoring temporaire
+        console.warn("[upload] auto-activate FEC source failed", err);
+      }
       setLocalAnalysisHint(true);
       setIsAnalysisComplete(true);
       setSuccessMessage("Analyse créée avec succès. Redirection vers la synthèse...");

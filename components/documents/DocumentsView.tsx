@@ -18,20 +18,24 @@ import { AnalysisCardGrid } from "@/components/documents/AnalysisCardGrid";
 import { EmptyFolderState } from "@/components/documents/EmptyFolderState";
 import { FolderDialog } from "@/components/documents/FolderDialog";
 import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
-import { ConnectionsPanel } from "@/components/integrations/ConnectionsPanel";
-import { AccountingConnectCard } from "@/components/integrations/AccountingConnectCard";
-import { BridgeConnectCard } from "@/components/integrations/BridgeConnectCard";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { DEFAULT_FOLDER_NAME, setActiveFolderName } from "@/lib/folders/activeFolder";
-import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
+import { DEFAULT_FOLDER_NAME } from "@/lib/folders/folderRegistry";
 import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
-import { clearActiveAnalysisId } from "@/lib/source/activeSource";
-import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
+import { SourceTile, type SourceTileState } from "@/components/documents/SourceTile";
+import { AccountingDetailsPanel } from "@/components/documents/AccountingDetailsPanel";
+import { BankingDetailsPanel } from "@/components/documents/BankingDetailsPanel";
+import { ConnectSourceModal } from "@/components/documents/ConnectSourceModal";
+import { SourceSwitchConfirmModal } from "@/components/documents/SourceSwitchConfirmModal";
+import type { ProviderId } from "@/components/integrations/AccountingConnectionWizard";
+import type { AccountingSource } from "@/types/dataSources";
+import type { ConnectionDto } from "@/app/api/integrations/connections/route";
 import {
   listUserFolders,
   createUserFolder,
@@ -73,14 +77,54 @@ export function DocumentsView() {
   const [dialog, setDialog] = useState<FolderDialogState>({ isOpen: false, mode: "create", targetName: "" });
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteFolderConfirm>({ isOpen: false, folderName: "", analysisCount: 0 });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSidebarCollapsedPreference());
-  // Dossier actif (sources statiques multi-exercices). Réagit aux changements
-  // via le hook réactif — l'utilisateur peut activer un dossier depuis le
-  // bandeau ci-dessous et la sélection se propage immédiatement à Synthèse.
-  const activeFolderName = useActiveFolderName();
-  // Conservé pour le cleanup à la suppression d'une analyse — si l'analyse
-  // supprimée est l'override actif, on clear le pointeur localStorage pour
-  // éviter qu'il pointe sur un fantôme.
-  const explicitActiveId = useActiveAnalysisId();
+
+  // Connexions actives — utilisées pour calculer l'état de chaque tuile
+  // (connectée vs déconnectée). Chargées en parallèle avec analyses + folders.
+  const [connections, setConnections] = useState<ConnectionDto[]>([]);
+
+  // Bridge — status temps réel pour la tuile Banque + le détail.
+  const bridgeStatus = useBridgeStatus();
+
+  // Modal "switch hors Documents" : seulement quand la source active est FEC
+  // et que l'utilisateur clique sur Pennylane / MyUnisoft / Odoo.
+  const [pendingSwitch, setPendingSwitch] = useState<{
+    target: AccountingSource;
+    targetLabel: string;
+  } | null>(null);
+
+  // Modal de connexion d'une source (wizard) ouverte avec un provider précis.
+  const [connectModalProvider, setConnectModalProvider] = useState<ProviderId | null>(null);
+
+  // États transients pour les actions du panneau de détails.
+  const [actionBusy, setActionBusy] = useState<{ syncing: boolean; disconnecting: boolean }>(
+    { syncing: false, disconnecting: false }
+  );
+  const [bridgeBusy, setBridgeBusy] = useState<{ syncing: boolean; disconnecting: boolean }>(
+    { syncing: false, disconnecting: false }
+  );
+  // "Changer de source ▾" — quand une source est active, la grille des
+  // 4 autres tuiles est masquée par défaut. L'utilisateur peut la
+  // déplier explicitement via ce toggle.
+  const [accountingSwitcherOpen, setAccountingSwitcherOpen] = useState(false);
+
+  // Source active globale (Firestore via useActiveDataSource). Mise à jour
+  // par les toggles binaires de cette page. `activeFolderName` ici reflète
+  // uniquement la sous-sélection FEC (multi-clients) ; les autres sources
+  // (Pennylane, MyUnisoft, Odoo, Bridge) n'ont pas de notion de folder.
+  const {
+    activeAccountingSource,
+    activeFecFolderName: activeFolderName,
+    activeBankingSource,
+    setActiveAccountingSource,
+    setActiveBankingSource,
+  } = useActiveDataSource();
+
+  // Auto-collapse du switcher dès que la source active change
+  // (l'utilisateur a basculé sur une nouvelle source → on cache la grille
+  // immédiatement, le panneau de détails se met à jour à sa place).
+  useEffect(() => {
+    setAccountingSwitcherOpen(false);
+  }, [activeAccountingSource]);
 
   useEffect(() => {
     return firebaseAuthGateway.subscribe(setUser);
@@ -102,9 +146,10 @@ export function DocumentsView() {
     if (!user) return;
     setLoading(true);
     try {
-      const [allAnalyses, folders] = await Promise.all([
+      const [allAnalyses, folders, idToken] = await Promise.all([
         listUserAnalyses(user.uid),
-        listUserFolders(user.uid)
+        listUserFolders(user.uid),
+        firebaseAuthGateway.getIdToken(),
       ]);
       setAnalyses(allAnalyses);
       const names = folders.map((f) => f.name);
@@ -112,9 +157,25 @@ export function DocumentsView() {
         names.unshift(DEFAULT_FOLDER_NAME);
       }
       setFolderNames(names);
+      // Connexions actives (Pennylane / MyUnisoft / Odoo) — pour décider
+      // de l'état "connectée vs déconnectée" de chaque tuile. Bridge est
+      // tracké séparément par useBridgeStatus.
+      if (idToken) {
+        const res = await fetch("/api/integrations/connections", {
+          headers: { Authorization: `Bearer ${idToken}` },
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { connections?: ConnectionDto[] };
+          setConnections((data.connections ?? []).filter((c) => c.provider !== "bridge"));
+        } else {
+          setConnections([]);
+        }
+      }
     } catch {
       setAnalyses([]);
       setFolderNames([DEFAULT_FOLDER_NAME]);
+      setConnections([]);
     } finally {
       setLoading(false);
     }
@@ -194,12 +255,10 @@ export function DocumentsView() {
 
   async function handleDeleteAnalysis(id: string) {
     if (!user) return;
-    // Si on supprime l'analyse marquée comme source active, on vide le pointeur —
-    // sinon le résolveur retomberait dessus indéfiniment côté hook (l'event est
-    // émis mais l'ID disparaît côté DB seulement).
-    if (explicitActiveId === id) {
-      clearActiveAnalysisId();
-    }
+    // La source active étant désormais une "kind" (pennylane/myunisoft/odoo/fec),
+    // pas un id, on n'a pas de pointeur à nettoyer ici. Si l'utilisateur
+    // supprime sa dernière liasse d'une source active, le dashboard affichera
+    // un état vide jusqu'à ce qu'il bascule via le toggle binaire.
     await deleteUserAnalysisById(user.uid, id);
     void loadData();
   }
@@ -208,6 +267,184 @@ export function DocumentsView() {
     if (!user) return;
     await moveAnalysisToFolder(user.uid, id, targetFolder);
     void loadData();
+  }
+
+  // ─── Mapping provider → state de tuile ────────────────────────────────
+  function tileStateForAccounting(target: AccountingSource): SourceTileState {
+    if (activeAccountingSource === target) return "active";
+    if (target === "fec") {
+      // FEC est "connecté" dès qu'au moins une analyse FEC/upload existe.
+      const hasFec = analyses.some((a) => {
+        const provider = a.sourceMetadata?.provider ?? null;
+        return provider === "fec" || provider === "upload";
+      });
+      return hasFec ? "connected" : "disconnected";
+    }
+    const hasConnection = connections.some(
+      (c) => c.provider === target && c.status === "active"
+    );
+    return hasConnection ? "connected" : "disconnected";
+  }
+
+  function tileStateForBanking(): SourceTileState {
+    if (activeBankingSource === "bridge") return "active";
+    return bridgeStatus.status?.connected ? "connected" : "disconnected";
+  }
+
+  // ─── Click handlers — tuiles ──────────────────────────────────────────
+  function providerToWizard(target: AccountingSource): ProviderId | null {
+    if (target === "pennylane" || target === "myunisoft" || target === "odoo") return target;
+    if (target === "fec") return "other"; // wizard "Autre logiciel" gère l'upload manuel
+    return null;
+  }
+
+  function handleAccountingTileClick(target: AccountingSource) {
+    const state = tileStateForAccounting(target);
+    if (state === "active") {
+      // Toggle off : désactive la source.
+      void setActiveAccountingSource(null);
+      return;
+    }
+    if (state === "disconnected") {
+      // Pas connectée → ouvrir le wizard (modal).
+      const wizardId = providerToWizard(target);
+      if (wizardId) setConnectModalProvider(wizardId);
+      return;
+    }
+    // Connectée mais inactive → activer.
+    // Cas spécial : si l'utilisateur quitte FEC pour aller sur Pennylane /
+    // MyUnisoft / Odoo, on demande confirmation.
+    if (activeAccountingSource === "fec" && target !== "fec") {
+      const labels: Record<AccountingSource, string> = {
+        pennylane: "Pennylane",
+        myunisoft: "MyUnisoft",
+        odoo: "Odoo",
+        fec: "Documents",
+      };
+      setPendingSwitch({ target, targetLabel: labels[target] });
+      return;
+    }
+    // Pour FEC : on prend le folder courant (activeFolder) comme sélection.
+    void setActiveAccountingSource(target, target === "fec" ? activeFolder : null);
+  }
+
+  async function confirmPendingSwitch() {
+    if (!pendingSwitch) return;
+    const { target } = pendingSwitch;
+    setPendingSwitch(null);
+    await setActiveAccountingSource(target, null);
+  }
+
+  function handleBankingTileClick() {
+    const state = tileStateForBanking();
+    if (state === "active") {
+      void setActiveBankingSource(null);
+      return;
+    }
+    if (state === "disconnected") {
+      void handleBridgeConnect();
+      return;
+    }
+    // connected → activate
+    void setActiveBankingSource("bridge");
+  }
+
+  // ─── Bridge actions (utilise les endpoints existants) ─────────────────
+  async function handleBridgeConnect() {
+    const idToken = await firebaseAuthGateway.getIdToken();
+    if (!idToken) return;
+    const res = await fetch("/api/integrations/bridge/connect", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = (await res.json().catch(() => ({}))) as { redirectUrl?: string };
+    if (data.redirectUrl) {
+      window.location.href = data.redirectUrl;
+    }
+  }
+
+  async function handleBridgeSync() {
+    const idToken = await firebaseAuthGateway.getIdToken();
+    if (!idToken) return;
+    setBridgeBusy((s) => ({ ...s, syncing: true }));
+    try {
+      await fetch("/api/integrations/bridge/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      await bridgeStatus.refresh();
+    } finally {
+      setBridgeBusy((s) => ({ ...s, syncing: false }));
+    }
+  }
+
+  async function handleBridgeDisconnect() {
+    if (!confirm("Déconnecter Bridge ? Les comptes synchronisés seront supprimés.")) return;
+    const idToken = await firebaseAuthGateway.getIdToken();
+    if (!idToken) return;
+    setBridgeBusy((s) => ({ ...s, disconnecting: true }));
+    try {
+      await fetch("/api/integrations/bridge/disconnect", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      await bridgeStatus.refresh();
+      await setActiveBankingSource(null);
+    } finally {
+      setBridgeBusy((s) => ({ ...s, disconnecting: false }));
+    }
+  }
+
+  // ─── Accounting actions (sync / disconnect via la connexion active) ───
+  function activeAccountingConnection(): ConnectionDto | null {
+    if (!activeAccountingSource || activeAccountingSource === "fec") return null;
+    return (
+      connections.find(
+        (c) => c.provider === activeAccountingSource && c.status === "active"
+      ) ?? null
+    );
+  }
+
+  async function handleAccountingSync() {
+    const conn = activeAccountingConnection();
+    if (!conn) return;
+    const idToken = await firebaseAuthGateway.getIdToken();
+    if (!idToken) return;
+    setActionBusy((s) => ({ ...s, syncing: true }));
+    try {
+      await fetch(`/api/integrations/${conn.provider}/sync`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId: conn.id }),
+      });
+      await loadData();
+    } finally {
+      setActionBusy((s) => ({ ...s, syncing: false }));
+    }
+  }
+
+  async function handleAccountingDisconnect() {
+    const conn = activeAccountingConnection();
+    if (!conn) return;
+    if (!confirm(`Déconnecter ${conn.provider} ? Les données synchronisées seront supprimées.`))
+      return;
+    const idToken = await firebaseAuthGateway.getIdToken();
+    if (!idToken) return;
+    setActionBusy((s) => ({ ...s, disconnecting: true }));
+    try {
+      await fetch(`/api/integrations/${conn.provider}/disconnect`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ connectionId: conn.id }),
+      });
+      await setActiveAccountingSource(null);
+      await loadData();
+    } finally {
+      setActionBusy((s) => ({ ...s, disconnecting: false }));
+    }
   }
 
   if (!user) {
@@ -241,81 +478,180 @@ export function DocumentsView() {
       <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
         <AppSidebar activeRoute="documents" accountFirstName={greetingName} />
 
-        {/* ===== ZONE CONTENU ===== */}
-        <div className="space-y-4">
-          {/* Bandeau résumé : liste de TOUTES les connexions actives
-              (comptables + bancaires). Vue d'ensemble persistante. */}
-          <ConnectionsPanel onChanged={() => void loadData()} />
+        {/* ===== ZONE CONTENU =====
+            space-y-8 (32 px) pour bien marquer la séparation des phases
+            d'onboarding entre Source comptable, Source bancaire (phase 2)
+            et Dossiers & fichiers (phase 3 conditionnelle FEC). */}
+        <div className="space-y-8">
+          {/* ─── BLOC 1 — Source comptable ────────────────────────────
+              2 modes :
+              - Pas de source active → grille pleine vue (5 tuiles).
+              - Source active → panneau de détails uniquement. La grille
+                des 4 autres sources est dépliable via le bouton "Changer
+                de source ▾" du panneau (cf. AccountingDetailsPanel). */}
+          <SourceBlock
+            title="Source comptable"
+            subtitle={
+              activeAccountingSource
+                ? undefined
+                : "Choisissez votre source de données comptables. Une seule peut être active à la fois."
+            }
+          >
+            {!activeAccountingSource ? (
+              <AccountingTilesGrid
+                excludeSource={null}
+                tileStateFor={tileStateForAccounting}
+                onTileClick={handleAccountingTileClick}
+              />
+            ) : (
+              <>
+                <AccountingDetailsPanel
+                  source={activeAccountingSource}
+                  connection={activeAccountingConnection()}
+                  fecFolderName={activeFolderName}
+                  fecAnalysisCount={
+                    activeAccountingSource === "fec"
+                      ? analyses.filter((a) => {
+                          const provider = a.sourceMetadata?.provider ?? null;
+                          if (provider !== "fec" && provider !== "upload") return false;
+                          if (!activeFolderName) return true;
+                          return (a.folderName ?? "").trim().toLowerCase() ===
+                            activeFolderName.toLowerCase();
+                        }).length
+                      : 0
+                  }
+                  onSync={handleAccountingSync}
+                  onDeactivate={() => setActiveAccountingSource(null)}
+                  onDisconnect={handleAccountingDisconnect}
+                  syncing={actionBusy.syncing}
+                  disconnecting={actionBusy.disconnecting}
+                  switcherOpen={accountingSwitcherOpen}
+                  onToggleSwitcher={() => setAccountingSwitcherOpen((v) => !v)}
+                />
+                {accountingSwitcherOpen ? (
+                  <div className="vyzor-section-reveal">
+                    <AccountingTilesGrid
+                      excludeSource={activeAccountingSource}
+                      tileStateFor={tileStateForAccounting}
+                      onTileClick={handleAccountingTileClick}
+                    />
+                  </div>
+                ) : null}
+              </>
+            )}
+          </SourceBlock>
 
-          {/* Cards détail repliables — même format pour les 2 sources. */}
-          <AccountingConnectCard onChanged={() => void loadData()} />
-          <BridgeConnectCard onChanged={() => void loadData()} />
-
-          {/* Tabs dossiers */}
-          <div className="precision-card rounded-2xl">
-            <FolderTabs
-              folders={folderItems}
-              activeFolder={activeFolder}
-              onSelect={setActiveFolder}
-              onRename={(name) => setDialog({ isOpen: true, mode: "rename", targetName: name })}
-              onDelete={(name) => requestDeleteFolder(name)}
-              onCreate={() => setDialog({ isOpen: true, mode: "create", targetName: "" })}
-            />
-          </div>
-
-          {/* Stats + Bouton "Source active du dashboard" au niveau dossier.
-              Quand on clique, on enregistre `activeFolderName` (toutes les
-              liasses du dossier deviennent disponibles via le sélecteur de
-              période côté Synthèse) et on clear l'override par analyse — ça
-              force le résolveur à utiliser le dossier comme source statique. */}
-          <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-            <div className="flex items-center gap-3">
-              <Folder className="h-4 w-4 text-quantis-gold/70" />
-              <p className="text-xs text-white/45">
-                {filteredAnalyses.length} analyse{filteredAnalyses.length !== 1 ? "s" : ""}
-                {lastUpdated ? ` · Dernière mise à jour le ${lastUpdated}` : ""}
-              </p>
-            </div>
-            {filteredAnalyses.length > 0 ? (
-              activeFolderName?.toLowerCase() === activeFolder.toLowerCase() ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-quantis-gold/40 bg-quantis-gold/10 px-3 py-1 text-[11px] font-semibold text-quantis-gold">
-                  <span className="h-1.5 w-1.5 rounded-full bg-quantis-gold" />
-                  Source active du dashboard
-                </span>
+          {/* ─── BLOC 2 — Source bancaire (phase 2 onboarding) ──────────
+              Visible UNIQUEMENT si une source comptable est active. Au
+              premier lancement, on n'affiche rien pour réduire le bruit
+              visuel. Le bloc apparaît avec une animation 200 ms quand
+              l'utilisateur active sa première source comptable, et
+              disparaît du DOM quand il la désactive (la connexion Bridge
+              persiste néanmoins en Firestore — toggle ≠ disconnect). */}
+          {activeAccountingSource !== null ? (
+            <SourceBlock
+              key="banking-block"
+              revealOnMount
+              title={
+                bridgeStatus.status?.connected ? (
+                  "Source bancaire"
+                ) : (
+                  <>
+                    Source bancaire{" "}
+                    <span
+                      style={{
+                        color: "rgba(255, 255, 255, 0.3)",
+                        fontWeight: 500,
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      (optionnelle)
+                    </span>
+                  </>
+                )
+              }
+              subtitle={
+                bridgeStatus.status?.connected
+                  ? "Indépendante de la source comptable. Bridge agrège vos comptes bancaires en temps réel via Open Banking PSD2."
+                  : "Connectez vos comptes bancaires pour enrichir vos analyses avec les flux en temps réel."
+              }
+            >
+              {/* Symétrie avec le bloc comptable :
+                  - Bridge non connecté → tuile unique "Connecter" (onboarding).
+                  - Bridge connecté (actif OU désactivé) → panneau de détails
+                    unifié uniquement, pas de tuile en doublon.
+                  Pas de bouton "Changer de source ▾" car Bridge est le seul
+                  provider bancaire pour l'instant. */}
+              {!bridgeStatus.status?.connected ? (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+                  <SourceTile
+                    name="Bridge"
+                    subtitle="Open Banking PSD2"
+                    logo={<TileLogo src="/images/integrations/bridge.svg" alt="Bridge" fallback="🏦" />}
+                    state="disconnected"
+                    onClick={handleBankingTileClick}
+                  />
+                </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveFolderName(activeFolder);
-                    clearActiveAnalysisId();
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-medium text-white/75 transition-colors hover:border-quantis-gold/40 hover:bg-quantis-gold/10 hover:text-quantis-gold"
-                >
-                  Définir comme source active
-                </button>
-              )
-            ) : null}
-          </div>
+                <BankingDetailsPanel
+                  status={bridgeStatus.status ?? null}
+                  isActive={activeBankingSource === "bridge"}
+                  onSync={handleBridgeSync}
+                  onActivate={() => setActiveBankingSource("bridge")}
+                  onDeactivate={() => setActiveBankingSource(null)}
+                  onDisconnect={handleBridgeDisconnect}
+                  syncing={bridgeBusy.syncing}
+                  disconnecting={bridgeBusy.disconnecting}
+                />
+              )}
+            </SourceBlock>
+          ) : null}
 
-          {/* Cards — loader retardé pour éviter le flash <400ms. */}
-          {loading && showSlowLoader ? (
-            <div className="py-20 text-center">
-              <p className="text-sm text-white/50">Chargement des analyses...</p>
-            </div>
-          ) : filteredAnalyses.length === 0 && !loading ? (
-            <EmptyFolderState
-              folderName={activeFolder}
-              onUpload={() => router.push("/upload")}
-            />
-          ) : (
-            <AnalysisCardGrid
-              analyses={filteredAnalyses}
-              folders={folderNames}
-              onDelete={(id) => void handleDeleteAnalysis(id)}
-              onMove={(id, target) => void handleMoveAnalysis(id, target)}
-              activeFolderName={activeFolderName}
-            />
-          )}
+          {/* ─── BLOC 3 conditionnel — Dossiers & fichiers (FEC) ────── */}
+          {activeAccountingSource === "fec" ? (
+            <SourceBlock title="Dossiers & fichiers">
+              <div className="precision-card rounded-2xl">
+                <FolderTabs
+                  folders={folderItems}
+                  activeFolder={activeFolder}
+                  onSelect={(name) => {
+                    setActiveFolder(name);
+                    void setActiveAccountingSource("fec", name);
+                  }}
+                  onRename={(name) => setDialog({ isOpen: true, mode: "rename", targetName: name })}
+                  onDelete={(name) => requestDeleteFolder(name)}
+                  onCreate={() => setDialog({ isOpen: true, mode: "create", targetName: "" })}
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 px-1">
+                <Folder className="h-4 w-4 text-quantis-gold/70" />
+                <p className="text-xs text-white/45">
+                  {filteredAnalyses.length} analyse{filteredAnalyses.length !== 1 ? "s" : ""}
+                  {lastUpdated ? ` · Dernière mise à jour le ${lastUpdated}` : ""}
+                </p>
+              </div>
+
+              {loading && showSlowLoader ? (
+                <div className="py-20 text-center">
+                  <p className="text-sm text-white/50">Chargement des analyses...</p>
+                </div>
+              ) : filteredAnalyses.length === 0 && !loading ? (
+                <EmptyFolderState
+                  folderName={activeFolder}
+                  onUpload={() => router.push("/upload")}
+                />
+              ) : (
+                <AnalysisCardGrid
+                  analyses={filteredAnalyses}
+                  folders={folderNames}
+                  onDelete={(id) => void handleDeleteAnalysis(id)}
+                  onMove={(id, target) => void handleMoveAnalysis(id, target)}
+                  activeFolderName={activeFolderName}
+                />
+              )}
+            </SourceBlock>
+          ) : null}
         </div>
       </div>
 
@@ -343,7 +679,213 @@ export function DocumentsView() {
         onConfirm={() => void confirmDeleteFolder()}
         onCancel={() => setDeleteConfirm({ isOpen: false, folderName: "", analysisCount: 0 })}
       />
+
+      {/* Modal wizard de connexion (ouverte au clic sur tuile non connectée).
+          À la fin d'un sync réussi, on auto-active la source comptable
+          correspondante : l'utilisateur a explicitement parcouru le
+          wizard, l'attente UX est de voir ses données immédiatement. */}
+      <ConnectSourceModal
+        open={connectModalProvider !== null}
+        provider={connectModalProvider}
+        onClose={() => setConnectModalProvider(null)}
+        onConnected={async () => {
+          // Map ProviderId (wizard) → AccountingSource (Firestore).
+          // "other" déclenche une redirection vers /upload qui gère lui-même
+          // l'activation FEC (cf. UploadPageView).
+          const providerToSource: Record<ProviderId, AccountingSource | null> = {
+            pennylane: "pennylane",
+            myunisoft: "myunisoft",
+            odoo: "odoo",
+            tiime: null,
+            other: null,
+          };
+          const source = connectModalProvider
+            ? providerToSource[connectModalProvider]
+            : null;
+          setConnectModalProvider(null);
+          if (source) {
+            await setActiveAccountingSource(source);
+          }
+          await loadData();
+        }}
+      />
+
+      {/* Modal de confirmation lors du switch FEC → autre source. */}
+      <SourceSwitchConfirmModal
+        open={pendingSwitch !== null}
+        targetName={pendingSwitch?.targetLabel ?? ""}
+        onConfirm={() => void confirmPendingSwitch()}
+        onCancel={() => setPendingSwitch(null)}
+      />
     </section>
+  );
+}
+
+// ─── Sous-composants utilitaires ────────────────────────────────────────
+
+/**
+ * Bandeau d'un bloc (titre uppercase + sous-titre + contenu).
+ * Pose la hiérarchie typo demandée par la spec : titre en uppercase petit
+ * text-tertiary, contenu en dessous.
+ *
+ * `title` accepte un ReactNode pour permettre au caller de styler une
+ * portion différemment (ex. "(optionnelle)" en text-tertiary).
+ *
+ * `revealOnMount` déclenche une animation fade-in + slide-down ~200 ms
+ * — utilisée pour la phase 2 d'onboarding (apparition du bloc bancaire
+ * quand une source comptable devient active).
+ */
+function SourceBlock({
+  title,
+  subtitle,
+  children,
+  revealOnMount = false,
+}: {
+  title: React.ReactNode;
+  subtitle?: string;
+  children: React.ReactNode;
+  revealOnMount?: boolean;
+}) {
+  return (
+    <section className={`space-y-3 ${revealOnMount ? "vyzor-section-reveal" : ""}`}>
+      <header className="px-1">
+        <p
+          style={{
+            color: "rgba(255, 255, 255, 0.45)",
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+          }}
+        >
+          {title}
+        </p>
+        {subtitle ? (
+          <p className="mt-1" style={{ color: "#9CA3AF", fontSize: 13, lineHeight: 1.5, maxWidth: 720 }}>
+            {subtitle}
+          </p>
+        ) : null}
+      </header>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
+
+/**
+ * Grille des tuiles de source comptable — réutilisée à 2 endroits :
+ *   - état "rien d'actif" (5 tuiles complètes)
+ *   - dépliage "Changer de source" (4 tuiles, source active exclue)
+ *
+ * Définit la liste canonique des sources et délègue le rendu au parent
+ * via `tileStateFor` + `onTileClick`. Garde un seul endroit qui sait que
+ * "Pennylane" est une tuile, "Tiime" est unavailable, etc.
+ */
+function AccountingTilesGrid({
+  excludeSource,
+  tileStateFor,
+  onTileClick,
+}: {
+  /** Si fourni, cette source n'apparaît pas dans la grille (mode switcher). */
+  excludeSource: AccountingSource | null;
+  tileStateFor: (target: AccountingSource) => SourceTileState;
+  onTileClick: (target: AccountingSource) => void;
+}) {
+  const tiles: Array<{
+    source: AccountingSource | "tiime";
+    name: string;
+    subtitle: string;
+    logo: React.ReactNode;
+    available: boolean;
+  }> = [
+    {
+      source: "pennylane",
+      name: "Pennylane",
+      subtitle: "Connexion automatique",
+      logo: <TileLogo src="/images/integrations/pennylane.png" alt="Pennylane" />,
+      available: true,
+    },
+    {
+      source: "myunisoft",
+      name: "MyUnisoft",
+      subtitle: "Connexion automatique",
+      logo: <TileLogo src="/images/integrations/myunisoft.png" alt="MyUnisoft" />,
+      available: true,
+    },
+    {
+      source: "odoo",
+      name: "Odoo",
+      subtitle: "API key + URL",
+      logo: <TileLogo src="/images/integrations/odoo.svg" alt="Odoo" />,
+      available: true,
+    },
+    {
+      source: "tiime",
+      name: "Tiime",
+      subtitle: "Bientôt disponible",
+      logo: <TileLogo src="/images/integrations/tiime.svg" alt="Tiime" />,
+      available: false,
+    },
+    {
+      source: "fec",
+      name: "Documents",
+      subtitle: "Upload Excel / FEC",
+      logo: <FileText className="h-5 w-5 text-quantis-gold" />,
+      available: true,
+    },
+  ];
+
+  // On garde Tiime visible aussi en mode switcher (l'utilisateur doit voir
+  // les options à venir), on exclut uniquement la source active courante.
+  const visible = tiles.filter((t) => t.source !== excludeSource);
+
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+      {visible.map((tile) => (
+        <SourceTile
+          key={tile.source}
+          name={tile.name}
+          subtitle={tile.subtitle}
+          logo={tile.logo}
+          state={
+            tile.available && tile.source !== "tiime"
+              ? tileStateFor(tile.source as AccountingSource)
+              : "unavailable"
+          }
+          onClick={() => {
+            if (!tile.available || tile.source === "tiime") return;
+            onTileClick(tile.source as AccountingSource);
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Vignette logo dans une tuile — gère le fallback (emoji ou icône) si
+ * l'image n'est pas chargée.
+ */
+function TileLogo({
+  src,
+  alt,
+  fallback,
+}: {
+  src: string;
+  alt: string;
+  fallback?: string;
+}) {
+  const [errored, setErrored] = useState(false);
+  if (errored && fallback) {
+    return <span className="text-lg">{fallback}</span>;
+  }
+  // eslint-disable-next-line @next/next/no-img-element -- logos hostés en static, pas besoin de next/image
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="h-6 w-6 object-contain"
+      onError={() => setErrored(true)}
+    />
   );
 }
 
