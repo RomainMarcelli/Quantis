@@ -18,6 +18,17 @@ service cloud.firestore {
         allow read, create, update, delete:
           if request.auth != null && request.auth.uid == userId;
       }
+
+      // Sous-collection des préférences utilisateur (extensible : sources de
+      // données actives, notifications, intégrations, etc.).
+      // Path actuel : users/{uid}/settings/dataSources (single doc) qui
+      // contient activeAccountingSource / activeBankingSource /
+      // activeFecFolderName + timestamps. Tout doc settings/{...} est
+      // strictement scopé à l'utilisateur authentifié.
+      match /settings/{settingId} {
+        allow read, create, update, delete:
+          if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     match /analyses/{analysisId} {
