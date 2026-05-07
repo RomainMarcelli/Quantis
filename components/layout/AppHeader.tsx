@@ -18,13 +18,13 @@
 
 import { useRouter } from "next/navigation";
 import { Lock, LogOut, Settings, UserCircle2 } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
 import { firebaseAuthGateway } from "@/services/auth";
 import type { ReactNode } from "react";
 
 export type AppHeaderProps = {
-  /** Nom de l'entreprise affiché en haut à gauche. Défaut "Quantis". */
+  /** Nom de l'entreprise affiché en haut à gauche. Défaut "Vyzor". */
   companyName?: string;
   /** Sous-titre affiché sous le nom (ex. "Plateforme financière",
    *  "Cockpit financier", "Documents", etc.). Défaut "Plateforme financière". */
@@ -43,7 +43,7 @@ export type AppHeaderProps = {
 };
 
 export function AppHeader({
-  companyName = "Quantis",
+  companyName = "Vyzor",
   subtitle = "Plateforme financière",
   contextBadge,
   searchPlaceholder = "Rechercher un KPI, une alerte ou une section...",
@@ -62,7 +62,7 @@ export function AppHeader({
       <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
         {/* Bloc gauche — logo + nom d'entreprise + sous-titre + badge contextuel */}
         <div className="flex min-w-0 items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
+          <VyzorLogo withText={false} size={28} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{companyName}</p>
             <p className="truncate text-xs text-white/55">{subtitle}</p>

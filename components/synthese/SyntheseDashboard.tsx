@@ -1,6 +1,6 @@
 // File: components/synthese/SyntheseDashboard.tsx
 // Role: Synthèse — vue cockpit principal, désormais 100% personnalisable.
-// Le seul élément fixe est le Quantis Score (forme variera en Phase 2).
+// Le seul élément fixe est le Vyzor Score (forme variera en Phase 2).
 // Tous les autres blocs (chart d'évolution, KPI cards, recommandation,
 // alertes, plan d'action, tiles fiscales) sont des widgets ajoutables /
 // supprimables / réordonnables / redimensionnables via CustomizableDashboard.
@@ -10,6 +10,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Calendar, CalendarRange, Download, Radio } from "lucide-react";
 import { SourceBadge } from "@/components/analysis/SourceBadge";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
+import { resolveDisponibilitesOverride } from "@/lib/banking/disponibilitesOverride";
 import {
   CustomizableDashboard,
   DashboardActions
@@ -17,6 +18,7 @@ import {
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import type { SourceMetadata } from "@/types/connectors";
 import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
+import type { BankingSource } from "@/types/dataSources";
 import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
 type SyntheseDashboardProps = {
@@ -63,21 +65,29 @@ type SyntheseDashboardProps = {
    * place du sélecteur statique. Le parent décide lequel passer.
    */
   temporalitySlot?: ReactNode;
+  /**
+   * Source banque active de l'utilisateur (toggle de /documents). Si
+   * différent de "bridge", on N'override PAS `disponibilites` avec le solde
+   * Bridge — la valeur reste celle calculée par la source comptable active
+   * (post-fix MyUnisoft 12 mois). Cf. brief data-sources : "désactiver
+   * Bridge désactive l'override Disponibilités".
+   */
+  activeBankingSource?: BankingSource | null;
 };
 
 // ─── Default layout Synthèse ───────────────────────────────────────────
 // Reprend exactement le contenu de l'ancien cockpit fixe :
-//   - Quantis Score (fixe — non supprimable)
+//   - Vyzor Score (fixe — non supprimable)
 //   - Courbe d'évolution multi-séries
 //   - 3 KPI cards (CA, Trésorerie, EBE)
 //   - Recommandation IA, plan d'action, alertes
 //   - Tiles fiscales TVA + IS
-// L'utilisateur peut tout réordonner / redimensionner ; seul le Quantis Score
+// L'utilisateur peut tout réordonner / redimensionner ; seul le Vyzor Score
 // est marqué `isFixed:true` pour être conservé en permanence sur la Synthèse.
 const DEFAULT_SYNTHESE_LAYOUT: DashboardLayout = {
   id: "synthese",
   widgets: [
-    // Quantis Score : viz composite (jauge + 4 piliers + message) — exige
+    // Vyzor Score : viz composite (jauge + 4 piliers + message) — exige
     // hauteur L (560 px+ natif) et largeur M minimum.
     { id: "default-quantis-score", kpiId: "synthese:score", vizType: "quantisScore", size: "M", height: "L", isFixed: true },
     // Charts pleine largeur sur 2 rangées (440 px) — confortable pour
@@ -118,23 +128,34 @@ export function SyntheseDashboard({
   selectedYearValue,
   onYearChange,
   temporalitySlot = null,
+  activeBankingSource = null,
 }: SyntheseDashboardProps) {
   // Bridge connecté → on substitue le solde "Disponibilités" par le solde
-  // bancaire temps réel. Le badge "Live" apparaît dans le bandeau meta.
+  // bancaire temps réel UNIQUEMENT si l'utilisateur a activé Bridge via le
+  // toggle de /documents (`activeBankingSource === "bridge"`).
+  //
+  // Sinon : on ignore Bridge même si la connexion est techniquement active —
+  // c'est l'engagement du brief data-sources ("désactiver Bridge désactive
+  // l'override Disponibilités"). Conséquence : la valeur affichée reste
+  // celle calculée par la source comptable active (MyUnisoft / Pennylane /
+  // FEC), respecte la TemporalityBar et reste cohérente avec /etats-financiers.
   const bridgeStatus = useBridgeStatus();
-  const liveBalance =
+  const rawBalance =
     bridgeStatus.status?.connected && typeof bridgeStatus.status.totalBalance === "number"
       ? bridgeStatus.status.totalBalance
       : null;
+  const liveBalance = resolveDisponibilitesOverride({
+    activeBankingSource,
+    liveBalance: rawBalance,
+  });
 
-  // Surcharge des disponibilités quand Bridge est connecté — utilisé par les
-  // widgets KpiCard qui affichent "disponibilites".
+  // Surcharge des disponibilités quand Bridge est actif (toggle ON + connexion
+  // OK) — utilisé par les widgets KpiCard qui affichent "disponibilites".
   //
-  // CRITIQUE : on s'appuie sur `currentKpis` (KPI déjà filtrés sur la période
-  // sélectionnée par la TemporalityBar côté SyntheseView). Avant ce fix, on
-  // lisait `currentAnalysis.kpis` qui contient les KPI ANNUELS figés au sync —
-  // résultat, changer le mois sur la TemporalityBar n'avait aucun effet sur
-  // les valeurs affichées (bug remonté par Antoine le 06/05/2026).
+  // On s'appuie sur `currentKpis` (KPI déjà filtrés sur la période sélectionnée
+  // par la TemporalityBar côté SyntheseView). Avant le fix temporality du
+  // 06/05/2026, on lisait `currentAnalysis.kpis` qui contient les KPI ANNUELS
+  // figés — changer le mois n'avait aucun effet sur les valeurs.
   const effectiveKpis = useMemo<CalculatedKpis>(() => {
     const baseKpis = currentKpis ?? currentAnalysis?.kpis ?? ({} as CalculatedKpis);
     if (liveBalance === null) {
@@ -290,7 +311,7 @@ export function SyntheseDashboard({
       </header>
 
       {/* Grille widgets pleine largeur : aucun élément n'est pinned hors-grille,
-          le Quantis Score est lui-même un widget marqué `isFixed:true` dans le
+          le Vyzor Score est lui-même un widget marqué `isFixed:true` dans le
           default layout (non supprimable, repositionnable). L'utilisateur peut
           mettre des widgets au-dessus, à côté ou en-dessous du score. */}
       <CustomizableDashboard

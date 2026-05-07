@@ -112,7 +112,7 @@ function buildDraft(): AnalysisDraft {
       healthScore: 75
     },
     quantisScore: {
-      quantis_score: 72.5,
+      vyzor_score: 72.5,
       piliers: {
         rentabilite: 70,
         solvabilite: 75,

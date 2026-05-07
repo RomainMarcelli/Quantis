@@ -13,11 +13,11 @@ describe("password policy", () => {
   });
 
   it("marks all rules valid for a compliant password", () => {
-    const checks = getPasswordRuleChecks("Quantis#2026");
+    const checks = getPasswordRuleChecks("Vyzor#2026");
 
     expect(checks.every((rule) => rule.isValid)).toBe(true);
-    expect(isPasswordCompliant("Quantis#2026")).toBe(true);
-    expect(getPasswordValidationError("Quantis#2026")).toBeUndefined();
+    expect(isPasswordCompliant("Vyzor#2026")).toBe(true);
+    expect(getPasswordValidationError("Vyzor#2026")).toBeUndefined();
   });
 
   it("returns the first validation error message", () => {

@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { buildCompleteKpis } from "@/lib/kpiBuilder";
-import { calculateQuantisScore } from "@/lib/quantisScore";
+import { calculateVyzorScore } from "@/lib/vyzorScore";
 
 describe("buildCompleteKpis", () => {
   it("calcule automatiquement les marges, la rotation BFR et le point mort", () => {
@@ -93,7 +93,7 @@ describe("buildCompleteKpis", () => {
     }
   });
 
-  it("s'intègre avec le calcul Quantis Score", () => {
+  it("s'intègre avec le calcul Vyzor Score", () => {
     const kpis = buildCompleteKpis({
       ca: 300_000,
       tcam: 3,
@@ -114,9 +114,9 @@ describe("buildCompleteKpis", () => {
       immo_net: 35_000
     });
 
-    const score = calculateQuantisScore(kpis);
-    expect(score.quantis_score).toBeGreaterThanOrEqual(0);
-    expect(score.quantis_score).toBeLessThanOrEqual(100);
+    const score = calculateVyzorScore(kpis);
+    expect(score.vyzor_score).toBeGreaterThanOrEqual(0);
+    expect(score.vyzor_score).toBeLessThanOrEqual(100);
     expect(score.alerte_investissement).toBe(true);
   });
 });

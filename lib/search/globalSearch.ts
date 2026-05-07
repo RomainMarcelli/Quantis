@@ -33,7 +33,7 @@ export const SEARCH_NAVIGATE_EVENT = "quantis:search-navigate";
 export const GLOBAL_SEARCH_ITEMS: SearchItem[] = [
   {
     id: "synthese-score",
-    label: "Quantis Score",
+    label: "Vyzor Score",
     description: "Synthèse · Santé globale",
     keywords: ["score", "sante", "synthese", "indice"],
     route: "/synthese",

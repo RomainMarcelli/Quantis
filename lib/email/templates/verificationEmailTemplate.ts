@@ -1,5 +1,5 @@
 // lib/email/templates/verificationEmailTemplate.ts
-// Génère le template transactionnel de vérification de compte dans la DA Quantis.
+// Génère le template transactionnel de vérification de compte dans la DA Vyzor.
 type VerificationEmailTemplateInput = {
   firstName?: string;
   verificationUrl: string;
@@ -9,7 +9,7 @@ export function buildVerificationEmailTemplate({
   firstName,
   verificationUrl
 }: VerificationEmailTemplateInput): { subject: string; html: string; text: string } {
-  const subject = "Confirmez votre compte Quantis";
+  const subject = "Confirmez votre compte Vyzor";
   const safeFirstName = firstName?.trim() || "Bonjour";
 
   const html = `
@@ -26,7 +26,7 @@ export function buildVerificationEmailTemplate({
           <td align="center">
             <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;background:#111218;border:1px solid #27272a;border-radius:16px;overflow:hidden;">
               <tr>
-                <td style="padding:26px 32px 10px 32px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:#a1a1aa;">Quantis</td>
+                <td style="padding:26px 32px 10px 32px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:#a1a1aa;">Vyzor</td>
               </tr>
               <tr>
                 <td style="padding:0 32px 0 32px;font-size:30px;line-height:1.2;font-weight:700;color:#ffffff;">
@@ -35,7 +35,7 @@ export function buildVerificationEmailTemplate({
               </tr>
               <tr>
                 <td style="padding:14px 32px 0 32px;font-size:15px;line-height:1.65;color:#d4d4d8;">
-                  ${safeFirstName}, votre espace Quantis est presque prêt. Confirmez votre adresse email pour finaliser l'activation.
+                  ${safeFirstName}, votre espace Vyzor est presque prêt. Confirmez votre adresse email pour finaliser l'activation.
                 </td>
               </tr>
               <tr>
@@ -64,7 +64,7 @@ export function buildVerificationEmailTemplate({
               </tr>
               <tr>
                 <td style="padding:14px 32px 22px 32px;border-top:1px solid #27272a;font-size:12px;color:#71717a;">
-                  Quantis - Cockpit financier pour PME
+                  Vyzor - Cockpit financier pour PME
                 </td>
               </tr>
             </table>
@@ -75,7 +75,7 @@ export function buildVerificationEmailTemplate({
   </html>
   `;
 
-  const text = `${safeFirstName}, confirmez votre compte Quantis via ce lien: ${verificationUrl}\n\nSi vous ne trouvez pas l'email, vérifiez aussi votre dossier spam.`;
+  const text = `${safeFirstName}, confirmez votre compte Vyzor via ce lien: ${verificationUrl}\n\nSi vous ne trouvez pas l'email, vérifiez aussi votre dossier spam.`;
 
   return {
     subject,

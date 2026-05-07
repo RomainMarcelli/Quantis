@@ -4,29 +4,29 @@ import { Check, ChevronDown } from "lucide-react";
 import { type CSSProperties, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-export type QuantisSelectOption = {
+export type VyzorSelectOption = {
   value: string;
   label: string;
   description?: string;
 };
 
-type QuantisSelectProps = {
+type VyzorSelectProps = {
   value: string;
   onChange: (value: string) => void;
-  options: QuantisSelectOption[];
+  options: VyzorSelectOption[];
   placeholder: string;
   disabled?: boolean;
   buttonClassName?: string;
 };
 
-export function QuantisSelect({
+export function VyzorSelect({
   value,
   onChange,
   options,
   placeholder,
   disabled = false,
   buttonClassName
-}: QuantisSelectProps) {
+}: VyzorSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);

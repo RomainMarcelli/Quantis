@@ -69,7 +69,7 @@ export function SyntheseView() {
 
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [greetingName, setGreetingName] = useState("Utilisateur");
-  const [companyName, setCompanyName] = useState("Quantis");
+  const [companyName, setCompanyName] = useState("Vyzor");
   const [sector, setSector] = useState<string | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
   const [selectedYearValue, setSelectedYearValue] = useState<string>("");
@@ -153,7 +153,7 @@ export function SyntheseView() {
   // Si l'utilisateur n'a rien sélectionné (toggle binaire vert/rouge dans
   // /documents), `activeAccountingSource` est null → on n'affiche pas de
   // dashboard, on guide l'utilisateur à choisir.
-  const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
+  const { activeAccountingSource, activeFecFolderName, activeBankingSource } = useActiveDataSource({
     analyses: allAnalyses,
   });
 
@@ -299,7 +299,7 @@ export function SyntheseView() {
       ]);
 
       setGreetingName(resolveFirstName(currentUser, profile?.firstName));
-      setCompanyName(profile?.companyName?.trim() || "Quantis");
+      setCompanyName(profile?.companyName?.trim() || "Vyzor");
       setSector(profile?.sector ?? null);
       setAllAnalyses(history);
 
@@ -410,6 +410,7 @@ export function SyntheseView() {
               previousKpis={previousKpis}
               analyses={allAnalyses}
               currentAnalysis={analysisPair.current}
+              activeBankingSource={activeBankingSource}
               periodLabel={
                 shouldShowTemporalityBar(analysisPair.current)
                   ? null

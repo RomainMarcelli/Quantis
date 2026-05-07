@@ -66,8 +66,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
 
-  // Profil utilisateur pour le nom de société (fallback "Quantis").
-  let companyName = "Quantis";
+  // Profil utilisateur pour le nom de société (fallback "Vyzor").
+  let companyName = "Vyzor";
   try {
     const profile = await getUserProfile(userId);
     if (profile?.companyName?.trim()) {

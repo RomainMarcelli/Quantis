@@ -1,5 +1,5 @@
-// File: components/dashboard/QuantisScoreCard.tsx
-// Role: carte score du cockpit pour afficher le Quantis Score a la place de l'indice de sante.
+// File: components/dashboard/VyzorScoreCard.tsx
+// Role: carte score du cockpit pour afficher le Vyzor Score a la place de l'indice de sante.
 "use client";
 
 import type { CSSProperties } from "react";
@@ -14,7 +14,7 @@ type ScorePiliers = {
   efficacite: number;
 } | null;
 
-type QuantisScoreCardProps = {
+type VyzorScoreCardProps = {
   score: number | null;
   scoreLabel: string;
   scorePiliers: ScorePiliers;
@@ -25,15 +25,15 @@ type QuantisScoreCardProps = {
 const DIAL_RADIUS = 130;
 const DIAL_CIRCUMFERENCE = 2 * Math.PI * DIAL_RADIUS;
 
-export function QuantisScoreCard({
+export function VyzorScoreCard({
   score,
   scoreLabel,
   scorePiliers,
   alerteInvestissement,
   searchId
-}: QuantisScoreCardProps) {
+}: VyzorScoreCardProps) {
   const animatedScore = useAnimatedNumber(score, { durationMs: 900 });
-  const scoreState = getQuantisScoreState(score);
+  const scoreState = getVyzorScoreState(score);
   const progressOffset = computeHealthStrokeDashoffset(score === null ? null : animatedScore, DIAL_RADIUS);
 
   return (
@@ -44,7 +44,7 @@ export function QuantisScoreCard({
       <div className="card-header mb-5 flex w-full items-center justify-between">
         <div className="flex items-center gap-2 text-white/60 transition-colors group-hover:text-white">
           <Gauge className="h-4 w-4" />
-          <h2 className="text-[11px] font-bold uppercase tracking-widest">Quantis Score</h2>
+          <h2 className="text-[11px] font-bold uppercase tracking-widest">Vyzor Score</h2>
         </div>
       </div>
 
@@ -131,7 +131,7 @@ export function QuantisScoreCard({
   );
 }
 
-function getQuantisScoreState(score: number | null): { label: string; colorHex: string } {
+function getVyzorScoreState(score: number | null): { label: string; colorHex: string } {
   if (score === null) {
     return { label: "Données insuffisantes", colorHex: "#8b8b93" };
   }

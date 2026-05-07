@@ -29,7 +29,7 @@ const CONSTRAINTS: Partial<Record<WidgetVizType, Constraint>> = {
   // Jauge bornée : besoin de hauteur pour l'arc + libellés.
   gauge: { minHeight: "M" },
 
-  // Quantis Score : composé jauge + 4 piliers + message d'état (~560 px
+  // Vyzor Score : composé jauge + 4 piliers + message d'état (~560 px
   // natif) → exige hauteur L pour ne pas écraser la mise en page.
   quantisScore: { minWidth: "M", minHeight: "L" },
 

@@ -1,12 +1,12 @@
-# PDF Parser Runbook (Quantis)
+# PDF Parser Runbook (Vyzor)
 
 ## Purpose
 
-This runbook is the single source of truth for the Quantis PDF parser.
+This runbook is the single source of truth for the Vyzor PDF parser.
 It must be updated at each parser change (API contract, extraction logic, mapping, persistence, UI test flow).
 
 Last update: 2026-04-09
-Owner: Quantis app team
+Owner: Vyzor app team
 
 ## Scope
 
@@ -40,7 +40,7 @@ Main modules:
 2. API verifies Firebase auth token and user ownership.
 3. API sends binary to Google Document AI.
 4. API extracts structured financial data from Document AI output.
-5. API maps extracted values to Quantis shape.
+5. API maps extracted values to Vyzor shape.
 6. API computes diagnostics (`confidenceScore`, `warnings`).
 7. API persists analysis under `users/{userId}/analyses/{analysisId}`.
 8. API returns lightweight response for frontend.

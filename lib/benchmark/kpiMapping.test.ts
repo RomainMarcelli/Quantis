@@ -48,7 +48,7 @@ describe("getMappingFor", () => {
     expect(getMappingFor("ca")?.prefix).toBe("ca");
   });
 
-  it("retourne null pour les KPIs Quantis sans équivalent dans la vue Vyzor", () => {
+  it("retourne null pour les KPIs Vyzor sans équivalent dans la vue Vyzor", () => {
     expect(getMappingFor("healthScore")).toBeNull();
     expect(getMappingFor("point_mort")).toBeNull();
     expect(getMappingFor("etat_materiel_indice")).toBeNull();

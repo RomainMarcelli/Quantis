@@ -27,7 +27,7 @@ import { RecommendationWidget } from "@/components/dashboard/widgets/Recommendat
 import { AlertsWidget } from "@/components/dashboard/widgets/AlertsWidget";
 import { ActionPlanWidget } from "@/components/dashboard/widgets/ActionPlanWidget";
 import { EvolutionChart } from "@/components/synthese/EvolutionChart";
-import { QuantisScoreCard } from "@/components/dashboard/QuantisScoreCard";
+import { VyzorScoreCard } from "@/components/dashboard/VyzorScoreCard";
 import { isRawVariableId } from "@/lib/dashboard/rawVariableCatalog";
 import type { AnalysisRecord, CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
@@ -71,7 +71,7 @@ type CustomizableDashboardProps = {
   synthese?: SyntheseViewModel | null;
   /**
    * Slot rendu en haut de la grille, AVANT les widgets. Utilisé pour la
-   * Quantis Score qui reste visible en permanence (non personnalisable
+   * Vyzor Score qui reste visible en permanence (non personnalisable
    * en V1 — sa forme variera en Phase 2).
    */
   pinnedHeaderSlot?: ReactNode;
@@ -186,7 +186,7 @@ export function CustomizableDashboard({
         return <EvolutionChart analyses={analyses} currentAnalysis={currentAnalysis} />;
       case "quantisScore":
         return synthese ? (
-          <QuantisScoreCard
+          <VyzorScoreCard
             score={synthese.score}
             scoreLabel={synthese.scoreLabel}
             scorePiliers={synthese.scorePiliers}
@@ -251,7 +251,7 @@ export function CustomizableDashboard({
         </div>
       ) : null}
 
-      {/* Slot pinned : Quantis Score reste affiché tout le temps en V1. */}
+      {/* Slot pinned : Vyzor Score reste affiché tout le temps en V1. */}
       {pinnedHeaderSlot}
 
       {isLoading ? (

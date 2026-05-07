@@ -38,7 +38,7 @@ export function FinancialStatementsView() {
   // Loader visible uniquement si la requête dépasse 400 ms.
   const showSlowLoader = useDelayedFlag(fetchState === "loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState("Quantis");
+  const [companyName, setCompanyName] = useState("Vyzor");
   const [greetingName, setGreetingName] = useState("Utilisateur");
 
   const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
@@ -79,7 +79,7 @@ export function FinancialStatementsView() {
         getUserProfile(currentUser.uid),
       ]);
       setAnalyses(history);
-      setCompanyName(profile?.companyName?.trim() || "Quantis");
+      setCompanyName(profile?.companyName?.trim() || "Vyzor");
       // Prénom affiché dans le bloc Compte de la sidebar — même règle de
       // résolution que les autres pages (profile.firstName en priorité,
       // puis displayName, puis email).

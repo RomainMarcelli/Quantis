@@ -13,13 +13,13 @@ const STEPS = [
   { icon: FileText, label: "Lecture du document...", threshold: 15 },
   { icon: Search, label: "Extraction des données financières...", threshold: 45 },
   { icon: Calculator, label: "Calcul des indicateurs clés...", threshold: 70 },
-  { icon: BarChart3, label: "Génération de votre score Quantis...", threshold: 90 },
+  { icon: BarChart3, label: "Génération de votre score Vyzor...", threshold: 90 },
   { icon: Save, label: "Finalisation de l'analyse...", threshold: 100 }
 ] as const;
 
 const ROTATING_MESSAGES = [
   "Analyse des ratios financiers en cours...",
-  "Calcul de votre score Quantis...",
+  "Calcul de votre score Vyzor...",
   "Évaluation de la santé financière...",
   "Comparaison avec les benchmarks sectoriels...",
   "Identification des points d'amélioration..."

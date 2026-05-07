@@ -1,7 +1,7 @@
 ﻿// File: tests/quantisScore.test.ts
-// Role: valide le moteur Quantis Score contre la logique Python de référence.
+// Role: valide le moteur Vyzor Score contre la logique Python de référence.
 import { describe, expect, it } from "vitest";
-import { calculateQuantisScore, normalize } from "@/lib/quantisScore";
+import { calculateVyzorScore, normalize } from "@/lib/vyzorScore";
 
 describe("normalize", () => {
   it("retourne 50 quand la valeur est absente ou invalide", () => {
@@ -23,9 +23,9 @@ describe("normalize", () => {
   });
 });
 
-describe("calculateQuantisScore", () => {
+describe("calculateVyzorScore", () => {
   it("calcule le score sur un cas nominal (aligné Python)", () => {
-    const result = calculateQuantisScore({
+    const result = calculateVyzorScore({
       marge_brute_pct: 48,
       marge_ebitda: 22,
       marge_nette_pct: 11,
@@ -45,7 +45,7 @@ describe("calculateQuantisScore", () => {
       ratio_immo_usure: 0.45
     });
 
-    expect(result.quantis_score).toBe(94.8);
+    expect(result.vyzor_score).toBe(94.8);
     expect(result.piliers.rentabilite).toBe(95.6);
     expect(result.piliers.efficacite).toBe(85.4);
     expect(result.piliers.solvabilite).toBe(100);
@@ -54,10 +54,10 @@ describe("calculateQuantisScore", () => {
   });
 
   it("gère les valeurs nulles et applique les defaults Python", () => {
-    const result = calculateQuantisScore({});
+    const result = calculateVyzorScore({});
 
     // Avec les defaults Python: ca=1, point_mort=0, fcf=0, tn=0, ratio_usure=1.0.
-    expect(result.quantis_score).toBe(46.1);
+    expect(result.vyzor_score).toBe(46.1);
     expect(result.piliers.rentabilite).toBe(50);
     expect(result.piliers.efficacite).toBe(42.5);
     expect(result.piliers.solvabilite).toBe(50);
@@ -66,7 +66,7 @@ describe("calculateQuantisScore", () => {
   });
 
   it("clamp le score final entre 0 et 100 sur des extrêmes", () => {
-    const high = calculateQuantisScore({
+    const high = calculateVyzorScore({
       marge_brute_pct: 999,
       marge_ebitda: 999,
       marge_nette_pct: 999,
@@ -86,7 +86,7 @@ describe("calculateQuantisScore", () => {
       ratio_immo_usure: 1
     });
 
-    const low = calculateQuantisScore({
+    const low = calculateVyzorScore({
       marge_brute_pct: -999,
       marge_ebitda: -999,
       marge_nette_pct: -999,
@@ -106,14 +106,14 @@ describe("calculateQuantisScore", () => {
       ratio_immo_usure: 0
     });
 
-    expect(high.quantis_score).toBeGreaterThanOrEqual(0);
-    expect(high.quantis_score).toBeLessThanOrEqual(100);
-    expect(low.quantis_score).toBeGreaterThanOrEqual(0);
-    expect(low.quantis_score).toBeLessThanOrEqual(100);
+    expect(high.vyzor_score).toBeGreaterThanOrEqual(0);
+    expect(high.vyzor_score).toBeLessThanOrEqual(100);
+    expect(low.vyzor_score).toBeGreaterThanOrEqual(0);
+    expect(low.vyzor_score).toBeLessThanOrEqual(100);
   });
 
   it("active le malus investissement de 5 points si ratio_immo_usure < 0.30", () => {
-    const base = calculateQuantisScore({
+    const base = calculateVyzorScore({
       marge_brute_pct: 45,
       marge_ebitda: 18,
       marge_nette_pct: 8,
@@ -133,7 +133,7 @@ describe("calculateQuantisScore", () => {
       ratio_immo_usure: 0.4
     });
 
-    const withMalus = calculateQuantisScore({
+    const withMalus = calculateVyzorScore({
       marge_brute_pct: 45,
       marge_ebitda: 18,
       marge_nette_pct: 8,
@@ -154,7 +154,7 @@ describe("calculateQuantisScore", () => {
     });
 
     expect(withMalus.alerte_investissement).toBe(true);
-    expect(round(base.quantis_score - withMalus.quantis_score, 1)).toBe(5);
+    expect(round(base.vyzor_score - withMalus.vyzor_score, 1)).toBe(5);
   });
 });
 

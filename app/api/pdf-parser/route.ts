@@ -3,7 +3,7 @@ import {
   isPdfPageLimitExceededError,
   processPdfWithDocumentAI
 } from "@/services/documentAI";
-import { mapToQuantisData, type QuantisFinancialData } from "@/services/financialMapping";
+import { mapToVyzorData, type VyzorFinancialData } from "@/services/financialMapping";
 import { computeKpis } from "@/services/kpiEngine";
 import { mapParsedFinancialDataToMappedFinancialData } from "@/services/mapping/parsedFinancialDataBridge";
 import { getFirebaseAdminAuth } from "@/lib/server/firebaseAdmin";
@@ -49,7 +49,7 @@ type PdfParserSuccessResponse = {
   success: true;
   parserVersion: "analysis-engine-v2";
   requestId: string | null;
-  quantisData: QuantisFinancialData;
+  quantisData: VyzorFinancialData;
   mappedData: Record<string, number | null>;
   kpis: Record<string, number | null>;
   confidenceScore: number;
@@ -110,7 +110,7 @@ type PdfParserHistoryResponse =
         id: string;
         createdAt: string;
         source: "pdf";
-        quantisData: QuantisFinancialData;
+        quantisData: VyzorFinancialData;
         confidenceScore: number;
         warnings: string[];
       }>;
@@ -340,7 +340,7 @@ export async function POST(request: NextRequest) {
     const financialData = analysis.parsedFinancialData;
     let mappedData = mapParsedFinancialDataToMappedFinancialData(financialData);
     let kpis = computeKpis(mappedData);
-    let quantisData = mapToQuantisData(financialData);
+    let quantisData = mapToVyzorData(financialData);
     const diagnostics = analysis.diagnostics;
     const warnings = [...diagnostics.warnings];
     if (quantisData.ca !== null && quantisData.ca < 0) {
@@ -359,7 +359,7 @@ export async function POST(request: NextRequest) {
         mergeVisionWithDocumentAI(financialData, visionResult.data, diagnostics.fieldScores);
         mappedData = mapParsedFinancialDataToMappedFinancialData(financialData);
         kpis = computeKpis(mappedData);
-        quantisData = mapToQuantisData(financialData);
+        quantisData = mapToVyzorData(financialData);
         warnings.push(`Vision LLM appliqué (score avant: ${confidenceBefore}, après: ${visionResult.confidenceScore})`);
       }
     } else {

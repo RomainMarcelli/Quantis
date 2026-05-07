@@ -78,7 +78,7 @@ export type WidgetInstance = {
   /** Axe HAUTEUR. Optionnel : défaut "S" (1 rangée). */
   height?: WidgetSize;
   /** Si true : widget non supprimable (X masqué dans WidgetFrame).
-   *  Cas d'usage : Quantis Score sur la Synthèse — toujours visible. */
+   *  Cas d'usage : Vyzor Score sur la Synthèse — toujours visible. */
   isFixed?: boolean;
 };
 

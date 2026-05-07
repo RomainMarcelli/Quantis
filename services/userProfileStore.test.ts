@@ -38,7 +38,7 @@ describe("userProfileStore", () => {
       firstName: "Marie",
       lastName: "Dupont",
       email: "marie@quantis.fr",
-      companyName: "Quantis SAS",
+      companyName: "Vyzor SAS",
       siren: "123456789",
       companySize: "pme",
       sector: "SaaS & Edition de Logiciels",
@@ -85,7 +85,7 @@ describe("userProfileStore", () => {
       data: () => ({
         firstName: "Marie",
         lastName: "Dupont",
-        companyName: "Quantis SAS",
+        companyName: "Vyzor SAS",
         siren: "123456789",
         companySize: "pme",
         sector: "SaaS & Edition de Logiciels",
@@ -101,7 +101,7 @@ describe("userProfileStore", () => {
     expect(result).toEqual({
       firstName: "Marie",
       lastName: "Dupont",
-      companyName: "Quantis SAS",
+      companyName: "Vyzor SAS",
       siren: "123456789",
       companySize: "pme",
       sector: "SaaS & Edition de Logiciels",
@@ -118,7 +118,7 @@ describe("userProfileStore", () => {
     await updateUserProfile("uid-1", {
       firstName: "Marie",
       lastName: "Dupont",
-      companyName: "Quantis SAS",
+      companyName: "Vyzor SAS",
       siren: "123456789",
       companySize: "pme",
       sector: "SaaS & Edition de Logiciels"

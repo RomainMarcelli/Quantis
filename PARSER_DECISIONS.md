@@ -1,5 +1,5 @@
 # PARSER_DECISIONS.md
-> Log des décisions techniques et produit sur le parser Quantis
+> Log des décisions techniques et produit sur le parser Vyzor
 
 ---
 

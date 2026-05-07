@@ -1,6 +1,6 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
-import type { QuantisFinancialData } from "@/services/financialMapping";
+import type { VyzorFinancialData } from "@/services/financialMapping";
 import {
   createEmptyParsedFinancialData,
   type DetectedFinancialSections,
@@ -25,20 +25,20 @@ export type SavedPdfAnalysisRecord = {
   id: string;
   createdAt: string;
   source: "pdf";
-  quantisData: QuantisFinancialData;
+  quantisData: VyzorFinancialData;
   rawData: SavedPdfAnalysisRawData;
 };
 
 type PersistedPdfAnalysis = {
   createdAt: Timestamp | FieldValue;
   source: "pdf";
-  quantisData: QuantisFinancialData;
+  quantisData: VyzorFinancialData;
   rawData: SavedPdfAnalysisRawData;
 };
 
 export async function saveAnalysis(
   userId: string,
-  data: QuantisFinancialData,
+  data: VyzorFinancialData,
   rawData: SavedPdfAnalysisRawData
 ): Promise<{ id: string }> {
   const firestore = getFirebaseAdminFirestore();

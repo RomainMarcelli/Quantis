@@ -1,6 +1,6 @@
-# Configuration CORS pour l'API Python Quantis
+# Configuration CORS pour l'API Python Vyzor
 
-> Statut au 2026-04-01: guide valide et inchangé côté implémentation applicative Quantis.
+> Statut au 2026-04-01: guide valide et inchangé côté implémentation applicative Vyzor.
 > Adapter uniquement la liste `allow_origins` selon les domaines réellement déployés.
 
 ## Problème

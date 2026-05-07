@@ -1,5 +1,5 @@
 // File: lib/kpi/kpiRegistry.ts
-// Role: source de vérité unique pour les KPIs Quantis.
+// Role: source de vérité unique pour les KPIs Vyzor.
 //
 // Chaque KPI est décrit par une `KpiDefinition` qui contient :
 //   - sa formule (humaine et code)

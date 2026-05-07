@@ -1,11 +1,11 @@
-# DOCUMENTATION COMPLETE PROJET - QUANTIS V3
+# DOCUMENTATION COMPLETE PROJET - VYZOR V3
 
 Version: 2026-04-09
 Statut: reference technique active
 Portee: frontend, backend, donnees, securite, tests, operations
 
 ## 1. Resume executif
-Quantis V3 est une application SaaS de pilotage financier pour PME.
+Vyzor V3 est une application SaaS de pilotage financier pour PME.
 Elle transforme des fichiers comptables (Excel, PDF liasse) en donnees structurees, KPI et vues decisionnelles.
 
 Flux coeur:
@@ -31,7 +31,7 @@ Stack coeur:
 - observabilite exploitable en production
 
 ## 3. Architecture globale
-Quantis suit une architecture modulaire en 5 couches.
+Vyzor suit une architecture modulaire en 5 couches.
 
 1) Presentation
 - routes Next.js (`app/*`)
@@ -90,7 +90,7 @@ Pipeline (`services/analysisPipeline.ts`):
 2. merge raw data
 3. mapping 2033 (`services/mapping/financialDataMapper.ts`)
 4. calcul KPI (`services/kpiEngine.ts`)
-5. calcul Quantis score
+5. calcul Vyzor score
 6. retour `analysisDraft`
 
 Persistance:
@@ -106,7 +106,7 @@ Flux:
 2. reception PDF multipart
 3. extraction Document AI (`services/documentAI.ts`)
 4. analyse structuree (`services/pdfAnalysis.ts`)
-5. mapping Quantis (`services/financialMapping.ts`)
+5. mapping Vyzor (`services/financialMapping.ts`)
 6. diagnostics (`confidenceScore`, `warnings`)
 7. persistance (`services/pdfAnalysisStore.ts`)
 8. reponse frontend leger
@@ -228,7 +228,7 @@ Responsabilites:
 - normalisation nombres FR
 - diagnostics (`confidenceScore`, `warnings`)
 
-### 9.3 Mapping Quantis
+### 9.3 Mapping Vyzor
 Service:
 - `services/financialMapping.ts`
 
@@ -379,6 +379,6 @@ Toute evolution architecture/API/securite doit mettre a jour ces fichiers.
 
 ## 19. Changelog documentation
 2026-04-09:
-- reecriture complete alignee avec la version actuelle Quantis V3
+- reecriture complete alignee avec la version actuelle Vyzor V3
 - architecture parser PDF Document AI detaillee
 - suppression du contenu historique non pertinent pour l'etat reel

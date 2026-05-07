@@ -1,6 +1,6 @@
-# Quantis MVP
+# Vyzor MVP
 
-Reconstruction from scratch de Quantis a partir des fichiers Markdown du projet historique.
+Reconstruction from scratch de Vyzor a partir des fichiers Markdown du projet historique.
 
 ## Etat du projet (mise a jour 2026-04-09)
 
@@ -15,7 +15,7 @@ Reconstruction from scratch de Quantis a partir des fichiers Markdown du projet 
 - Parser PDF Document AI operationnel de bout en bout:
   - extraction brute (`rawText`, `pages`, `entities`, `tables`) cote serveur;
   - analyse structuree bilan/compte de resultat (`services/pdfAnalysis.ts`);
-  - mapping donnees Quantis (`services/financialMapping.ts`);
+  - mapping donnees Vyzor (`services/financialMapping.ts`);
   - persistance Firestore des analyses PDF (`services/pdfAnalysisStore.ts`);
   - endpoint `POST /api/pdf-parser` + historique `GET /api/pdf-parser`.
 - UX parser stabilisee sur `/pdf-parser-test`:
@@ -130,7 +130,7 @@ Puis ouvrir `http://localhost:3000`.
 
 ## Email de confirmation
 
-- Envoi gere via Resend (design DA Quantis) avec liens securises Firebase Admin.
+- Envoi gere via Resend (design DA Vyzor) avec liens securises Firebase Admin.
 - Templates utilises:
   - `lib/email/templates/verificationEmailTemplate.ts`
   - `lib/email/templates/passwordResetEmailTemplate.ts`
@@ -153,7 +153,7 @@ Flux implemente:
   - `services/pdfAnalysisStore.ts`
   - `app/api/pdf-parser/route.ts`
 - Mapping 2033: `services/mapping/financialDataMapper.ts`
-- Moteur KPI complet (formules Quantis Mapping): `services/kpiEngine.ts`
+- Moteur KPI complet (formules Vyzor Mapping): `services/kpiEngine.ts`
 - Corrections historiques multi-annees a la lecture:
   - `services/analysisHistory.ts`
   - `services/kpiHistoryEngine.ts`

@@ -13,8 +13,8 @@ import {
   X
 } from "lucide-react";
 import { useProductTour } from "@/hooks/useProductTour";
-import { QuantisSelect } from "@/components/ui/QuantisSelect";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorSelect } from "@/components/ui/VyzorSelect";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { UploadProcessingOverlay } from "@/components/upload/UploadProcessingOverlay";
 import {
   ONBOARDING_UPLOAD_CONTEXT_COMPLETED_EVENT,
@@ -327,7 +327,7 @@ export function UploadPageView() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="rounded-xl border border-white/10 bg-transparent p-1.5">
-              <QuantisLogo withText={false} size={34} imageClassName="h-8 w-8 object-contain" />
+              <VyzorLogo withText={false} size={34} imageClassName="h-8 w-8 object-contain" />
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-quantis-gold">Analyse financière</p>
@@ -431,7 +431,7 @@ export function UploadPageView() {
           <div className="mt-5 grid gap-4 md:grid-cols-2" data-tour-id="upload-context">
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-white">Nombre d&apos;employés (optionnel)</span>
-              <QuantisSelect
+              <VyzorSelect
                 value={companySize}
                 onChange={(value) => setCompanySize(value as CompanySizeValue | "")}
                 placeholder="Sélectionner une tranche"
@@ -445,7 +445,7 @@ export function UploadPageView() {
 
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-white">Secteur d&apos;activité (optionnel)</span>
-              <QuantisSelect
+              <VyzorSelect
                 value={sector}
                 onChange={(value) => {
                   setSector(value);

@@ -91,6 +91,7 @@ import {
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
+import { computeShowTresorerie } from "@/lib/banking/disponibilitesOverride";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
@@ -119,11 +120,17 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
 
-  // L'onglet Trésorerie n'apparaît que si :
-  //  - une connexion Bridge active existe (useBridgeStatus polle /status)
-  //  - OU l'analyse courante porte un bankingSummary (résultat d'un sync
-  //    précédent attaché à cette analyse, même si la connexion vient d'être
-  //    supprimée — l'historique reste exploitable).
+  // L'onglet Trésorerie n'apparaît que si LES TROIS conditions sont vraies :
+  //   1. l'utilisateur a activé Bridge via le toggle de /documents
+  //      (`activeBankingSource === "bridge"`, lu plus bas via useActiveDataSource).
+  //   2. une connexion Bridge active existe (useBridgeStatus polle /status)
+  //      OU l'analyse courante porte un bankingSummary (sync précédent attaché
+  //      à cette analyse, même si la connexion vient d'être supprimée).
+  //   3. (implicite) le toggle l'emporte sur les données en cache : un
+  //      bankingSummary historique n'est plus rendu si l'utilisateur a
+  //      explicitement désactivé sa source banque dans /documents.
+  // L'expression finale est dérivée plus bas, après l'appel à
+  // useActiveDataSource (qui est plus tardif dans la fonction).
   const bridgeStatus = useBridgeStatus();
   // Fallback summary : si l'analyse courante n'a pas de bankingSummary
   // attaché (cas typique : sync standalone effectué depuis Documents sans
@@ -131,7 +138,6 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // status endpoint.
   const bankingSummary =
     analysis?.bankingSummary ?? bridgeStatus.status?.summary ?? null;
-  const showTresorerie = Boolean(bridgeStatus.status?.connected) || bankingSummary !== null;
 
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
@@ -149,7 +155,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [currentFolder, setCurrentFolder] = useState<string>(DEFAULT_FOLDER_NAME);
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
-  const [companyName, setCompanyName] = useState("Quantis");
+  const [companyName, setCompanyName] = useState("Vyzor");
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   // Loader visible uniquement si le chargement dépasse 400 ms (cf. hook).
@@ -221,8 +227,19 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // pointe pas explicitement sur une analyse (analysisId dans la prop), on
   // résout l'analyse à afficher en filtrant la liste par
   // `activeAccountingSource` (et `activeFecFolderName` si FEC).
-  const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
+  const { activeAccountingSource, activeFecFolderName, activeBankingSource } = useActiveDataSource({
     analyses: allAnalyses,
+  });
+
+  // Onglet Trésorerie : visible UNIQUEMENT si l'utilisateur a activé Bridge
+  // via le toggle de /documents. Le toggle l'emporte sur le cache : un
+  // bankingSummary historique attaché à une analyse passée n'est plus
+  // exploité quand l'utilisateur a désactivé sa source banque (cf. brief
+  // data-sources : "désactiver Bridge masque l'onglet Trésorerie").
+  const showTresorerie = computeShowTresorerie({
+    activeBankingSource,
+    bridgeConnected: Boolean(bridgeStatus.status?.connected),
+    hasBankingSummary: bankingSummary !== null,
   });
 
   // Sync currentFolder local avec l'éventuel folder FEC actif.
@@ -500,7 +517,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
       setAllAnalyses(history);
       setGreetingName(resolveFirstName(currentUser, profile?.firstName));
-      setCompanyName(profile?.companyName?.trim() || "Quantis");
+      setCompanyName(profile?.companyName?.trim() || "Vyzor");
       const persistedFolderNames = persistedFolders.map((folder) => normalizeFolderName(folder.name));
       persistedFolderNames.forEach((folderName) => registerKnownFolderName(folderName));
       setKnownFolders(getKnownFolderNames());
@@ -1316,7 +1333,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 kpis={effectiveAnalysis?.kpis ?? analysis.kpis}
                 mappedData={effectiveAnalysis?.mappedData ?? analysis.mappedData}
                 previousKpis={previousPeriodKpis ?? previousAnalysis?.kpis ?? null}
-                bankingSummary={bankingSummary}
+                bankingSummary={showTresorerie ? bankingSummary : null}
                 analyses={allAnalyses}
                 currentAnalysis={analysis}
                 analysisModeLabel={

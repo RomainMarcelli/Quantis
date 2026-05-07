@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   processPdfWithDocumentAIMock,
   analyzeFinancialDocumentMock,
-  mapToQuantisDataMock,
+  mapToVyzorDataMock,
   verifyIdTokenMock,
   saveAnalysisMock,
   getUserAnalysesMock,
@@ -11,7 +11,7 @@ const {
 } = vi.hoisted(() => ({
   processPdfWithDocumentAIMock: vi.fn(),
   analyzeFinancialDocumentMock: vi.fn(),
-  mapToQuantisDataMock: vi.fn(),
+  mapToVyzorDataMock: vi.fn(),
   verifyIdTokenMock: vi.fn(),
   saveAnalysisMock: vi.fn(),
   getUserAnalysesMock: vi.fn(),
@@ -28,7 +28,7 @@ vi.mock("@/services/pdfAnalysis", () => ({
   analyzeFinancialDocument: analyzeFinancialDocumentMock
 }));
 vi.mock("@/services/financialMapping", () => ({
-  mapToQuantisData: mapToQuantisDataMock
+  mapToVyzorData: mapToVyzorDataMock
 }));
 vi.mock("@/lib/server/firebaseAdmin", () => ({
   getFirebaseAdminAuth: () => ({
@@ -63,7 +63,7 @@ describe("POST /api/pdf-parser", () => {
       entities: [{ type: "amount" }],
       tables: [{ headerRows: [] }]
     });
-    mapToQuantisDataMock.mockReturnValue({
+    mapToVyzorDataMock.mockReturnValue({
       ca: 300,
       totalCharges: 400,
       netResult: -100,
@@ -198,7 +198,7 @@ describe("POST /api/pdf-parser", () => {
     expect(payload.debugData).toBeUndefined();
     expect(processPdfWithDocumentAIMock).toHaveBeenCalledTimes(1);
     expect(analyzeFinancialDocumentMock).toHaveBeenCalledTimes(1);
-    expect(mapToQuantisDataMock).toHaveBeenCalledTimes(1);
+    expect(mapToVyzorDataMock).toHaveBeenCalledTimes(1);
     expect(saveAnalysisMock).toHaveBeenCalledTimes(1);
     expect(saveAnalysisMock).toHaveBeenCalledWith(
       "user-1",
@@ -319,7 +319,7 @@ describe("POST /api/pdf-parser", () => {
   });
 
   it("ajoute un warning si le CA calcule est negatif", async () => {
-    mapToQuantisDataMock.mockReturnValueOnce({
+    mapToVyzorDataMock.mockReturnValueOnce({
       ca: -7105,
       totalCharges: 400,
       netResult: -100,
@@ -355,7 +355,7 @@ describe("GET /api/pdf-parser", () => {
       entities: [{ type: "amount" }],
       tables: [{ headerRows: [] }]
     });
-    mapToQuantisDataMock.mockReturnValue({
+    mapToVyzorDataMock.mockReturnValue({
       ca: 300,
       totalCharges: 400,
       netResult: -100,

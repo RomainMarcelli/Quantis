@@ -1,7 +1,7 @@
 ﻿// File: lib/quantisScore.ts
-// Role: calcule le Quantis Score (QS) V1 avec la logique Python de reference, en fonction pure TypeScript.
+// Role: calcule le Vyzor Score (QS) V1 avec la logique Python de reference, en fonction pure TypeScript.
 
-export type QuantisScoreInputKpis = {
+export type VyzorScoreInputKpis = {
   // Entrees attendues par la formule de scoring.
   marge_brute_pct?: number | null;
   marge_ebitda?: number | null;
@@ -30,8 +30,8 @@ export type QuantisScoreInputKpis = {
   etat_materiel_indice?: number | null;
 };
 
-export type QuantisScoreResult = {
-  quantis_score: number;
+export type VyzorScoreResult = {
+  vyzor_score: number;
   piliers: {
     rentabilite: number;
     solvabilite: number;
@@ -83,7 +83,7 @@ export function normalize(
   return (100 * (numericValue - minVal)) / (maxVal - minVal);
 }
 
-export function calculateQuantisScore(kpis: QuantisScoreInputKpis): QuantisScoreResult {
+export function calculateVyzorScore(kpis: VyzorScoreInputKpis): VyzorScoreResult {
   const input = resolveScoreInputs(kpis);
 
   // --- 1. PILIER RENTABILITE (35%) ---
@@ -145,7 +145,7 @@ export function calculateQuantisScore(kpis: QuantisScoreInputKpis): QuantisScore
   const finalScore = clamp(finalScoreRaw, 0, 100);
 
   return {
-    quantis_score: round(finalScore, 1),
+    vyzor_score: round(finalScore, 1),
     piliers: {
       rentabilite: round(pRentabilite, 1),
       solvabilite: round(pSolvabilite, 1),
@@ -156,7 +156,7 @@ export function calculateQuantisScore(kpis: QuantisScoreInputKpis): QuantisScore
   };
 }
 
-type QuantisScoreResolvedInput = {
+type VyzorScoreResolvedInput = {
   marge_brute_pct: number | null;
   marge_ebitda: number | null;
   marge_nette_pct: number | null;
@@ -176,7 +176,7 @@ type QuantisScoreResolvedInput = {
   ratio_immo_usure: number | null;
 };
 
-function resolveScoreInputs(kpis: QuantisScoreInputKpis): QuantisScoreResolvedInput {
+function resolveScoreInputs(kpis: VyzorScoreInputKpis): VyzorScoreResolvedInput {
   const ca = pickNumber(kpis.ca);
   const resultatNet = pickNumber(kpis.resultat_net, kpis.netProfit);
 
@@ -205,7 +205,7 @@ function resolveScoreInputs(kpis: QuantisScoreInputKpis): QuantisScoreResolvedIn
   };
 }
 
-function resolveRatioImmoUsure(kpis: QuantisScoreInputKpis): number | null {
+function resolveRatioImmoUsure(kpis: VyzorScoreInputKpis): number | null {
   const direct = pickNumber(kpis.ratio_immo_usure);
   if (direct !== null) {
     return ratioIfPercent(direct);

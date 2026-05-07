@@ -80,7 +80,7 @@ export const WIDGET_CATEGORIES: WidgetCategoryDefinition[] = [
 ];
 
 // Catégories du registre KPI hors picker (Phase 1) : "score" reste invisible
-// car healthScore est rendu dans son propre QuantisScoreCard, pas dans la grille.
+// car healthScore est rendu dans son propre VyzorScoreCard, pas dans la grille.
 const HIDDEN_CATEGORIES = new Set(["score"]);
 
 // Convertit une SyntheseWidgetDefinition en PickerEntry uniforme.

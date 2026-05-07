@@ -379,7 +379,7 @@ export function ValueCreationTest({
               </div>
               <div className="flex flex-col gap-1">
                 <span className="agent-kicker text-[10px] font-mono">
-                  QUANTIS_AGENT {" > "} SIMULATION RENTABILITÉ
+                  VYZOR_AGENT {" > "} SIMULATION RENTABILITÉ
                 </span>
                 <p className={`text-[14px] font-medium ${isDark ? "text-white/80" : "text-slate-700"}`}>
                   {simulationLabel}

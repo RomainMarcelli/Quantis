@@ -341,7 +341,7 @@ export function FinancingTest({
               </div>
               <div className="flex flex-col gap-1">
                 <span className="agent-kicker text-[10px] font-mono">
-                  QUANTIS_AGENT {" > "} MODÉLISATION DE FINANCEMENT
+                  VYZOR_AGENT {" > "} MODÉLISATION DE FINANCEMENT
                 </span>
                 <p className="text-[14px] font-medium agent-message">
                   Capacité d&apos;emprunt résiduelle estimée pour le prochain cycle de financement.

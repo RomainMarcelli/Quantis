@@ -358,7 +358,7 @@ export function RentabilityTest({
               </div>
               <div className="flex flex-col gap-1">
                 <span className="agent-kicker text-[10px] font-mono">
-                  QUANTIS_AGENT {" > "} RECOMMANDATION STRATÉGIQUE
+                  VYZOR_AGENT {" > "} RECOMMANDATION STRATÉGIQUE
                 </span>
                 <p className="text-[14px] font-medium agent-message">
                   {spread !== null && spread < 0

@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, Info, Save } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import { buildCompleteKpis, type ManualKpiInput } from "@/lib/kpiBuilder";
-import { calculateQuantisScore } from "@/lib/quantisScore";
+import { calculateVyzorScore } from "@/lib/vyzorScore";
 import { DEFAULT_FOLDER_NAME, registerKnownFolderName } from "@/lib/folders/folderRegistry";
 import { writeActiveAccountingSource } from "@/services/dataSourcesStore";
 import { createEmptyMappedFinancialData } from "@/services/mapping/financialDataMapper";
@@ -135,10 +135,10 @@ export function ManualKpiEntryView() {
       // Pipeline demandé:
       // 1) input utilisateur
       // 2) buildCompleteKpis
-      // 3) calculateQuantisScore
+      // 3) calculateVyzorScore
       // 4) sauvegarde + affichage synthèse
       const completeKpis = buildCompleteKpis(parsed.value);
-      const quantisScore = calculateQuantisScore(completeKpis);
+      const quantisScore = calculateVyzorScore(completeKpis);
 
       const mappedData = createEmptyMappedFinancialData();
       mappedData.total_actif = parsed.value.total_actif;
@@ -238,12 +238,12 @@ export function ManualKpiEntryView() {
               Saisie manuelle <span className="text-quantis-gold">des KPI</span>
             </h1>
             <p className="mt-2 text-sm text-white/70">
-              Renseignez quelques indicateurs simples. Quantis calcule ensuite automatiquement les KPI avancés
-              pour produire un Quantis Score fiable.
+              Renseignez quelques indicateurs simples. Vyzor calcule ensuite automatiquement les KPI avancés
+              pour produire un Vyzor Score fiable.
             </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-            <QuantisLogo withText={false} size={34} />
+            <VyzorLogo withText={false} size={34} />
           </div>
         </div>
       </header>

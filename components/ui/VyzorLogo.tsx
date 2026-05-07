@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-type QuantisLogoProps = {
+type VyzorLogoProps = {
   size?: number;
   withText?: boolean;
   textClassName?: string;
@@ -11,26 +11,26 @@ type QuantisLogoProps = {
   href?: string | null;
 };
 
-export function QuantisLogo({
+export function VyzorLogo({
   size = 28,
   withText = true,
   textClassName = "text-xs uppercase tracking-wide text-quantis-slate",
   className = "",
   imageClassName = "shrink-0 bg-transparent object-contain",
   href = "/"
-}: QuantisLogoProps) {
+}: VyzorLogoProps) {
   const content = (
     <>
       {/* Source unique du logo applicatif pour garantir une cohérence globale dans toute l'application. */}
       <Image
         src="/images/LogoV3.png"
-        alt="Logo Quantis"
+        alt="Logo Vyzor"
         width={size}
         height={size}
         className={imageClassName}
         priority
       />
-      {withText ? <span className={textClassName}>Quantis</span> : null}
+      {withText ? <span className={textClassName}>Vyzor</span> : null}
     </>
   );
 

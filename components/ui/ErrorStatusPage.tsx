@@ -1,8 +1,8 @@
 // File: components/ui/ErrorStatusPage.tsx
-// Role: composant de page d'erreur premium réutilisable (404/403/501) cohérent avec la DA Quantis.
+// Role: composant de page d'erreur premium réutilisable (404/403/501) cohérent avec la DA Vyzor.
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 
 type ErrorStatusPageProps = {
   statusCode: number;
@@ -26,7 +26,7 @@ export function ErrorStatusPage({
 
       <section className="precision-card relative z-10 w-full rounded-2xl p-8 md:p-10">
         <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={36} className="rounded-lg border border-white/15 bg-black/25 p-1.5" />
+          <VyzorLogo withText={false} size={36} className="rounded-lg border border-white/15 bg-black/25 p-1.5" />
           <p className="text-xs uppercase tracking-[0.18em] text-white/50">Erreur application</p>
         </div>
 

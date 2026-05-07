@@ -26,7 +26,7 @@ import {
   EyeOff,
   Loader2,
 } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { LegalFooter } from "@/components/layout/LegalFooter";
 import { firebaseAuthGateway } from "@/services/auth";
 import {
@@ -287,7 +287,7 @@ export function AuthPage({
             {/* Logo mobile : la colonne branding est masquée → on remet un
                 logo en haut du form pour ne pas laisser l'écran nu. */}
             <div className="mb-8 flex justify-center lg:hidden">
-              <QuantisLogo withText size={28} />
+              <VyzorLogo withText size={28} />
             </div>
 
             {mode === "login" && (
@@ -429,7 +429,7 @@ function BrandingPanel() {
 
       {/* Header : logo centré. */}
       <div className="relative z-10 flex justify-center">
-        <QuantisLogo withText size={32} />
+        <VyzorLogo withText size={32} />
       </div>
 
       {/* Contenu central — centré horizontalement et verticalement. */}
