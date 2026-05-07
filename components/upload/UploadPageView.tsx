@@ -27,6 +27,7 @@ import {
 } from "@/lib/onboarding/options";
 import type { CompanySizeValue } from "@/lib/onboarding/options";
 import { DEFAULT_FOLDER_NAME, registerKnownFolderName } from "@/lib/folders/folderRegistry";
+import { writeActiveAccountingSource } from "@/services/dataSourcesStore";
 import { validateUploadInput } from "@/lib/upload/uploadValidation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firebaseStorage } from "@/lib/firebase";
@@ -296,8 +297,15 @@ export function UploadPageView() {
       // "Aucune synthèse" parce que activeAccountingSource reste null.
       // L'auto-activation par sync (Pennylane/MyUnisoft/Odoo) a la même
       // sémantique : choix explicite de l'user = source active.
-      const { writeActiveAccountingSource } = await import("@/services/dataSourcesStore");
-      await writeActiveAccountingSource(user.uid, "fec", persistedDraft.folderName);
+      // Si l'écriture Firestore échoue (rules manquantes, quota), on log
+      // mais on n'empêche PAS la redirection — la liste des analyses est
+      // sauvée, l'utilisateur pourra activer manuellement plus tard.
+      try {
+        await writeActiveAccountingSource(user.uid, "fec", persistedDraft.folderName);
+      } catch (err) {
+        // eslint-disable-next-line no-console -- monitoring temporaire
+        console.warn("[upload] auto-activate FEC source failed", err);
+      }
       setLocalAnalysisHint(true);
       setIsAnalysisComplete(true);
       setSuccessMessage("Analyse créée avec succès. Redirection vers la synthèse...");
