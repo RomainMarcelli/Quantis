@@ -153,7 +153,7 @@ export function SyntheseView() {
   // Si l'utilisateur n'a rien sélectionné (toggle binaire vert/rouge dans
   // /documents), `activeAccountingSource` est null → on n'affiche pas de
   // dashboard, on guide l'utilisateur à choisir.
-  const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
+  const { activeAccountingSource, activeFecFolderName, activeBankingSource } = useActiveDataSource({
     analyses: allAnalyses,
   });
 
@@ -410,6 +410,7 @@ export function SyntheseView() {
               previousKpis={previousKpis}
               analyses={allAnalyses}
               currentAnalysis={analysisPair.current}
+              activeBankingSource={activeBankingSource}
               periodLabel={
                 shouldShowTemporalityBar(analysisPair.current)
                   ? null
