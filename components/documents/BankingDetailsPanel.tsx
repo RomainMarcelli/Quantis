@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react";
+import { Power } from "lucide-react";
 import { formatCurrency } from "@/components/dashboard/formatting";
 
 type BridgeStatusLike = {
@@ -30,7 +31,10 @@ type BridgeStatusLike = {
 
 type BankingDetailsPanelProps = {
   status: BridgeStatusLike | null;
+  /** True = connecté ET activé (vert) ; false = connecté mais désactivé (rouge). */
+  isActive: boolean;
   onSync: () => void | Promise<void>;
+  onActivate: () => void | Promise<void>;
   onDeactivate: () => void | Promise<void>;
   onDisconnect: () => void | Promise<void>;
   syncing?: boolean;
@@ -39,7 +43,9 @@ type BankingDetailsPanelProps = {
 
 export function BankingDetailsPanel({
   status,
+  isActive,
   onSync,
+  onActivate,
   onDeactivate,
   onDisconnect,
   syncing = false,
@@ -49,6 +55,12 @@ export function BankingDetailsPanel({
   const accountsCount = status?.accountsCount ?? 0;
   const totalBalance = status?.totalBalance ?? null;
   const lastSyncLabel = status?.lastSyncAt ? formatRelativeFrench(status.lastSyncAt) : "Jamais";
+
+  // Pastille verte (active) ou rouge (désactivée). Cohérent avec le panneau
+  // comptable : la pastille reflète l'état Firestore activeBankingSource.
+  const dotColor = isActive ? "#22C55E" : "#EF4444";
+  const dotBg = isActive ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)";
+  const dotBorder = isActive ? "rgba(34, 197, 94, 0.3)" : "rgba(239, 68, 68, 0.3)";
 
   return (
     <section
@@ -66,9 +78,9 @@ export function BankingDetailsPanel({
             aria-hidden
             className="inline-flex h-8 w-8 items-center justify-center rounded-lg"
             style={{
-              backgroundColor: "rgba(34, 197, 94, 0.15)",
-              border: "1px solid rgba(34, 197, 94, 0.3)",
-              color: "#22C55E",
+              backgroundColor: dotBg,
+              border: `1px solid ${dotBorder}`,
+              color: dotColor,
             }}
           >
             <CheckCircle2 className="h-4 w-4" />
@@ -76,6 +88,12 @@ export function BankingDetailsPanel({
           <div>
             <p style={{ color: "#FFFFFF", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>
               Bridge
+              {!isActive ? (
+                <span style={{ color: "#FCA5A5", fontWeight: 500, fontSize: 14 }}>
+                  {" · "}
+                  Désactivée
+                </span>
+              ) : null}
             </p>
             <p className="mt-0.5" style={{ color: "#9CA3AF", fontSize: 14 }}>
               {accountsCount > 0
@@ -98,14 +116,25 @@ export function BankingDetailsPanel({
         >
           {syncing ? "Synchronisation…" : "Synchroniser"}
         </ActionButton>
-        <ActionButton
-          icon={PowerOff}
-          onClick={onDeactivate}
-          disabled={syncing || disconnecting}
-          tone="neutral"
-        >
-          Désactiver
-        </ActionButton>
+        {isActive ? (
+          <ActionButton
+            icon={PowerOff}
+            onClick={onDeactivate}
+            disabled={syncing || disconnecting}
+            tone="neutral"
+          >
+            Désactiver
+          </ActionButton>
+        ) : (
+          <ActionButton
+            icon={Power}
+            onClick={onActivate}
+            disabled={syncing || disconnecting}
+            tone="gold"
+          >
+            Activer
+          </ActionButton>
+        )}
         <ActionButton
           icon={disconnecting ? Loader2 : Trash2}
           spinning={disconnecting}

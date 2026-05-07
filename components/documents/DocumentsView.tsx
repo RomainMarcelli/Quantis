@@ -576,26 +576,34 @@ export function DocumentsView() {
                   : "Connectez vos comptes bancaires pour enrichir vos analyses avec les flux en temps réel."
               }
             >
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-                <SourceTile
-                  name="Bridge"
-                  subtitle="Open Banking PSD2"
-                  logo={<TileLogo src="/images/integrations/bridge.svg" alt="Bridge" fallback="🏦" />}
-                  state={tileStateForBanking()}
-                  onClick={handleBankingTileClick}
-                />
-              </div>
-
-              {activeBankingSource === "bridge" ? (
+              {/* Symétrie avec le bloc comptable :
+                  - Bridge non connecté → tuile unique "Connecter" (onboarding).
+                  - Bridge connecté (actif OU désactivé) → panneau de détails
+                    unifié uniquement, pas de tuile en doublon.
+                  Pas de bouton "Changer de source ▾" car Bridge est le seul
+                  provider bancaire pour l'instant. */}
+              {!bridgeStatus.status?.connected ? (
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+                  <SourceTile
+                    name="Bridge"
+                    subtitle="Open Banking PSD2"
+                    logo={<TileLogo src="/images/integrations/bridge.svg" alt="Bridge" fallback="🏦" />}
+                    state="disconnected"
+                    onClick={handleBankingTileClick}
+                  />
+                </div>
+              ) : (
                 <BankingDetailsPanel
                   status={bridgeStatus.status ?? null}
+                  isActive={activeBankingSource === "bridge"}
                   onSync={handleBridgeSync}
+                  onActivate={() => setActiveBankingSource("bridge")}
                   onDeactivate={() => setActiveBankingSource(null)}
                   onDisconnect={handleBridgeDisconnect}
                   syncing={bridgeBusy.syncing}
                   disconnecting={bridgeBusy.disconnecting}
                 />
-              ) : null}
+              )}
             </SourceBlock>
           ) : null}
 
