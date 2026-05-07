@@ -1,7 +1,7 @@
 // Client HTTP minimal pour l'API MyUnisoft v1.
 //
 // Auth = 2 headers :
-//  - X-Third-Party-Secret = clé partenaire fixe (env MYUNISOFT_PARTNER_SECRET)
+//  - X-Third-Party-Secret = clé partenaire fixe (env MYUNISOFT_THIRD_PARTY_SECRET)
 //  - Authorization: Bearer <JWT>  = token par cabinet/société (depuis la connection)
 //
 // Doc : https://partners.api.myunisoft.fr/
@@ -28,10 +28,10 @@ function getBaseUrl(): string {
 }
 
 function getPartnerSecret(): string {
-  const secret = process.env.MYUNISOFT_PARTNER_SECRET;
+  const secret = process.env.MYUNISOFT_THIRD_PARTY_SECRET;
   if (!secret) {
     throw new Error(
-      "MYUNISOFT_PARTNER_SECRET is not configured. Add it to your .env to use the MyUnisoft adapter."
+      "MYUNISOFT_THIRD_PARTY_SECRET is not configured. Add it to your .env to use the MyUnisoft adapter."
     );
   }
   return secret;

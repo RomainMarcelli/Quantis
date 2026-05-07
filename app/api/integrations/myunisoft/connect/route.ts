@@ -1,7 +1,7 @@
 // POST /api/integrations/myunisoft/connect
 // Crée une connection MyUnisoft pour l'utilisateur courant.
 // Auth = JWT MyUnisoft (par cabinet/société) + ID externe de la société.
-// Le X-Third-Party-Secret partenaire est lu côté serveur depuis MYUNISOFT_PARTNER_SECRET.
+// Le X-Third-Party-Secret partenaire est lu côté serveur depuis MYUNISOFT_THIRD_PARTY_SECRET.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { buildPartnerJwtAuth } from "@/services/integrations/adapters/myunisoft/auth";
