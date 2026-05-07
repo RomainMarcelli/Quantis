@@ -79,20 +79,23 @@ export type KpiCardLayoutProps = {
   disableTooltip?: boolean;
 };
 
+// Couleurs sourcées des CSS vars sémantiques (cf. app/globals.css) pour
+// que ces inline styles flip automatiquement entre dark et light. Sans ça
+// les hex hardcodés #FFFFFF restaient blancs sur fond clair = illisibles.
 const HEADER_NAME_STYLE: React.CSSProperties = {
   fontSize: "10px",
   letterSpacing: "0.05em",
-  color: "#9CA3AF",
+  color: "var(--app-text-secondary)",
 };
 
 const TITLE_STYLE: React.CSSProperties = {
   fontSize: "16px",
-  color: "#FFFFFF",
+  color: "var(--app-text-primary)",
 };
 
 const VALUE_STYLE: React.CSSProperties = {
   fontSize: "32px",
-  color: "#FFFFFF",
+  color: "var(--app-text-primary)",
 };
 
 const VARIATION_STYLE: React.CSSProperties = {

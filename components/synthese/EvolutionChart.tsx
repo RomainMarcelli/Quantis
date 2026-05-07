@@ -45,8 +45,11 @@ type EvolutionChartProps = {
   currentAnalysis: AnalysisRecord | null;
 };
 
-const COLOR_CA = "#FFFFFF";
-const COLOR_EBE = "#C5A059";
+// Couleurs des séries — référencent les CSS vars qui flip selon le theme.
+// COLOR_CA pointe vers `--app-text-primary` : blanc en dark, noir en light.
+// COLOR_EBE pointe vers `--app-brand-gold` : flip aussi.
+const COLOR_CA = "var(--app-text-primary)";
+const COLOR_EBE = "var(--app-brand-gold)";
 const COLOR_RESULTAT = "#34D399";
 
 const SERIES_LABELS = {

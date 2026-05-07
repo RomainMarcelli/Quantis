@@ -81,7 +81,7 @@ export function AccountingDetailsPanel({
     <section
       className="rounded-2xl p-5"
       style={{
-        backgroundColor: "rgba(15, 15, 18, 0.85)",
+        backgroundColor: "var(--app-card-glass-bg)",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
         border: "1px solid rgba(197, 160, 89, 0.25)",
@@ -101,16 +101,16 @@ export function AccountingDetailsPanel({
             <CheckCircle2 className="h-4 w-4" />
           </span>
           <div>
-            <p style={{ color: "#FFFFFF", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>
+            <p style={{ color: "var(--app-text-primary)", fontSize: 18, fontWeight: 600, letterSpacing: "-0.01em" }}>
               {SOURCE_LABELS[source]}
               {isFec && fecFolderName ? (
-                <span style={{ color: "#9CA3AF", fontWeight: 400, fontSize: 14 }}>
+                <span style={{ color: "var(--app-text-secondary)", fontWeight: 400, fontSize: 14 }}>
                   {" · "}
                   {fecFolderName}
                 </span>
               ) : null}
             </p>
-            <p className="mt-0.5" style={{ color: "#9CA3AF", fontSize: 14 }}>
+            <p className="mt-0.5" style={{ color: "var(--app-text-secondary)", fontSize: 14 }}>
               {isFec
                 ? `${fecAnalysisCount} liasse${fecAnalysisCount > 1 ? "s" : ""} dans ce dossier · Dernière mise à jour ${lastSyncLabel}`
                 : `Dernière sync ${lastSyncLabel}`}
@@ -202,7 +202,7 @@ export function AccountingDetailsPanel({
           {showTechnical ? (
             <dl
               className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-[12px] sm:grid-cols-2"
-              style={{ color: "#9CA3AF" }}
+              style={{ color: "var(--app-text-secondary)" }}
             >
               <TechRow label="Provider" value={connection.provider} mono />
               <TechRow label="Token" value={connection.tokenPreview} mono />

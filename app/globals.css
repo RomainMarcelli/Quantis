@@ -70,17 +70,19 @@
   --app-text-primary: #0A0A0F;        /* presque noir, jamais noir pur */
   --app-text-secondary: #4B5563;
   --app-text-tertiary: #6B7280;
-  --app-text-on-gold: #FFFFFF;        /* gold light = brun foncé → texte blanc */
-  --app-brand-gold: #8B6F2A;          /* brun-doré profond, lisible sur blanc */
-  --app-brand-gold-hover: #6F5921;
-  --app-brand-gold-rgb: 139 111 42;
+  --app-text-on-gold: #FFFFFF;        /* gold light = brun moyen → texte blanc OK */
+  --app-brand-gold: #A88847;          /* café-au-lait gold — intermédiaire entre
+                                          le doré dark (#C5A059) et un brun trop
+                                          foncé. WCAG AA sur blanc (~4.6:1). */
+  --app-brand-gold-hover: #8B6F2A;
+  --app-brand-gold-rgb: 168 136 71;
   --app-success: #16A34A;             /* vert profond, lisible sur blanc */
   --app-danger: #DC2626;
   --app-danger-soft: #B91C1C;
   --app-warning: #D97706;
   --app-border: rgb(0 0 0 / 8%);
   --app-border-strong: rgb(0 0 0 / 12%);
-  --app-glow-gold: 0 0 24px rgb(139 111 42 / 10%);
+  --app-glow-gold: 0 0 24px rgb(168 136 71 / 10%);
   --app-overlay: rgb(0 0 0 / 30%);
   --app-surface-soft: rgb(0 0 0 / 3%);
   --app-surface-medium: rgb(0 0 0 / 6%);
@@ -104,9 +106,9 @@
   --quantis-card-border-top: rgb(0 0 0 / 12%);
   --quantis-card-shadow: 0 8px 24px -12px rgb(15 23 42 / 18%);
   --quantis-noise-opacity: 0.008;
-  --quantis-spotlight: radial-gradient(ellipse at center, rgb(139 111 42 / 8%) 0%, transparent 62%);
+  --quantis-spotlight: radial-gradient(ellipse at center, rgb(168 136 71 / 8%) 0%, transparent 62%);
   --quantis-card-header-border: rgb(0 0 0 / 8%);
-  --quantis-card-header-border-hover: rgb(139 111 42 / 35%);
+  --quantis-card-header-border-hover: rgb(168 136 71 / 35%);
   --quantis-edu-text: rgb(75 85 99 / 80%);
   --quantis-edu-text-hover: rgb(10 10 15 / 90%);
   color-scheme: light;
@@ -139,7 +141,7 @@ body {
      trop fort, on adoucit. */
   & body {
     background:
-      radial-gradient(circle at 18% -10%, rgb(139 111 42 / 6%), transparent 35%),
+      radial-gradient(circle at 18% -10%, rgb(168 136 71 / 6%), transparent 35%),
       radial-gradient(circle at 85% -20%, rgb(22 163 74 / 4%), transparent 40%),
       var(--quantis-smoke);
   }
@@ -165,20 +167,20 @@ body {
 
   /* ── Brand gold (Tailwind config + classes existantes) ── */
   & .text-quantis-gold { color: var(--app-brand-gold) !important; }
-  & .text-quantis-gold\/90 { color: rgb(139 111 42 / 90%) !important; }
-  & .text-quantis-gold\/80 { color: rgb(139 111 42 / 80%) !important; }
-  & .text-quantis-gold\/70 { color: rgb(139 111 42 / 70%) !important; }
-  & .text-quantis-gold\/60 { color: rgb(139 111 42 / 60%) !important; }
+  & .text-quantis-gold\/90 { color: rgb(168 136 71 / 90%) !important; }
+  & .text-quantis-gold\/80 { color: rgb(168 136 71 / 80%) !important; }
+  & .text-quantis-gold\/70 { color: rgb(168 136 71 / 70%) !important; }
+  & .text-quantis-gold\/60 { color: rgb(168 136 71 / 60%) !important; }
   & .border-quantis-gold,
   & .border-quantis-gold\/60,
   & .border-quantis-gold\/40,
   & .border-quantis-gold\/30 { border-color: var(--app-brand-gold) !important; }
-  & .bg-quantis-gold\/15 { background-color: rgb(139 111 42 / 15%) !important; }
-  & .bg-quantis-gold\/12 { background-color: rgb(139 111 42 / 12%) !important; }
-  & .bg-quantis-gold\/10 { background-color: rgb(139 111 42 / 10%) !important; }
-  & .bg-quantis-gold\/\[0\.08\] { background-color: rgb(139 111 42 / 8%) !important; }
-  & .bg-quantis-gold\/\[0\.06\] { background-color: rgb(139 111 42 / 6%) !important; }
-  & .bg-quantis-gold\/\[0\.04\] { background-color: rgb(139 111 42 / 4%) !important; }
+  & .bg-quantis-gold\/15 { background-color: rgb(168 136 71 / 15%) !important; }
+  & .bg-quantis-gold\/12 { background-color: rgb(168 136 71 / 12%) !important; }
+  & .bg-quantis-gold\/10 { background-color: rgb(168 136 71 / 10%) !important; }
+  & .bg-quantis-gold\/\[0\.08\] { background-color: rgb(168 136 71 / 8%) !important; }
+  & .bg-quantis-gold\/\[0\.06\] { background-color: rgb(168 136 71 / 6%) !important; }
+  & .bg-quantis-gold\/\[0\.04\] { background-color: rgb(168 136 71 / 4%) !important; }
 
   /* ── Surfaces sombres → surfaces claires ── */
   & .bg-black\/55,
