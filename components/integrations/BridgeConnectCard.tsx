@@ -27,6 +27,8 @@ import {
 import { firebaseAuthGateway } from "@/services/auth";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
 import { formatCurrency } from "@/components/dashboard/formatting";
+import { DataSourceToggle } from "@/components/integrations/DataSourceToggle";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
 
 type BridgeConnectCardProps = {
   /** Callback quand un sync vient de se terminer — utilisé pour rafraîchir
@@ -36,6 +38,7 @@ type BridgeConnectCardProps = {
 
 export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
   const { status, loading, refresh } = useBridgeStatus();
+  const { activeBankingSource, setActiveBankingSource } = useActiveDataSource();
   const [busy, setBusy] = useState<"connect" | "sync" | "disconnect" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -219,6 +222,23 @@ export function BridgeConnectCard({ onChanged }: BridgeConnectCardProps) {
         </div>
 
         <div className="flex flex-shrink-0 flex-wrap items-center gap-2 md:self-center">
+          {/* Toggle binaire "Active / Désactivée" — Bridge est indépendant
+              de la source comptable (peut coexister). Désactivé tant que
+              la connexion n'est pas établie : on ne peut pas activer une
+              source bancaire qui n'existe pas encore. */}
+          <DataSourceToggle
+            isActive={activeBankingSource === "bridge"}
+            disabled={!isConnected}
+            onToggle={async (next) => {
+              await setActiveBankingSource(next ? "bridge" : null);
+            }}
+            title={
+              isConnected
+                ? "Inclure les KPI banque dans le pipeline (Trésorerie, Disponibilités)"
+                : "Connectez Bridge d'abord"
+            }
+            label={{ disabled: "Connectez d'abord" }}
+          />
           {!isConnected ? (
             <button
               type="button"

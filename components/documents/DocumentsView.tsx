@@ -30,6 +30,7 @@ import {
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
 import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { DataSourceToggle } from "@/components/integrations/DataSourceToggle";
 import {
   listUserFolders,
   createUserFolder,
@@ -79,6 +80,7 @@ export function DocumentsView() {
   const {
     activeAccountingSource,
     activeFecFolderName: activeFolderName,
+    setActiveAccountingSource,
   } = useActiveDataSource();
 
   useEffect(() => {
@@ -260,11 +262,11 @@ export function DocumentsView() {
             />
           </div>
 
-          {/* Stats + Bouton "Source active du dashboard" au niveau dossier.
-              Quand on clique, on enregistre `activeFolderName` (toutes les
-              liasses du dossier deviennent disponibles via le sélecteur de
-              période côté Synthèse) et on clear l'override par analyse — ça
-              force le résolveur à utiliser le dossier comme source statique. */}
+          {/* Stats + toggle binaire "Active / Désactivée" pour la source FEC
+              au niveau dossier. Activer un dossier passe `activeAccountingSource
+              = "fec"` + `activeFecFolderName = <ce dossier>` en une seule
+              mutation atomique (cf. setActiveAccountingSource). Mutuellement
+              exclusif avec Pennylane / MyUnisoft / Odoo (auto-désactivés). */}
           <div className="flex flex-wrap items-center justify-between gap-3 px-1">
             <div className="flex items-center gap-3">
               <Folder className="h-4 w-4 text-quantis-gold/70" />
@@ -273,17 +275,18 @@ export function DocumentsView() {
                 {lastUpdated ? ` · Dernière mise à jour le ${lastUpdated}` : ""}
               </p>
             </div>
-            {filteredAnalyses.length > 0 &&
-            activeAccountingSource === "fec" &&
-            (activeFolderName ?? "").toLowerCase() === activeFolder.toLowerCase() ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-quantis-gold/40 bg-quantis-gold/10 px-3 py-1 text-[11px] font-semibold text-quantis-gold">
-                <span className="h-1.5 w-1.5 rounded-full bg-quantis-gold" />
-                Source active
-              </span>
+            {filteredAnalyses.length > 0 ? (
+              <DataSourceToggle
+                isActive={
+                  activeAccountingSource === "fec" &&
+                  (activeFolderName ?? "").toLowerCase() === activeFolder.toLowerCase()
+                }
+                onToggle={async (next) => {
+                  await setActiveAccountingSource(next ? "fec" : null, next ? activeFolder : null);
+                }}
+                title={`Utiliser le dossier "${activeFolder}" comme source FEC du dashboard`}
+              />
             ) : null}
-            {/* Le toggle d'activation binaire (vert/rouge) est rendu sur la
-                card FEC dédiée (cf. components/integrations/* dans le commit
-                suivant) — pas de bouton dupliqué ici. */}
           </div>
 
           {/* Cards — loader retardé pour éviter le flash <400ms. */}

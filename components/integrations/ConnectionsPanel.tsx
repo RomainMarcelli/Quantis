@@ -6,8 +6,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Loader2, Plug, RefreshCw, Trash2 } from "lucide-react";
+import { Loader2, Plug, RefreshCw, Trash2 } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
+import { DataSourceToggle } from "@/components/integrations/DataSourceToggle";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { isAccountingSource, type AccountingSource } from "@/types/dataSources";
 import type { ConnectionDto } from "@/app/api/integrations/connections/route";
 
 type PerConnectionStatus = "idle" | "syncing" | "disconnecting";
@@ -54,6 +57,7 @@ export function ConnectionsPanel({ onChanged, excludeProviders }: ConnectionsPan
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [perConnection, setPerConnection] = useState<Record<string, PerConnectionStatus>>({});
+  const { activeAccountingSource, setActiveAccountingSource } = useActiveDataSource();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -265,28 +269,36 @@ export function ConnectionsPanel({ onChanged, excludeProviders }: ConnectionsPan
                 )}
               </div>
 
-              <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
-                {/* Bouton de bascule "source active" — pour les sources
-                    dynamiques. Si un dossier statique est actuellement actif,
-                    on propose de basculer dessus. Sinon on signale qu'on est
-                    déjà sur la source dynamique (Pennylane / etc). */}
-                {/* L'activation comme source active a été déplacée sur la
-                    card de connexion dédiée (toggle binaire vert/rouge dans
-                    /documents). Ce panel ne gère plus que le statut technique
-                    de la connexion (sync, déconnexion). */}
+              <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
+                {/* Toggle binaire "Active / Désactivée" — la source comptable
+                    est mutuellement exclusive : activer Pennylane désactive
+                    automatiquement les autres (logique portée par
+                    setActiveAccountingSource). */}
+                {isAccountingSource(c.provider) ? (
+                  <DataSourceToggle
+                    isActive={activeAccountingSource === c.provider}
+                    onToggle={async (next) => {
+                      const value: AccountingSource | null = next
+                        ? (c.provider as AccountingSource)
+                        : null;
+                      await setActiveAccountingSource(value);
+                    }}
+                    title={`Utiliser ${PROVIDER_LABELS[c.provider] ?? c.provider} comme source du dashboard`}
+                  />
+                ) : null}
                 <button
                   type="button"
                   onClick={() => void handleResync(c.id, c.provider)}
                   disabled={isBusy}
-                  title={`Synchronise les dernières données ${PROVIDER_LABELS[c.provider] ?? c.provider} et utilise cette source pour le dashboard.`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/40 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20 disabled:opacity-40"
+                  title={`Resynchronise les données ${PROVIDER_LABELS[c.provider] ?? c.provider}.`}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/75 hover:bg-white/10 disabled:opacity-40"
                 >
                   {isSyncing ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <RefreshCw className="h-3.5 w-3.5" />
                   )}
-                  {isSyncing ? "Synchronisation…" : "Synchroniser et activer"}
+                  {isSyncing ? "Synchronisation…" : "Synchroniser"}
                 </button>
                 <button
                   type="button"
