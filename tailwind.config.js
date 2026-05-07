@@ -10,20 +10,33 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // ─── Couleurs Tailwind référencées par classes (text-quantis-*, bg-*) ──
+        // Pointent vers les CSS variables sémantiques définies dans
+        // app/globals.css. Cela permet aux classes existantes
+        // (`text-quantis-gold`, `bg-quantis-base`) de basculer
+        // automatiquement entre dark et light selon le `data-theme` posé
+        // sur <html> par ThemeProvider — pas de refacto requis côté
+        // composants pour ces classes.
         quantis: {
-          smoke: "#f4f5f7",
-          paper: "#fafafa",
-          white: "#ffffff",
-          carbon: "#1a1a1a",
-          slate: "#6b7280",
-          mist: "#e5e7eb",
-          base: "#09090b",
-          surface: "#18181b",
-          border: "#27272a",
-          muted: "#8b8b93",
-          gold: "#d4af37",
-          emerald: "#0f766e",
-          crimson: "#9f1239"
+          // Backgrounds
+          base: "var(--app-bg)",
+          surface: "var(--app-bg-elevated)",
+          paper: "var(--quantis-paper)",
+          smoke: "var(--quantis-smoke)",
+          white: "var(--quantis-white)",
+          // Text
+          carbon: "var(--quantis-carbon)",
+          slate: "var(--quantis-slate)",
+          muted: "var(--app-text-secondary)",
+          // Borders
+          border: "var(--app-border)",
+          mist: "var(--quantis-mist)",
+          // Brand — format RGB-space pour supporter les modificateurs
+          // d'opacité Tailwind (text-quantis-gold/50, bg-quantis-gold/10).
+          // L'app-brand-gold-rgb flip selon le theme (cf. globals.css).
+          gold: "rgb(var(--app-brand-gold-rgb) / <alpha-value>)",
+          emerald: "var(--app-success)",
+          crimson: "var(--app-danger)"
         }
       }
     }

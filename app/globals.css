@@ -5,6 +5,37 @@
 @tailwind utilities;
 
 :root {
+  /* ─── Tokens sémantiques modernes — DARK (défaut) ────────────────────
+     Référencés par Tailwind (cf. tailwind.config.js) et par les composants
+     via var(--app-…). Le mode clair les flip via [data-theme="light"]. */
+  --app-bg: #09090b;
+  --app-bg-elevated: #0F0F12;
+  --app-card-bg: #1A1A2E;
+  --app-card-glass-bg: rgb(15 15 18 / 85%);
+  --app-text-primary: #FFFFFF;
+  --app-text-secondary: #9CA3AF;
+  --app-text-tertiary: #6B7280;
+  --app-text-on-gold: #09090b;
+  --app-brand-gold: #C5A059;
+  --app-brand-gold-hover: #D4B876;
+  --app-brand-gold-rgb: 197 160 89;
+  --app-success: #22C55E;
+  --app-danger: #EF4444;
+  --app-danger-soft: #FCA5A5;
+  --app-warning: #F59E0B;
+  --app-border: rgb(255 255 255 / 6%);
+  --app-border-strong: rgb(255 255 255 / 10%);
+  --app-glow-gold: 0 0 24px rgb(197 160 89 / 6%);
+  --app-overlay: rgb(0 0 0 / 60%);
+  /* Surface "neutre transparent" — fond légèrement teinté pour les rows
+     hover, badges discrets, etc. (utilisé par bg-white/X et bg-black/X). */
+  --app-surface-soft: rgb(255 255 255 / 4%);
+  --app-surface-medium: rgb(255 255 255 / 8%);
+  --app-surface-strong: rgb(255 255 255 / 12%);
+
+  /* ─── Tokens legacy (gardés pour compat avec les usages existants) ──
+     Ces vars sont utilisées par .precision-card, .premium-analysis-root,
+     etc. dans le bas de ce fichier. */
   --quantis-smoke: #0f1115;
   --quantis-paper: #171b22;
   --quantis-white: #141923;
@@ -31,28 +62,53 @@
 }
 
 :root[data-theme="light"] {
-  --quantis-smoke: #f4f5f7;
-  --quantis-paper: #fafafa;
-  --quantis-white: #ffffff;
-  --quantis-carbon: #1a1a1a;
-  --quantis-slate: #6b7280;
-  --quantis-mist: #e5e7eb;
-  --quantis-gold: #d4af37;
-  --quantis-emerald: #0f766e;
-  --quantis-crimson: #9f1239;
-  --quantis-premium-root-bg: #f4f5f7;
-  --quantis-premium-root-fg: #111827;
-  --quantis-card-bg: #ffffff;
-  --quantis-card-bg-hover: #f8fafc;
-  --quantis-card-border: rgb(15 23 42 / 12%);
-  --quantis-card-border-top: rgb(15 23 42 / 20%);
-  --quantis-card-shadow: 0 8px 24px -12px rgb(15 23 42 / 22%);
-  --quantis-noise-opacity: 0.012;
-  --quantis-spotlight: radial-gradient(ellipse at center, rgb(212 175 55 / 9%) 0%, transparent 62%);
-  --quantis-card-header-border: rgb(15 23 42 / 12%);
-  --quantis-card-header-border-hover: rgb(212 175 55 / 35%);
-  --quantis-edu-text: rgb(30 41 59 / 62%);
-  --quantis-edu-text-hover: rgb(15 23 42 / 82%);
+  /* ─── Tokens sémantiques — LIGHT ─────────────────────────────────── */
+  --app-bg: #FAFAF7;                  /* blanc cassé chaud */
+  --app-bg-elevated: #FFFFFF;
+  --app-card-bg: #FFFFFF;
+  --app-card-glass-bg: rgb(255 255 255 / 85%);
+  --app-text-primary: #0A0A0F;        /* presque noir, jamais noir pur */
+  --app-text-secondary: #4B5563;
+  --app-text-tertiary: #6B7280;
+  --app-text-on-gold: #FFFFFF;        /* gold light = brun foncé → texte blanc */
+  --app-brand-gold: #8B6F2A;          /* brun-doré profond, lisible sur blanc */
+  --app-brand-gold-hover: #6F5921;
+  --app-brand-gold-rgb: 139 111 42;
+  --app-success: #16A34A;             /* vert profond, lisible sur blanc */
+  --app-danger: #DC2626;
+  --app-danger-soft: #B91C1C;
+  --app-warning: #D97706;
+  --app-border: rgb(0 0 0 / 8%);
+  --app-border-strong: rgb(0 0 0 / 12%);
+  --app-glow-gold: 0 0 24px rgb(139 111 42 / 10%);
+  --app-overlay: rgb(0 0 0 / 30%);
+  --app-surface-soft: rgb(0 0 0 / 3%);
+  --app-surface-medium: rgb(0 0 0 / 6%);
+  --app-surface-strong: rgb(0 0 0 / 10%);
+
+  /* ─── Tokens legacy — versions light ──────────────────────────────── */
+  --quantis-smoke: #FAFAF7;
+  --quantis-paper: #FFFFFF;
+  --quantis-white: #FFFFFF;
+  --quantis-carbon: #0A0A0F;
+  --quantis-slate: #4B5563;
+  --quantis-mist: #E5E7EB;
+  --quantis-gold: #8B6F2A;
+  --quantis-emerald: #16A34A;
+  --quantis-crimson: #DC2626;
+  --quantis-premium-root-bg: #FAFAF7;
+  --quantis-premium-root-fg: #0A0A0F;
+  --quantis-card-bg: #FFFFFF;
+  --quantis-card-bg-hover: #F8FAFC;
+  --quantis-card-border: rgb(0 0 0 / 8%);
+  --quantis-card-border-top: rgb(0 0 0 / 12%);
+  --quantis-card-shadow: 0 8px 24px -12px rgb(15 23 42 / 18%);
+  --quantis-noise-opacity: 0.008;
+  --quantis-spotlight: radial-gradient(ellipse at center, rgb(139 111 42 / 8%) 0%, transparent 62%);
+  --quantis-card-header-border: rgb(0 0 0 / 8%);
+  --quantis-card-header-border-hover: rgb(139 111 42 / 35%);
+  --quantis-edu-text: rgb(75 85 99 / 80%);
+  --quantis-edu-text-hover: rgb(10 10 15 / 90%);
   color-scheme: light;
 }
 
@@ -66,6 +122,123 @@ body {
   color: var(--quantis-carbon);
   font-family: var(--font-quantis), "Inter", "Segoe UI", sans-serif;
 }
+
+/* ─── Mode clair — overrides des utilitaires Tailwind hardcodés ──────
+   Beaucoup de composants utilisent `text-white`, `bg-black/20`,
+   `border-white/10`, `text-quantis-gold` en dur. Plutôt que de toucher
+   chaque composant (lourd refacto), on override ces classes ici quand
+   l'attribut [data-theme="light"] est posé sur <html>.
+
+   Couvre ~80 % des cas visuels. Quelques composants avec
+   `style={{ color: "#FFFFFF" }}` inline restent en dur (les inline
+   styles ne peuvent pas être override par CSS pur) — ils seront
+   adaptés au cas par cas si besoin. */
+
+[data-theme="light"] {
+  /* Body background : la radial gradient or sur fond clair se voit
+     trop fort, on adoucit. */
+  & body {
+    background:
+      radial-gradient(circle at 18% -10%, rgb(139 111 42 / 6%), transparent 35%),
+      radial-gradient(circle at 85% -20%, rgb(22 163 74 / 4%), transparent 40%),
+      var(--quantis-smoke);
+  }
+
+  /* ── Texte ── */
+  & .text-white { color: var(--app-text-primary) !important; }
+  & .text-white\/95 { color: rgb(10 10 15 / 95%) !important; }
+  & .text-white\/90 { color: rgb(10 10 15 / 90%) !important; }
+  & .text-white\/85 { color: rgb(10 10 15 / 85%) !important; }
+  & .text-white\/80 { color: rgb(10 10 15 / 80%) !important; }
+  & .text-white\/75 { color: rgb(10 10 15 / 75%) !important; }
+  & .text-white\/72 { color: rgb(10 10 15 / 72%) !important; }
+  & .text-white\/70 { color: rgb(10 10 15 / 70%) !important; }
+  & .text-white\/65 { color: rgb(10 10 15 / 65%) !important; }
+  & .text-white\/60 { color: rgb(10 10 15 / 60%) !important; }
+  & .text-white\/55 { color: rgb(75 85 99) !important; }
+  & .text-white\/50 { color: rgb(75 85 99) !important; }
+  & .text-white\/45 { color: rgb(107 114 128) !important; }
+  & .text-white\/40 { color: rgb(107 114 128) !important; }
+  & .text-white\/35 { color: rgb(107 114 128 / 80%) !important; }
+  & .text-white\/30 { color: rgb(107 114 128 / 70%) !important; }
+  & .text-white\/25 { color: rgb(107 114 128 / 60%) !important; }
+
+  /* ── Brand gold (Tailwind config + classes existantes) ── */
+  & .text-quantis-gold { color: var(--app-brand-gold) !important; }
+  & .text-quantis-gold\/90 { color: rgb(139 111 42 / 90%) !important; }
+  & .text-quantis-gold\/80 { color: rgb(139 111 42 / 80%) !important; }
+  & .text-quantis-gold\/70 { color: rgb(139 111 42 / 70%) !important; }
+  & .text-quantis-gold\/60 { color: rgb(139 111 42 / 60%) !important; }
+  & .border-quantis-gold,
+  & .border-quantis-gold\/60,
+  & .border-quantis-gold\/40,
+  & .border-quantis-gold\/30 { border-color: var(--app-brand-gold) !important; }
+  & .bg-quantis-gold\/15 { background-color: rgb(139 111 42 / 15%) !important; }
+  & .bg-quantis-gold\/12 { background-color: rgb(139 111 42 / 12%) !important; }
+  & .bg-quantis-gold\/10 { background-color: rgb(139 111 42 / 10%) !important; }
+  & .bg-quantis-gold\/\[0\.08\] { background-color: rgb(139 111 42 / 8%) !important; }
+  & .bg-quantis-gold\/\[0\.06\] { background-color: rgb(139 111 42 / 6%) !important; }
+  & .bg-quantis-gold\/\[0\.04\] { background-color: rgb(139 111 42 / 4%) !important; }
+
+  /* ── Surfaces sombres → surfaces claires ── */
+  & .bg-black\/55,
+  & .bg-black\/60 { background-color: var(--app-overlay) !important; }
+  & .bg-black\/40 { background-color: rgb(0 0 0 / 8%) !important; }
+  & .bg-black\/35 { background-color: rgb(0 0 0 / 7%) !important; }
+  & .bg-black\/30 { background-color: rgb(0 0 0 / 5%) !important; }
+  & .bg-black\/25 { background-color: rgb(0 0 0 / 4%) !important; }
+  & .bg-black\/20 { background-color: rgb(0 0 0 / 4%) !important; }
+  & .bg-white\/15 { background-color: rgb(0 0 0 / 6%) !important; }
+  & .bg-white\/10 { background-color: rgb(0 0 0 / 4%) !important; }
+  & .bg-white\/5 { background-color: rgb(0 0 0 / 3%) !important; }
+  & .bg-white\/\[0\.06\] { background-color: rgb(0 0 0 / 4%) !important; }
+  & .bg-white\/\[0\.04\] { background-color: rgb(0 0 0 / 3%) !important; }
+  & .bg-white\/\[0\.03\] { background-color: rgb(0 0 0 / 2%) !important; }
+  & .bg-white\/\[0\.025\] { background-color: rgb(0 0 0 / 2%) !important; }
+  & .bg-white\/\[0\.02\] { background-color: rgb(0 0 0 / 2%) !important; }
+
+  /* ── Bordures blanches translucides → bordures noires translucides ── */
+  & .border-white\/30 { border-color: rgb(0 0 0 / 18%) !important; }
+  & .border-white\/25 { border-color: rgb(0 0 0 / 15%) !important; }
+  & .border-white\/20 { border-color: rgb(0 0 0 / 12%) !important; }
+  & .border-white\/15 { border-color: rgb(0 0 0 / 10%) !important; }
+  & .border-white\/10 { border-color: rgb(0 0 0 / 8%) !important; }
+  & .border-white\/\[0\.08\] { border-color: rgb(0 0 0 / 6%) !important; }
+  & .border-white\/\[0\.06\] { border-color: rgb(0 0 0 / 5%) !important; }
+
+  /* ── Inline-style hex hardcodés des composants récents (auth, docs,
+     legal, IA) — sélecteurs d'attribut. CSS ne peut pas override les
+     `style="color: #FFFFFF"` inline (priorité). On ne couvre donc pas
+     ces cas ici ; ils restent visibles en dark uniquement et seront
+     ajustés au cas par cas. */
+}
+
+/* ─── Précisions sur composants stratégiques ─────────────────────── */
+
+[data-theme="light"] .precision-card {
+  background-color: var(--quantis-card-bg);
+  border-color: var(--quantis-card-border);
+  box-shadow: var(--quantis-card-shadow);
+  color: var(--quantis-carbon);
+}
+
+[data-theme="light"] .premium-analysis-root {
+  background-color: var(--quantis-premium-root-bg);
+  color: var(--quantis-premium-root-fg);
+}
+
+/* Sidebar active (route courante) — fond doré très dilué + texte gold
+   profond cf. spec. Les classes Tailwind utilisées :
+   `bg-quantis-gold/[0.08]` + `text-quantis-gold`. */
+[data-theme="light"] .border-l-quantis-gold,
+[data-theme="light"] .border-l-\[3px\].border-quantis-gold {
+  border-left-color: var(--app-brand-gold) !important;
+}
+
+/* Glassmorphism panels — beaucoup de composants posent
+   `style={{ backgroundColor: "rgba(15,15,18,0.85)" }}` en inline. Quand
+   l'inline impose un fond sombre en mode clair on ne peut pas l'override.
+   Les versions qui utilisent precision-card sont déjà OK via les vars. */
 
 .font-mono {
   font-family: var(--font-quantis-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
