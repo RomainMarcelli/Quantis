@@ -76,7 +76,7 @@ export function ConnectSourceModal({
           aria-label="Fermer"
           className="absolute right-4 top-4 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors"
           style={{
-            color: "rgba(255, 255, 255, 0.65)",
+            color: "var(--app-text-secondary)",
             backgroundColor: "rgba(255, 255, 255, 0.05)",
             border: "1px solid rgba(255, 255, 255, 0.1)",
           }}

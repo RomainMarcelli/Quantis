@@ -87,13 +87,13 @@ export function SourceSwitchConfirmModal({
           <div className="min-w-0 flex-1">
             <h2
               id="source-switch-modal-title"
-              style={{ color: "#FFFFFF", fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em" }}
+              style={{ color: "var(--app-text-primary)", fontSize: 17, fontWeight: 600, letterSpacing: "-0.01em" }}
             >
               Activer {targetName} comme source ?
             </h2>
             <p
               className="mt-2"
-              style={{ color: "#C8CACE", fontSize: 14, lineHeight: 1.5 }}
+              style={{ color: "var(--app-text-primary)", fontSize: 14, lineHeight: 1.5 }}
             >
               Vos fichiers Excel/FEC uploadés ne seront plus utilisés pour les
               calculs (mais restent stockés). Vous pourrez réactiver
@@ -109,7 +109,7 @@ export function SourceSwitchConfirmModal({
             onClick={onCancel}
             className="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
             style={{
-              color: "rgba(255, 255, 255, 0.75)",
+              color: "var(--app-text-primary)",
               backgroundColor: "rgba(255, 255, 255, 0.05)",
               border: "1px solid rgba(255, 255, 255, 0.1)",
             }}
@@ -121,7 +121,7 @@ export function SourceSwitchConfirmModal({
             onClick={onConfirm}
             className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
             style={{
-              color: "#09090b",
+              color: "var(--app-text-on-gold)",
               backgroundColor: "#C5A059",
             }}
           >

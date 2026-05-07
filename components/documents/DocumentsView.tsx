@@ -560,7 +560,7 @@ export function DocumentsView() {
                     Source bancaire{" "}
                     <span
                       style={{
-                        color: "rgba(255, 255, 255, 0.3)",
+                        color: "var(--app-text-tertiary)",
                         fontWeight: 500,
                         letterSpacing: "0.06em",
                       }}
@@ -751,7 +751,7 @@ function SourceBlock({
       <header className="px-1">
         <p
           style={{
-            color: "rgba(255, 255, 255, 0.45)",
+            color: "var(--app-text-secondary)",
             fontSize: 11,
             fontWeight: 600,
             letterSpacing: "0.12em",
