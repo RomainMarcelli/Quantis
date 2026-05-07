@@ -680,13 +680,32 @@ export function DocumentsView() {
         onCancel={() => setDeleteConfirm({ isOpen: false, folderName: "", analysisCount: 0 })}
       />
 
-      {/* Modal wizard de connexion (ouverte au clic sur tuile non connectée). */}
+      {/* Modal wizard de connexion (ouverte au clic sur tuile non connectée).
+          À la fin d'un sync réussi, on auto-active la source comptable
+          correspondante : l'utilisateur a explicitement parcouru le
+          wizard, l'attente UX est de voir ses données immédiatement. */}
       <ConnectSourceModal
         open={connectModalProvider !== null}
         provider={connectModalProvider}
         onClose={() => setConnectModalProvider(null)}
         onConnected={async () => {
+          // Map ProviderId (wizard) → AccountingSource (Firestore).
+          // "other" déclenche une redirection vers /upload qui gère lui-même
+          // l'activation FEC (cf. UploadPageView).
+          const providerToSource: Record<ProviderId, AccountingSource | null> = {
+            pennylane: "pennylane",
+            myunisoft: "myunisoft",
+            odoo: "odoo",
+            tiime: null,
+            other: null,
+          };
+          const source = connectModalProvider
+            ? providerToSource[connectModalProvider]
+            : null;
           setConnectModalProvider(null);
+          if (source) {
+            await setActiveAccountingSource(source);
+          }
           await loadData();
         }}
       />

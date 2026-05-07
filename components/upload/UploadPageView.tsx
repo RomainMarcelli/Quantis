@@ -290,9 +290,14 @@ export function UploadPageView() {
         filesToSubmit
       );
       await saveAnalysisDraft(persistedDraft);
-      // L'activation comme source active reste manuelle via le toggle binaire
-      // de /documents — on ne force plus la bascule automatique post-upload.
       registerKnownFolderName(persistedDraft.folderName);
+      // L'utilisateur a explicitement uploadé un fichier → on active la
+      // source FEC avec le folder courant. Sans ça, /synthese affiche
+      // "Aucune synthèse" parce que activeAccountingSource reste null.
+      // L'auto-activation par sync (Pennylane/MyUnisoft/Odoo) a la même
+      // sémantique : choix explicite de l'user = source active.
+      const { writeActiveAccountingSource } = await import("@/services/dataSourcesStore");
+      await writeActiveAccountingSource(user.uid, "fec", persistedDraft.folderName);
       setLocalAnalysisHint(true);
       setIsAnalysisComplete(true);
       setSuccessMessage("Analyse créée avec succès. Redirection vers la synthèse...");

@@ -199,6 +199,11 @@ export function ManualKpiEntryView() {
       await saveAnalysisDraft(draft);
       setLocalAnalysisHint(true);
       registerKnownFolderName(DEFAULT_FOLDER_NAME);
+      // Saisie manuelle = équivalent d'un upload FEC → on active la source
+      // pour que la synthèse affiche les données saisies (sinon
+      // activeAccountingSource = null → "Aucune synthèse disponible").
+      const { writeActiveAccountingSource } = await import("@/services/dataSourcesStore");
+      await writeActiveAccountingSource(user.uid, "fec", DEFAULT_FOLDER_NAME);
       router.push("/synthese");
     } catch (error) {
       setErrorMessage(
