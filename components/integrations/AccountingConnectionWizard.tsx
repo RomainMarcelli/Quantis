@@ -666,21 +666,21 @@ function MyUnisoftStep({
   onSyncCompleted?: () => void | Promise<void>;
 }) {
   const [jwt, setJwt] = useState("");
-  const [companyId, setCompanyId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleConnect() {
-    if (!jwt.trim() || !companyId.trim()) {
-      setError("Token JWT et ID société sont obligatoires.");
+    if (!jwt.trim()) {
+      setError("Token JWT obligatoire.");
       return;
     }
     setError(null);
     setBusy(true);
     try {
+      // L'externalCompanyId est dérivé côté serveur depuis le JWT
+      // (claim `sub`/`cabinet_id`) — l'utilisateur n'a pas à le saisir.
       const connect = await callApi("/api/integrations/myunisoft/connect", {
         accessToken: jwt.trim(),
-        externalCompanyId: companyId.trim(),
       });
       if (!connect.ok) throw new Error(extractError(connect.data, "Connexion refusée"));
       const connectionId = (connect.data as { connectionId: string }).connectionId;
@@ -711,7 +711,7 @@ function MyUnisoftStep({
       <Instruction>
         Dans MyUnisoft, allez dans <strong className="text-white">Paramètres → Connecteurs dossier → Sélectionnez Vyzor → Cliquez Générer</strong>.
       </Instruction>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3">
         <SecureField
           label="Token JWT"
           value={jwt}
@@ -721,18 +721,11 @@ function MyUnisoftStep({
           sensitive
           disabled={busy}
         />
-        <SecureField
-          label="ID de votre société"
-          value={companyId}
-          onChange={setCompanyId}
-          placeholder="ex. 227732"
-          disabled={busy}
-        />
       </div>
       <div>
         <PrimaryButton
           onClick={() => void handleConnect()}
-          disabled={busy || !jwt.trim() || !companyId.trim()}
+          disabled={busy || !jwt.trim()}
           busy={busy}
         >
           {busy ? "Connexion en cours…" : "Connecter"}
