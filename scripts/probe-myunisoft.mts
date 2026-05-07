@@ -48,12 +48,15 @@ type ProbeResult = {
   itemCount?: number;
 };
 
-async function call(endpoint: string, query?: Record<string, string>): Promise<ProbeResult> {
+async function call(endpoint: string, query: Record<string, string> = {}): Promise<ProbeResult> {
   const url = new URL(`${BASE}${endpoint}`);
-  if (query) {
-    for (const [k, v] of Object.entries(query)) {
-      url.searchParams.set(k, v);
-    }
+  // Tous les endpoints MAD requièrent ?version=1.0.0 (sauf indication
+  // contraire — on garde version par défaut, l'appelant peut l'override).
+  if (!query.version && endpoint.startsWith("/mad/")) {
+    query.version = "1.0.0";
+  }
+  for (const [k, v] of Object.entries(query)) {
+    url.searchParams.set(k, v);
   }
   const start = Date.now();
   const response = await fetch(url.toString(), {
@@ -104,32 +107,38 @@ async function call(endpoint: string, query?: Record<string, string>): Promise<P
 
   const results: ProbeResult[] = [];
 
-  // 1. Vérification d'auth via un endpoint léger.
-  results.push(await call("/exercice"));
+  // ─── Endpoints MAD officiels (cf. partners.api.myunisoft.fr/MAD) ────
+  // 1. Exercices
+  results.push(await call("/mad/exercices"));
 
-  // 2. Référentiel : journaux.
-  results.push(await call("/diary"));
-  // alternative à tester si /diary 404 :
-  //   results.push(await call("/journal"));
+  // 2. Journaux
+  results.push(await call("/mad/journals"));
 
-  // 3. Référentiel : plan comptable.
-  results.push(await call("/account"));
+  // 3. Plan comptable
+  results.push(await call("/mad/accounts"));
 
   // 4. Écritures sur l'exercice courant.
+  // /mad/entries requiert startDate + endDate (un exercice à la fois selon
+  // la doc — itérer si l'utilisateur a plusieurs exercices).
   const year = new Date().getUTCFullYear();
   results.push(
-    await call("/entry", {
-      from: `${year}-01-01`,
-      to: `${year}-12-31`,
-      limit: "10",
+    await call("/mad/entries", {
+      startDate: `${year}-01-01`,
+      endDate: `${year}-12-31`,
     })
   );
 
-  // 5. Balance.
+  // 5. Balance pour l'exercice courant.
+  // /mad/balance requiert un filtre classAccount (classe PCG : 1=capital,
+  // 2=immo, 3=stocks, 4=tiers, 5=trésorerie, 6=charges, 7=produits,
+  // 8=spéciaux, 9=analytique). Ici on test classe 4 (tiers) qui contient
+  // les comptes 401/411 — toujours mouvementés. Pour la sync réelle on
+  // itèrera sur les classes 1-9.
   results.push(
-    await call("/balance", {
-      from: `${year}-01-01`,
-      to: `${year}-12-31`,
+    await call("/mad/balance", {
+      startDate: `${year}-01-01`,
+      endDate: `${year}-12-31`,
+      classAccount: "4",
     })
   );
 

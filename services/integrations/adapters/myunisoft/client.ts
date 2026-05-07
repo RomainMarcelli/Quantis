@@ -110,21 +110,23 @@ export type MyUnisoftRequestInit = {
  * défaut, jamais d'erreur silencieuse).
  */
 function getMockResponse<T>(endpoint: string): T {
-  if (endpoint.startsWith("/diary") || endpoint.startsWith("/journal")) {
+  // Endpoints MAD (canon — /mad/*?version=1.0.0). Ce sont ceux que les
+  // fetchers utilisent en prod.
+  if (endpoint.startsWith("/mad/journals")) {
     return MOCK_JOURNALS as T;
   }
-  if (endpoint.startsWith("/account") || endpoint.startsWith("/accounts")) {
+  if (endpoint.startsWith("/mad/accounts")) {
     return MOCK_ACCOUNTS as T;
   }
-  if (endpoint.startsWith("/entry") || endpoint.startsWith("/entries") || endpoint.startsWith("/mad/entries")) {
+  if (endpoint.startsWith("/mad/entries")) {
     return MOCK_ENTRIES as T;
   }
-  if (endpoint.startsWith("/balance") || endpoint.startsWith("/trial-balance")) {
+  if (endpoint.startsWith("/mad/balance")) {
     return MOCK_BALANCE as T;
   }
-  if (endpoint.startsWith("/exercice") || endpoint.startsWith("/me")) {
-    // Endpoints de vérification d'auth — renvoie un objet minimal valide.
-    return { ok: true } as T;
+  if (endpoint.startsWith("/mad/exercices")) {
+    // Endpoint de vérification d'auth — renvoie un tableau minimal valide.
+    return [] as T;
   }
   return [] as T;
 }
@@ -152,6 +154,12 @@ export async function myUnisoftRequest<T>(
         url.searchParams.set(key, String(value));
       }
     }
+  }
+  // Tous les endpoints MAD requièrent ?version=1.0.0 (cf. specs partenaires
+  // MyUnisoft). On l'injecte automatiquement si l'appelant ne l'a pas
+  // déjà précisé pour éviter d'avoir à le répéter dans chaque fetcher.
+  if (endpoint.startsWith("/mad/") && !url.searchParams.has("version")) {
+    url.searchParams.set("version", "1.0.0");
   }
 
   const requestInit: RequestInit = {
@@ -246,12 +254,12 @@ export function extractList<T>(response: MyUnisoftListResponse<T>): T[] {
   return [];
 }
 
-// Vérification du token via un endpoint léger (à confirmer au moment du test E2E ;
-// /me ou /accounts existent probablement). Renvoie true si la conn est valide.
+// Vérification du token via /mad/exercices (endpoint léger, retourne 1-3
+// items selon les exercices ouverts). 401/403 = token invalide ; tout
+// autre échec se propage.
 export async function myUnisoftVerifyAuth(connection: Connection): Promise<boolean> {
   try {
-    // On tente une requête sur un endpoint léger. À ajuster selon la doc finale.
-    await myUnisoftRequest(connection, "/exercice", { method: "GET" });
+    await myUnisoftRequest(connection, "/mad/exercices", { method: "GET" });
     return true;
   } catch (error) {
     if (error instanceof MyUnisoftApiError && (error.status === 401 || error.status === 403)) {

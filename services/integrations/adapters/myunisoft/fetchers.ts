@@ -1,13 +1,19 @@
 // Fetchers MyUnisoft v1 — un par entité.
 //
-// MyUnisoft renvoie typiquement des listes complètes sans pagination cursor (pour les
-// référentiels comme journals/accounts) ou avec une pagination par page/limit.
-// On adapte chaque fetcher en conséquence, et on retourne une AdapterSyncPage standard.
+// Tous les endpoints utilisent le format MAD (MyUnisoft Accounting Data) :
+//   - Préfixe : /mad/*
+//   - Query param obligatoire : version=1.0.0 (auto-injecté par le client)
+//   - Doc : https://github.com/MyUnisoft/api-partenaires/tree/main/docs/MAD/specs/v1.0.0
 //
-// IMPORTANT : les chemins exacts (`/entry`, `/account`, etc.) sont à confirmer au moment
-// du test E2E avec une vraie clé. La doc partners.api.myunisoft.fr indique ces noms,
-// mais des alternatives existent (/mad/entries, /mad/exercices). Ce fetcher utilise les
-// chemins les plus probables et logge des warnings si la forme de réponse est inattendue.
+// Spécificités par endpoint :
+//   - /mad/journals     : référentiel, pas de pagination (≈ 20 items observés)
+//   - /mad/accounts     : référentiel, pas de pagination (≈ 2000 items observés)
+//   - /mad/exercices    : référentiel, retourne les exercices ouverts
+//   - /mad/entries      : requiert startDate + endDate (un exercice à la fois)
+//   - /mad/balance      : requiert startDate + endDate + classAccount (1-9 PCG)
+//
+// Pour la balance complète, on itère sur les 9 classes PCG (1=capital, 2=immo,
+// 3=stocks, 4=tiers, 5=trésorerie, 6=charges, 7=produits, 8=spéciaux, 9=analytique).
 
 import {
   extractList,
@@ -36,29 +42,26 @@ import type {
   NormalizedTrialBalanceEntry,
 } from "@/types/connectors";
 
-// MyUnisoft pagination : si l'API supporte le cursor, on l'utilise via `?cursor=` ou
-// `?page=`. Ce client accepte les deux ; pour les référentiels (journals, accounts),
-// on présume qu'une seule page suffit. Pour les écritures, on paginera.
-const PAGE_LIMIT = 200;
+const PCG_CLASSES = ["1", "2", "3", "4", "5", "6", "7", "8"] as const;
+
+function toIsoDay(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
 
 // ─── Journals ──────────────────────────────────────────────────────────────
 
 export async function fetchJournals(
   ctx: AdapterSyncContext,
-  cursor: string | null
+  _cursor: string | null
 ): Promise<AdapterSyncPage<Journal>> {
-  // /diary est l'endpoint REST pour les journaux selon la doc partner ;
-  // l'alternative MAD est /mad/journals à confirmer.
   const raw = await myUnisoftRequest<MyUnisoftListResponse<MyUnisoftJournal>>(
     ctx.connection,
-    "/diary",
-    { query: cursor ? { cursor } : undefined }
+    "/mad/journals"
   );
   const items = extractList(raw);
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
   return {
     items: items.map((j) => mapJournal(j, mapperCtx)),
-    // MyUnisoft ne retourne pas de cursor sur ces référentiels (à confirmer en E2E).
     nextCursor: null,
   };
 }
@@ -67,12 +70,11 @@ export async function fetchJournals(
 
 export async function fetchLedgerAccounts(
   ctx: AdapterSyncContext,
-  cursor: string | null
+  _cursor: string | null
 ): Promise<AdapterSyncPage<LedgerAccount>> {
   const raw = await myUnisoftRequest<MyUnisoftListResponse<MyUnisoftAccount>>(
     ctx.connection,
-    "/account",
-    { query: cursor ? { cursor } : undefined }
+    "/mad/accounts"
   );
   const items = extractList(raw);
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
@@ -84,18 +86,17 @@ export async function fetchLedgerAccounts(
 
 // ─── Contacts (extraits des comptes 40x/41x avec `company`) ────────────────
 //
-// MyUnisoft n'a pas d'endpoint `/contacts` ou `/customers` séparé : les contacts
-// sont incrustés dans les comptes auxiliaires (racine 401, 404, 411). On refait donc
-// l'appel `/account` et on filtre.
+// MyUnisoft n'a pas d'endpoint `/contacts` séparé : les contacts sont incrustés
+// dans les comptes auxiliaires (racine 401, 404, 411). On refait l'appel
+// /mad/accounts et on filtre côté mapper.
 
 export async function fetchContacts(
   ctx: AdapterSyncContext,
-  cursor: string | null
+  _cursor: string | null
 ): Promise<AdapterSyncPage<Contact>> {
   const raw = await myUnisoftRequest<MyUnisoftListResponse<MyUnisoftAccount>>(
     ctx.connection,
-    "/account",
-    { query: cursor ? { cursor } : undefined }
+    "/mad/accounts"
   );
   const items = extractList(raw);
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
@@ -108,55 +109,57 @@ export async function fetchContacts(
 }
 
 // ─── Écritures comptables ──────────────────────────────────────────────────
+//
+// /mad/entries requiert un intervalle de dates (startDate + endDate au format
+// YYYY-MM-DD) — pas de cursor de pagination, l'API retourne tout l'intervalle
+// en une fois. En mode "incremental", on borne sur la fenêtre de mise à jour.
 
 export async function fetchAccountingEntries(
   ctx: AdapterSyncContext,
-  cursor: string | null
+  _cursor: string | null
 ): Promise<AdapterSyncPage<AccountingEntry>> {
-  // Le filtre par période en mode initial est utile pour limiter le volume.
-  // Le filtre updated_at_gteq pour le mode incrémental dépend du support MyUnisoft.
-  const query: Record<string, string | number> = { limit: PAGE_LIMIT };
-  if (cursor) query.cursor = cursor;
-  if (ctx.mode === "initial") {
-    query["date_from"] = ctx.periodStart.toISOString().slice(0, 10);
-    query["date_to"] = ctx.periodEnd.toISOString().slice(0, 10);
-  } else {
-    // Incrémental : MyUnisoft expose probablement `updated_after` ou similaire.
-    // À ajuster en E2E.
-    query["updated_after"] = ctx.periodStart.toISOString();
-  }
+  const startDate = toIsoDay(ctx.periodStart);
+  const endDate = toIsoDay(ctx.periodEnd);
 
   const raw = await myUnisoftRequest<MyUnisoftListResponse<MyUnisoftEntry>>(
     ctx.connection,
-    "/entry",
-    { query }
+    "/mad/entries",
+    { query: { startDate, endDate } }
   );
   const items = extractList(raw);
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
 
-  // MyUnisoft inclut déjà les `movements[]` dans l'écriture → pas de N+1 nécessaire.
+  // Les `movements[]` sont déjà inclus dans chaque écriture → pas de N+1.
   return {
     items: items.map((e) => mapEntry(e, mapperCtx)),
-    // À ajuster si l'API expose un cursor (à priori non sur cette route).
     nextCursor: null,
   };
 }
 
 // ─── Trial balance (balance générale) ──────────────────────────────────────
+//
+// /mad/balance requiert un filtre classAccount (classe PCG 1-9). On itère sur
+// les 8 premières classes (la 9 = analytique, hors balance comptable standard)
+// pour récupérer le plan complet en une sync. Les classes vides retournent
+// simplement [] sans erreur.
 
 export async function fetchTrialBalance(
   connection: Connection,
   periodStart: Date,
   periodEnd: Date
 ): Promise<NormalizedTrialBalanceEntry[]> {
-  // L'endpoint /balance accepte typiquement period_start/period_end ; à ajuster en E2E.
-  const start = periodStart.toISOString().slice(0, 10);
-  const end = periodEnd.toISOString().slice(0, 10);
-  const raw = await myUnisoftRequest<MyUnisoftListResponse<MyUnisoftBalanceEntry>>(
-    connection,
-    "/balance",
-    { query: { date_from: start, date_to: end } }
-  );
-  const items = extractList(raw);
-  return mapTrialBalance(items, periodStart, periodEnd);
+  const startDate = toIsoDay(periodStart);
+  const endDate = toIsoDay(periodEnd);
+
+  const allEntries: MyUnisoftBalanceEntry[] = [];
+  for (const classAccount of PCG_CLASSES) {
+    const raw = await myUnisoftRequest<MyUnisoftListResponse<MyUnisoftBalanceEntry>>(
+      connection,
+      "/mad/balance",
+      { query: { startDate, endDate, classAccount } }
+    );
+    allEntries.push(...extractList(raw));
+  }
+
+  return mapTrialBalance(allEntries, periodStart, periodEnd);
 }
