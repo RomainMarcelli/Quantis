@@ -463,6 +463,81 @@ body {
   box-shadow: 0 0 0 3px rgb(var(--app-brand-gold-deep-rgb) / 10%);
 }
 
+/* ─── Phase 8 — États financiers (P&L / Bilan) lisibilité comptable ─
+   Le brief : zebra striping subtil, en-têtes de section coloriés,
+   codes 2033-SD en mono tertiary, négatifs en danger entre parenthèses,
+   totaux fond gold deep dilué + bordure top, résultat net signature. */
+
+[data-theme="light"] [data-fin-section] {
+  background-color: #FFFFFF !important;
+  border: 1px solid rgb(0 0 0 / 6%) !important;
+  box-shadow: var(--app-shadow-elev-1);
+}
+
+[data-theme="light"] [data-fin-section-header] {
+  background-color: #F5F4F0;
+  color: var(--app-text-secondary) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.05em !important;
+  padding: 12px 16px;
+  margin: -12px -16px 8px;
+  border-radius: 12px 12px 0 0;
+}
+
+/* Zebra striping subtil sur les lignes de données. */
+[data-theme="light"] [data-fin-section] [data-fin-row]:nth-child(even) {
+  background-color: #FAFAF7;
+}
+[data-theme="light"] [data-fin-section] [data-fin-row] {
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+/* Codes 2033-SD en mono tertiary lisible sur fond clair. */
+[data-theme="light"] [data-fin-pcg] {
+  color: var(--app-text-tertiary) !important;
+  font-size: 12px !important;
+}
+
+/* Montants négatifs : danger entre parenthèses (la mise entre paren
+   est déjà faite par formatAmount). */
+[data-theme="light"] [data-fin-amount="negative"] {
+  color: var(--app-danger) !important;
+}
+[data-theme="light"] [data-fin-amount="positive"] {
+  color: var(--app-text-primary) !important;
+}
+
+/* Sous-totaux et résultats — différenciation par intensity. */
+[data-theme="light"] [data-fin-subtotal="section"] {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 4%) !important;
+  border-top: 1px solid rgb(0 0 0 / 10%) !important;
+  font-weight: 600 !important;
+  padding: 8px;
+  margin: 8px -8px 0;
+  border-radius: 6px;
+}
+[data-theme="light"] [data-fin-subtotal="result"] {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 6%) !important;
+  border-top: 1px solid rgb(var(--app-brand-gold-deep-rgb) / 20%) !important;
+  font-weight: 600 !important;
+  color: var(--app-text-primary) !important;
+  padding: 8px;
+  margin: 8px -8px 0;
+  border-radius: 6px;
+}
+[data-theme="light"] [data-fin-subtotal="final"] {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 8%) !important;
+  border-top: 1px solid rgb(var(--app-brand-gold-deep-rgb) / 30%) !important;
+  font-weight: 700 !important;
+  padding: 10px 8px;
+  margin: 10px -8px 0;
+  border-radius: 6px;
+}
+[data-theme="light"] [data-fin-subtotal="final"] span {
+  color: var(--app-brand-gold-deep) !important;
+}
+
 /* Glassmorphism panels — beaucoup de composants posent
    `style={{ backgroundColor: "rgba(15,15,18,0.85)" }}` en inline. Quand
    l'inline impose un fond sombre en mode clair on ne peut pas l'override.

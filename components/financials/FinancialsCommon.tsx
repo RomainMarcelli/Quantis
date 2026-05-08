@@ -42,6 +42,7 @@ export function FinancialLineRow({
   return (
     <div
       className="grid grid-cols-[1fr_auto] items-baseline gap-3 py-1 text-xs"
+      data-fin-row
       title={
         line.tooltip
           ? `${line.tooltip}${line.pcgCode ? ` (2033-SD : ${line.pcgCode})` : ""}`
@@ -53,7 +54,7 @@ export function FinancialLineRow({
       <span className="truncate text-white/85">
         {line.label}
         {line.pcgCode ? (
-          <span className="ml-1.5 font-mono text-[9px] text-white/30">
+          <span className="ml-1.5 font-mono text-[9px] text-white/30" data-fin-pcg>
             [{line.pcgCode}]
           </span>
         ) : null}
@@ -62,6 +63,7 @@ export function FinancialLineRow({
         className={`flex-shrink-0 font-mono tabular-nums ${
           negative ? "text-rose-300/85" : "text-white/85"
         }`}
+        data-fin-amount={negative ? "negative" : "positive"}
       >
         {formatAmount(line.value)}
       </span>
@@ -101,7 +103,10 @@ export function SectionSubtotal({
         : "text-white";
 
   return (
-    <div className={`grid grid-cols-[1fr_auto] items-baseline gap-3 ${styling}`}>
+    <div
+      className={`grid grid-cols-[1fr_auto] items-baseline gap-3 ${styling}`}
+      data-fin-subtotal={intensity}
+    >
       <span>{label}</span>
       <span className={`flex-shrink-0 font-mono tabular-nums ${amountColor}`}>
         {formatAmount(value)}
@@ -137,8 +142,11 @@ export function SectionCard({
   }`;
 
   return (
-    <div className={containerClass}>
-      <p className="mb-2 text-[10px] font-mono uppercase tracking-[0.16em] text-white/55">
+    <div className={containerClass} data-fin-section>
+      <p
+        className="mb-2 text-[10px] font-mono uppercase tracking-[0.16em] text-white/55"
+        data-fin-section-header
+      >
         {section.title}
       </p>
       {visibleLines.length === 0 ? (
