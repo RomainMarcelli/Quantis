@@ -207,14 +207,18 @@ function BreakEvenChartCanvas({
         >
           <defs>
             <linearGradient id={lossGradientId} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor={isDark ? "rgba(248,113,113,0.22)" : "rgba(239,68,68,0.22)"} />
-              <stop offset="55%" stopColor={isDark ? "rgba(248,113,113,0.1)" : "rgba(239,68,68,0.1)"} />
-              <stop offset="100%" stopColor={isDark ? "rgba(248,113,113,0.02)" : "rgba(239,68,68,0.03)"} />
+              {/* En light : intensité uniforme faible sur toute la zone
+                  (cf. retour utilisateur 08/05/2026 : pas de dégradé,
+                  même opacité partout). En dark : on conserve le dégradé
+                  original qui marche bien sur fond sombre. */}
+              <stop offset="0%" stopColor={isDark ? "rgba(248,113,113,0.22)" : "rgba(239,68,68,0.06)"} />
+              <stop offset="55%" stopColor={isDark ? "rgba(248,113,113,0.1)" : "rgba(239,68,68,0.06)"} />
+              <stop offset="100%" stopColor={isDark ? "rgba(248,113,113,0.02)" : "rgba(239,68,68,0.06)"} />
             </linearGradient>
             <linearGradient id={profitGradientId} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor={isDark ? "rgba(16,185,129,0.03)" : "rgba(16,185,129,0.03)"} />
-              <stop offset="45%" stopColor={isDark ? "rgba(16,185,129,0.09)" : "rgba(16,185,129,0.09)"} />
-              <stop offset="100%" stopColor={isDark ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.18)"} />
+              <stop offset="0%" stopColor={isDark ? "rgba(16,185,129,0.03)" : "rgba(16,185,129,0.06)"} />
+              <stop offset="45%" stopColor={isDark ? "rgba(16,185,129,0.09)" : "rgba(16,185,129,0.06)"} />
+              <stop offset="100%" stopColor={isDark ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.06)"} />
             </linearGradient>
 
             <filter id={caGlowId} x="-45%" y="-45%" width="190%" height="190%">
