@@ -1005,6 +1005,118 @@ body {
   stroke: rgb(15 23 42 / 10%);
 }
 
+/* ─── Phase 3 — Vyzor Score signature mode clair ─────────────────────
+   L'élément le plus premium de l'interface : gradient SVG sur l'arc,
+   chiffre central pondéré, badge sémantique foncé sur fond opacité 12%,
+   piliers en mini-bars colorées selon le score, bg de la card en
+   gradient radial chaud (centre #FFFFFF, bords #F8F7F3). */
+
+[data-theme="light"] [data-vyzor-score] {
+  /* Bg radial subtil — la "lueur de chaleur" du brief, pas un gradient
+     visible. Override de .precision-card pour ce composant uniquement. */
+  background-image: radial-gradient(
+    ellipse at center,
+    #FFFFFF 0%,
+    #F8F7F3 100%
+  );
+  background-color: #FFFFFF;
+}
+
+/* Dial track / ticks adaptés en light (sans le scope premium-analysis-root) */
+[data-theme="light"] [data-vyzor-score] .dial-track {
+  stroke: rgb(0 0 0 / 6%);
+}
+[data-theme="light"] [data-vyzor-score] .dial-ticks {
+  stroke: rgb(0 0 0 / 12%);
+}
+
+/* L'arc de progression utilise le gradient SVG (gold profond → couleur
+   sémantique du score). Drop-shadow doré atténué — un glow subtil au
+   lieu du flash dark. */
+[data-theme="light"] [data-vyzor-score] .dial-progress {
+  stroke: url(#vyzor-score-gradient);
+  filter: drop-shadow(0 1px 3px rgb(139 111 42 / 18%));
+}
+[data-theme="light"] [data-vyzor-score]:hover .dial-progress {
+  filter: drop-shadow(0 2px 6px rgb(139 111 42 / 28%));
+}
+
+/* Chiffre central — passe à 48px (3rem) en light (cf. brief).
+   Reste à 6.8rem en dark pour l'effet signature plus dramatic. */
+[data-theme="light"] [data-vyzor-score] .tnum {
+  font-size: 3rem !important;
+  line-height: 1 !important;
+  color: var(--app-text-primary) !important;
+  font-weight: 700 !important;
+}
+
+/* Badge sémantique — en light : fond opacité 12% + texte version
+   foncée (cf. brief). On ne peut pas override l'inline style direct ;
+   on applique un layer color via filter pour le pastiller, et un bg
+   color visible via la div parent. */
+[data-theme="light"] [data-vyzor-score][data-score-state="critical"] [data-score-badge] {
+  background-color: rgb(220 38 38 / 12%) !important;
+  border-color: rgb(220 38 38 / 25%) !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="critical"] [data-score-badge] span {
+  color: #991B1B !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="warning"] [data-score-badge] {
+  background-color: rgb(217 119 6 / 12%) !important;
+  border-color: rgb(217 119 6 / 25%) !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="warning"] [data-score-badge] span {
+  color: #9A3412 !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="good"] [data-score-badge] {
+  background-color: rgb(22 163 74 / 12%) !important;
+  border-color: rgb(22 163 74 / 25%) !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="good"] [data-score-badge] span {
+  color: #166534 !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="na"] [data-score-badge] {
+  background-color: rgb(0 0 0 / 4%) !important;
+  border-color: rgb(0 0 0 / 10%) !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="na"] [data-score-badge] span {
+  color: var(--app-text-tertiary) !important;
+}
+
+/* Piliers — en light : on transforme la "card" en row plate avec une
+   mini-bar de progression colorée selon le tone. */
+[data-theme="light"] [data-vyzor-score] [data-piliers-item] {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  padding: 8px 4px !important;
+}
+[data-theme="light"] [data-vyzor-score] [data-piliers-track] {
+  background-color: rgb(0 0 0 / 4%) !important;
+}
+[data-theme="light"] [data-vyzor-score] [data-piliers-item][data-tone="good"] [data-piliers-fill] {
+  background-color: var(--app-success);
+}
+[data-theme="light"] [data-vyzor-score] [data-piliers-item][data-tone="warning"] [data-piliers-fill] {
+  background-color: var(--app-warning);
+}
+[data-theme="light"] [data-vyzor-score] [data-piliers-item][data-tone="critical"] [data-piliers-fill] {
+  background-color: var(--app-danger);
+}
+/* Et en dark, pour cohérence, on remplit aussi les fills (sinon ils
+   sont invisibles puisqu'on a ajouté la track + fill au composant). */
+:root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="good"] [data-piliers-fill],
+:root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="good"] [data-piliers-fill] {
+  background-color: #22C55E;
+}
+:root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="warning"] [data-piliers-fill],
+:root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="warning"] [data-piliers-fill] {
+  background-color: #F59E0B;
+}
+:root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="critical"] [data-piliers-fill],
+:root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="critical"] [data-piliers-fill] {
+  background-color: #EF4444;
+}
+
 /* Animation globale au scroll: révèle progressivement les cartes sans casser la DA premium. */
 [data-scroll-reveal] {
   opacity: 0;
