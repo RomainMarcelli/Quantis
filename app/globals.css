@@ -63,12 +63,13 @@
 
 :root[data-theme="light"] {
   /* ─── Tokens sémantiques — LIGHT ─────────────────────────────────── */
-  /* Canvas légèrement beige/doré pour faire ressortir les tuiles blanches
-     (cf. retour utilisateur 08/05/2026). Le ratio canvas/tuile devient
-     visible (ΔL ≈ 4 %) sans perdre le caractère "clair" de l'ensemble.
-     L'élévation N1 des cards (.precision-card avec ombre + bg #FFFFFF)
-     reste donc lisible. */
-  --app-bg: #F4EEE0;
+  /* Canvas beige doré clair (cf. retour utilisateur 08/05/2026 :
+     "10 % plus clair que F4EEE0 + léger dégradé vers du doré").
+     Base #F8F2E5 = #F4EEE0 mix 10 % vers blanc → reste warm mais
+     respire. Le dégradé est posé sur le body (cf. plus bas) pour
+     pousser vers une teinte plus dorée vers le bas/droite — donne
+     une sophistication subtile sans bruit visible. */
+  --app-bg: #F8F2E5;
   --app-bg-elevated: #FFFFFF;
   --app-card-bg: #FFFFFF;
   --app-card-glass-bg: rgb(255 255 255 / 85%);
@@ -124,7 +125,7 @@
 
   /* ─── Tokens legacy — versions light ──────────────────────────────── */
   /* --quantis-smoke aligné sur --app-bg pour cohérence canvas. */
-  --quantis-smoke: #F4EEE0;
+  --quantis-smoke: #F8F2E5;
   --quantis-paper: #FFFFFF;
   --quantis-white: #FFFFFF;
   --quantis-carbon: #0A0A0F;
@@ -133,7 +134,7 @@
   --quantis-gold: #8B6F2A;
   --quantis-emerald: #16A34A;
   --quantis-crimson: #DC2626;
-  --quantis-premium-root-bg: #F4EEE0;
+  --quantis-premium-root-bg: #F8F2E5;
   --quantis-premium-root-fg: #0A0A0F;
   --quantis-card-bg: #FFFFFF;
   --quantis-card-bg-hover: #F8FAFC;
@@ -172,12 +173,20 @@ body {
    adaptés au cas par cas si besoin. */
 
 [data-theme="light"] {
-  /* Body background : la radial gradient or sur fond clair se voit
-     trop fort, on adoucit. */
+  /* Body background — composition à 3 couches (cf. retour 08/05/2026 :
+     "10 % plus clair + léger dégradé poussant vers du doré pour
+     ajouter en sophistication") :
+       1. Spot gold ample en haut-gauche → impression de lumière
+          chaude qui descend dans la page.
+       2. Linear gradient diagonal #FBF6EA (haut-gauche très clair) →
+          #F4EBD6 (bas-droite plus doré) → le mouvement vers le
+          doré est visible mais reste subtil.
+       3. Couleur de base var(--quantis-smoke) #F8F2E5 (fallback +
+          mix de fond). */
   & body {
     background:
-      radial-gradient(circle at 18% -10%, rgb(168 136 71 / 6%), transparent 35%),
-      radial-gradient(circle at 85% -20%, rgb(22 163 74 / 4%), transparent 40%),
+      radial-gradient(ellipse at 25% -5%, rgb(168 136 71 / 11%), transparent 50%),
+      linear-gradient(135deg, #FBF6EA 0%, #F8F2E5 45%, #F4EBD6 100%),
       var(--quantis-smoke);
   }
 
