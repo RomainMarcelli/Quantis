@@ -65,6 +65,9 @@ type SyntheseDashboardProps = {
   /**
    * Slot pour la `TemporalityBar` (mode dynamique). Rendu sous le titre, à la
    * place du sélecteur statique. Le parent décide lequel passer.
+   * @deprecated brief 09/05/2026 — la TemporalityBar est désormais portée
+   *  par le AppHeader (ligne 2). Cette prop reste pour compat mais n'est
+   *  plus consommée par la SyntheseView.
    */
   temporalitySlot?: ReactNode;
   /**
@@ -75,6 +78,13 @@ type SyntheseDashboardProps = {
    * Bridge désactive l'override Disponibilités".
    */
   activeBankingSource?: BankingSource | null;
+  /**
+   * Mode édition controlled — quand fourni, le state isEditing est piloté
+   * par le parent (cf. brief Header unifié 09/05/2026, le bouton
+   * "Personnaliser" est désormais dans la ligne 2 du AppHeader).
+   */
+  isEditingControlled?: boolean;
+  onEditingChange?: (next: boolean) => void;
 };
 
 // ─── Default layout Synthèse ───────────────────────────────────────────
@@ -131,7 +141,10 @@ export function SyntheseDashboard({
   onYearChange,
   temporalitySlot = null,
   activeBankingSource = null,
+  isEditingControlled,
+  onEditingChange,
 }: SyntheseDashboardProps) {
+  void temporalitySlot; // @deprecated brief 09/05/2026 — non rendu
   // Bridge connecté → on substitue le solde "Disponibilités" par le solde
   // bancaire temps réel UNIQUEMENT si l'utilisateur a activé Bridge via le
   // toggle de /documents (`activeBankingSource === "bridge"`).
@@ -169,9 +182,17 @@ export function SyntheseDashboard({
     };
   }, [currentKpis, currentAnalysis, liveBalance]);
 
-  // Mode édition — état lifté pour pouvoir mettre Personnaliser dans le
-  // bandeau title haut (au lieu de near "Mes widgets" comme avant).
-  const [isEditing, setIsEditing] = useState(false);
+  // Mode édition — controlled si le parent fournit `isEditingControlled`
+  // (cf. brief 09/05/2026 — bouton Personnaliser dans la ligne 2 du
+  // AppHeader). Fallback uncontrolled pour les call sites qui ne lèvent
+  // pas encore le state.
+  const [internalIsEditing, setInternalIsEditing] = useState(false);
+  const isEditing = isEditingControlled ?? internalIsEditing;
+  const setIsEditing = (next: boolean | ((v: boolean) => boolean)) => {
+    const nextValue = typeof next === "function" ? next(isEditing) : next;
+    if (onEditingChange) onEditingChange(nextValue);
+    else setInternalIsEditing(nextValue);
+  };
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportMenuPos, setExportMenuPos] = useState<{ top: number; right: number } | null>(null);
   const exportButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -223,41 +244,24 @@ export function SyntheseDashboard({
     selectedYearValue !== undefined &&
     onYearChange !== undefined;
 
+  // Phase 3 brief 09/05/2026 — analysisModeLabel n'est plus consommé par
+  // le bandeau "ANALYSE DYNAMIQUE" (supprimé). On garde le calcul pour
+  // compat éventuelle (ex. tests existants).
+  void analysisModeLabel;
+
   return (
     <section className="space-y-4">
-      {/* Bandeau titre Synthèse — remonté en haut (avant le meta) pour donner
-          immédiatement le contexte de la page. Le toggle Personnaliser est
-          ici uniquement (pas de bouton "+ Ajouter un widget" pour éviter le
-          doublon avec celui rendu par CustomizableDashboard quand isEditing). */}
-      <header className="fade-up relative z-10 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+      {/* Bandeau titre Synthèse — refonte 09/05/2026 :
+          - Titre + sous-titre "Bonjour …" conservés.
+          - Badge "ANALYSE DYNAMIQUE" supprimé (bruit visuel inutile).
+          - DashboardActions (Personnaliser) déplacé dans la ligne 2 du
+            AppHeader (cf. brief Header unifié). */}
+      <header className="fade-up relative z-10 flex flex-col items-start justify-between gap-4">
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">Synthèse</h1>
           <p className="text-sm text-quantis-muted">
             Bonjour {greetingName}, voici la vue d&apos;ensemble de vos indicateurs clés.
           </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
-            <div
-              className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]"
-              data-live-pulse
-            />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">
-              {analysisModeLabel}
-            </span>
-          </div>
-
-          <DashboardActions
-            isEditing={isEditing}
-            isSaving={false}
-            onToggleEditing={() => setIsEditing(!isEditing)}
-            onOpenPicker={() => {
-              // No-op : "+ Ajouter un widget" est rendu par CustomizableDashboard
-              // (showAddButton=false ici pour éviter le doublon).
-            }}
-            showAddButton={false}
-          />
         </div>
       </header>
 
@@ -296,13 +300,17 @@ export function SyntheseDashboard({
         </div>
       ) : null}
 
-      {/* Bandeau meta consolidé (entreprise / date / source / actions) —
-          repositionné après le titre+période pour libérer le haut de page.
-          data-meta-block + masquage CSS quand body[data-simulation-open] :
-          le simulateur ouvert prend toute la largeur et n'a plus à
-          cohabiter avec les métadonnées (cf. brief 09/05/2026). */}
+      {/* @deprecated brief 09/05/2026 — bandeau meta supprimé.
+          L'info entreprise/source est désormais portée par
+          `<AppHeader contextBadge={…} companyName={…} />` (ligne 1).
+          Les boutons Simuler/Exporter/Personnaliser vivent dans la
+          ligne 2 du AppHeader (`headerActions` de SyntheseView).
+          Ce bloc est conservé en JSX pour compat momentanée (tests
+          qui cherchent les textes "Analyse du" / "Live") mais sera
+          retiré dans un commit suivant. */}
       <header
         data-meta-block
+        hidden
         className="precision-card fade-up relative z-10 flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5"
       >
         <div>

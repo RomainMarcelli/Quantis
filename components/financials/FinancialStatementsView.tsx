@@ -10,7 +10,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { listUserAnalyses } from "@/services/analysisStore";
 import { getUserProfile } from "@/services/userProfileStore";
@@ -131,20 +130,16 @@ export function FinancialStatementsView() {
 
   return (
     <section className="w-full space-y-4">
+      {/* Phase 3 brief Header unifié 09/05/2026 :
+          variant="data" pour exposer la ligne 2 (TemporalityBar +
+          actions). Bouton Retour supprimé (la sidebar suffit pour
+          la navigation). Pas de TemporalityBar ici car les états
+          financiers sont des snapshots à un instant T (clôture). */}
       <AppHeader
+        variant="data"
         companyName={companyName}
         subtitle={subtitle}
         contextBadge={activeAnalysis ? <ActiveSourceBadge analysis={activeAnalysis} /> : undefined}
-        actionSlot={
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Retour
-          </button>
-        }
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">

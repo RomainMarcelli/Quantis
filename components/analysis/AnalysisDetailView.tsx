@@ -934,9 +934,15 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
   return (
     <section className="w-full space-y-4">
-      <AppHeader
-        companyName={companyName}
-      />
+      {/* Phase 3 brief Header unifié 09/05/2026 — variant="data" pour
+          exposer la ligne 2. Pas de slots remplis ici car les onglets
+          du Tableau de bord (Création de valeur / Investissement /
+          Financement / Rentabilité / Trésorerie) restent dans la zone
+          de contenu sous le header (cf. brief : "ils ne font PAS
+          partie du header"). Les sections individuelles (RentabilityTest,
+          ValueCreationTest…) gèrent elles-mêmes leur TemporalityBar
+          contextuelle. */}
+      <AppHeader variant="data" companyName={companyName} />
 
       {/* Loader retardé : ne s'affiche que si le chargement dépasse 400 ms. */}
       {showAnalysisLoader ? (

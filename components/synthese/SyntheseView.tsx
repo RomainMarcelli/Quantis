@@ -5,12 +5,14 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Download,
   FileText,
   LayoutDashboard,
   Lock,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Receipt,
   Settings,
   Sparkles,
@@ -322,11 +324,94 @@ export function SyntheseView() {
     router.replace("/");
   }
 
+  // ─── Phase 3 brief Header unifié 09/05/2026 ───────────────────────
+  // State `isEditing` lifté au niveau de la vue pour pouvoir poser le
+  // bouton "Personnaliser" dans la ligne 2 du AppHeader (vs ancien
+  // bandeau meta interne au SyntheseDashboard, désormais supprimé).
+  const [isEditing, setIsEditing] = useState(false);
+
+  const showTemporalityBar =
+    analysisPair.current && shouldShowTemporalityBar(analysisPair.current);
+  const headerTemporalityBar = showTemporalityBar ? (
+    <TemporalityBar
+      availableRange={computeAvailableRange(analysisPair.current!)}
+      daysInPeriod={null}
+    />
+  ) : null;
+
+  // Boutons de la ligne 2 — toujours visibles dès qu'une analyse est
+  // active. "Simuler" rend le widget via Portal (cf. SimulationWidget).
+  // "Exporter" déclenche le download direct du rapport PDF (sans menu —
+  // le dropdown précédent du SyntheseDashboard a été retiré, le format
+  // PDF est l'unique format actuellement supporté).
+  const headerActions = analysisPair.current ? (
+    <>
+      {effective ? (
+        <SimulationToggleButton
+          mappedData={effective.mappedData}
+          portalContainerId="simulation-portal-container"
+        />
+      ) : null}
+      <button
+        type="button"
+        onClick={async () => {
+          if (!analysisPair.current) return;
+          const err = await downloadFinancialReport({ analysisId: analysisPair.current.id });
+          if (err) console.warn("[financial-report] download failed", err);
+        }}
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition"
+        style={{
+          border: "1px solid var(--app-border-strong)",
+          color: "var(--app-text-primary)",
+          backgroundColor: "transparent",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }}
+      >
+        <Download className="h-3.5 w-3.5" />
+        Exporter
+      </button>
+      <button
+        type="button"
+        onClick={() => setIsEditing((v) => !v)}
+        aria-pressed={isEditing}
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition"
+        style={{
+          border: "1px solid var(--app-border-strong)",
+          color: isEditing ? "var(--app-brand-gold-deep)" : "var(--app-text-primary)",
+          backgroundColor: isEditing
+            ? "rgb(var(--app-brand-gold-deep-rgb) / 8%)"
+            : "transparent",
+        }}
+        onMouseEnter={(e) => {
+          if (!isEditing) {
+            e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isEditing) {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }
+        }}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        {isEditing ? "Terminer" : "Personnaliser"}
+      </button>
+    </>
+  ) : null;
+
   return (
     <section className="w-full space-y-4">
       <AppHeader
+        variant="data"
         companyName={companyName}
         contextBadge={<ActiveSourceBadge analysis={analysisPair.current} />}
+        temporalityBar={headerTemporalityBar}
+        headerActions={headerActions}
       />
 
       {/* Loader retardé : n'apparaît que si la requête dépasse 400 ms.
@@ -421,33 +506,13 @@ export function SyntheseView() {
                     ? `Exercice ${analysisPair.current.fiscalYear}`
                     : null
               }
-              simulationSlot={
-                effective ? (
-                  <SimulationToggleButton
-                    mappedData={effective.mappedData}
-                    portalContainerId="simulation-portal-container"
-                  />
-                ) : null
-              }
               userId={user?.uid ?? null}
-              // Sélecteur dynamique (TemporalityBar complète) sous le titre
-              // pour les sources Pennylane/MyUnisoft/Odoo qui ont un
-              // dailyAccounting. Pour les sources statiques on passe à la
-              // place yearOptions/selectedYearValue/onYearChange — la
-              // SyntheseDashboard rend alors une mini-bar "Année" simple.
-              temporalitySlot={
-                shouldShowTemporalityBar(analysisPair.current) ? (
-                  <TemporalityBar
-                    availableRange={computeAvailableRange(analysisPair.current!)}
-                    daysInPeriod={effective?.isFiltered ? effective.filterSummary.daysInPeriod : null}
-                    rightLabel={
-                      effective?.isFiltered
-                        ? `${effective.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
-                        : undefined
-                    }
-                  />
-                ) : null
-              }
+              // Phase 3 (header unifié 09/05/2026) : la TemporalityBar est
+              // désormais portée par le AppHeader (ligne 2). On ne fournit
+              // plus de temporalitySlot ici. Idem pour simulationSlot
+              // (déplacé vers headerActions) et le bandeau meta supprimé.
+              isEditingControlled={isEditing}
+              onEditingChange={setIsEditing}
               yearOptions={yearOptions}
               selectedYearValue={selectedYearValue}
               onYearChange={setSelectedYearValue}
