@@ -405,6 +405,64 @@ body {
   transform: rotate(45deg);
 }
 
+/* ─── Phase 7 — Assistant IA chat conversationnel ────────────────────
+   Le brief : bulle utilisateur warm beige (#EEEDE8), bulle IA blanche
+   avec ombre subtile + bordure, bloc "insight" doré en bordure gauche
+   3px gold + fond rgb(139 111 42 / 4%). Les composants ont reçu des
+   data-ai-bubble pour scoper le style. */
+[data-theme="light"] [data-ai-bubble="user"] {
+  --app-ai-user-bg: #EEEDE8;
+  background-color: #EEEDE8 !important;
+  color: var(--app-text-primary) !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] [data-ai-bubble="user"],
+:root:not([data-theme="light"]) [data-ai-bubble="user"] {
+  --app-ai-user-bg: rgb(255 255 255 / 5%);
+  color: rgb(255 255 255 / 80%) !important;
+}
+
+/* Boutons de suggestion follow-up (cf. brief : fond rgb(139 111 42 / 6%)
+   + bordure rgb(139 111 42 / 12%) + texte gold deep). On cible les
+   call-sites via leur classe `vyzor-followup-chip` (à appliquer dans
+   AiResponseCard) ou via les data-attributes data-ai-followup. */
+[data-theme="light"] [data-ai-followup],
+[data-theme="light"] .vyzor-followup-chip {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 6%) !important;
+  border: 1px solid rgb(var(--app-brand-gold-deep-rgb) / 12%) !important;
+  color: var(--app-brand-gold-deep) !important;
+  border-radius: 12px;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+[data-theme="light"] [data-ai-followup]:hover,
+[data-theme="light"] .vyzor-followup-chip:hover {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 10%) !important;
+  border-color: rgb(var(--app-brand-gold-deep-rgb) / 18%) !important;
+}
+
+/* Bloc insight doré (la barre latérale qui contient l'explication IA).
+   On cible les éléments tagged `data-ai-insight` ou via les classes
+   utilities Tailwind (`border-l-quantis-gold` est typique). */
+[data-theme="light"] [data-ai-insight] {
+  border-left: 3px solid var(--app-brand-gold-deep) !important;
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 4%) !important;
+  border-radius: 0 8px 8px 0 !important;
+}
+
+/* Champ de saisie du chat — focus gold-deep + ring 3px (cohérent avec
+   les inputs globaux Phase 9). Cible explicitement le textarea du chat
+   IA via data-ai-input. */
+[data-theme="light"] [data-ai-input] {
+  background-color: #FFFFFF !important;
+  border: 1px solid rgb(0 0 0 / 10%) !important;
+  border-radius: 12px;
+}
+[data-theme="light"] [data-ai-input]:focus,
+[data-theme="light"] [data-ai-input]:focus-within {
+  border-color: var(--app-brand-gold-deep) !important;
+  box-shadow: 0 0 0 3px rgb(var(--app-brand-gold-deep-rgb) / 10%);
+}
+
 /* Glassmorphism panels — beaucoup de composants posent
    `style={{ backgroundColor: "rgba(15,15,18,0.85)" }}` en inline. Quand
    l'inline impose un fond sombre en mode clair on ne peut pas l'override.

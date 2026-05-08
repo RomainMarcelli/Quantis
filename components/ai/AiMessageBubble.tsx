@@ -20,20 +20,22 @@ type AiMessageBubbleProps = {
 export function AiMessageBubble({ message, onFollowUp }: AiMessageBubbleProps) {
   if (message.role === "user") {
     return (
-      <div className="vyzor-msg-enter flex flex-col items-end">
-        <p
+      <div className="vyzor-msg-enter flex flex-col items-end" data-ai-msg="user">
+        <div
           className="max-w-[88%] text-[14px] leading-relaxed"
+          data-ai-bubble="user"
           style={{
-            color: "rgba(255, 255, 255, 0.6)",
-            paddingRight: 16,
-            textAlign: "right",
+            color: "var(--app-text-primary)",
+            backgroundColor: "var(--app-ai-user-bg, rgba(255,255,255,0.04))",
+            borderRadius: "16px 16px 4px 16px",
+            padding: "10px 14px",
           }}
         >
           {message.content}
-        </p>
+        </div>
         <span
           className="mt-1 text-[10px] tabular-nums"
-          style={{ color: "rgba(255, 255, 255, 0.3)", paddingRight: 16 }}
+          style={{ color: "var(--app-text-tertiary)", paddingRight: 16 }}
         >
           {formatTimestamp(message.timestamp)}
         </span>
@@ -44,7 +46,7 @@ export function AiMessageBubble({ message, onFollowUp }: AiMessageBubbleProps) {
   const structured =
     message.structured ?? buildStructuredFromMarkdown(message.content, null, null);
   return (
-    <div className="vyzor-msg-enter">
+    <div className="vyzor-msg-enter" data-ai-msg="assistant">
       <AiResponseCard response={structured} onFollowUp={onFollowUp} />
     </div>
   );

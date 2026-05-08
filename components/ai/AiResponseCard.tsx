@@ -388,19 +388,12 @@ function FollowUpBlock({
           type="button"
           onClick={() => onPick(q)}
           aria-label={`Poser la question : ${q}`}
-          className="rounded-full border px-3 py-1 text-[12px] transition"
+          data-ai-followup
+          className="vyzor-followup-chip rounded-full border px-3 py-1 text-[12px] transition"
           style={{
             borderColor: "rgba(255, 255, 255, 0.08)",
             backgroundColor: "rgba(255, 255, 255, 0.03)",
             color: "rgba(255, 255, 255, 0.7)",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(197, 160, 89, 0.08)";
-            e.currentTarget.style.color = "#E8D9B8";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.03)";
-            e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)";
           }}
         >
           {q}
