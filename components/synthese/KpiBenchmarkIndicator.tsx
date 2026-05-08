@@ -101,6 +101,8 @@ export function KpiBenchmarkIndicator({
     <span
       className="relative inline-flex items-center"
       data-search-id="kpi-benchmark-indicator"
+      data-benchmark-indicator
+      data-benchmark-tone={positionTone}
       onMouseEnter={showTooltip}
       onMouseLeave={hideTooltip}
     >
@@ -113,8 +115,13 @@ export function KpiBenchmarkIndicator({
         onBlur={hideTooltip}
         className="group/bench flex items-center gap-2 rounded-md px-1.5 py-1 transition hover:bg-white/5"
       >
-        {/* Échelle horizontale : track fin + 3 dots, le dot actif plus gros avec glow et pulse. */}
-        <span className="relative flex h-3 w-12 flex-row items-center justify-between">
+        {/* Échelle horizontale : track fin + 3 dots, le dot actif plus gros avec glow et pulse.
+            En mode clair, les dots sont masqués (data-benchmark-dots) au profit
+            d'un badge texte plus lisible (cf. brief Synthèse). */}
+        <span
+          className="relative flex h-3 w-12 flex-row items-center justify-between"
+          data-benchmark-dots
+        >
           <span aria-hidden="true" className="absolute left-1.5 right-1.5 top-1/2 h-px -translate-y-1/2 bg-white/10" />
           <Dot active={activeSlot === "low"} tone="negative" />
           <Dot active={activeSlot === "mid"} tone="neutral" />
@@ -122,7 +129,10 @@ export function KpiBenchmarkIndicator({
         </span>
 
         {/* Label de position toujours visible : couleur assortie au cercle actif. */}
-        <span className={`text-[10px] font-semibold uppercase tracking-wide ${toneTextClass(positionTone)}`}>
+        <span
+          className={`text-[10px] font-semibold uppercase tracking-wide ${toneTextClass(positionTone)}`}
+          data-benchmark-label
+        >
           {positionLabel}
         </span>
       </button>

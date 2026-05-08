@@ -310,6 +310,7 @@ export function SimulationToggleButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        data-vyzor-simulate
         className="inline-flex items-center gap-2 rounded-xl border border-quantis-gold/30 bg-quantis-gold/10 px-4 py-2 text-xs font-semibold text-quantis-gold transition hover:bg-quantis-gold/20"
       >
         <span aria-hidden>✨</span>

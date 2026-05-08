@@ -239,7 +239,10 @@ export function SyntheseDashboard({
 
         <div className="flex items-center gap-2">
           <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
+            <div
+              className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]"
+              data-live-pulse
+            />
             <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">
               {analysisModeLabel}
             </span>
