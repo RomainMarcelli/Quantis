@@ -14,7 +14,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowUp,
   ChevronRight,
   Clock,
@@ -166,28 +165,15 @@ function AssistantConversationsViewInner() {
     [conversations, showAllConversations]
   );
 
-  // Le sous-titre du AppHeader : on garde la sémantique mais sans les
-  // détails du quota (déplacés sous l'input).
-  const headerSubtitle = quota
-    ? `Posez vos questions sur vos KPIs`
-    : "Posez vos questions sur vos KPIs";
+  // Sous-titre selon le brief Header unifié (09/05/2026).
+  const headerSubtitle = "Posez vos questions sur vos KPIs";
 
   return (
     <section className="w-full space-y-4">
       <AppHeader
+        variant="simple"
         companyName="Assistant IA Vyzor"
         subtitle={headerSubtitle}
-        searchPlaceholder="Rechercher une conversation, un KPI…"
-        actionSlot={
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Retour
-          </button>
-        }
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">

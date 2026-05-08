@@ -43,7 +43,7 @@ export default function ChatClient() {
   return (
     <main className="premium-analysis-root relative min-h-screen w-full overflow-hidden px-3 py-4 md:px-4 lg:px-6">
       <section className="w-full space-y-4">
-        <AppHeader companyName="Assistant IA Vyzor" subtitle="Chat" />
+        <AppHeader variant="simple" companyName="Assistant IA Vyzor" subtitle="Posez vos questions sur vos KPIs" />
         <div className="relative grid gap-6 grid-cols-1 lg:grid-cols-[auto_minmax(0,1fr)]">
           <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
           <div className="min-w-0">

@@ -457,11 +457,11 @@ export function DocumentsView() {
 
   return (
     <section className="w-full space-y-4">
-      {/* Header global unifié */}
+      {/* Header global unifié — variante simple (pas de filtre temporel) */}
       <AppHeader
+        variant="simple"
         companyName="Documents"
-        subtitle="Gestion de vos analyses financières"
-        searchPlaceholder="Rechercher un fichier, un dossier..."
+        subtitle="Gestion de vos documents"
         actionSlot={
           <button
             type="button"

@@ -936,7 +936,6 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     <section className="w-full space-y-4">
       <AppHeader
         companyName={companyName}
-        searchPlaceholder="Rechercher un KPI, une section ou un document..."
       />
 
       {/* Loader retardé : ne s'affiche que si le chargement dépasse 400 ms. */}

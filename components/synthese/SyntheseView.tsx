@@ -327,7 +327,6 @@ export function SyntheseView() {
       <AppHeader
         companyName={companyName}
         contextBadge={<ActiveSourceBadge analysis={analysisPair.current} />}
-        searchPlaceholder="Rechercher un KPI, une alerte ou une section..."
       />
 
       {/* Loader retardé : n'apparaît que si la requête dépasse 400 ms.

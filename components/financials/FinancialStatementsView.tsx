@@ -135,7 +135,6 @@ export function FinancialStatementsView() {
         companyName={companyName}
         subtitle={subtitle}
         contextBadge={activeAnalysis ? <ActiveSourceBadge analysis={activeAnalysis} /> : undefined}
-        searchPlaceholder="Rechercher un poste, un code 2033-SD…"
         actionSlot={
           <button
             type="button"
