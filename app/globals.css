@@ -1546,25 +1546,28 @@ body {
   padding: 0 !important;
   box-shadow: none !important;
 }
-/* Dots dim (états non-actifs) : opacity 50 % de la couleur sémantique
-   pour qu'ils soient visibles mais pas dominants. Les dots actifs
-   gardent leur taille augmentée + couleur 100 %. */
-[data-theme="light"] [data-benchmark-indicator] .bg-emerald-500\/30 {
+/* Dots dim (états non-actifs) : opacity 50 % de la couleur sémantique.
+   Spécificité augmentée avec :root + 4 sélecteurs imbriqués pour battre
+   les overrides legacy plus bas (.precision-card [class*="bg-emerald-500/"]
+   etc. qui matchaient aussi /30 et rendaient les dots en vert pâle).
+   Sans cette spécificité, les dots apparaissaient comme un rectangle
+   gris uniforme (cf. retour utilisateur 08/05/2026 + screenshot CA). */
+:root[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] .bg-emerald-500\/30 {
   background-color: rgb(22 163 74 / 50%) !important;
 }
-[data-theme="light"] [data-benchmark-indicator] .bg-amber-500\/30 {
+:root[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] .bg-amber-500\/30 {
   background-color: rgb(217 119 6 / 50%) !important;
 }
-[data-theme="light"] [data-benchmark-indicator] .bg-rose-500\/30 {
+:root[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] .bg-rose-500\/30 {
   background-color: rgb(220 38 38 / 50%) !important;
 }
-[data-theme="light"] [data-benchmark-indicator] .bg-emerald-400 {
+:root[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] .bg-emerald-400 {
   background-color: #16A34A !important;
 }
-[data-theme="light"] [data-benchmark-indicator] .bg-amber-300 {
+:root[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] .bg-amber-300 {
   background-color: #D97706 !important;
 }
-[data-theme="light"] [data-benchmark-indicator] .bg-rose-400 {
+:root[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] .bg-rose-400 {
   background-color: #DC2626 !important;
 }
 /* Halos ring + box-shadow coupés (créaient un flou coloré sur fond clair). */
