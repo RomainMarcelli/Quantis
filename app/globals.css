@@ -1518,27 +1518,33 @@ body {
   background-color: #EF4444;
 }
 
-/* ─── Badges benchmark — mise en page identique dark/light, mais en
-   light on supprime l'encadrement gris (track horizontale + hover bg)
-   qui ajoutait de la confusion (cf. retour 08/05/2026 : "supprime
-   le petit encadrement gris autour"). Les couleurs des dots et du
-   label sont renforcées via les overrides Tailwind plus haut. */
+/* ─── Badges benchmark — en mode clair : juste 3 dots colorés
+   (rouge / jaune / vert), le dot actif légèrement plus gros, et le
+   label texte à côté dans la bonne couleur (cf. retour utilisateur
+   08/05/2026 : "je ne veux PAS de track grise, juste les 3 dots
+   colorés et le mot dans la bonne couleur"). On retire :
+   - la track horizontale grise (le span aria-hidden)
+   - le hover bg du bouton
+   - les ring + shadow halos
+   - le fond gris des dots dim → on garde la couleur sémantique
+     directement avec une opacité suffisante. */
 [data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] > span[aria-hidden="true"] {
-  background-color: transparent !important;
+  display: none !important;
 }
 [data-theme="light"] [data-benchmark-indicator] button:hover {
   background-color: transparent !important;
 }
-/* Renforce les dots en mode clair : passer de 30 % opacity (peu visible
-   sur fond beige) à 60 % pour les dots dim, 100 % pour les dots actifs. */
+/* Dots dim (états non-actifs) : opacity 50 % de la couleur sémantique
+   pour qu'ils soient visibles mais pas dominants. Les dots actifs
+   gardent leur taille augmentée + couleur 100 %. */
 [data-theme="light"] [data-benchmark-indicator] .bg-emerald-500\/30 {
-  background-color: rgb(22 163 74 / 60%) !important;
+  background-color: rgb(22 163 74 / 50%) !important;
 }
 [data-theme="light"] [data-benchmark-indicator] .bg-amber-500\/30 {
-  background-color: rgb(217 119 6 / 60%) !important;
+  background-color: rgb(217 119 6 / 50%) !important;
 }
 [data-theme="light"] [data-benchmark-indicator] .bg-rose-500\/30 {
-  background-color: rgb(220 38 38 / 60%) !important;
+  background-color: rgb(220 38 38 / 50%) !important;
 }
 [data-theme="light"] [data-benchmark-indicator] .bg-emerald-400 {
   background-color: #16A34A !important;
@@ -1549,12 +1555,16 @@ body {
 [data-theme="light"] [data-benchmark-indicator] .bg-rose-400 {
   background-color: #DC2626 !important;
 }
-/* Et on neutralise les ring + shadow gloss (ring-emerald-300/70 etc.) qui
-   créaient un halo coloré agréable en dark mais flou sur fond clair. */
+/* Halos ring + box-shadow coupés (créaient un flou coloré sur fond clair). */
 [data-theme="light"] [data-benchmark-indicator] [class*="ring-"] {
   --tw-ring-shadow: 0 0 #0000 !important;
   --tw-shadow: 0 0 #0000 !important;
   box-shadow: none !important;
+}
+/* L'animate-pulse sur les dots actifs (animation pulse Tailwind) crée
+   un blink un peu nerveux sur fond clair. On la coupe en light. */
+[data-theme="light"] [data-benchmark-indicator] .animate-pulse {
+  animation: none !important;
 }
 
 /* ─── Brief Synthèse v2 — Section 5 : bannière VYZOR_AGENT
