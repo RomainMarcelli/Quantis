@@ -43,10 +43,16 @@ import type {
 
 // ─── Tokens ─────────────────────────────────────────────────────────────
 
-const COLOR_GOLD = "#C5A059";
-const COLOR_SUCCESS = "#22C55E";
-const COLOR_DANGER = "#EF4444";
-const COLOR_WARNING = "#F59E0B";
+// Couleurs pilotées par CSS vars sémantiques (cf. globals.css) → flip
+// automatique entre dark (vif : #C5A059, #22C55E…) et light (foncé :
+// #8B6F2A, #16A34A…) sans dupliquer la logique. Le var() est valide
+// dans une string CSS (color, fill, stroke, backgroundColor) ; pour
+// les fond avec opacity (rgba), on garde des hex en RGB juste pour
+// les usages où on a besoin de l'opacité (rares).
+const COLOR_GOLD = "var(--app-brand-gold)";
+const COLOR_SUCCESS = "var(--app-success)";
+const COLOR_DANGER = "var(--app-danger)";
+const COLOR_WARNING = "var(--app-warning)";
 
 const RUNWAY_STYLES: Record<BankingRunwayStatus, { fg: string; label: string }> = {
   safe: { fg: COLOR_SUCCESS, label: "confortable" },
@@ -298,11 +304,11 @@ function HeroCard({
           />
           Bridge
         </span>
-        <span style={{ color: "rgba(255, 255, 255, 0.55)" }}>
+        <span style={{ color: "var(--app-text-tertiary)" }}>
           {summary.accounts.length} compte{summary.accounts.length > 1 ? "s" : ""} connecté{summary.accounts.length > 1 ? "s" : ""}
         </span>
-        <span style={{ color: "rgba(255, 255, 255, 0.35)" }}>·</span>
-        <span style={{ color: "rgba(255, 255, 255, 0.55)" }}>
+        <span style={{ color: "var(--app-text-tertiary)" }}>·</span>
+        <span style={{ color: "var(--app-text-tertiary)" }}>
           sync {lastSyncRel}
         </span>
         <Radio className="ml-auto h-3.5 w-3.5 animate-pulse" style={{ color: COLOR_GOLD }} />
@@ -311,7 +317,7 @@ function HeroCard({
       {/* Solde principal + sparkline */}
       <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.55)" }}>
+          <p className="text-[10px] uppercase tracking-[0.18em]" style={{ color: "var(--app-text-tertiary)" }}>
             Solde total
           </p>
           <p
@@ -376,14 +382,14 @@ function MiniStat({
     <div
       className="vyzor-fade-up rounded-xl px-3.5 py-3"
       style={{
-        backgroundColor: "rgba(255, 255, 255, 0.03)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        backgroundColor: "var(--app-surface-soft)",
+        border: "1px solid var(--app-border)",
         animationDelay: `${delayMs}ms`,
       }}
     >
       <div className="flex items-center gap-1.5">
         <Icon className="h-3 w-3" style={{ color }} />
-        <span className="text-[10px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.55)" }}>
+        <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--app-text-tertiary)" }}>
           {label}
         </span>
       </div>
@@ -420,8 +426,8 @@ function ViewToggle({
       <div
         className="inline-flex rounded-full p-1"
         style={{
-          backgroundColor: "rgba(255, 255, 255, 0.04)",
-          border: "1px solid rgba(255, 255, 255, 0.06)",
+          backgroundColor: "var(--app-surface-soft)",
+          border: "1px solid var(--app-border)",
         }}
         role="tablist"
         aria-label="Vues Trésorerie"
@@ -479,7 +485,7 @@ function ToggleButton({
       className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] transition"
       style={{
         backgroundColor: active ? "rgba(197, 160, 89, 0.15)" : "transparent",
-        color: active ? COLOR_GOLD : "rgba(255, 255, 255, 0.65)",
+        color: active ? COLOR_GOLD : "var(--app-text-secondary)",
       }}
     >
       <Icon className="h-3 w-3" />
@@ -518,7 +524,7 @@ function AccountsGrid({
   if (accounts.length === 0) {
     return (
       <article className="precision-card rounded-2xl p-5">
-        <p className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
+        <p className="text-sm" style={{ color: "var(--app-text-secondary)" }}>
           Aucun compte connecté pour l'instant.
         </p>
       </article>
@@ -553,7 +559,7 @@ function AccountCard({
   const meta = ACCOUNT_TYPE_META[account.type];
   const Icon = meta.Icon;
   const balanceColor =
-    account.balance < 0 ? COLOR_DANGER : "rgba(255, 255, 255, 0.95)";
+    account.balance < 0 ? COLOR_DANGER : "var(--app-text-primary)";
   const ibanMasked = maskIban(account.iban);
 
   return (
@@ -562,8 +568,8 @@ function AccountCard({
       onClick={onClick}
       className="vyzor-fade-up group flex flex-col gap-2 rounded-2xl p-4 text-left transition"
       style={{
-        backgroundColor: "rgba(26, 26, 46, 0.55)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        backgroundColor: "var(--app-card-bg)",
+        border: "1px solid var(--app-border)",
         animationDelay: `${delayMs}ms`,
       }}
       onMouseEnter={(e) => {
@@ -571,7 +577,7 @@ function AccountCard({
         e.currentTarget.style.boxShadow = "0 0 18px rgba(197, 160, 89, 0.12)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)";
+        e.currentTarget.style.borderColor = "var(--app-border)";
         e.currentTarget.style.boxShadow = "none";
       }}
       aria-label={`${account.name} chez ${account.providerName}, solde ${formatCurrency(account.balance)}`}
@@ -590,7 +596,7 @@ function AccountCard({
           </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{account.name}</p>
-            <p className="truncate text-[11px]" style={{ color: "rgba(255,255,255,0.55)" }}>
+            <p className="truncate text-[11px]" style={{ color: "var(--app-text-tertiary)" }}>
               {account.providerName} · {meta.label}
             </p>
           </div>
@@ -608,7 +614,7 @@ function AccountCard({
         <p
           className="font-mono text-[10px]"
           style={{
-            color: "rgba(255, 255, 255, 0.4)",
+            color: "var(--app-text-tertiary)",
             fontFamily: '"JetBrains Mono", ui-monospace, monospace',
           }}
         >
@@ -624,7 +630,7 @@ function CashflowChart({ flows }: { flows: MonthlyFlow[] }) {
     return (
       <article className="precision-card rounded-2xl p-5">
         <h2 className="text-base font-semibold text-white">Flux de trésorerie</h2>
-        <p className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
+        <p className="mt-2 text-sm" style={{ color: "var(--app-text-tertiary)" }}>
           Pas encore de flux mensuels exploitables.
         </p>
       </article>
@@ -639,8 +645,8 @@ function CashflowChart({ flows }: { flows: MonthlyFlow[] }) {
     <article
       className="vyzor-fade-up rounded-2xl p-5"
       style={{
-        backgroundColor: "rgba(15, 15, 18, 0.6)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        backgroundColor: "var(--app-card-bg)",
+        border: "1px solid var(--app-border)",
         animationDelay: "120ms",
       }}
     >
@@ -660,17 +666,17 @@ function CashflowChart({ flows }: { flows: MonthlyFlow[] }) {
 function Legend() {
   return (
     <div className="flex items-center gap-3 text-[11px]">
-      <span className="inline-flex items-center gap-1" style={{ color: "rgba(255,255,255,0.7)" }}>
+      <span className="inline-flex items-center gap-1" style={{ color: "var(--app-text-secondary)" }}>
         <span
           className="inline-block h-2 w-2 rounded"
           style={{ backgroundColor: COLOR_GOLD }}
         />
         Entrées
       </span>
-      <span className="inline-flex items-center gap-1" style={{ color: "rgba(255,255,255,0.7)" }}>
+      <span className="inline-flex items-center gap-1" style={{ color: "var(--app-text-secondary)" }}>
         <span
           className="inline-block h-2 w-2 rounded"
-          style={{ backgroundColor: "rgba(255, 255, 255, 0.25)" }}
+          style={{ backgroundColor: "var(--app-border-strong)" }}
         />
         Sorties
       </span>
@@ -692,14 +698,14 @@ function FlowRow({
   return (
     <div className="vyzor-fade-up" style={{ animationDelay: `${delayMs}ms` }}>
       <div className="flex items-center justify-between text-[10px] uppercase tracking-wider">
-        <span style={{ color: "rgba(255,255,255,0.55)" }}>{formatMonthLabel(flow.month)}</span>
+        <span style={{ color: "var(--app-text-tertiary)" }}>{formatMonthLabel(flow.month)}</span>
         <span className="tnum" style={{ color: flow.netFlow >= 0 ? COLOR_SUCCESS : COLOR_DANGER }}>
           {flow.netFlow >= 0 ? "+" : ""}
           {formatCurrency(flow.netFlow)}
         </span>
       </div>
       <div className="mt-1 flex items-center gap-1.5">
-        <div className="flex-1 h-2.5 overflow-hidden rounded" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+        <div className="flex-1 h-2.5 overflow-hidden rounded" style={{ backgroundColor: "var(--app-surface-soft)" }}>
           <div
             className="h-full rounded transition-all"
             style={{
@@ -710,12 +716,12 @@ function FlowRow({
             }}
           />
         </div>
-        <div className="flex-1 h-2.5 overflow-hidden rounded" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+        <div className="flex-1 h-2.5 overflow-hidden rounded" style={{ backgroundColor: "var(--app-surface-soft)" }}>
           <div
             className="h-full rounded transition-all"
             style={{
               width: `${Math.max(outPct, 1.5)}%`,
-              backgroundColor: "rgba(255, 255, 255, 0.25)",
+              backgroundColor: "var(--app-border-strong)",
               transitionTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
               transitionDuration: "500ms",
             }}
@@ -731,7 +737,7 @@ function TopExpenses({ categories }: { categories: CategoryAggregate[] }) {
     return (
       <article className="precision-card rounded-2xl p-5">
         <h2 className="text-base font-semibold text-white">Top dépenses</h2>
-        <p className="mt-2 text-sm" style={{ color: "rgba(255,255,255,0.55)" }}>
+        <p className="mt-2 text-sm" style={{ color: "var(--app-text-tertiary)" }}>
           Pas de dépenses identifiées.
         </p>
       </article>
@@ -743,8 +749,8 @@ function TopExpenses({ categories }: { categories: CategoryAggregate[] }) {
     <article
       className="vyzor-fade-up rounded-2xl p-5"
       style={{
-        backgroundColor: "rgba(15, 15, 18, 0.6)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        backgroundColor: "var(--app-card-bg)",
+        border: "1px solid var(--app-border)",
         animationDelay: "160ms",
       }}
     >
@@ -760,13 +766,13 @@ function TopExpenses({ categories }: { categories: CategoryAggregate[] }) {
             >
               <div className="flex items-center justify-between text-[11px]">
                 <span className="truncate text-white">{cat.categoryLabel}</span>
-                <span className="tnum flex-shrink-0" style={{ color: "rgba(255,255,255,0.7)" }}>
+                <span className="tnum flex-shrink-0" style={{ color: "var(--app-text-secondary)" }}>
                   {formatCurrency(cat.total)} · {pct.toFixed(0)}%
                 </span>
               </div>
               <div
                 className="mt-1 h-2 overflow-hidden rounded"
-                style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+                style={{ backgroundColor: "var(--app-surface-soft)" }}
               >
                 <div
                   className="h-full rounded transition-all"
@@ -813,7 +819,7 @@ function TransactionsView({
   if (filtered.length === 0) {
     return (
       <article className="precision-card rounded-2xl p-5">
-        <p className="text-sm" style={{ color: "rgba(255,255,255,0.6)" }}>
+        <p className="text-sm" style={{ color: "var(--app-text-secondary)" }}>
           Aucune transaction sur les 90 derniers jours pour ce filtre.
         </p>
       </article>
@@ -824,8 +830,8 @@ function TransactionsView({
     <article
       className="vyzor-fade-up rounded-2xl"
       style={{
-        backgroundColor: "rgba(15, 15, 18, 0.6)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        backgroundColor: "var(--app-card-bg)",
+        border: "1px solid var(--app-border)",
         overflow: "hidden",
       }}
     >
@@ -857,15 +863,15 @@ function TransactionRow({
 }) {
   const isCredit = tx.amount >= 0;
   const Icon = isCredit ? ArrowDownLeft : ArrowUpRight;
-  const iconColor = isCredit ? COLOR_SUCCESS : "rgba(255, 255, 255, 0.6)";
-  const amountColor = isCredit ? COLOR_SUCCESS : "rgba(255, 255, 255, 0.95)";
+  const iconColor = isCredit ? COLOR_SUCCESS : "var(--app-text-secondary)";
+  const amountColor = isCredit ? COLOR_SUCCESS : "var(--app-text-primary)";
   const description = tx.description || "Opération sans libellé";
 
   return (
     <li
       className="vyzor-fade-up flex items-center gap-3 px-4 py-2.5 transition"
       style={{
-        borderBottom: isLast ? undefined : "1px solid rgba(255, 255, 255, 0.05)",
+        borderBottom: isLast ? undefined : "1px solid var(--app-border)",
         animationDelay: `${delayMs}ms`,
       }}
       onMouseEnter={(e) => {
@@ -878,14 +884,14 @@ function TransactionRow({
       <span
         className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg"
         style={{
-          backgroundColor: isCredit ? "rgba(34, 197, 94, 0.1)" : "rgba(255, 255, 255, 0.05)",
+          backgroundColor: isCredit ? "rgba(34, 197, 94, 0.1)" : "var(--app-border)",
         }}
       >
         <Icon className="h-3.5 w-3.5" style={{ color: iconColor }} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] text-white">{description}</p>
-        <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+        <p className="text-[11px]" style={{ color: "var(--app-text-tertiary)" }}>
           {tx.date}
           {account ? ` · ${account.name}` : ""}
           {tx.isFuture ? " · à venir" : ""}
