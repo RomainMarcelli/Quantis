@@ -170,23 +170,9 @@ export function RentabilityTest({
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 
-      <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
-            Rentabilité & valeur actionnariale
-          </h2>
-          <p className="text-sm text-quantis-muted">
-            Création de richesse, performance du capital et impact du levier.
-          </p>
-        </div>
-
-        {analysisModeLabel ? (
-          <div className="interactive-badge flex items-center gap-2 self-start rounded border border-white/10 bg-white/[0.02] px-3 py-1 md:self-auto">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">{analysisModeLabel}</span>
-          </div>
-        ) : null}
-      </header>
+      {/* Titre individuel "Rentabilité & valeur actionnariale" supprimé —
+          désormais mergé dans le titre principal du AppHeader
+          ("Tableau de bord - …"). */}
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
         {/* Graphique top : courbe d'évolution du KPI sélectionné. Défaut = ROE. */}

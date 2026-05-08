@@ -5,8 +5,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Download,
-  FileText,
   LayoutDashboard,
   Lock,
   LogOut,
@@ -47,6 +45,7 @@ import { getUserProfile } from "@/services/userProfileStore";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
+import { ExportSyntheseButton } from "@/components/synthese/ExportSyntheseButton";
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
 import { useTemporality } from "@/lib/temporality/temporalityContext";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
@@ -341,9 +340,9 @@ export function SyntheseView() {
 
   // Boutons de la ligne 2 — toujours visibles dès qu'une analyse est
   // active. "Simuler" rend le widget via Portal (cf. SimulationWidget).
-  // "Exporter" déclenche le download direct du rapport PDF (sans menu —
-  // le dropdown précédent du SyntheseDashboard a été retiré, le format
-  // PDF est l'unique format actuellement supporté).
+  // "Exporter la synthèse" expose un dropdown PDF / Word (le bouton est
+  // unique à la page Synthèse — sur les pages Tableau de bord, c'est
+  // "Exporter les tableaux" qui prend sa place).
   const headerActions = analysisPair.current ? (
     <>
       {effective ? (
@@ -352,31 +351,17 @@ export function SyntheseView() {
           portalContainerId="simulation-portal-container"
         />
       ) : null}
-      <button
-        type="button"
-        onClick={async () => {
+      <ExportSyntheseButton
+        onExport={async (format) => {
           if (!analysisPair.current) return;
-          const err = await downloadFinancialReport({ analysisId: analysisPair.current.id });
+          const err = await downloadFinancialReport({
+            analysisId: analysisPair.current.id,
+            effectiveKpis: effective?.kpis ?? null,
+            format,
+          });
           if (err) console.warn("[financial-report] download failed", err);
         }}
-        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition"
-        style={{
-          border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 30%)",
-          color: "var(--app-brand-gold-deep)",
-          backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 10%)",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor =
-            "rgb(var(--app-brand-gold-deep-rgb) / 18%)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor =
-            "rgb(var(--app-brand-gold-deep-rgb) / 10%)";
-        }}
-      >
-        <Download className="h-3.5 w-3.5" />
-        Exporter la synthèse
-      </button>
+      />
       <button
         type="button"
         onClick={() => setIsEditing((v) => !v)}

@@ -180,6 +180,10 @@ function AssistantConversationsViewInner() {
         <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
 
         <section className="precision-card w-full rounded-2xl">
+          {/* La tuile occupe toute la largeur disponible mais le contenu
+              (hero, input, suggestions, historique) reste centré dans une
+              colonne lisible — cf. brief 09/05/2026. */}
+          <div className="mx-auto w-full max-w-3xl">
           {/* ─── 1. Hero centré ──────────────────────────────────────── */}
           <div className="flex flex-col items-center px-6 pb-9 pt-12 text-center md:px-8">
             <span
@@ -371,6 +375,7 @@ function AssistantConversationsViewInner() {
                 ))}
               </ul>
             ) : null}
+          </div>
           </div>
         </section>
       </div>

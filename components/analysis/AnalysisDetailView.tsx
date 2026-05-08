@@ -6,10 +6,8 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } 
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
-  Download,
   FileText,
   Bot,
-  Calendar,
   Folder,
   LayoutDashboard,
   Lock,
@@ -28,10 +26,7 @@ import {
 } from "lucide-react";
 import { SimulationToggleButton } from "@/components/simulation/SimulationWidget";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
-import {
-  DashboardFinancialTestMenu,
-  type DashboardTestTabId
-} from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
+import type { DashboardTestTabId } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
 import { DashboardFinancialTestContent } from "@/components/dashboard/navigation/DashboardFinancialTestContent";
 import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashboardModal";
 import { useUserDashboards } from "@/hooks/useUserDashboards";
@@ -74,7 +69,7 @@ import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
-import { SourceBadge } from "@/components/analysis/SourceBadge";
+import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
 import { useActiveDataSource } from "@/hooks/useActiveDataSource";
 import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
@@ -91,7 +86,6 @@ import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
-import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import {
   DashboardReportModal,
   type DashboardOption,
@@ -945,6 +939,15 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // / Personnaliser. Le state `isEditing` est tracké au niveau de la vue
   // (cosmétique pour le bouton ; les sections d'onglet — RentabilityTest,
   // etc. — gèrent elles-mêmes leur mode édition via leur CustomizableDashboard).
+
+  // Titre combiné "Tableau de bord - <section>" : on résout le label de
+  // l'onglet actif en cherchant d'abord parmi les 5 fixes, puis dans la
+  // liste des dashboards custom de l'utilisateur.
+  const activeDashboardLabel = resolveActiveDashboardLabel(
+    activeDashboardTab,
+    userDashboards.dashboards
+  );
+
   const showHeaderTemporalityBar =
     analysis && shouldShowTemporalityBar(analysis);
   const headerTemporalityBar = showHeaderTemporalityBar ? (
@@ -964,11 +967,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       ) : null}
       <button
         type="button"
-        onClick={async () => {
-          if (!analysis) return;
-          const err = await downloadFinancialReport({ analysisId: analysis.id });
-          if (err) console.warn("[financial-report] download failed", err);
-        }}
+        onClick={() => setDashboardReportOpen(true)}
         className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition"
         style={{
           border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 30%)",
@@ -984,8 +983,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             "rgb(var(--app-brand-gold-deep-rgb) / 10%)";
         }}
       >
-        <Download className="h-3.5 w-3.5" />
-        Exporter la synthèse
+        <FileText className="h-3.5 w-3.5" />
+        Exporter les tableaux
       </button>
       <button
         type="button"
@@ -1025,6 +1024,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       <AppHeader
         variant="data"
         companyName={companyName}
+        contextBadge={analysis ? <ActiveSourceBadge analysis={analysis} /> : undefined}
         temporalityBar={headerTemporalityBar}
         headerActions={headerActions}
       />
@@ -1307,118 +1307,24 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             </>
           ) : analysis ? (
             <>
-              {/* Titre remonté en haut — l'utilisateur voit immédiatement le
-                  contexte. Le sélecteur de période vient juste dessous. */}
+              {/* Titre combiné "Tableau de bord - <section>" — la section est
+                  déterminée par l'onglet actif (5 fixes + dashboards custom).
+                  Le format reste constant quelle que soit la page (fixe ou
+                  custom) — cf. brief 09/05/2026. */}
               <div className="px-1">
-                <h1 className="text-2xl font-semibold text-white md:text-3xl">Tableau de bord</h1>
+                <h1 className="text-2xl font-semibold text-white md:text-3xl">
+                  Tableau de bord{activeDashboardLabel ? ` - ${activeDashboardLabel}` : ""}
+                </h1>
                 <p className="mt-1 text-sm text-white/65">
                   Bonjour {greetingName}, voici la vue détaillée de vos indicateurs financiers.
                 </p>
               </div>
 
-              {/* Sélecteur de période sous le titre :
-                   - Sources dynamiques (Pennylane/MyUnisoft/Odoo) → TemporalityBar
-                     complète (jour/semaine/mois/trimestre/année + nav).
-                   - Sources statiques (PDF/Excel) → mini-bar "Année" + dropdown
-                     pour switcher entre les exercices disponibles. Le sélecteur
-                     historique de la sidebar a été retiré (doublon). */}
-              {shouldShowTemporalityBar(analysis) ? (
-                <TemporalityBar
-                  availableRange={computeAvailableRange(analysis)}
-                  daysInPeriod={effectiveAnalysis?.isFiltered ? effectiveAnalysis.filterSummary.daysInPeriod : null}
-                  rightLabel={
-                    effectiveAnalysis?.isFiltered
-                      ? `${effectiveAnalysis.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
-                      : undefined
-                  }
-                />
-              ) : dashboardYearOptions.length > 1 ? (
-                <div className="precision-card flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3" data-scroll-reveal-ignore>
-                  <div className="flex items-center gap-2 text-white/60">
-                    <Calendar className="h-4 w-4" />
-                    <span className="text-xs uppercase tracking-wider">Période</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-                    <button
-                      type="button"
-                      className="rounded-md bg-quantis-gold px-3 py-1 text-xs font-medium text-black"
-                      aria-pressed
-                    >
-                      Année
-                    </button>
-                  </div>
-                  <select
-                    id="dashboard-year-static"
-                    value={selectedDashboardYear}
-                    onChange={(event) => setSelectedDashboardYear(event.target.value)}
-                    className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white outline-none transition hover:bg-white/10 focus:border-quantis-gold/70"
-                  >
-                    {dashboardYearOptions.map((option) => (
-                      <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
-
-              {/* Bandeau meta consolidé : société + date + source + période
-                  (statique uniquement) + actions. */}
-              <header className="precision-card flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
-                    <span>Analyse du {new Date(analysis.createdAt).toLocaleString("fr-FR")}</span>
-                    <SourceBadge
-                      sourceMetadata={analysis.sourceMetadata ?? null}
-                      analysisCreatedAt={analysis.createdAt}
-                    />
-                    {!shouldShowTemporalityBar(analysis) && analysis.fiscalYear ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-white/75">
-                        Exercice {analysis.fiscalYear}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 self-start md:self-auto">
-                  {/* Le bouton ouvre la modale unique (synthèse OU sélection
-                      de tableaux). On évite un dropdown qui se faisait clipper
-                      par l'overflow du parent precision-card. */}
-                  <button
-                    type="button"
-                    onClick={() => setDashboardReportOpen(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    Exporter les tableaux
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!analysis) return;
-                      exportAnalysisDataAsJson({ analysis, companyName });
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
-                  >
-                    Exporter données
-                  </button>
-                </div>
-              </header>
-
-              <DashboardFinancialTestMenu
-                activeTab={activeDashboardTab}
-                onChange={handleFinancialTabChange}
-                showTresorerie={showTresorerie}
-                customDashboards={userDashboards.dashboards}
-                onCreateDashboard={user ? () => setCreateDashboardOpen(true) : undefined}
-                onDeleteDashboard={async (id) => {
-                  await userDashboards.deleteDashboard(id);
-                  // Si l'utilisateur supprime l'onglet courant, on retombe sur Création de valeur.
-                  if (activeDashboardTab === id) {
-                    setActiveDashboardTab(DEFAULT_ANALYSIS_TAB);
-                  }
-                }}
-              />
+              {/* Phase 3 brief Header unifié 09/05/2026 — bandeaux meta /
+                  TemporalityBar interne / sélecteur d'année statique /
+                  DashboardFinancialTestMenu supprimés. La TemporalityBar
+                  globale est désormais portée par le AppHeader (ligne 2),
+                  la navigation entre onglets se fait via la sidebar. */}
               {/* previousKpis :
                    - Priorité 1 = KPIs de la période antérieure de même durée
                      (Année → N-1, Mois → M-1…) calculés via dailyAccounting.
@@ -1598,6 +1504,26 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       ) : null}
     </section>
   );
+}
+
+// Labels des 5 onglets fixes — alignés sur DashboardFinancialTestMenu.
+// Source unique pour le titre combiné "Tableau de bord - <section>".
+const FIXED_DASHBOARD_LABELS: Record<string, string> = {
+  "creation-valeur": "Création de valeur",
+  "investissement-bfr": "Investissement",
+  financement: "Financement",
+  rentabilite: "Rentabilité",
+  tresorerie: "Trésorerie",
+};
+
+function resolveActiveDashboardLabel(
+  activeTab: DashboardTestTabId,
+  customDashboards: ReadonlyArray<{ id: string; name: string }>
+): string | null {
+  const fixed = FIXED_DASHBOARD_LABELS[activeTab];
+  if (fixed) return fixed;
+  const custom = customDashboards.find((d) => d.id === activeTab);
+  return custom?.name?.trim() || null;
 }
 
 function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): string {

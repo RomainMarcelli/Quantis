@@ -162,26 +162,15 @@ export function FinancingTest({
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 
-      <header className="fade-up relative z-[4] mb-10 flex flex-col items-start justify-between gap-5 md:flex-row md:items-end">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
-            Financement & solvabilité
-          </h2>
-          <p className="text-sm text-quantis-muted">Capacité d&apos;emprunt, génération de cash et liquidité court terme</p>
-        </div>
-
-        <div className="flex flex-col items-end gap-2 self-start md:self-auto">
-          {analysisModeLabel ? (
-            <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
-              <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
-              <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">{analysisModeLabel}</span>
-            </div>
-          ) : null}
-          <div className="interactive-badge flex items-center gap-2 rounded border border-quantis-gold/20 bg-quantis-gold/[0.04] px-3 py-1">
-            <span className="text-[10px] font-medium uppercase tracking-widest text-quantis-gold">
-              Score crédit : {creditBadge}
-            </span>
-          </div>
+      {/* Titre individuel "Financement & solvabilité" supprimé — désormais
+          mergé dans le titre principal du AppHeader ("Tableau de bord - …").
+          Le badge "Score crédit" reste utile pour cette section : on le
+          remonte en haut à droite. */}
+      <header className="fade-up relative z-[4] mb-6 flex justify-end">
+        <div className="interactive-badge flex items-center gap-2 rounded border border-quantis-gold/20 bg-quantis-gold/[0.04] px-3 py-1">
+          <span className="text-[10px] font-medium uppercase tracking-widest text-quantis-gold">
+            Score crédit : {creditBadge}
+          </span>
         </div>
       </header>
 

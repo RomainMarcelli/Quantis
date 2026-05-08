@@ -92,17 +92,8 @@ export function DashboardFinancialTestContent({
     };
     return (
       <section className="space-y-4">
-        <header className="precision-card rounded-2xl px-4 py-3">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/45">
-            Dashboard personnalisé
-          </p>
-          <h2 className="text-2xl font-semibold text-white">
-            {dashboard?.name ?? "Dashboard sans nom"}
-          </h2>
-          <p className="mt-1 text-xs text-white/55">
-            Compose librement ton tableau avec n&apos;importe quel widget.
-          </p>
-        </header>
+        {/* Titre du dashboard custom supprimé — désormais mergé dans le
+            titre principal du AppHeader ("Tableau de bord - <nom>"). */}
         <CustomizableDashboard
           userId={userId}
           layoutId={activeTab}
