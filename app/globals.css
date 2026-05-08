@@ -353,6 +353,58 @@ body {
   border-color: rgb(0 0 0 / 10%);
 }
 
+/* ─── Phase 6 — Glassmorphism warm (tooltips / modals / dropdowns) ──
+   Beaucoup de composants utilisent `bg-quantis-base/95 backdrop-blur` ou
+   `backdrop-blur-xl` pour leur fond — en dark, c'est un noir 95 % flou ;
+   en light, il faut le frost warm. On override ciblé sur les classes
+   les plus utilisées (KpiTooltip, KpiBenchmarkIndicator, etc.). */
+[data-theme="light"] .bg-quantis-base\/95,
+[data-theme="light"] .bg-quantis-base\/90 {
+  background-color: var(--app-glass-warm-bg) !important;
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  box-shadow: var(--app-glass-warm-shadow);
+}
+[data-theme="light"] [class*="backdrop-blur"]:where(.bg-quantis-base\/95, .bg-quantis-base\/90) {
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+
+/* ─── Phase 9 — Micro-interactions (transitions douces) ─────────────
+   Le brief : "tout changement d'état visuel doit avoir une transition
+   de 200ms ease". On l'applique aux éléments les plus interactifs
+   (boutons, liens sidebar — déjà couverts plus haut, cards,
+   inputs/selects). Pas de transition globale `*` (impact perf et
+   effets surprenants sur les non-interactifs). */
+[data-theme="light"] button:not([disabled]),
+[data-theme="light"] a {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
+[data-theme="light"] input:focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+  outline: none;
+  border-color: var(--app-brand-gold-deep) !important;
+  box-shadow: 0 0 0 3px rgb(139 111 42 / 10%);
+}
+
+/* Hover de l'icône engrenage des cards KPI (cf. brief : "rotation
+   subtile de 45° sur hover, 300ms ease"). On vise les Settings/Cog
+   icons à l'intérieur des precision-cards. */
+[data-theme="light"] .precision-card [data-kpi-cog],
+[data-theme="light"] .precision-card svg.lucide-settings {
+  transition: transform 300ms ease, color 200ms ease;
+}
+[data-theme="light"] .precision-card:hover [data-kpi-cog],
+[data-theme="light"] .precision-card:hover svg.lucide-settings {
+  transform: rotate(45deg);
+}
+
 /* Glassmorphism panels — beaucoup de composants posent
    `style={{ backgroundColor: "rgba(15,15,18,0.85)" }}` en inline. Quand
    l'inline impose un fond sombre en mode clair on ne peut pas l'override.
@@ -1187,6 +1239,83 @@ body {
     0 14px 30px rgba(216, 172, 47, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
   transform: translateY(-1px);
+}
+
+/* ─── Phase 5 — Hiérarchie boutons mode clair ─────────────────────────
+   En mode clair, on retire le gradient décoratif (cf. brief : "pas de
+   gradients décoratifs") et on passe à un aplat gold profond avec un
+   double box-shadow (key + ring) qui rappelle le style Mercury / Linear
+   sans passer par du faux relief. */
+[data-theme="light"] .btn-gold-premium,
+[data-theme="light"] .cta-gold-pilot {
+  border: 1px solid var(--app-brand-gold-deep);
+  background-image: none;
+  background-color: var(--app-brand-gold-deep);
+  color: #FFFFFF;
+  box-shadow:
+    0 1px 3px rgb(139 111 42 / 20%),
+    0 0 0 1px rgb(139 111 42 / 8%);
+  border-radius: 10px;
+  transition: background-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+[data-theme="light"] .btn-gold-premium:hover,
+[data-theme="light"] .cta-gold-pilot:hover {
+  background-image: none;
+  background-color: #7A6125;
+  box-shadow:
+    0 2px 6px rgb(139 111 42 / 25%),
+    0 0 0 1px rgb(139 111 42 / 12%);
+  transform: none;
+}
+
+/* Boutons secondaires utility — class réutilisable. Convention :
+   transparent + bordure douce + hover discret. À appliquer aux CTA
+   non-primaires (Exporter, Simuler, Annuler…). */
+.btn-vyzor-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgb(0 0 0 / 12%);
+  background-color: transparent;
+  color: var(--app-text-primary);
+  border-radius: 10px;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.btn-vyzor-secondary:hover {
+  background-color: rgb(0 0 0 / 3%);
+  border-color: rgb(0 0 0 / 18%);
+}
+:root[data-theme="dark"] .btn-vyzor-secondary,
+:root:not([data-theme="light"]) .btn-vyzor-secondary {
+  border-color: rgb(255 255 255 / 12%);
+  color: rgb(255 255 255 / 90%);
+}
+:root[data-theme="dark"] .btn-vyzor-secondary:hover,
+:root:not([data-theme="light"]) .btn-vyzor-secondary:hover {
+  background-color: rgb(255 255 255 / 4%);
+  border-color: rgb(255 255 255 / 18%);
+}
+
+/* Boutons destructifs — pour les actions Déconnecter / Supprimer. */
+.btn-vyzor-destructive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgb(220 38 38 / 25%);
+  background-color: transparent;
+  color: var(--app-danger);
+  border-radius: 10px;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.btn-vyzor-destructive:hover {
+  background-color: rgb(220 38 38 / 6%);
+  border-color: rgb(220 38 38 / 40%);
 }
 
 /* ─── Documents — onboarding séquentiel ───────────────────────────────
