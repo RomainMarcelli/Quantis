@@ -102,9 +102,11 @@ const VARIATION_STYLE: React.CSSProperties = {
   fontSize: "14px",
 };
 
-const COLOR_GREEN = "#22C55E";
-const COLOR_RED = "#EF4444";
-const COLOR_GREY = "#9CA3AF";
+// Couleurs sémantiques liées aux CSS vars : flip automatique entre dark
+// (#22C55E vif) et light (#16A34A profond) sans dupliquer la logique.
+const COLOR_GREEN = "var(--app-success)";
+const COLOR_RED = "var(--app-danger)";
+const COLOR_GREY = "var(--app-text-tertiary)";
 
 export function KpiCardLayout({
   kpiId,

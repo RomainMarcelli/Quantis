@@ -242,6 +242,29 @@ body {
      `style="color: #FFFFFF"` inline (priorité). On ne couvre donc pas
      ces cas ici ; ils restent visibles en dark uniquement et seront
      ajustés au cas par cas. */
+
+  /* ── Tones sémantiques Tailwind (utilisés par KpiBenchmarkIndicator
+     et autres badges) → versions FONCÉES en light, lisibles sur fond
+     clair (cf. brief : ratio AA minimum + foncé pour signaler). */
+  & .text-emerald-300,
+  & .text-emerald-400 { color: #166534 !important; }
+  & .text-emerald-500 { color: #16A34A !important; }
+  & .text-amber-200,
+  & .text-amber-300 { color: #9A3412 !important; }
+  & .text-amber-400 { color: #B45309 !important; }
+  & .text-red-300,
+  & .text-red-400 { color: #991B1B !important; }
+  & .text-red-500 { color: #DC2626 !important; }
+
+  /* ── Surfaces sémantiques light (badges benchmark, alerts, banners)
+     → fond opacité 8-12 % + texte version foncée. Le brief : "BAS 25%"
+     en bg rgb(220 38 38 / 8%) + texte #991B1B. */
+  & .bg-emerald-500\/10,
+  & .bg-emerald-500\/20 { background-color: rgb(22 163 74 / 10%) !important; }
+  & .bg-amber-500\/10,
+  & .bg-amber-500\/20 { background-color: rgb(217 119 6 / 10%) !important; }
+  & .bg-red-500\/10,
+  & .bg-red-500\/20 { background-color: rgb(220 38 38 / 10%) !important; }
 }
 
 /* ─── Précisions sur composants stratégiques ─────────────────────── */
