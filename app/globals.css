@@ -1371,11 +1371,17 @@ body {
    qui vaut #10B981 pour Excellent). En light on garde ça vert. */
 
 /* Piliers — en light : on transforme la "card" en row plate avec une
-   mini-bar de progression colorée selon le tone. */
+   mini-bar de progression colorée selon le tone. Le brief Synthèse
+   demande explicitement la suppression du cadre (cf. retour 08/05/2026
+   : "supprime le cadre autour"). On force border:none + radius:0
+   plutôt que juste transparent (sinon une légère bordure résiduelle
+   peut subsister via les overrides Tailwind border-white/10). */
 [data-theme="light"] [data-vyzor-score] [data-piliers-item] {
   background-color: transparent !important;
-  border-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
   padding: 8px 4px !important;
+  box-shadow: none !important;
 }
 [data-theme="light"] [data-vyzor-score] [data-piliers-track] {
   background-color: rgb(0 0 0 / 5%) !important;
@@ -1413,35 +1419,15 @@ body {
   background-color: #EF4444;
 }
 
-/* ─── Brief Synthèse v2 (08/05/2026) — Section 3 : badges benchmark
-   En light : remplace les dots colorés par un badge texte propre
-   (BAS 25% / MÉDIANE / TOP 25%). On masque les dots et on style le
-   label en pilule colorée selon le tone. */
-[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] {
-  display: none !important;
-}
-[data-theme="light"] [data-benchmark-indicator] [data-benchmark-label] {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 10px;
-  border-radius: 6px;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.02em !important;
-  text-transform: none !important;
-}
-[data-theme="light"] [data-benchmark-indicator][data-benchmark-tone="negative"] [data-benchmark-label] {
-  background-color: rgb(220 38 38 / 8%) !important;
-  color: #991B1B !important;
-}
-[data-theme="light"] [data-benchmark-indicator][data-benchmark-tone="neutral"] [data-benchmark-label] {
-  background-color: rgb(217 119 6 / 8%) !important;
-  color: #92400E !important;
-}
-[data-theme="light"] [data-benchmark-indicator][data-benchmark-tone="positive"] [data-benchmark-label] {
-  background-color: rgb(22 163 74 / 8%) !important;
-  color: #166534 !important;
-}
+/* ─── Badges benchmark — mise en page identique dark/light pour
+   cohérence visuelle (cf. retour utilisateur 08/05/2026). On garde
+   les dots colorés + le label texte uppercase tels qu'en dark.
+   Seules les couleurs sémantiques du label (text-rose-300 etc.) sont
+   adaptées en versions foncées via les overrides Tailwind globaux
+   plus haut dans ce fichier (text-rose-300 → #991B1B etc.). Les dots
+   utilisent leurs classes Tailwind originales (bg-emerald-500/30,
+   bg-amber-500/30, bg-rose-500/30) qui restent lisibles sur fond
+   clair grâce à leur opacité 30 %. */
 
 /* ─── Brief Synthèse v2 — Section 5 : bannière VYZOR_AGENT
    Distingue immédiatement la recommandation IA des KPI statiques
