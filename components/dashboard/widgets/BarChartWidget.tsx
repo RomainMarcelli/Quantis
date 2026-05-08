@@ -4,12 +4,11 @@
 // la lecture par période est plus parlante en barres (CA mensuel, EBE annuel).
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -33,6 +32,7 @@ import {
   INSUFFICIENT_DATA_LABEL
 } from "@/components/dashboard/formatting";
 import { getKpiDefinition, type KpiUnit } from "@/lib/kpi/kpiRegistry";
+import { StableChartContainer } from "@/components/dashboard/widgets/StableChartContainer";
 import type { AnalysisRecord } from "@/types/analysis";
 
 type BarChartWidgetProps = {
@@ -43,7 +43,7 @@ type BarChartWidgetProps = {
 
 const COLOR_BAR = "#C5A059";
 
-export function BarChartWidget({ kpiId, analyses, currentAnalysis }: BarChartWidgetProps) {
+function BarChartWidgetImpl({ kpiId, analyses, currentAnalysis }: BarChartWidgetProps) {
   const monthlyAvailable = hasMonthlyDataAvailable(currentAnalysis);
   const definition = getKpiDefinition(kpiId);
 
@@ -81,7 +81,7 @@ export function BarChartWidget({ kpiId, analyses, currentAnalysis }: BarChartWid
 
       {hasData ? (
         <div className="h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <StableChartContainer>
             <BarChart data={series} margin={{ top: 8, right: 18, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
               <XAxis
@@ -101,9 +101,9 @@ export function BarChartWidget({ kpiId, analyses, currentAnalysis }: BarChartWid
                 content={(props) => <BarTooltip {...props} unit={unit} title={title} />}
                 cursor={{ fill: "rgba(197,160,89,0.08)" }}
               />
-              <Bar dataKey="value" fill={COLOR_BAR} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="value" fill={COLOR_BAR} radius={[3, 3, 0, 0]} isAnimationActive={false} />
             </BarChart>
-          </ResponsiveContainer>
+          </StableChartContainer>
         </div>
       ) : (
         <div className="flex h-[200px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
@@ -148,3 +148,5 @@ function formatTooltipValue(value: number | null, unit: KpiUnit): string {
   if (unit === "ratio" || unit === "score") return formatNumber(value, 2);
   return formatNumber(value);
 }
+
+export const BarChartWidget = memo(BarChartWidgetImpl);

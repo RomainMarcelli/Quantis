@@ -178,14 +178,10 @@ export function useDashboardLayout({
   );
 
   const removeWidget = useCallback((instanceId: string) => {
-    setLayout((prev) => {
-      const target = prev.widgets.find((w) => w.id === instanceId);
-      if (target?.isFixed) return prev; // garde-fou : on ne retire pas un widget marqué fixe.
-      return {
-        ...prev,
-        widgets: prev.widgets.filter((w) => w.id !== instanceId)
-      };
-    });
+    setLayout((prev) => ({
+      ...prev,
+      widgets: prev.widgets.filter((w) => w.id !== instanceId)
+    }));
   }, []);
 
   const reorderWidgets = useCallback((orderedIds: string[]) => {

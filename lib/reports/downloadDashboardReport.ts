@@ -1,42 +1,34 @@
-// File: lib/reports/downloadFinancialReport.ts
-// Role: helper côté navigateur — POST /api/reports/financial, récupère le PDF
-// binaire, déclenche un download via Blob URL. Lit le Content-Disposition pour
-// utiliser le nom de fichier proposé par le serveur.
+// File: lib/reports/downloadDashboardReport.ts
+// Role: helper côté navigateur pour le rapport PDF mode "dashboard".
+// POST /api/reports/dashboard avec analysisId + liste de dashboardIds,
+// déclenche un download du PDF.
 
 import { firebaseAuthGateway } from "@/services/auth";
 import type { CalculatedKpis } from "@/types/analysis";
 
-export type DownloadFinancialReportInput = {
+export type DownloadDashboardReportInput = {
   analysisId: string;
-  /**
-   * KPIs effectifs côté client (avec overrides Bridge / slider temporalité).
-   * Quand fournis, le serveur les utilise au lieu de `analysis.kpis` —
-   * garantit la parité score / valeurs entre l'écran et le PDF.
-   */
-  effectiveKpis?: CalculatedKpis | null;
+  dashboardIds: string[];
   /** Format de sortie (PDF par défaut). */
   format?: "pdf" | "docx";
+  /** KPIs effectifs côté client — pour parité écran ↔ rapport. */
+  effectiveKpis?: CalculatedKpis | null;
 };
 
-export type DownloadFinancialReportError =
+export type DownloadDashboardReportError =
   | { kind: "unauthenticated" }
   | { kind: "http"; status: number; message: string }
   | { kind: "network"; message: string };
 
-/**
- * Déclenche le téléchargement du rapport PDF financier 4 pages pour l'analyse
- * donnée. Retourne null en cas de succès, ou un objet d'erreur typé sinon
- * (laisse le caller décider du UX feedback).
- */
-export async function downloadFinancialReport(
-  input: DownloadFinancialReportInput
-): Promise<DownloadFinancialReportError | null> {
+export async function downloadDashboardReport(
+  input: DownloadDashboardReportInput
+): Promise<DownloadDashboardReportError | null> {
   const idToken = await firebaseAuthGateway.getIdToken();
   if (!idToken) return { kind: "unauthenticated" };
 
   let res: Response;
   try {
-    res = await fetch("/api/reports/financial", {
+    res = await fetch("/api/reports/dashboard", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${idToken}`,
@@ -44,8 +36,9 @@ export async function downloadFinancialReport(
       },
       body: JSON.stringify({
         analysisId: input.analysisId,
-        effectiveKpis: input.effectiveKpis ?? null,
+        dashboardIds: input.dashboardIds,
         format: input.format ?? "pdf",
+        effectiveKpis: input.effectiveKpis ?? null,
       }),
     });
   } catch (err) {
@@ -58,13 +51,13 @@ export async function downloadFinancialReport(
       const data = (await res.json()) as { error?: string; detail?: string };
       detail = data.detail ?? data.error ?? detail;
     } catch {
-      // ignore — réponse non-JSON
+      // ignore
     }
     return { kind: "http", status: res.status, message: detail };
   }
 
   const blob = await res.blob();
-  const fallbackName = `rapport-financier.${input.format ?? "pdf"}`;
+  const fallbackName = `rapport-tableau-de-bord.${input.format ?? "pdf"}`;
   const filename = parseFilenameFromContentDisposition(res.headers.get("Content-Disposition"))
     ?? fallbackName;
 

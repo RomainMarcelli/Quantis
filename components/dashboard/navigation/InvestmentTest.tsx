@@ -25,14 +25,8 @@ import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 // principales d'aujourd'hui (BFR, ratio_immo). La carte "Variation annuelle"
 // est retirée — l'info de variation est désormais portée par chaque widget
 // KpiCard (ligne N vs N-1 automatique via KpiCardLayout).
-const DEFAULT_INVESTMENT_LAYOUT: DashboardLayout = {
-  id: "dashboard:investissement",
-  constrainedToCategory: "investissement",
-  widgets: [
-    { id: "inv-bfr", kpiId: "bfr", vizType: "kpiCard", size: "M" },
-    { id: "inv-ratio-immo", kpiId: "ratio_immo", vizType: "kpiCard", size: "M" }
-  ] as WidgetInstance[]
-};
+import { DEFAULT_DASHBOARD_LAYOUTS } from "@/lib/dashboard/defaultDashboardLayouts";
+const DEFAULT_INVESTMENT_LAYOUT = DEFAULT_DASHBOARD_LAYOUTS["investissement-bfr"];
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import { buildKpiTrend, buildSignedTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";

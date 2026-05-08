@@ -18,22 +18,9 @@ import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAut
 import { BreakEvenChart } from "@/components/dashboard/navigation/BreakEvenChart";
 import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
 import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
-import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
+import { DEFAULT_DASHBOARD_LAYOUTS } from "@/lib/dashboard/defaultDashboardLayouts";
 
-// Default layout pour l'onglet Création de valeur : reproduit les 6 cartes
-// existantes (CA, TCAM, EBE, VA, marge_ebitda, point_mort).
-const DEFAULT_VALUE_CREATION_LAYOUT: DashboardLayout = {
-  id: "dashboard:creation_valeur",
-  constrainedToCategory: "creation_valeur",
-  widgets: [
-    { id: "vc-ca", kpiId: "ca", vizType: "kpiCard", size: "S" },
-    { id: "vc-tcam", kpiId: "tcam", vizType: "kpiCard", size: "S" },
-    { id: "vc-ebe", kpiId: "ebe", vizType: "kpiCard", size: "S" },
-    { id: "vc-va", kpiId: "va", vizType: "kpiCard", size: "S" },
-    { id: "vc-marge-ebitda", kpiId: "marge_ebitda", vizType: "kpiCard", size: "S" },
-    { id: "vc-point-mort", kpiId: "point_mort", vizType: "kpiCard", size: "S" }
-  ] as WidgetInstance[]
-};
+const DEFAULT_VALUE_CREATION_LAYOUT = DEFAULT_DASHBOARD_LAYOUTS["creation-valeur"];
 import { KpiTrendPill } from "@/components/dashboard/navigation/KpiTrendPill";
 import { useAnimatedNumber } from "@/components/dashboard/useAnimatedNumber";
 import { useTheme } from "@/hooks/useTheme";

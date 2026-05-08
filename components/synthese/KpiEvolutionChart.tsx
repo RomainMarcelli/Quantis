@@ -7,18 +7,18 @@
 // dailyAccounting) ou annuelle (historique des analyses du dossier).
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
   type TooltipContentProps
 } from "recharts";
 import { Calendar, TrendingUp } from "lucide-react";
+import { StableChartContainer } from "@/components/dashboard/widgets/StableChartContainer";
 import type { AnalysisRecord } from "@/types/analysis";
 import {
   buildKpiMonthlySeries,
@@ -52,7 +52,7 @@ type KpiEvolutionChartProps = {
 
 const COLOR_LINE = "#C5A059"; // or quantis-gold
 
-export function KpiEvolutionChart({ kpiId, analyses, currentAnalysis }: KpiEvolutionChartProps) {
+function KpiEvolutionChartImpl({ kpiId, analyses, currentAnalysis }: KpiEvolutionChartProps) {
   const monthlyAvailable = hasMonthlyDataAvailable(currentAnalysis);
   const definition = getKpiDefinition(kpiId);
 
@@ -133,7 +133,7 @@ export function KpiEvolutionChart({ kpiId, analyses, currentAnalysis }: KpiEvolu
 
       {hasData ? (
         <div className="h-[220px] min-h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <StableChartContainer>
             <LineChart data={series} margin={{ top: 8, right: 18, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
               <XAxis
@@ -162,9 +162,10 @@ export function KpiEvolutionChart({ kpiId, analyses, currentAnalysis }: KpiEvolu
                 dot={{ r: 2.5, fill: COLOR_LINE, strokeWidth: 0 }}
                 activeDot={{ r: 5, stroke: COLOR_LINE, strokeWidth: 1, fill: "#0f0f12" }}
                 connectNulls={false}
+                isAnimationActive={false}
               />
             </LineChart>
-          </ResponsiveContainer>
+          </StableChartContainer>
         </div>
       ) : (
         <div className="flex h-[220px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
@@ -298,3 +299,5 @@ function formatTooltipValue(value: number | null, unit: KpiUnit): string {
   if (unit === "ratio" || unit === "score") return formatNumber(value, 2);
   return formatNumber(value);
 }
+
+export const KpiEvolutionChart = memo(KpiEvolutionChartImpl);

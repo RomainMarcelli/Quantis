@@ -33,18 +33,8 @@ import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 // Default layout pour l'onglet Financement : reproduit les 6 cartes existantes
 // (capacite_remboursement, caf, fte, solvabilite, gearing, tn). Toutes les
 // variations + benchmarks sont portés par chaque widget KpiCard.
-const DEFAULT_FINANCING_LAYOUT: DashboardLayout = {
-  id: "dashboard:financement",
-  constrainedToCategory: "financement",
-  widgets: [
-    { id: "fin-cap-remb", kpiId: "capacite_remboursement_annees", vizType: "kpiCard", size: "S" },
-    { id: "fin-caf", kpiId: "caf", vizType: "kpiCard", size: "S" },
-    { id: "fin-fte", kpiId: "fte", vizType: "kpiCard", size: "S" },
-    { id: "fin-solva", kpiId: "solvabilite", vizType: "kpiCard", size: "S" },
-    { id: "fin-gearing", kpiId: "gearing", vizType: "kpiCard", size: "S" },
-    { id: "fin-tn", kpiId: "tn", vizType: "kpiCard", size: "S" }
-  ] as WidgetInstance[]
-};
+import { DEFAULT_DASHBOARD_LAYOUTS } from "@/lib/dashboard/defaultDashboardLayouts";
+const DEFAULT_FINANCING_LAYOUT = DEFAULT_DASHBOARD_LAYOUTS["financement"];
 
 type FinancingTestProps = {
   kpis: CalculatedKpis;

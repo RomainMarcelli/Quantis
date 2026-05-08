@@ -89,7 +89,10 @@ import {
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
-import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
+import {
+  DashboardReportModal,
+  type DashboardOption,
+} from "@/components/dashboard/DashboardReportModal";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
 import { computeShowTresorerie } from "@/lib/banking/disponibilitesOverride";
 
@@ -143,6 +146,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
   // Phase 4 — modale "Nouveau tableau de bord" pour créer un dashboard custom.
   const [createDashboardOpen, setCreateDashboardOpen] = useState(false);
+  // Modale "Télécharger le rapport" — choix synthèse vs sélection multi-tableaux.
+  const [dashboardReportOpen, setDashboardReportOpen] = useState(false);
   // Phase 4 — liste des dashboards custom de l'utilisateur (CRUD Firestore).
   const userDashboards = useUserDashboards(user?.uid ?? null);
   // Le select du menu pilote l'année d'analyse affichée dans le dashboard.
@@ -1281,20 +1286,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                   </div>
                 </div>
                 <div className="flex items-center gap-2 self-start md:self-auto">
+                  {/* Le bouton ouvre la modale unique (synthèse OU sélection
+                      de tableaux). On évite un dropdown qui se faisait clipper
+                      par l'overflow du parent precision-card. */}
                   <button
                     type="button"
-                    onClick={async () => {
-                      if (!analysis) return;
-                      const err = await downloadFinancialReport({ analysisId: analysis.id });
-                      if (err) {
-                        // Erreur silencieuse : on log côté console pour debug.
-                        console.warn("[financial-report] download failed", err);
-                      }
-                    }}
+                    onClick={() => setDashboardReportOpen(true)}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20"
                   >
                     <FileText className="h-3.5 w-3.5" />
-                    Télécharger le rapport PDF
+                    Exporter les tableaux
                   </button>
                   <button
                     type="button"
@@ -1357,6 +1358,30 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                     setActiveDashboardTab(newId as DashboardTestTabId);
                   }
                 }}
+              />
+
+              {/* Modale "Rapport tableau de bord" — verrouillée en mode
+                  dashboard (l'export synthèse est dans l'onglet Synthèse). */}
+              <DashboardReportModal
+                open={dashboardReportOpen}
+                onClose={() => setDashboardReportOpen(false)}
+                analysisId={analysis.id}
+                lockType="dashboard"
+                effectiveKpis={effectiveAnalysis?.kpis ?? analysis.kpis}
+                options={(((): DashboardOption[] => {
+                  const fixed: DashboardOption[] = [
+                    { id: "creation-valeur", label: "Création de valeur", description: "Indicateurs de richesse créée et marges opérationnelles" },
+                    { id: "investissement-bfr", label: "Investissement & BFR", description: "Cycle d'exploitation et besoin en fonds de roulement" },
+                    { id: "financement", label: "Financement", description: "Structure financière et capacité de remboursement" },
+                    { id: "rentabilite", label: "Rentabilité", description: "Performance des capitaux engagés (ROE, ROCE)" },
+                  ];
+                  const customs: DashboardOption[] = userDashboards.dashboards.map((d) => ({
+                    id: d.id,
+                    label: d.name || "Tableau personnalisé",
+                    description: "Tableau personnalisé",
+                  }));
+                  return [...fixed, ...customs];
+                }))()}
               />
             </>
           ) : (

@@ -11,8 +11,9 @@
 "use client";
 
 import { Plus, SlidersHorizontal, Check, Loader2 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useDashboardLayout } from "@/hooks/useDashboardLayout";
+import { isKpiAvailable, type KpiAvailabilityContext } from "@/lib/kpi/kpiAvailability";
 import { WidgetGrid } from "@/components/dashboard/widgets/WidgetGrid";
 import { KpiPickerDrawer } from "@/components/dashboard/widgets/KpiPickerDrawer";
 import { KpiCardWidget } from "@/components/dashboard/widgets/KpiCardWidget";
@@ -130,6 +131,27 @@ export function CustomizableDashboard({
   };
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Contexte d'availability — partagé entre le filtrage du layout et le
+  // graying-out du picker. Pas de N/D affiché : un widget dont la donnée
+  // n'est pas disponible n'apparaît tout simplement pas dans la grille.
+  // mappedData inclus pour que les variables brutes (Bilan/CdR) soient
+  // évaluées au même titre que les KPIs calculés.
+  const availabilityCtx: KpiAvailabilityContext = useMemo(() => ({
+    kpis,
+    mappedData: mappedData ?? null,
+    synthese: synthese ?? null,
+    currentAnalysis,
+  }), [kpis, mappedData, synthese, currentAnalysis]);
+
+  // Layout effectif : on filtre les widgets dont la donnée n'est pas
+  // disponible (KPI calculé OU variable brute Bilan/CdR).
+  const effectiveLayout = useMemo<DashboardLayout>(() => {
+    const visibleWidgets = layout.widgets.filter((w) =>
+      isKpiAvailable(w.kpiId, availabilityCtx),
+    );
+    return { ...layout, widgets: visibleWidgets };
+  }, [layout, availabilityCtx]);
+
   // Dispatcher de rendu : selon le `vizType` du widget, choisit le composant.
   // Phase 1 :
   //   - `kpiCard` (registre KPI), `lineChart` (registre KPI)
@@ -223,7 +245,7 @@ export function CustomizableDashboard({
             <p className="text-xs text-white/55">
               {isEditing
                 ? "Glisse pour réordonner, redimensionne, ou supprime un widget."
-                : `${layout.widgets.length} widget${layout.widgets.length > 1 ? "s" : ""} affiché${layout.widgets.length > 1 ? "s" : ""}.`}
+                : `${effectiveLayout.widgets.length} widget${effectiveLayout.widgets.length > 1 ? "s" : ""} affiché${effectiveLayout.widgets.length > 1 ? "s" : ""}.`}
             </p>
           </div>
 
@@ -260,7 +282,7 @@ export function CustomizableDashboard({
         </div>
       ) : (
         <WidgetGrid
-          layout={layout}
+          layout={effectiveLayout}
           isEditing={isEditing}
           renderWidget={renderWidget}
           onReorder={reorderWidgets}
@@ -274,6 +296,7 @@ export function CustomizableDashboard({
         onClose={() => setPickerOpen(false)}
         onAdd={(kpiId, vizType) => addWidget(kpiId, vizType, "M")}
         lockedCategory={lockedCategory}
+        availabilityCtx={availabilityCtx}
       />
     </section>
   );

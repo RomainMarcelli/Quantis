@@ -395,13 +395,17 @@ export function SyntheseView() {
               }}
               onReupload={() => router.push("/upload")}
               onManualEntry={() => router.push("/upload/manual")}
-              onDownloadFinancialReport={async () => {
+              onDownloadFinancialReport={async (format) => {
+                // Le format est choisi via le menu déroulant du bouton (PDF
+                // ou Word). On pousse les KPIs effectifs pour garantir la
+                // parité écran ↔ rapport.
                 if (!analysisPair.current) return;
-                const err = await downloadFinancialReport({ analysisId: analysisPair.current.id });
-                if (err) {
-                  // Erreur silencieuse — log debug, le bouton n'a pas de feedback UX dédié.
-                  console.warn("[financial-report] download failed", err);
-                }
+                const err = await downloadFinancialReport({
+                  analysisId: analysisPair.current.id,
+                  effectiveKpis: effective?.kpis ?? null,
+                  format,
+                });
+                if (err) console.warn("[financial-report] download failed", err);
               }}
               synthese={synthese}
               parserVersion={analysisPair.current.parserVersion}
@@ -471,6 +475,7 @@ export function SyntheseView() {
           )}
         </div>
       </div>
+
     </section>
   );
 }

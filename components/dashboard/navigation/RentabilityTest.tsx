@@ -43,14 +43,8 @@ type ChartPoint = {
 // Default layout — reproduit les 2 cartes existantes (ROE, ROCE) sous forme
 // de widgets customizable. L'utilisateur peut ajouter d'autres KPIs de la
 // catégorie "rentabilite" (effet_levier, marge_nette) via le picker.
-const DEFAULT_RENTABILITY_LAYOUT: DashboardLayout = {
-  id: "dashboard:rentabilite",
-  constrainedToCategory: "rentabilite",
-  widgets: [
-    { id: "rent-roe", kpiId: "roe", vizType: "kpiCard", size: "M" },
-    { id: "rent-roce", kpiId: "roce", vizType: "kpiCard", size: "M" }
-  ] as WidgetInstance[]
-};
+import { DEFAULT_DASHBOARD_LAYOUTS } from "@/lib/dashboard/defaultDashboardLayouts";
+const DEFAULT_RENTABILITY_LAYOUT = DEFAULT_DASHBOARD_LAYOUTS["rentabilite"];
 
 export function RentabilityTest({
   kpis,

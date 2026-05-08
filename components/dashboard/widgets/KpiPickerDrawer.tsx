@@ -11,7 +11,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, Sparkles, X } from "lucide-react";
+import { Check, Search, Sparkles, X } from "lucide-react";
 import {
   WIDGET_CATEGORIES,
   listAllPickerKpis,
@@ -23,6 +23,11 @@ import {
   getAllowedVizTypes,
   getDefaultVizType
 } from "@/lib/kpi/widgetCompatibility";
+import {
+  isKpiAvailable,
+  unavailabilityReason,
+  type KpiAvailabilityContext
+} from "@/lib/kpi/kpiAvailability";
 import { WidgetPreview } from "@/components/dashboard/widgets/WidgetPreview";
 import type { WidgetCategory, WidgetVizType } from "@/types/dashboard";
 
@@ -47,13 +52,23 @@ type KpiPickerDrawerProps = {
   onAdd: (kpiId: string, vizType: WidgetVizType) => void;
   /** Si défini : seul cette catégorie est disponible (Phase 3 — sous-onglets contraints). */
   lockedCategory?: WidgetCategory;
+  /**
+   * Contexte d'availability — sert à griser les KPIs dont la donnée n'est
+   * pas calculable pour l'analyse courante. Sans ce contexte, tout est
+   * réputé disponible (mode "preview" hors-analyse).
+   */
+  availabilityCtx?: KpiAvailabilityContext;
 };
 
-export function KpiPickerDrawer({ open, onClose, onAdd, lockedCategory }: KpiPickerDrawerProps) {
+export function KpiPickerDrawer({ open, onClose, onAdd, lockedCategory, availabilityCtx }: KpiPickerDrawerProps) {
   const initialCategory: WidgetCategory = lockedCategory ?? WIDGET_CATEGORIES[0].id;
   const [activeCategory, setActiveCategory] = useState<WidgetCategory>(initialCategory);
   const [search, setSearch] = useState("");
-  const [selectedKpiId, setSelectedKpiId] = useState<string | null>(null);
+  // Multi-sélection : on peut cocher plusieurs KPIs et tous les ajouter
+  // d'un coup. `lastFocusedKpiId` sert au panneau de droite (preview du
+  // dernier sélectionné) et au choix de la viz pour le mono-select.
+  const [selectedKpiIds, setSelectedKpiIds] = useState<Set<string>>(() => new Set());
+  const [lastFocusedKpiId, setLastFocusedKpiId] = useState<string | null>(null);
   const [selectedVizType, setSelectedVizType] = useState<WidgetVizType>("kpiCard");
 
   // Liste filtrée : recherche prend le pas sur la catégorie active.
@@ -70,18 +85,59 @@ export function KpiPickerDrawer({ open, onClose, onAdd, lockedCategory }: KpiPic
     return listKpisByCategory(activeCategory);
   }, [search, activeCategory]);
 
-  // Sélection d'un KPI : on positionne aussi la viz par défaut côté détail.
-  // Pattern alternatif au useEffect "set default viz on selection change" qui
-  // déclenchait un avertissement React 19 (set-state-in-effect).
-  function selectKpi(kpiId: string) {
-    setSelectedKpiId(kpiId);
+  // Toggle d'un KPI dans la multi-sélection. Garde-fou : si indisponible,
+  // on ne le sélectionne pas. `lastFocusedKpiId` est mis à jour pour piloter
+  // le panneau de preview à droite.
+  function toggleKpi(kpiId: string) {
+    if (availabilityCtx && !isKpiAvailable(kpiId, availabilityCtx)) return;
+    setSelectedKpiIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(kpiId)) {
+        next.delete(kpiId);
+      } else {
+        next.add(kpiId);
+      }
+      return next;
+    });
+    setLastFocusedKpiId(kpiId);
     setSelectedVizType(getDefaultVizType(kpiId));
   }
+
+  /**
+   * Pour chaque KPI visible, on précalcule sa disponibilité — utile pour
+   * trier les indisponibles à la fin de la liste et pour styler chaque entry.
+   */
+  const kpiStates = useMemo(() => {
+    if (!availabilityCtx) return new Map<string, { available: true }>();
+    const m = new Map<string, { available: boolean; reason?: string }>();
+    for (const def of visibleKpis) {
+      const available = isKpiAvailable(def.id, availabilityCtx);
+      m.set(def.id, available
+        ? { available: true }
+        : { available: false, reason: unavailabilityReason(def.id, availabilityCtx) }
+      );
+    }
+    return m;
+  }, [visibleKpis, availabilityCtx]);
+
+  // Tri : disponibles en haut, indisponibles en bas (mais toujours visibles
+  // pour signaler à l'utilisateur QU'ils existent — règle UX "discoverability").
+  const sortedKpis = useMemo(() => {
+    if (!availabilityCtx) return visibleKpis;
+    const arr = [...visibleKpis];
+    arr.sort((a, b) => {
+      const av = kpiStates.get(a.id)?.available ? 1 : 0;
+      const bv = kpiStates.get(b.id)?.available ? 1 : 0;
+      return bv - av; // disponibles d'abord
+    });
+    return arr;
+  }, [visibleKpis, kpiStates, availabilityCtx]);
 
   // Reset des sélections internes — appelé sur close/confirm pour ne pas
   // garder une sélection orpheline entre deux ouvertures.
   function resetAndClose() {
-    setSelectedKpiId(null);
+    setSelectedKpiIds(new Set());
+    setLastFocusedKpiId(null);
     setSelectedVizType("kpiCard");
     setSearch("");
     setActiveCategory(lockedCategory ?? WIDGET_CATEGORIES[0].id);
@@ -90,13 +146,28 @@ export function KpiPickerDrawer({ open, onClose, onAdd, lockedCategory }: KpiPic
 
   if (!open) return null;
 
-  const allowedVizTypes = selectedKpiId
-    ? filterPhase1VizTypes(getAllowedVizTypes(selectedKpiId))
+  // Le panneau de droite affiche le viz selector pour le KPI focus (le
+  // dernier coché). Quand plusieurs sont sélectionnés, on applique la viz
+  // choisie au focus uniquement, et le DEFAULT viz pour les autres.
+  const focusKpiId = lastFocusedKpiId && selectedKpiIds.has(lastFocusedKpiId)
+    ? lastFocusedKpiId
+    : null;
+  const allowedVizTypes = focusKpiId
+    ? filterPhase1VizTypes(getAllowedVizTypes(focusKpiId))
     : [];
+  const selectionSize = selectedKpiIds.size;
 
   function handleConfirm() {
-    if (!selectedKpiId) return;
-    onAdd(selectedKpiId, selectedVizType);
+    if (selectionSize === 0) return;
+    // On respecte l'ordre d'affichage de la liste pour l'ajout, pas l'ordre
+    // de cochage (lecture plus naturelle pour l'utilisateur ensuite).
+    const ordered = sortedKpis.filter((d) => selectedKpiIds.has(d.id));
+    for (const def of ordered) {
+      const viz = def.id === focusKpiId
+        ? selectedVizType
+        : getDefaultVizType(def.id);
+      onAdd(def.id, viz);
+    }
     resetAndClose();
   }
 
@@ -169,36 +240,78 @@ export function KpiPickerDrawer({ open, onClose, onAdd, lockedCategory }: KpiPic
         {/* Liste KPI + détail viz à droite */}
         <div className="flex flex-1 overflow-hidden">
           <div className="w-1/2 overflow-y-auto border-r border-white/10 px-3 py-2">
-            {visibleKpis.length === 0 ? (
+            {sortedKpis.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-white/45">
                 Aucun KPI ne correspond à ta recherche.
               </p>
             ) : (
               <ul className="space-y-1">
-                {visibleKpis.map((def) => (
-                  <li key={def.id}>
-                    <button
-                      type="button"
-                      onClick={() => selectKpi(def.id)}
-                      aria-pressed={selectedKpiId === def.id}
-                      className={`w-full rounded-md px-3 py-2 text-left transition ${
-                        selectedKpiId === def.id
+                {sortedKpis.map((def) => {
+                  const state = kpiStates.get(def.id);
+                  const isUnavailable = state?.available === false;
+                  const isChecked = selectedKpiIds.has(def.id);
+                  const isFocused = lastFocusedKpiId === def.id && isChecked;
+                  // Indisponible : grisé + curseur not-allowed + tooltip
+                  // explicatif. Sinon : checkbox + ligne cliquable.
+                  const baseClass = isUnavailable
+                    ? "flex w-full items-start gap-3 rounded-md px-3 py-2 text-left opacity-40 cursor-not-allowed"
+                    : `flex w-full items-start gap-3 rounded-md px-3 py-2 text-left transition ${
+                        isFocused
                           ? "bg-quantis-gold/10 ring-1 ring-quantis-gold/40"
+                          : isChecked
+                          ? "bg-quantis-gold/[0.06]"
                           : "hover:bg-white/[0.04]"
-                      }`}
-                    >
-                      <p className="text-sm font-medium text-white">{def.label}</p>
-                      <p className="mt-0.5 text-[11px] text-white/55">{def.shortLabel}</p>
-                    </button>
-                  </li>
-                ))}
+                      }`;
+                  return (
+                    <li key={def.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleKpi(def.id)}
+                        aria-pressed={isChecked}
+                        aria-disabled={isUnavailable}
+                        disabled={isUnavailable}
+                        title={isUnavailable ? state?.reason : undefined}
+                        className={baseClass}
+                      >
+                        <span
+                          className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                            isChecked
+                              ? "border-quantis-gold bg-quantis-gold/80 text-quantis-base"
+                              : "border-white/25"
+                          }`}
+                          aria-hidden="true"
+                        >
+                          {isChecked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white">{def.label}</p>
+                          <p className="mt-0.5 text-[11px] text-white/55">
+                            {isUnavailable
+                              ? (state?.reason ?? "Donnée non disponible.")
+                              : def.shortLabel}
+                          </p>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
 
           <div className="flex w-1/2 flex-col overflow-y-auto px-5 py-4">
-            {selectedKpiId ? (
+            {focusKpiId ? (
               <div className="flex flex-1 flex-col gap-4">
+                {/* Bandeau récap quand plusieurs sont cochés. */}
+                {selectionSize > 1 ? (
+                  <div className="rounded-md border border-quantis-gold/20 bg-quantis-gold/5 px-3 py-2 text-[11px] text-white/75">
+                    <p>
+                      <span className="font-medium text-quantis-gold">{selectionSize} KPIs cochés</span>
+                      {" — la visualisation sélectionnée s'applique au KPI focus ; les autres prennent leur viz par défaut."}
+                    </p>
+                  </div>
+                ) : null}
+
                 <div>
                   <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/45">
                     Type de visualisation
@@ -228,17 +341,14 @@ export function KpiPickerDrawer({ open, onClose, onAdd, lockedCategory }: KpiPic
                   ) : null}
                 </div>
 
-                {/* Aperçu visuel du widget — mini-illustration stylisée
-                    de la viz sélectionnée pour aider au choix sans avoir
-                    à valider et tester. */}
                 {allowedVizTypes.length > 0 ? (
-                  <WidgetPreview vizType={selectedVizType} kpiId={selectedKpiId} />
+                  <WidgetPreview vizType={selectedVizType} kpiId={focusKpiId} />
                 ) : null}
               </div>
             ) : (
               <p className="m-auto text-center text-xs text-white/45">
                 <Sparkles className="mx-auto mb-2 h-5 w-5 text-quantis-gold/60" />
-                Sélectionne un KPI à gauche pour configurer sa visualisation.
+                Coche un ou plusieurs KPI à gauche pour les ajouter d&apos;un seul coup.
               </p>
             )}
 
@@ -253,10 +363,10 @@ export function KpiPickerDrawer({ open, onClose, onAdd, lockedCategory }: KpiPic
               <button
                 type="button"
                 onClick={handleConfirm}
-                disabled={!selectedKpiId || allowedVizTypes.length === 0}
+                disabled={selectionSize === 0}
                 className="flex-1 rounded-lg border border-quantis-gold/40 bg-quantis-gold/15 px-3 py-2 text-sm font-medium text-quantis-gold hover:bg-quantis-gold/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Ajouter
+                {selectionSize > 1 ? `Ajouter (${selectionSize})` : "Ajouter"}
               </button>
             </div>
           </div>

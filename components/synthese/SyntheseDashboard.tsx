@@ -6,8 +6,9 @@
 // supprimables / réordonnables / redimensionnables via CustomizableDashboard.
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { Calendar, CalendarRange, Download, Radio } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Calendar, CalendarRange, ChevronDown, Download, Radio } from "lucide-react";
 import { SourceBadge } from "@/components/analysis/SourceBadge";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
 import { resolveDisponibilitesOverride } from "@/lib/banking/disponibilitesOverride";
@@ -25,7 +26,8 @@ type SyntheseDashboardProps = {
   greetingName: string;
   companyName: string;
   analysisCreatedAt: string;
-  onDownloadFinancialReport?: () => void;
+  /** Callback déclenché à la sélection du format dans le menu déroulant. */
+  onDownloadFinancialReport?: (format: "pdf" | "docx") => void;
   onExportData?: () => void;
   onReupload: () => void;
   onManualEntry: () => void;
@@ -77,19 +79,19 @@ type SyntheseDashboardProps = {
 
 // ─── Default layout Synthèse ───────────────────────────────────────────
 // Reprend exactement le contenu de l'ancien cockpit fixe :
-//   - Vyzor Score (fixe — non supprimable)
+//   - Vyzor Score
 //   - Courbe d'évolution multi-séries
 //   - 3 KPI cards (CA, Trésorerie, EBE)
 //   - Recommandation IA, plan d'action, alertes
 //   - Tiles fiscales TVA + IS
-// L'utilisateur peut tout réordonner / redimensionner ; seul le Vyzor Score
-// est marqué `isFixed:true` pour être conservé en permanence sur la Synthèse.
+// L'utilisateur peut tout réordonner / redimensionner / supprimer — y compris
+// le Vyzor Score, qu'il peut rajouter ensuite via le picker s'il le souhaite.
 const DEFAULT_SYNTHESE_LAYOUT: DashboardLayout = {
   id: "synthese",
   widgets: [
     // Vyzor Score : viz composite (jauge + 4 piliers + message) — exige
     // hauteur L (560 px+ natif) et largeur M minimum.
-    { id: "default-quantis-score", kpiId: "synthese:score", vizType: "quantisScore", size: "M", height: "L", isFixed: true },
+    { id: "default-quantis-score", kpiId: "synthese:score", vizType: "quantisScore", size: "M", height: "L" },
     // Charts pleine largeur sur 2 rangées (440 px) — confortable pour
     // lire les axes + légende.
     { id: "default-evolution", kpiId: "synthese:evolution", vizType: "evolutionChart", size: "L", height: "M" },
@@ -170,6 +172,41 @@ export function SyntheseDashboard({
   // Mode édition — état lifté pour pouvoir mettre Personnaliser dans le
   // bandeau title haut (au lieu de near "Mes widgets" comme avant).
   const [isEditing, setIsEditing] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportMenuPos, setExportMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const exportButtonRef = useRef<HTMLButtonElement | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Click hors du menu OU de son bouton → fermeture. Le menu est portalisé
+  // (rendu dans document.body), il faut donc tester les deux refs.
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    function onDown(e: MouseEvent) {
+      const target = e.target as Node | null;
+      if (!target) return;
+      const inButton = exportButtonRef.current?.contains(target);
+      const inMenu = exportMenuRef.current?.contains(target);
+      if (!inButton && !inMenu) setExportMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [exportMenuOpen]);
+
+  function toggleExportMenu() {
+    if (exportMenuOpen) {
+      setExportMenuOpen(false);
+      return;
+    }
+    // Position le menu juste sous le bouton, ancré à droite (alignement).
+    const rect = exportButtonRef.current?.getBoundingClientRect();
+    if (rect) {
+      setExportMenuPos({
+        top: rect.bottom + 6,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setExportMenuOpen(true);
+  }
   // L'ouverture du picker reste interne à CustomizableDashboard, mais on
   // tracke aussi le `isSaving` via un nudge state. Pour V1 : pas de feedback
   // visuel custom dans le header — l'animation interne au CustomizableDashboard
@@ -290,12 +327,16 @@ export function SyntheseDashboard({
           {simulationSlot}
           {onDownloadFinancialReport ? (
             <button
+              ref={exportButtonRef}
               type="button"
-              onClick={onDownloadFinancialReport}
+              onClick={toggleExportMenu}
+              aria-haspopup="menu"
+              aria-expanded={exportMenuOpen}
               className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20"
             >
               <Download className="h-3.5 w-3.5" />
-              Télécharger le rapport PDF
+              Exporter la synthèse
+              <ChevronDown className="h-3 w-3" />
             </button>
           ) : null}
           {onExportData ? (
@@ -328,6 +369,41 @@ export function SyntheseDashboard({
         onEditingChange={setIsEditing}
         hideHeaderTitle
       />
+
+      {/* Menu format export — portalisé dans document.body pour ne pas être
+          clippé par l'overflow du parent precision-card. Position calculée
+          en `fixed` à partir du rect du bouton. */}
+      {exportMenuOpen && exportMenuPos && onDownloadFinancialReport && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={exportMenuRef}
+              role="menu"
+              style={{
+                position: "fixed",
+                top: exportMenuPos.top,
+                right: exportMenuPos.right,
+                zIndex: 60,
+              }}
+              className="w-32 overflow-hidden rounded-md border border-white/10 bg-quantis-base/95 shadow-xl backdrop-blur"
+            >
+              {(["pdf", "docx"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setExportMenuOpen(false);
+                    onDownloadFinancialReport(f);
+                  }}
+                  className="block w-full px-3 py-2 text-left text-xs text-white/85 hover:bg-white/[0.04]"
+                >
+                  {f === "pdf" ? "PDF" : "Word"}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )
+        : null}
     </section>
   );
 }

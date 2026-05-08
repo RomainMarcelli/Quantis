@@ -12,19 +12,19 @@
 // - Annuel  : 3 ans / 5 ans / Tout l'historique
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Legend,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
   type TooltipContentProps
 } from "recharts";
 import { Calendar, TrendingUp } from "lucide-react";
+import { StableChartContainer } from "@/components/dashboard/widgets/StableChartContainer";
 import type { AnalysisRecord } from "@/types/analysis";
 import {
   buildMonthlySeries,
@@ -58,7 +58,7 @@ const SERIES_LABELS = {
   resultatNet: "Résultat net"
 } as const;
 
-export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProps) {
+function EvolutionChartImpl({ analyses, currentAnalysis }: EvolutionChartProps) {
   const monthlyAvailable = hasMonthlyDataAvailable(currentAnalysis);
 
   const [mode, setMode] = useState<EvolutionSeriesMode>(
@@ -129,7 +129,7 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
 
       {hasData ? (
         <div className="h-[260px] flex-1 min-h-[220px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <StableChartContainer>
             <LineChart data={series} margin={{ top: 10, right: 18, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
               <XAxis
@@ -166,6 +166,7 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
                 dot={{ r: 2.5, fill: COLOR_CA, strokeWidth: 0 }}
                 activeDot={{ r: 5, stroke: COLOR_CA, strokeWidth: 1, fill: "#0f0f12" }}
                 connectNulls={false}
+                isAnimationActive={false}
               />
               <Line
                 type="monotone"
@@ -176,6 +177,7 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
                 dot={{ r: 2.5, fill: COLOR_EBE, strokeWidth: 0 }}
                 activeDot={{ r: 5, stroke: COLOR_EBE, strokeWidth: 1, fill: "#0f0f12" }}
                 connectNulls={false}
+                isAnimationActive={false}
               />
               <Line
                 type="monotone"
@@ -186,9 +188,10 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
                 dot={{ r: 2.5, fill: COLOR_RESULTAT, strokeWidth: 0 }}
                 activeDot={{ r: 5, stroke: COLOR_RESULTAT, strokeWidth: 1, fill: "#0f0f12" }}
                 connectNulls={false}
+                isAnimationActive={false}
               />
             </LineChart>
-          </ResponsiveContainer>
+          </StableChartContainer>
         </div>
       ) : (
         <EmptyState mode={mode} hasAnyAnalysis={analyses.length > 0} />
@@ -342,3 +345,12 @@ function formatTooltipValue(value: number | null): string {
     maximumFractionDigits: 0
   }).format(value);
 }
+
+// React.memo : prévient les re-renders pendant le drag (les seuls cas où
+// les props pourraient changer sont des changements de données, pas des
+// updates UI). Recharts a un useEffect interne sensible aux re-renders
+// fréquents — sans memo, un drag déclenche "Maximum update depth exceeded"
+// dans XAxis. Comparaison shallow par défaut suffit (analyses et
+// currentAnalysis sont des références stables tant que les données ne
+// changent pas).
+export const EvolutionChart = memo(EvolutionChartImpl);
