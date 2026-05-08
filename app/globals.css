@@ -1531,8 +1531,20 @@ body {
 [data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] > span[aria-hidden="true"] {
   display: none !important;
 }
-[data-theme="light"] [data-benchmark-indicator] button:hover {
+/* Bouton wrapper du benchmark : on aplatit complètement en mode clair
+   pour qu'aucun rectangle gris ne soit visible autour du label.
+   (padding 0, no border, bg transparent même au hover.) Le bouton
+   reste cliquable pour ouvrir le tooltip — on retire juste son chrome
+   visuel. */
+[data-theme="light"] [data-benchmark-indicator] button,
+[data-theme="light"] [data-benchmark-indicator] button:hover,
+[data-theme="light"] [data-benchmark-indicator] button:focus {
   background-color: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
 }
 /* Dots dim (états non-actifs) : opacity 50 % de la couleur sémantique
    pour qu'ils soient visibles mais pas dominants. Les dots actifs
