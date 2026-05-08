@@ -63,19 +63,19 @@ const STATUS_TO_STYLE: Record<
   danger: {
     bg: "rgba(239, 68, 68, 0.08)",
     border: "#EF4444",
-    color: "#FCA5A5",
+    color: "var(--app-danger)",
     Icon: AlertTriangle,
   },
   good: {
     bg: "rgba(34, 197, 94, 0.08)",
     border: "#22C55E",
-    color: "#86EFAC",
+    color: "var(--app-success)",
     Icon: CheckCircle,
   },
   neutral: {
     bg: "rgba(197, 160, 89, 0.08)",
-    border: "#C5A059",
-    color: "#E8D9B8",
+    border: "var(--app-brand-gold-deep)",
+    color: "var(--app-brand-gold-deep)",
     Icon: Lightbulb,
   },
 };
@@ -193,7 +193,7 @@ function ExplanationBlock({ text, delay }: { text: string; delay: number }) {
   return (
     <p
       className="vyzor-block-enter-12 text-[13px] leading-relaxed"
-      style={{ color: "rgba(255, 255, 255, 0.75)", animationDelay: `${delay}ms` }}
+      style={{ color: "var(--app-text-secondary)", animationDelay: `${delay}ms` }}
     >
       {tokens}
     </p>
@@ -254,7 +254,7 @@ function ComparisonBlock({
   return (
     <div
       className="vyzor-block-enter-12 rounded-lg p-3"
-      style={{ backgroundColor: "rgba(255, 255, 255, 0.02)", animationDelay: `${delay}ms` }}
+      style={{ backgroundColor: "var(--app-surface-soft)", animationDelay: `${delay}ms` }}
     >
       <div className="space-y-2">
         <Bar
@@ -267,8 +267,8 @@ function ComparisonBlock({
           label={comparison.reference.label}
           value={comparison.reference.value}
           widthPct={referencePct}
-          color="rgba(255, 255, 255, 0.1)"
-          textColor="rgba(255, 255, 255, 0.6)"
+          color="var(--app-border-strong)"
+          textColor="var(--app-text-secondary)"
         />
       </div>
     </div>
@@ -280,7 +280,7 @@ function Bar({
   value,
   widthPct,
   color,
-  textColor = "rgba(255, 255, 255, 0.85)",
+  textColor = "var(--app-text-primary)",
 }: {
   label: string;
   value: number;
@@ -293,7 +293,7 @@ function Bar({
     <div className="flex items-center gap-3">
       <div
         className="relative h-6 flex-1 overflow-hidden rounded"
-        style={{ backgroundColor: "rgba(255,255,255,0.04)" }}
+        style={{ backgroundColor: "var(--app-surface-soft)" }}
       >
         <div
           className="absolute inset-y-0 left-0 rounded transition-all"
@@ -304,7 +304,7 @@ function Bar({
         <span className="text-[12px] font-semibold" style={{ color: textColor }}>
           {formatted}
         </span>
-        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>
+        <span className="text-[10px]" style={{ color: "var(--app-text-tertiary)" }}>
           {label}
         </span>
       </div>
@@ -342,7 +342,7 @@ function ActionsBlock({
             className="inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] transition"
             style={{
               borderColor: "rgba(197, 160, 89, 0.4)",
-              color: "#C5A059",
+              color: "var(--app-brand-gold-deep)",
               backgroundColor: "transparent",
               boxShadow: "none",
             }}
@@ -391,9 +391,9 @@ function FollowUpBlock({
           data-ai-followup
           className="vyzor-followup-chip rounded-full border px-3 py-1 text-[12px] transition"
           style={{
-            borderColor: "rgba(255, 255, 255, 0.08)",
-            backgroundColor: "rgba(255, 255, 255, 0.03)",
-            color: "rgba(255, 255, 255, 0.7)",
+            borderColor: "var(--app-border-strong)",
+            backgroundColor: "var(--app-surface-soft)",
+            color: "var(--app-text-secondary)",
           }}
         >
           {q}

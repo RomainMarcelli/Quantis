@@ -260,7 +260,7 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = "rgba(197, 160, 89, 0.08)";
-            e.currentTarget.style.color = "#C5A059";
+            e.currentTarget.style.color = "var(--app-brand-gold-deep)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
@@ -302,7 +302,7 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
               style={{
                 backgroundColor: "rgba(239, 68, 68, 0.08)",
                 border: "1px solid rgba(239, 68, 68, 0.3)",
-                color: "#FCA5A5",
+                color: "var(--app-danger)",
               }}
             >
               {errorMessage}
@@ -358,8 +358,8 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
               aria-label="Envoyer la question"
               className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full transition disabled:opacity-30"
               style={{
-                backgroundColor: sendDisabled ? "rgba(197, 160, 89, 0.15)" : "#C5A059",
-                color: sendDisabled ? "#C5A059" : "#0F0F12",
+                backgroundColor: sendDisabled ? "rgba(197, 160, 89, 0.15)" : "var(--app-brand-gold-deep)",
+                color: sendDisabled ? "var(--app-brand-gold-deep)" : "#0F0F12",
               }}
               onMouseEnter={(e) => {
                 if (sendDisabled) return;
@@ -367,7 +367,7 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
               }}
               onMouseLeave={(e) => {
                 if (sendDisabled) return;
-                e.currentTarget.style.backgroundColor = "#C5A059";
+                e.currentTarget.style.backgroundColor = "var(--app-brand-gold-deep)";
               }}
             >
               <Send className="h-4 w-4" />
@@ -424,7 +424,7 @@ function EmptyConversation({
           style={{
             backgroundColor: "rgba(197, 160, 89, 0.1)",
             border: "1px solid rgba(197, 160, 89, 0.3)",
-            color: "#C5A059",
+            color: "var(--app-brand-gold-deep)",
           }}
         >
           <Sparkles className="h-6 w-6" />

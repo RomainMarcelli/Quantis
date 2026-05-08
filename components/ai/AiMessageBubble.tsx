@@ -26,7 +26,7 @@ export function AiMessageBubble({ message, onFollowUp }: AiMessageBubbleProps) {
           data-ai-bubble="user"
           style={{
             color: "var(--app-text-primary)",
-            backgroundColor: "var(--app-ai-user-bg, rgba(255,255,255,0.04))",
+            backgroundColor: "var(--app-ai-user-bg, var(--app-surface-soft))",
             borderRadius: "16px 16px 4px 16px",
             padding: "10px 14px",
           }}
