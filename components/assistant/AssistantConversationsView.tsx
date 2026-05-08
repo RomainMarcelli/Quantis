@@ -193,7 +193,7 @@ function AssistantConversationsViewInner() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
         <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
 
-        <section className="precision-card mx-auto w-full max-w-3xl rounded-2xl">
+        <section className="precision-card w-full rounded-2xl">
           {/* ─── 1. Hero centré ──────────────────────────────────────── */}
           <div className="flex flex-col items-center px-6 pb-9 pt-12 text-center md:px-8">
             <span
