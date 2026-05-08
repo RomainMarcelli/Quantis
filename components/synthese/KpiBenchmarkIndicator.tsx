@@ -169,29 +169,44 @@ type DotProps = {
 };
 
 function Dot({ active, tone }: DotProps) {
+  // Couleurs sémantiques en hex direct pour les inline styles ci-dessous.
+  // Inline style gagne TOUJOURS sur les classes Tailwind (et donc sur les
+  // overrides CSS .precision-card [class*="bg-X-500/"]). Garantit la
+  // visibilité des dots quel que soit le contexte / mode dark/light.
+  const TONE_COLOR: Record<Tone, string> = {
+    positive: "#16A34A", // success deep — visible en dark ET light
+    neutral: "#D97706", // warning deep
+    negative: "#DC2626", // danger deep
+  };
   const tones: Record<Tone, { dim: string; glow: string }> = {
     positive: {
-      dim: "h-1.5 w-1.5 bg-emerald-500/30",
+      dim: "h-1.5 w-1.5",
       glow:
-        "h-3 w-3 bg-emerald-400 shadow-[0_0_14px_rgba(16,185,129,0.95)] ring-2 ring-emerald-300/70 animate-pulse"
+        "h-3 w-3 shadow-[0_0_14px_rgba(16,185,129,0.95)] ring-2 ring-emerald-300/70 animate-pulse",
     },
     neutral: {
-      dim: "h-1.5 w-1.5 bg-amber-500/30",
+      dim: "h-1.5 w-1.5",
       glow:
-        "h-3 w-3 bg-amber-300 shadow-[0_0_14px_rgba(251,191,36,0.95)] ring-2 ring-amber-200/70 animate-pulse"
+        "h-3 w-3 shadow-[0_0_14px_rgba(251,191,36,0.95)] ring-2 ring-amber-200/70 animate-pulse",
     },
     negative: {
-      dim: "h-1.5 w-1.5 bg-rose-500/30",
+      dim: "h-1.5 w-1.5",
       glow:
-        "h-3 w-3 bg-rose-400 shadow-[0_0_14px_rgba(244,63,94,0.95)] ring-2 ring-rose-300/70 animate-pulse"
-    }
+        "h-3 w-3 shadow-[0_0_14px_rgba(244,63,94,0.95)] ring-2 ring-rose-300/70 animate-pulse",
+    },
   };
 
   const variant = active ? tones[tone].glow : tones[tone].dim;
+  // Couleur appliquée en inline style — gagne sur tous les overrides CSS
+  // (notamment les .precision-card [class*="bg-X-500/"] qui rendaient les
+  // dots en pâle quasi-blanc, donnant l'impression d'un rectangle gris).
+  // Opacité 50 % pour les dim (visible mais discret), 100 % pour l'actif.
+  const dotColor = TONE_COLOR[tone];
   return (
     <span
       aria-hidden="true"
       className={`relative z-10 rounded-full transition-all duration-300 ${variant}`}
+      style={{ backgroundColor: dotColor, opacity: active ? 1 : 0.5 }}
     />
   );
 }

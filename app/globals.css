@@ -1528,7 +1528,10 @@ body {
    - les ring + shadow halos
    - le fond gris des dots dim → on garde la couleur sémantique
      directement avec une opacité suffisante. */
-[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] > span[aria-hidden="true"] {
+/* Cible UNIQUEMENT la track horizontale (span absolute) — pas les Dot
+   qui ont AUSSI aria-hidden="true" mais sont en position relative.
+   Sans cette précision, on masquait aussi les 3 dots colorés. */
+[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] > span.absolute {
   display: none !important;
 }
 /* Bouton wrapper du benchmark : on aplatit complètement en mode clair
