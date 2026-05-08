@@ -32,6 +32,11 @@
   --app-surface-soft: rgb(255 255 255 / 4%);
   --app-surface-medium: rgb(255 255 255 / 8%);
   --app-surface-strong: rgb(255 255 255 / 12%);
+  /* Gold profond signature — défini ici aussi pour cohérence (en light il
+     est dans le block dédié plus bas avec sa valeur foncée #8B6F2A). En
+     dark on garde la couleur originale --app-brand-gold #C5A059. */
+  --app-brand-gold-deep: #C5A059;
+  --app-brand-gold-deep-rgb: 197 160 89;
 
   /* ─── Tokens legacy (gardés pour compat avec les usages existants) ──
      Ces vars sont utilisées par .precision-card, .premium-analysis-root,
@@ -122,6 +127,13 @@
   --app-glass-warm-bg: rgb(255 255 252 / 80%);
   --app-glass-warm-border: rgb(0 0 0 / 6%);
   --app-glass-warm-shadow: 0 4px 16px rgb(0 0 0 / 6%);
+
+  /* KpiTooltip : fond gris neutre + ombre douce en light (cf. retour
+     08/05/2026 : "fond gris au lieu de doré"). Le hex 245 = #F5F5F5
+     reste légèrement plus foncé que le canvas (#F8F2E5) → contraste
+     naturel sans être agressif. */
+  --kpi-tooltip-bg: rgb(245, 245, 245);
+  --kpi-tooltip-shadow: 0 8px 24px rgb(0 0 0 / 10%), 0 2px 6px rgb(0 0 0 / 6%);
 
   /* ─── Tokens legacy — versions light ──────────────────────────────── */
   /* --quantis-smoke aligné sur --app-bg pour cohérence canvas. */
@@ -405,6 +417,23 @@ body {
    conservée (effet de focus subtil). */
 [data-theme="light"] .precision-card:hover .data-react {
   text-shadow: none;
+}
+
+/* Bouton "Question IA" du KpiTooltip — en mode clair, on force le gold
+   profond (cf. retour utilisateur 08/05/2026 : "comme sur la temporality
+   bar, doré très foncé"). Sans cet override le bouton héritait du
+   --app-brand-gold (#A88847) qui est plus pâle. */
+[data-theme="light"] [data-tooltip-question] {
+  border-color: rgb(var(--app-brand-gold-deep-rgb) / 50%) !important;
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 8%) !important;
+  color: var(--app-brand-gold-deep) !important;
+}
+[data-theme="light"] [data-tooltip-question]:hover {
+  border-color: rgb(var(--app-brand-gold-deep-rgb) / 75%) !important;
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 14%) !important;
+}
+[data-theme="light"] [data-tooltip-question] svg {
+  color: var(--app-brand-gold-deep) !important;
 }
 
 /* ─── Phase 6 — Tooltips / modals / dropdowns en mode clair ──────
