@@ -6,16 +6,11 @@
 // supprimables / réordonnables / redimensionnables via CustomizableDashboard.
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { Calendar, CalendarRange, ChevronDown, Download, Radio } from "lucide-react";
-import { SourceBadge } from "@/components/analysis/SourceBadge";
+import { useMemo, useState, type ReactNode } from "react";
+import { Calendar } from "lucide-react";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
 import { resolveDisponibilitesOverride } from "@/lib/banking/disponibilitesOverride";
-import {
-  CustomizableDashboard,
-  DashboardActions
-} from "@/components/dashboard/widgets/CustomizableDashboard";
+import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import type { SourceMetadata } from "@/types/connectors";
 import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
@@ -193,45 +188,9 @@ export function SyntheseDashboard({
     if (onEditingChange) onEditingChange(nextValue);
     else setInternalIsEditing(nextValue);
   };
-  const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const [exportMenuPos, setExportMenuPos] = useState<{ top: number; right: number } | null>(null);
-  const exportButtonRef = useRef<HTMLButtonElement | null>(null);
-  const exportMenuRef = useRef<HTMLDivElement | null>(null);
-
-  // Click hors du menu OU de son bouton → fermeture. Le menu est portalisé
-  // (rendu dans document.body), il faut donc tester les deux refs.
-  useEffect(() => {
-    if (!exportMenuOpen) return;
-    function onDown(e: MouseEvent) {
-      const target = e.target as Node | null;
-      if (!target) return;
-      const inButton = exportButtonRef.current?.contains(target);
-      const inMenu = exportMenuRef.current?.contains(target);
-      if (!inButton && !inMenu) setExportMenuOpen(false);
-    }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [exportMenuOpen]);
-
-  function toggleExportMenu() {
-    if (exportMenuOpen) {
-      setExportMenuOpen(false);
-      return;
-    }
-    // Position le menu juste sous le bouton, ancré à droite (alignement).
-    const rect = exportButtonRef.current?.getBoundingClientRect();
-    if (rect) {
-      setExportMenuPos({
-        top: rect.bottom + 6,
-        right: window.innerWidth - rect.right,
-      });
-    }
-    setExportMenuOpen(true);
-  }
-  // L'ouverture du picker reste interne à CustomizableDashboard, mais on
-  // tracke aussi le `isSaving` via un nudge state. Pour V1 : pas de feedback
-  // visuel custom dans le header — l'animation interne au CustomizableDashboard
-  // suffit.
+  // Phase 3 brief 09/05/2026 — le menu d'export multi-format (PDF/Word)
+  // a été retiré : le bouton "Exporter la synthèse" déclenche désormais
+  // le download direct depuis SyntheseView (un seul format = PDF).
   const analysisModeLabel = resolveAnalysisModeLabel(currentAnalysis);
 
   // Sélecteur d'année statique (sources PDF/Excel) — rendu UNIQUEMENT si le
@@ -300,73 +259,11 @@ export function SyntheseDashboard({
         </div>
       ) : null}
 
-      {/* @deprecated brief 09/05/2026 — bandeau meta supprimé.
-          L'info entreprise/source est désormais portée par
-          `<AppHeader contextBadge={…} companyName={…} />` (ligne 1).
-          Les boutons Simuler/Exporter/Personnaliser vivent dans la
-          ligne 2 du AppHeader (`headerActions` de SyntheseView).
-          Ce bloc est conservé en JSX pour compat momentanée (tests
-          qui cherchent les textes "Analyse du" / "Live") mais sera
-          retiré dans un commit suivant. */}
-      <header
-        data-meta-block
-        hidden
-        className="precision-card fade-up relative z-10 flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5"
-      >
-        <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
-            <span>Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}</span>
-            <SourceBadge sourceMetadata={sourceMetadata} analysisCreatedAt={analysisCreatedAt} />
-            {periodLabel ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-white/75">
-                <CalendarRange className="h-3 w-3 text-white/55" />
-                {periodLabel}
-              </span>
-            ) : null}
-            {parserVersion === "v2" && (
-              <span className="inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
-                Parser V2
-              </span>
-            )}
-            {liveBalance !== null && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300"
-                title="Soldes bancaires temps réel via Bridge"
-              >
-                <Radio className="h-3 w-3 animate-pulse" />
-                Live
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-          {simulationSlot}
-          {onDownloadFinancialReport ? (
-            <button
-              ref={exportButtonRef}
-              type="button"
-              onClick={toggleExportMenu}
-              aria-haspopup="menu"
-              aria-expanded={exportMenuOpen}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Exporter la synthèse
-              <ChevronDown className="h-3 w-3" />
-            </button>
-          ) : null}
-          {onExportData ? (
-            <button
-              type="button"
-              onClick={onExportData}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
-            >
-              Exporter données
-            </button>
-          ) : null}
-        </div>
-      </header>
+      {/* Bandeau meta supprimé — brief 09/05/2026.
+          L'info entreprise/source est désormais portée par AppHeader
+          ligne 1 (companyName + contextBadge). Les boutons Simuler /
+          Exporter la synthèse / Personnaliser vivent dans la ligne 2
+          du AppHeader (headerActions de SyntheseView). */}
 
       {/* Container Portal pour le simulateur — quand l'utilisateur clique
           "Simuler un scénario" dans le header, le widget se rend ici via
@@ -394,40 +291,6 @@ export function SyntheseDashboard({
         hideHeaderTitle
       />
 
-      {/* Menu format export — portalisé dans document.body pour ne pas être
-          clippé par l'overflow du parent precision-card. Position calculée
-          en `fixed` à partir du rect du bouton. */}
-      {exportMenuOpen && exportMenuPos && onDownloadFinancialReport && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              ref={exportMenuRef}
-              role="menu"
-              style={{
-                position: "fixed",
-                top: exportMenuPos.top,
-                right: exportMenuPos.right,
-                zIndex: 60,
-              }}
-              className="w-32 overflow-hidden rounded-md border border-white/10 bg-quantis-base/95 shadow-xl backdrop-blur"
-            >
-              {(["pdf", "docx"] as const).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setExportMenuOpen(false);
-                    onDownloadFinancialReport(f);
-                  }}
-                  className="block w-full px-3 py-2 text-left text-xs text-white/85 hover:bg-white/[0.04]"
-                >
-                  {f === "pdf" ? "PDF" : "Word"}
-                </button>
-              ))}
-            </div>,
-            document.body,
-          )
-        : null}
     </section>
   );
 }

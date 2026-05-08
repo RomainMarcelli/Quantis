@@ -6,6 +6,7 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } 
 import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
+  Download,
   FileText,
   Bot,
   Calendar,
@@ -25,6 +26,8 @@ import {
   Upload,
   UserCircle2
 } from "lucide-react";
+import { SimulationToggleButton } from "@/components/simulation/SimulationWidget";
+import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import {
   DashboardFinancialTestMenu,
   type DashboardTestTabId
@@ -161,6 +164,11 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Vyzor");
+  // Phase 3 brief Header unifié 09/05/2026 — state cosmétique du bouton
+  // "Personnaliser" dans la ligne 2 du AppHeader. Cosmétique car les
+  // sections d'onglet (RentabilityTest, etc.) gèrent elles-mêmes leur
+  // mode édition via leur CustomizableDashboard interne.
+  const [headerEditing, setHeaderEditing] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   // Loader visible uniquement si le chargement dépasse 400 ms (cf. hook).
@@ -932,17 +940,99 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     );
   }
 
+  // ─── Header unifié — Phase 3 brief 09/05/2026 ──────────────────────
+  // Mêmes 3 boutons que la page Synthèse : Simuler / Exporter la synthèse
+  // / Personnaliser. Le state `isEditing` est tracké au niveau de la vue
+  // (cosmétique pour le bouton ; les sections d'onglet — RentabilityTest,
+  // etc. — gèrent elles-mêmes leur mode édition via leur CustomizableDashboard).
+  const showHeaderTemporalityBar =
+    analysis && shouldShowTemporalityBar(analysis);
+  const headerTemporalityBar = showHeaderTemporalityBar ? (
+    <TemporalityBar
+      availableRange={computeAvailableRange(analysis!)}
+      daysInPeriod={null}
+    />
+  ) : null;
+
+  const headerActions = analysis ? (
+    <>
+      {effectiveAnalysis ? (
+        <SimulationToggleButton
+          mappedData={effectiveAnalysis.mappedData}
+          portalContainerId="simulation-portal-container"
+        />
+      ) : null}
+      <button
+        type="button"
+        onClick={async () => {
+          if (!analysis) return;
+          const err = await downloadFinancialReport({ analysisId: analysis.id });
+          if (err) console.warn("[financial-report] download failed", err);
+        }}
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition"
+        style={{
+          border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 30%)",
+          color: "var(--app-brand-gold-deep)",
+          backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 10%)",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor =
+            "rgb(var(--app-brand-gold-deep-rgb) / 18%)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor =
+            "rgb(var(--app-brand-gold-deep-rgb) / 10%)";
+        }}
+      >
+        <Download className="h-3.5 w-3.5" />
+        Exporter la synthèse
+      </button>
+      <button
+        type="button"
+        onClick={() => setHeaderEditing((v) => !v)}
+        aria-pressed={headerEditing}
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition"
+        style={{
+          border: "1px solid var(--app-border-strong)",
+          color: headerEditing ? "var(--app-brand-gold-deep)" : "var(--app-text-primary)",
+          backgroundColor: headerEditing
+            ? "rgb(var(--app-brand-gold-deep-rgb) / 8%)"
+            : "transparent",
+        }}
+        onMouseEnter={(e) => {
+          if (!headerEditing) {
+            e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!headerEditing) {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }
+        }}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        {headerEditing ? "Terminer" : "Personnaliser"}
+      </button>
+    </>
+  ) : null;
+
   return (
     <section className="w-full space-y-4">
-      {/* Phase 3 brief Header unifié 09/05/2026 — variant="data" pour
-          exposer la ligne 2. Pas de slots remplis ici car les onglets
-          du Tableau de bord (Création de valeur / Investissement /
-          Financement / Rentabilité / Trésorerie) restent dans la zone
-          de contenu sous le header (cf. brief : "ils ne font PAS
-          partie du header"). Les sections individuelles (RentabilityTest,
-          ValueCreationTest…) gèrent elles-mêmes leur TemporalityBar
-          contextuelle. */}
-      <AppHeader variant="data" companyName={companyName} />
+      {/* Phase 3 brief Header unifié 09/05/2026 — variant="data" + 3 actions
+          (Simuler / Exporter la synthèse / Personnaliser) en ligne 2.
+          Les onglets (Création de valeur / Investissement / etc.) restent
+          dans la zone de contenu sous le header. */}
+      <AppHeader
+        variant="data"
+        companyName={companyName}
+        temporalityBar={headerTemporalityBar}
+        headerActions={headerActions}
+      />
+
+      {/* Container Portal pour le simulateur (cf. brief simulator panneau
+          autonome 08/05/2026). Le widget se rend ici plein largeur quand
+          le bouton "Simuler" est activé. */}
+      <div id="simulation-portal-container" />
 
       {/* Loader retardé : ne s'affiche que si le chargement dépasse 400 ms. */}
       {showAnalysisLoader ? (

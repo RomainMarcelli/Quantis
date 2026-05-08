@@ -359,21 +359,23 @@ export function SyntheseView() {
           const err = await downloadFinancialReport({ analysisId: analysisPair.current.id });
           if (err) console.warn("[financial-report] download failed", err);
         }}
-        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition"
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition"
         style={{
-          border: "1px solid var(--app-border-strong)",
-          color: "var(--app-text-primary)",
-          backgroundColor: "transparent",
+          border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 30%)",
+          color: "var(--app-brand-gold-deep)",
+          backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 10%)",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+          e.currentTarget.style.backgroundColor =
+            "rgb(var(--app-brand-gold-deep-rgb) / 18%)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "transparent";
+          e.currentTarget.style.backgroundColor =
+            "rgb(var(--app-brand-gold-deep-rgb) / 10%)";
         }}
       >
         <Download className="h-3.5 w-3.5" />
-        Exporter
+        Exporter la synthèse
       </button>
       <button
         type="button"
