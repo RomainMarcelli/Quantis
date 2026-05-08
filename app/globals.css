@@ -382,6 +382,29 @@ body {
 [data-theme="light"] .precision-card:hover {
   box-shadow: var(--app-shadow-elev-2);
   border-color: rgb(0 0 0 / 10%);
+  /* Pas de translateY en light (l'élévation est portée par l'ombre,
+     un déplacement physique en plus crée du flou perçu sur fond clair). */
+  transform: none;
+  /* Background hover désactivé : var(--quantis-card-bg-hover) est un
+     gris bleuté qui jure avec la tuile blanche. On garde le bg natif. */
+  background: var(--quantis-card-bg);
+}
+
+/* Pseudo-elements ::after et ::before des precision-card → désactivés
+   en light. Ce sont eux qui projetaient les "lueurs" gold dorées
+   visibles au survol des tuiles (cf. retour utilisateur 08/05/2026 :
+   "il y a toujours une lueur sur les tuiles quand je passe dessus").
+   En dark, ils restent actifs pour conserver l'effet signature. */
+[data-theme="light"] .precision-card::after,
+[data-theme="light"] .precision-card::before {
+  display: none !important;
+}
+
+/* Le text-shadow blanc sur .data-react au survol crée un halo flou
+   gênant sur fond clair — désactivé. La micro-mise à l'échelle est
+   conservée (effet de focus subtil). */
+[data-theme="light"] .precision-card:hover .data-react {
+  text-shadow: none;
 }
 
 /* ─── Phase 6 — Glassmorphism warm (tooltips / modals / dropdowns) ──
