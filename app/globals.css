@@ -88,6 +88,35 @@
   --app-surface-medium: rgb(0 0 0 / 6%);
   --app-surface-strong: rgb(0 0 0 / 10%);
 
+  /* ─── Niveaux d'élévation (light only — voir brief design 08/05/2026) ─
+     N0 = canvas (var(--app-bg))
+     N1 = surface (cards, blocs de contenu) — flotte légèrement
+     N2 = surface surélevée (modals, tooltips, hover des cards)
+     Les ombres sont composites (key + ambient) pour ressembler à une
+     vraie projection de lumière, pas à un blur uniforme. */
+  --app-shadow-elev-1: 0 1px 3px rgb(0 0 0 / 4%), 0 1px 2px rgb(0 0 0 / 2%);
+  --app-shadow-elev-2: 0 4px 12px rgb(0 0 0 / 6%), 0 1px 3px rgb(0 0 0 / 4%);
+
+  /* Sidebar — fond plus chaud que le canvas pour créer une séparation
+     douce sans bordure tranchée (cf. brief : "F5F5F0, un cran plus chaud
+     que le canvas"). */
+  --app-sidebar-bg: #F5F5F0;
+  --app-sidebar-border: rgb(0 0 0 / 6%);
+
+  /* Gold profond — accent signature pour les éléments qui doivent
+     "sortir" (sidebar actif, boutons primaires, score, totaux). Plus
+     foncé que --app-brand-gold (qui reste pour les hovers/secondaires). */
+  --app-brand-gold-deep: #8B6F2A;
+  --app-brand-gold-deep-rgb: 139 111 42;
+
+  /* Glassmorphism warm — équivalent light du frost-glass dark. Le
+     "warm" vient du blue channel à 252 (vs 255), créant une teinte
+     beige imperceptible mais qui distingue d'un blanc pur médical.
+     saturate(1.2) renforce les couleurs derrière sans les déformer. */
+  --app-glass-warm-bg: rgb(255 255 252 / 80%);
+  --app-glass-warm-border: rgb(0 0 0 / 6%);
+  --app-glass-warm-shadow: 0 4px 16px rgb(0 0 0 / 6%);
+
   /* ─── Tokens legacy — versions light ──────────────────────────────── */
   --quantis-smoke: #FAFAF7;
   --quantis-paper: #FFFFFF;
@@ -234,7 +263,71 @@ body {
    `bg-quantis-gold/[0.08]` + `text-quantis-gold`. */
 [data-theme="light"] .border-l-quantis-gold,
 [data-theme="light"] .border-l-\[3px\].border-quantis-gold {
-  border-left-color: var(--app-brand-gold) !important;
+  border-left-color: var(--app-brand-gold-deep) !important;
+}
+
+/* ─── Phase 2 — Sidebar premium light (brief 08/05/2026) ────────────
+   Identité claire : fond plus chaud que le canvas, séparateur doux
+   à droite, état actif fort (gold profond + bordure gauche 2px),
+   hover discret pour les routes inactives. */
+[data-theme="light"] .premium-sidebar,
+[data-theme="light"] [data-sidebar-shell] {
+  background-color: var(--app-sidebar-bg) !important;
+  border-right: 1px solid var(--app-sidebar-border) !important;
+}
+
+/* Lien sidebar actif — fond doré dilué + bordure gauche en gold profond.
+   On vise les call-sites qui combinent `text-quantis-gold` ET
+   `bg-quantis-gold/*` (== état actif). Le `[data-active="true"]` est
+   un ajout sémantique pour les composants qui le posent explicitement. */
+[data-theme="light"] [data-sidebar-link][data-active="true"] {
+  color: var(--app-brand-gold-deep) !important;
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 6%) !important;
+  border-left: 2px solid var(--app-brand-gold-deep) !important;
+  border-radius: 12px;
+  transition: background-color 200ms ease, color 200ms ease, border-left-color 200ms ease;
+}
+[data-theme="light"] [data-sidebar-link]:not([data-active="true"]):hover {
+  background-color: rgb(0 0 0 / 3%) !important;
+  color: var(--app-text-secondary) !important;
+}
+
+/* ─── Phase 1 — Utility classes pour l'élévation et le glass warm ──── */
+[data-theme="light"] .elev-1 {
+  box-shadow: var(--app-shadow-elev-1);
+}
+[data-theme="light"] .elev-2 {
+  box-shadow: var(--app-shadow-elev-2);
+}
+/* Hover : les cards N1 montent au N2 sans saut. */
+[data-theme="light"] .elev-1.elev-hover:hover {
+  box-shadow: var(--app-shadow-elev-2);
+  border-color: rgb(0 0 0 / 10%);
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+[data-theme="light"] .glass-warm {
+  background-color: var(--app-glass-warm-bg);
+  border: 1px solid var(--app-glass-warm-border);
+  box-shadow: var(--app-glass-warm-shadow);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+
+/* ─── Phase 4 — Cards KPI (precision-card) en mode clair ──────────────
+   Le composant existant `.precision-card` déjà appliqué partout. On
+   améliore son rendu light : élévation N1 par défaut, hover N2, bordure
+   plus subtile, padding intact (géré par les classes Tailwind du
+   composant). */
+[data-theme="light"] .precision-card {
+  background-color: var(--quantis-card-bg);
+  border: 1px solid rgb(0 0 0 / 6%);
+  box-shadow: var(--app-shadow-elev-1);
+  color: var(--quantis-carbon);
+  transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+[data-theme="light"] .precision-card:hover {
+  box-shadow: var(--app-shadow-elev-2);
+  border-color: rgb(0 0 0 / 10%);
 }
 
 /* Glassmorphism panels — beaucoup de composants posent
