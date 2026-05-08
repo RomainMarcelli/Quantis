@@ -24,6 +24,7 @@ import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
 import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
 import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
+import { useTheme } from "@/hooks/useTheme";
 import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
 type RentabilityTestProps = {
@@ -137,7 +138,17 @@ export function RentabilityTest({
 
   const chartGeometry = useMemo(() => computeChartGeometry(comparisonSeries), [comparisonSeries]);
   const spreadTone = spread === null ? "na" : spread >= 0 ? "positive" : "negative";
-  const spreadColor = spreadTone === "positive" ? "#C5A059" : spreadTone === "negative" ? "#ef4444" : "#ffffff";
+  // Couleurs theme-aware pour le chart ROE/ROCE — sans ça les courbes
+  // (ROCE blanc, ROE gold pâle) sont invisibles sur fond clair (cf.
+  // retour utilisateur 08/05/2026). En light : ROCE devient text-primary
+  // noir, le gold passe au gold-deep #8B6F2A, le rouge inchangé.
+  const { isDark } = useTheme();
+  const goldColor = isDark ? "#C5A059" : "#8B6F2A";
+  const roceColor = isDark ? "#ffffff" : "#0A0A0F";
+  const spreadColor =
+    spreadTone === "positive" ? goldColor : spreadTone === "negative" ? "#ef4444" : roceColor;
+  const gridColor = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const axisColor = isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.18)";
 
   return (
     <section
@@ -146,6 +157,7 @@ export function RentabilityTest({
       onMouseLeave={handleMouseLeave}
     >
       <div
+        data-mouse-glow
         className="pointer-events-none absolute z-[3] h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(197,160,89,0.12)_0%,transparent_62%)] transition-opacity duration-300"
         style={{
           left: `${mouseGlow.x}px`,
@@ -222,7 +234,7 @@ export function RentabilityTest({
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-4 text-[10px] uppercase text-white/70">
-              <LegendDot color="#ffffff" label="ROCE (activité)" />
+              <LegendDot color={roceColor} label="ROCE (activité)" />
               <LegendDot color={spreadColor} label="ROE (actionnaire)" />
               <KpiTrendPill trend={spreadTrend} compact />
             </div>
@@ -230,12 +242,12 @@ export function RentabilityTest({
 
           <div className="relative h-72 w-full">
             <svg className="h-full w-full" viewBox="0 0 1000 250" preserveAspectRatio="none">
-              <line x1="0" y1="52" x2="1000" y2="52" stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
-              <line x1="0" y1="102" x2="1000" y2="102" stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
-              <line x1="0" y1="152" x2="1000" y2="152" stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
-              <line x1="0" y1="202" x2="1000" y2="202" stroke="rgba(255,255,255,0.08)" strokeDasharray="4 4" />
-              <line x1="0" y1="0" x2="0" y2="250" stroke="rgba(255,255,255,0.2)" />
-              <line x1="0" y1="250" x2="1000" y2="250" stroke="rgba(255,255,255,0.2)" />
+              <line x1="0" y1="52" x2="1000" y2="52" stroke={gridColor} strokeDasharray="4 4" />
+              <line x1="0" y1="102" x2="1000" y2="102" stroke={gridColor} strokeDasharray="4 4" />
+              <line x1="0" y1="152" x2="1000" y2="152" stroke={gridColor} strokeDasharray="4 4" />
+              <line x1="0" y1="202" x2="1000" y2="202" stroke={gridColor} strokeDasharray="4 4" />
+              <line x1="0" y1="0" x2="0" y2="250" stroke={axisColor} />
+              <line x1="0" y1="250" x2="1000" y2="250" stroke={axisColor} />
 
               <polygon
                 points={chartGeometry.spreadArea}
@@ -248,7 +260,7 @@ export function RentabilityTest({
                 }
               />
 
-              <polyline points={chartGeometry.roceLine} fill="none" stroke="#ffffff" strokeWidth="2.4" />
+              <polyline points={chartGeometry.roceLine} fill="none" stroke={roceColor} strokeWidth="2.4" />
               <polyline points={chartGeometry.roeLine} fill="none" stroke={spreadColor} strokeWidth="2.8" />
 
               {chartGeometry.rocePoints.map((point, index) => (

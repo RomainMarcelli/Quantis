@@ -146,6 +146,10 @@ export function VyzorScoreCard({
   );
 }
 
+/** Mapping score → label + couleur visible (utilisée par le SVG gradient
+ *  et le badge en mode dark). Brief mode-clair Synthèse (08/05/2026) :
+ *  4 paliers — 0-30 Critique, 31-60 Sous tension, 61-80 Bon, 81-100 Excellent.
+ *  En mode clair, les couleurs sont overridées par CSS (data-score-state). */
 function getVyzorScoreState(score: number | null): { label: string; colorHex: string } {
   if (score === null) {
     return { label: "Données insuffisantes", colorHex: "#8b8b93" };
@@ -153,24 +157,33 @@ function getVyzorScoreState(score: number | null): { label: string; colorHex: st
   if (score > 80) {
     return { label: "Excellent", colorHex: "#10B981" };
   }
-  if (score >= 50) {
+  if (score >= 61) {
+    return { label: "Bon", colorHex: "#C5A059" };
+  }
+  if (score >= 31) {
     return { label: "Sous tension", colorHex: "#F59E0B" };
   }
   return { label: "Critique", colorHex: "#EF4444" };
 }
 
 /** Clé sémantique de l'état du score, utilisée pour les sélecteurs CSS
- *  data-attribute (overrides mode clair par état). */
-function getScoreStateKey(score: number | null): "na" | "critical" | "warning" | "good" {
+ *  data-attribute (overrides mode clair par état). 5 valeurs (4 paliers
+ *  + na) alignées sur le brief. */
+function getScoreStateKey(
+  score: number | null
+): "na" | "critical" | "warning" | "good" | "excellent" {
   if (score === null) return "na";
-  if (score > 80) return "good";
-  if (score >= 50) return "warning";
+  if (score > 80) return "excellent";
+  if (score >= 61) return "good";
+  if (score >= 31) return "warning";
   return "critical";
 }
 
 function PiliersItem({ label, value }: { label: string; value: number }) {
-  // Couleur sémantique pour la mini-barre de progression.
-  const tone = value >= 70 ? "good" : value >= 40 ? "warning" : "critical";
+  // 4 tons selon les seuils du brief (alignés sur le score global) :
+  // 81-100 success vert, 61-80 brand-gold, 31-60 warning orange, 0-30 danger.
+  const tone =
+    value > 80 ? "excellent" : value >= 61 ? "good" : value >= 31 ? "warning" : "critical";
   const safeValue = Math.max(0, Math.min(100, value));
   return (
     <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2" data-piliers-item data-tone={tone}>

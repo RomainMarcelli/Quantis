@@ -25,6 +25,7 @@ import {
 } from "recharts";
 import { Calendar, TrendingUp } from "lucide-react";
 import { StableChartContainer } from "@/components/dashboard/widgets/StableChartContainer";
+import { useTheme } from "@/hooks/useTheme";
 import type { AnalysisRecord } from "@/types/analysis";
 import {
   buildMonthlySeries,
@@ -60,6 +61,15 @@ const SERIES_LABELS = {
 
 function EvolutionChartImpl({ analyses, currentAnalysis }: EvolutionChartProps) {
   const monthlyAvailable = hasMonthlyDataAvailable(currentAnalysis);
+  // Theme-aware chart colors. En dark : ticks/labels blancs translucides.
+  // En light : ticks/labels gris foncé + texte de légende noir (cf. brief
+  // Synthèse : "légende des graphiques en noir").
+  const { isDark } = useTheme();
+  const tickColor = isDark ? "rgba(255,255,255,0.55)" : "rgba(10,10,15,0.65)";
+  const tickColorMuted = isDark ? "rgba(255,255,255,0.45)" : "rgba(10,10,15,0.55)";
+  const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+  const axisColor = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.12)";
+  const legendColor = isDark ? "rgba(255,255,255,0.7)" : "rgba(10,10,15,0.95)";
 
   const [mode, setMode] = useState<EvolutionSeriesMode>(
     monthlyAvailable ? "monthly" : "yearly"
@@ -131,15 +141,15 @@ function EvolutionChartImpl({ analyses, currentAnalysis }: EvolutionChartProps) 
         <div className="h-[260px] flex-1 min-h-[220px]">
           <StableChartContainer>
             <LineChart data={series} margin={{ top: 10, right: 18, bottom: 0, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10, fontFamily: "monospace" }}
+                tick={{ fill: tickColor, fontSize: 10, fontFamily: "monospace" }}
                 tickLine={false}
-                axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                axisLine={{ stroke: axisColor }}
               />
               <YAxis
-                tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10, fontFamily: "monospace" }}
+                tick={{ fill: tickColorMuted, fontSize: 10, fontFamily: "monospace" }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={formatYAxisValue}
@@ -154,7 +164,7 @@ function EvolutionChartImpl({ analyses, currentAnalysis }: EvolutionChartProps) 
                 iconType="line"
                 wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }}
                 formatter={(value: string) => (
-                  <span style={{ color: "rgba(255,255,255,0.7)" }}>{value}</span>
+                  <span style={{ color: legendColor }}>{value}</span>
                 )}
               />
               <Line
