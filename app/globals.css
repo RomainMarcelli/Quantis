@@ -1504,6 +1504,54 @@ body {
   display: none !important;
 }
 
+/* ─── Recharts — légendes, ticks et axes en noir lisible en mode clair
+   (cf. retour 08/05/2026 : "légendes des graphiques, dates en abscisse,
+   temporalités du filtre doivent être en noir"). Override des `fill`
+   posés inline par les composants (XAxis tick={{ fill: rgba(255,...) }})
+   via la spécificité CSS sur les classes Recharts. CSS `fill !important`
+   gagne sur l'attribut SVG `fill` selon la spec. */
+[data-theme="light"] .recharts-cartesian-axis-tick-value,
+[data-theme="light"] .recharts-cartesian-axis-tick-value tspan {
+  fill: rgba(10, 10, 15, 0.78) !important;
+}
+[data-theme="light"] .recharts-legend-item-text {
+  color: rgba(10, 10, 15, 0.95) !important;
+}
+[data-theme="light"] .recharts-cartesian-axis-line {
+  stroke: rgba(0, 0, 0, 0.18) !important;
+}
+[data-theme="light"] .recharts-cartesian-grid-horizontal line,
+[data-theme="light"] .recharts-cartesian-grid-vertical line {
+  stroke: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Pills de filtres temporels (PeriodPills, ModeToggle dans EvolutionChart
+   et KpiEvolutionChart) — texte plus contrasté en light. Les classes
+   text-white/45 et text-white/55 sont déjà overridées en gris
+   secondary mais le user veut du noir clair pour la temporalité. */
+[data-theme="light"] [aria-pressed]:not([aria-pressed="true"]) {
+  color: var(--app-text-primary);
+}
+[data-theme="light"] [aria-pressed]:not([aria-pressed="true"]):hover {
+  color: var(--app-brand-gold-deep);
+}
+[data-theme="light"] [aria-pressed="true"] {
+  color: var(--app-brand-gold-deep);
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 10%);
+}
+
+/* ─── Assistant IA — logo Vyzor doré plus foncé en mode clair
+   (cf. retour 08/05/2026 : "la petite icône doit être en doré plus
+   foncé pour qu'il soit visible"). Le PNG d'origine (LogoV3.png) est
+   trop pâle sur fond clair. On applique un filter CSS qui combine
+   brightness réduite + saturation augmentée + sepia subtil pour
+   pousser vers un brun-doré profond, sans changer l'asset. Le
+   sélecteur cible toutes les instances du VyzorLogo (pas que
+   l'Assistant — cohérence globale). */
+[data-theme="light"] [alt="Logo Vyzor"] {
+  filter: brightness(0.55) saturate(1.5) hue-rotate(-3deg);
+}
+
 /* ─── Brief Synthèse v2 — Section 7 : pastille "Live" pulse
    Le badge "ANALYSE DYNAMIQUE" / "Données live" a une pastille verte.
    En mode clair on lui ajoute un pulse subtil 2s pour attirer l'attention
