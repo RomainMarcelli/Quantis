@@ -303,15 +303,31 @@ body {
    On vise les call-sites qui combinent `text-quantis-gold` ET
    `bg-quantis-gold/*` (== état actif). Le `[data-active="true"]` est
    un ajout sémantique pour les composants qui le posent explicitement. */
+/* Brief mode-clair Synthèse (08/05/2026) :
+   - bordure gauche 2.5px gold profond
+   - border-radius 0/10/10/0 (le côté gauche reste carré → la bordure
+     gauche se voit nettement, pas masquée par un arrondi)
+   - texte en font-weight 500 quand actif. */
 [data-theme="light"] [data-sidebar-link][data-active="true"] {
   color: var(--app-brand-gold-deep) !important;
-  background-color: rgb(var(--app-brand-gold-deep-rgb) / 6%) !important;
-  border-left: 2px solid var(--app-brand-gold-deep) !important;
-  border-radius: 12px;
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 7%) !important;
+  border-left: 2.5px solid var(--app-brand-gold-deep) !important;
+  border-radius: 0 10px 10px 0 !important;
+  font-weight: 500 !important;
   transition: background-color 200ms ease, color 200ms ease, border-left-color 200ms ease;
+}
+/* Icônes Lucide / labels héritent du gold via currentColor — il faut
+   forcer le color: inherit sur les enfants pour vaincre les classes
+   Tailwind text-white/X qui s'appliquent par défaut. */
+[data-theme="light"] [data-sidebar-link][data-active="true"] svg,
+[data-theme="light"] [data-sidebar-link][data-active="true"] span {
+  color: var(--app-brand-gold-deep) !important;
 }
 [data-theme="light"] [data-sidebar-link]:not([data-active="true"]):hover {
   background-color: rgb(0 0 0 / 3%) !important;
+  color: var(--app-text-secondary) !important;
+}
+[data-theme="light"] [data-sidebar-link]:not([data-active="true"]):hover svg {
   color: var(--app-text-secondary) !important;
 }
 
@@ -1221,75 +1237,123 @@ body {
 
 [data-theme="light"] [data-vyzor-score] {
   /* Bg radial subtil — la "lueur de chaleur" du brief, pas un gradient
-     visible. Override de .precision-card pour ce composant uniquement. */
+     visible. Override de .precision-card pour ce composant uniquement.
+     Brief Synthèse v2 : ombre composite renforcée pour distinguer
+     nettement le bloc Score du canvas beige derrière. */
   background-image: radial-gradient(
     ellipse at center,
     #FFFFFF 0%,
     #F8F7F3 100%
   );
   background-color: #FFFFFF;
+  border: 1px solid rgb(0 0 0 / 6%) !important;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 4%), 0 2px 8px rgb(0 0 0 / 2%) !important;
+  border-radius: 16px !important;
+  padding: 28px 24px !important;
 }
 
-/* Dial track / ticks adaptés en light (sans le scope premium-analysis-root) */
+/* Dial track / ticks adaptés en light (sans le scope premium-analysis-root)
+   Brief : un trait plein subtil (pas pointillés) pour ne pas faire
+   "loading inachevé". Les ticks (anneau pointillé décoratif) sont
+   masqués en light. */
 [data-theme="light"] [data-vyzor-score] .dial-track {
   stroke: rgb(0 0 0 / 6%);
+  stroke-width: 12px;
 }
 [data-theme="light"] [data-vyzor-score] .dial-ticks {
-  stroke: rgb(0 0 0 / 12%);
+  stroke: transparent;
+}
+
+/* Anneaux décoratifs spinning (les 2 cercles dasharray exterior) :
+   discrets en light pour ne pas perturber la lecture. */
+[data-theme="light"] [data-vyzor-score] svg > circle:not(.dial-track):not(.dial-ticks):not(.dial-progress) {
+  stroke: rgb(0 0 0 / 4%) !important;
 }
 
 /* L'arc de progression utilise le gradient SVG (gold profond → couleur
-   sémantique du score). Drop-shadow doré atténué — un glow subtil au
-   lieu du flash dark. */
+   sémantique du score). Stroke-width 12px pour donner du poids visuel
+   à la signature. Drop-shadow doré atténué — un glow subtil au lieu
+   du flash dark. */
 [data-theme="light"] [data-vyzor-score] .dial-progress {
   stroke: url(#vyzor-score-gradient);
+  stroke-width: 12px;
   filter: drop-shadow(0 1px 3px rgb(139 111 42 / 18%));
 }
 [data-theme="light"] [data-vyzor-score]:hover .dial-progress {
   filter: drop-shadow(0 2px 6px rgb(139 111 42 / 28%));
 }
 
-/* Chiffre central — passe à 48px (3rem) en light (cf. brief).
+/* Chiffre central — 56px (3.5rem) en light (brief Synthèse v2).
    Reste à 6.8rem en dark pour l'effet signature plus dramatic. */
 [data-theme="light"] [data-vyzor-score] .tnum {
-  font-size: 3rem !important;
+  font-size: 3.5rem !important;
   line-height: 1 !important;
   color: var(--app-text-primary) !important;
   font-weight: 700 !important;
 }
 
-/* Badge sémantique — en light : fond opacité 12% + texte version
-   foncée (cf. brief). On ne peut pas override l'inline style direct ;
-   on applique un layer color via filter pour le pastiller, et un bg
-   color visible via la div parent. */
+/* Badge sémantique — en light : pilule (border-radius 20px, padding 4/14,
+   font 13px). 4 paliers + na (brief Synthèse v2 :
+     0-30   Critique     fond rouge  10% / texte #991B1B
+     31-60  Sous tension fond orange 10% / texte #92400E
+     61-80  Bon          fond gold   10% / texte #8B6F2A
+     81-100 Excellent    fond vert   10% / texte #166534
+   On override l'inline style via !important + sélecteur d'attribut. */
+[data-theme="light"] [data-vyzor-score] [data-score-badge] {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px !important;
+  border-radius: 20px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.03em !important;
+}
 [data-theme="light"] [data-vyzor-score][data-score-state="critical"] [data-score-badge] {
-  background-color: rgb(220 38 38 / 12%) !important;
-  border-color: rgb(220 38 38 / 25%) !important;
+  background-color: rgb(220 38 38 / 10%) !important;
+  border-color: transparent !important;
 }
 [data-theme="light"] [data-vyzor-score][data-score-state="critical"] [data-score-badge] span {
   color: #991B1B !important;
+  font-size: 13px !important;
 }
 [data-theme="light"] [data-vyzor-score][data-score-state="warning"] [data-score-badge] {
-  background-color: rgb(217 119 6 / 12%) !important;
-  border-color: rgb(217 119 6 / 25%) !important;
+  background-color: rgb(217 119 6 / 10%) !important;
+  border-color: transparent !important;
 }
 [data-theme="light"] [data-vyzor-score][data-score-state="warning"] [data-score-badge] span {
-  color: #9A3412 !important;
+  color: #92400E !important;
+  font-size: 13px !important;
 }
 [data-theme="light"] [data-vyzor-score][data-score-state="good"] [data-score-badge] {
-  background-color: rgb(22 163 74 / 12%) !important;
-  border-color: rgb(22 163 74 / 25%) !important;
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 10%) !important;
+  border-color: transparent !important;
 }
 [data-theme="light"] [data-vyzor-score][data-score-state="good"] [data-score-badge] span {
+  color: var(--app-brand-gold-deep) !important;
+  font-size: 13px !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="excellent"] [data-score-badge] {
+  background-color: rgb(22 163 74 / 10%) !important;
+  border-color: transparent !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="excellent"] [data-score-badge] span {
   color: #166534 !important;
+  font-size: 13px !important;
 }
 [data-theme="light"] [data-vyzor-score][data-score-state="na"] [data-score-badge] {
   background-color: rgb(0 0 0 / 4%) !important;
-  border-color: rgb(0 0 0 / 10%) !important;
+  border-color: transparent !important;
 }
 [data-theme="light"] [data-vyzor-score][data-score-state="na"] [data-score-badge] span {
   color: var(--app-text-tertiary) !important;
+  font-size: 13px !important;
 }
+
+/* L'état "excellent" passe le gradient SVG vert au lieu de la couleur
+   du gradient gold→hex. On force le second stop SVG via stop-color
+   sur le linearGradient (le composant le mappe à scoreState.colorHex
+   qui vaut #10B981 pour Excellent). En light on garde ça vert. */
 
 /* Piliers — en light : on transforme la "card" en row plate avec une
    mini-bar de progression colorée selon le tone. */
@@ -1299,10 +1363,15 @@ body {
   padding: 8px 4px !important;
 }
 [data-theme="light"] [data-vyzor-score] [data-piliers-track] {
-  background-color: rgb(0 0 0 / 4%) !important;
+  background-color: rgb(0 0 0 / 5%) !important;
+}
+/* 4 tons brief Synthèse v2 — 81-100 success, 61-80 brand-gold,
+   31-60 warning, 0-30 danger. */
+[data-theme="light"] [data-vyzor-score] [data-piliers-item][data-tone="excellent"] [data-piliers-fill] {
+  background-color: var(--app-success);
 }
 [data-theme="light"] [data-vyzor-score] [data-piliers-item][data-tone="good"] [data-piliers-fill] {
-  background-color: var(--app-success);
+  background-color: var(--app-brand-gold-deep);
 }
 [data-theme="light"] [data-vyzor-score] [data-piliers-item][data-tone="warning"] [data-piliers-fill] {
   background-color: var(--app-warning);
@@ -1312,9 +1381,13 @@ body {
 }
 /* Et en dark, pour cohérence, on remplit aussi les fills (sinon ils
    sont invisibles puisqu'on a ajouté la track + fill au composant). */
+:root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="excellent"] [data-piliers-fill],
+:root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="excellent"] [data-piliers-fill] {
+  background-color: #22C55E;
+}
 :root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="good"] [data-piliers-fill],
 :root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="good"] [data-piliers-fill] {
-  background-color: #22C55E;
+  background-color: #C5A059;
 }
 :root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="warning"] [data-piliers-fill],
 :root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="warning"] [data-piliers-fill] {
@@ -1323,6 +1396,139 @@ body {
 :root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="critical"] [data-piliers-fill],
 :root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="critical"] [data-piliers-fill] {
   background-color: #EF4444;
+}
+
+/* ─── Brief Synthèse v2 (08/05/2026) — Section 3 : badges benchmark
+   En light : remplace les dots colorés par un badge texte propre
+   (BAS 25% / MÉDIANE / TOP 25%). On masque les dots et on style le
+   label en pilule colorée selon le tone. */
+[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] {
+  display: none !important;
+}
+[data-theme="light"] [data-benchmark-indicator] [data-benchmark-label] {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+}
+[data-theme="light"] [data-benchmark-indicator][data-benchmark-tone="negative"] [data-benchmark-label] {
+  background-color: rgb(220 38 38 / 8%) !important;
+  color: #991B1B !important;
+}
+[data-theme="light"] [data-benchmark-indicator][data-benchmark-tone="neutral"] [data-benchmark-label] {
+  background-color: rgb(217 119 6 / 8%) !important;
+  color: #92400E !important;
+}
+[data-theme="light"] [data-benchmark-indicator][data-benchmark-tone="positive"] [data-benchmark-label] {
+  background-color: rgb(22 163 74 / 8%) !important;
+  color: #166534 !important;
+}
+
+/* ─── Brief Synthèse v2 — Section 5 : bannière VYZOR_AGENT
+   Distingue immédiatement la recommandation IA des KPI statiques
+   par sa bordure gauche dorée 3px + fond légèrement teinté or.
+   On cible les call-sites via .agent-panel (utilisé dans AIInsight et
+   les sections RentabilityTest/InvestmentTest/FinancingTest). */
+[data-theme="light"] .agent-panel {
+  background-color: #FFFFFF !important;
+  border: 1px solid rgb(var(--app-brand-gold-deep-rgb) / 15%) !important;
+  border-left: 3px solid var(--app-brand-gold-deep) !important;
+  border-radius: 0 12px 12px 0 !important;
+  box-shadow: 0 1px 3px rgb(var(--app-brand-gold-deep-rgb) / 6%);
+}
+[data-theme="light"] .agent-panel .agent-kicker {
+  color: var(--app-brand-gold-deep) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+}
+[data-theme="light"] .agent-panel .agent-icon-shell,
+[data-theme="light"] .agent-panel .agent-arrow-shell {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 8%) !important;
+  border-color: rgb(var(--app-brand-gold-deep-rgb) / 18%) !important;
+  border-radius: 10px !important;
+  color: var(--app-brand-gold-deep) !important;
+}
+[data-theme="light"] .agent-panel .agent-icon-shell svg,
+[data-theme="light"] .agent-panel .agent-arrow-shell svg {
+  color: var(--app-brand-gold-deep) !important;
+}
+
+/* ─── Brief Synthèse v2 — Section 6 : alerte rouge subtile
+   Les blocs d'alerte (BFR élevé, etc.) doivent avoir un fond très
+   doux + bordure gauche 3px en danger + texte foncé pour rester
+   premium sans agresser. On cible les blocs marqués
+   data-vyzor-alert ou les anciennes classes "bg-rose-500/X". */
+[data-theme="light"] [data-vyzor-alert],
+[data-theme="light"] [data-vyzor-alert="danger"] {
+  background-color: rgb(220 38 38 / 6%) !important;
+  border: 1px solid rgb(220 38 38 / 15%) !important;
+  border-left: 3px solid var(--app-danger) !important;
+  border-radius: 0 8px 8px 0 !important;
+  color: #991B1B !important;
+}
+[data-theme="light"] [data-vyzor-alert] * {
+  color: #991B1B !important;
+}
+
+/* ─── Brief Synthèse v2 — Section 7 : pastille "Live" pulse
+   Le badge "ANALYSE DYNAMIQUE" / "Données live" a une pastille verte.
+   En mode clair on lui ajoute un pulse subtil 2s pour attirer l'attention
+   sur cette feature live. */
+@keyframes vyzor-live-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgb(22 163 74 / 50%);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgb(22 163 74 / 0%);
+  }
+}
+[data-theme="light"] [data-live-pulse],
+[data-theme="light"] .interactive-badge .bg-emerald-500 {
+  animation: vyzor-live-pulse 2s ease-in-out infinite;
+}
+
+/* ─── Brief Synthèse v2 — Section 7 : bouton "Simuler un scénario"
+   En light : style secondaire doré (cf. brief). Bordure rgb gold-deep
+   20%, fond rgb gold-deep 6%, texte gold-deep, hover fond 10%. */
+[data-theme="light"] [data-vyzor-simulate] {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 6%) !important;
+  border-color: rgb(var(--app-brand-gold-deep-rgb) / 20%) !important;
+  color: var(--app-brand-gold-deep) !important;
+}
+[data-theme="light"] [data-vyzor-simulate]:hover {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 10%) !important;
+  border-color: rgb(var(--app-brand-gold-deep-rgb) / 32%) !important;
+}
+
+/* ─── Brief Synthèse v2 — Section 4 : toggle MENSUEL/ANNUEL
+   Style segmented control iOS — container fond rgba(0,0,0,0.04),
+   segment actif blanc avec ombre + radius 8px, transition slide. */
+[data-theme="light"] [data-segmented-toggle] {
+  background-color: rgb(0 0 0 / 4%);
+  border-radius: 10px;
+  padding: 3px;
+  display: inline-flex;
+  gap: 2px;
+}
+[data-theme="light"] [data-segmented-toggle] [data-segment] {
+  background-color: transparent;
+  color: var(--app-text-secondary);
+  border: none;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 200ms ease;
+}
+[data-theme="light"] [data-segmented-toggle] [data-segment][data-active="true"] {
+  background-color: #FFFFFF;
+  color: var(--app-text-primary);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
 }
 
 /* Animation globale au scroll: révèle progressivement les cartes sans casser la DA premium. */
