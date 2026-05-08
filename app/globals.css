@@ -63,7 +63,12 @@
 
 :root[data-theme="light"] {
   /* ─── Tokens sémantiques — LIGHT ─────────────────────────────────── */
-  --app-bg: #FAFAF7;                  /* blanc cassé chaud */
+  /* Canvas légèrement beige/doré pour faire ressortir les tuiles blanches
+     (cf. retour utilisateur 08/05/2026). Le ratio canvas/tuile devient
+     visible (ΔL ≈ 4 %) sans perdre le caractère "clair" de l'ensemble.
+     L'élévation N1 des cards (.precision-card avec ombre + bg #FFFFFF)
+     reste donc lisible. */
+  --app-bg: #F4EEE0;
   --app-bg-elevated: #FFFFFF;
   --app-card-bg: #FFFFFF;
   --app-card-glass-bg: rgb(255 255 255 / 85%);
@@ -118,7 +123,8 @@
   --app-glass-warm-shadow: 0 4px 16px rgb(0 0 0 / 6%);
 
   /* ─── Tokens legacy — versions light ──────────────────────────────── */
-  --quantis-smoke: #FAFAF7;
+  /* --quantis-smoke aligné sur --app-bg pour cohérence canvas. */
+  --quantis-smoke: #F4EEE0;
   --quantis-paper: #FFFFFF;
   --quantis-white: #FFFFFF;
   --quantis-carbon: #0A0A0F;
@@ -127,7 +133,7 @@
   --quantis-gold: #8B6F2A;
   --quantis-emerald: #16A34A;
   --quantis-crimson: #DC2626;
-  --quantis-premium-root-bg: #FAFAF7;
+  --quantis-premium-root-bg: #F4EEE0;
   --quantis-premium-root-fg: #0A0A0F;
   --quantis-card-bg: #FFFFFF;
   --quantis-card-bg-hover: #F8FAFC;
@@ -1494,15 +1500,13 @@ body {
   border-color: rgb(22 163 74 / 18%) !important;
 }
 
-/* ─── Mouse glow (4 sections dashboard navigation) — overlay sombre
-   en mode clair (cf. retour 08/05/2026 : "la lumière qui suit la
-   souris doit être sombre"). En dark, garde le glow doré original. */
+/* ─── Mouse glow — supprimé en mode clair (cf. retour 08/05/2026 :
+   "supprime le mouse glow pour le mode clair"). On display:none plutôt
+   qu'opacity:0 pour éviter tout repaint inutile (le JS continue à
+   tracker la position mais l'overlay n'est jamais composé). En dark,
+   le glow doré reste actif. */
 [data-theme="light"] [data-mouse-glow] {
-  background-image: radial-gradient(
-    circle,
-    rgba(0, 0, 0, 0.07) 0%,
-    transparent 60%
-  ) !important;
+  display: none !important;
 }
 
 /* ─── Brief Synthèse v2 — Section 7 : pastille "Live" pulse
