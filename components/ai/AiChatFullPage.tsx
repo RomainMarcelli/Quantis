@@ -209,28 +209,28 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
       // sous le viewport.
       className="relative flex h-[calc(100vh-7.5rem)] flex-col rounded-2xl"
       style={{
-        backgroundColor: "rgba(15, 15, 18, 0.6)",
-        border: "1px solid rgba(255, 255, 255, 0.06)",
+        backgroundColor: "var(--app-card-bg)",
+        border: "1px solid var(--app-border)",
       }}
     >
       {/* Header — bouton retour + titre KPI */}
       <header
         className="flex flex-shrink-0 items-center gap-3 px-5 py-3"
-        style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.06)" }}
+        style={{ borderBottom: "1px solid var(--app-border)" }}
       >
         <button
           type="button"
           onClick={() => router.back()}
           aria-label="Retour"
           className="inline-flex h-9 w-9 items-center justify-center rounded-full transition"
-          style={{ color: "rgba(255, 255, 255, 0.6)" }}
+          style={{ color: "var(--app-text-secondary)" }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.08)";
+            e.currentTarget.style.backgroundColor = "var(--app-border-strong)";
             e.currentTarget.style.color = "white";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.color = "rgba(255, 255, 255, 0.6)";
+            e.currentTarget.style.color = "var(--app-text-secondary)";
           }}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -242,7 +242,7 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
               {definition ? definition.label : "Assistant Vyzor"}
             </p>
             {definition && props.kpiValue !== null && props.kpiValue !== undefined && Number.isFinite(props.kpiValue) ? (
-              <p className="truncate text-[11px]" style={{ color: "rgba(255, 255, 255, 0.55)" }}>
+              <p className="truncate text-[11px]" style={{ color: "var(--app-text-tertiary)" }}>
                 Valeur actuelle : {formatKpiValueByUnit(definition.unit, props.kpiValue)}
               </p>
             ) : null}
@@ -254,17 +254,17 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
           aria-label="Nouvelle conversation"
           className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] transition"
           style={{
-            backgroundColor: "rgba(255, 255, 255, 0.04)",
-            border: "1px solid rgba(255, 255, 255, 0.08)",
-            color: "rgba(255, 255, 255, 0.7)",
+            backgroundColor: "var(--app-surface-soft)",
+            border: "1px solid var(--app-border-strong)",
+            color: "var(--app-text-secondary)",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = "rgba(197, 160, 89, 0.08)";
             e.currentTarget.style.color = "#C5A059";
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
-            e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)";
+            e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+            e.currentTarget.style.color = "var(--app-text-secondary)";
           }}
         >
           <MessageSquarePlus className="h-3.5 w-3.5" />
@@ -314,7 +314,7 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
       {/* Input bar — sticky en bas, centré */}
       <div
         className="flex-shrink-0 px-4 pb-5 pt-3 md:px-6"
-        style={{ borderTop: "1px solid rgba(255, 255, 255, 0.06)" }}
+        style={{ borderTop: "1px solid var(--app-border)" }}
       >
         <form
           onSubmit={(e) => {
@@ -326,14 +326,14 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
           <div
             className="flex items-end gap-2 rounded-2xl px-4 py-3 transition"
             style={{
-              backgroundColor: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.1)",
+              backgroundColor: "var(--app-surface-soft)",
+              border: "1px solid var(--app-border-strong)",
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = "rgba(197, 160, 89, 0.4)";
             }}
             onBlur={(e) => {
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)";
+              e.currentTarget.style.borderColor = "var(--app-border-strong)";
             }}
           >
             <textarea
@@ -373,7 +373,7 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
               <Send className="h-4 w-4" />
             </button>
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <div className="mt-2 flex items-center justify-between text-[11px]" style={{ color: "var(--app-text-tertiary)" }}>
             <span>Entrée pour envoyer · Maj+Entrée pour saut de ligne</span>
             {remainingQuota !== null ? (
               <span className="font-mono uppercase tracking-wider">
@@ -436,7 +436,7 @@ function EmptyConversation({
         </h2>
         <p
           className="mx-auto mt-2 max-w-[480px] text-[13px]"
-          style={{ color: "rgba(255,255,255,0.6)" }}
+          style={{ color: "var(--app-text-secondary)" }}
         >
           {definition
             ? definition.tooltip.explanation
@@ -455,15 +455,15 @@ function EmptyConversation({
             onClick={() => onPick(q.question)}
             className="vyzor-fade-up group flex items-start gap-3 rounded-xl p-3 text-left transition"
             style={{
-              backgroundColor: "rgba(15, 15, 18, 0.6)",
-              border: "1px solid rgba(255, 255, 255, 0.06)",
+              backgroundColor: "var(--app-card-bg)",
+              border: "1px solid var(--app-border)",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = "rgba(197, 160, 89, 0.4)";
               e.currentTarget.style.boxShadow = "0 0 12px rgba(197, 160, 89, 0.12)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)";
+              e.currentTarget.style.borderColor = "var(--app-border)";
               e.currentTarget.style.boxShadow = "none";
             }}
           >
@@ -472,7 +472,7 @@ function EmptyConversation({
             </span>
             <span
               className="flex-1 text-[13px] leading-snug"
-              style={{ color: "rgba(255, 255, 255, 0.85)" }}
+              style={{ color: "var(--app-text-primary)" }}
             >
               {q.question}
             </span>
