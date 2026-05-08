@@ -88,6 +88,35 @@
   --app-surface-medium: rgb(0 0 0 / 6%);
   --app-surface-strong: rgb(0 0 0 / 10%);
 
+  /* ─── Niveaux d'élévation (light only — voir brief design 08/05/2026) ─
+     N0 = canvas (var(--app-bg))
+     N1 = surface (cards, blocs de contenu) — flotte légèrement
+     N2 = surface surélevée (modals, tooltips, hover des cards)
+     Les ombres sont composites (key + ambient) pour ressembler à une
+     vraie projection de lumière, pas à un blur uniforme. */
+  --app-shadow-elev-1: 0 1px 3px rgb(0 0 0 / 4%), 0 1px 2px rgb(0 0 0 / 2%);
+  --app-shadow-elev-2: 0 4px 12px rgb(0 0 0 / 6%), 0 1px 3px rgb(0 0 0 / 4%);
+
+  /* Sidebar — fond plus chaud que le canvas pour créer une séparation
+     douce sans bordure tranchée (cf. brief : "F5F5F0, un cran plus chaud
+     que le canvas"). */
+  --app-sidebar-bg: #F5F5F0;
+  --app-sidebar-border: rgb(0 0 0 / 6%);
+
+  /* Gold profond — accent signature pour les éléments qui doivent
+     "sortir" (sidebar actif, boutons primaires, score, totaux). Plus
+     foncé que --app-brand-gold (qui reste pour les hovers/secondaires). */
+  --app-brand-gold-deep: #8B6F2A;
+  --app-brand-gold-deep-rgb: 139 111 42;
+
+  /* Glassmorphism warm — équivalent light du frost-glass dark. Le
+     "warm" vient du blue channel à 252 (vs 255), créant une teinte
+     beige imperceptible mais qui distingue d'un blanc pur médical.
+     saturate(1.2) renforce les couleurs derrière sans les déformer. */
+  --app-glass-warm-bg: rgb(255 255 252 / 80%);
+  --app-glass-warm-border: rgb(0 0 0 / 6%);
+  --app-glass-warm-shadow: 0 4px 16px rgb(0 0 0 / 6%);
+
   /* ─── Tokens legacy — versions light ──────────────────────────────── */
   --quantis-smoke: #FAFAF7;
   --quantis-paper: #FFFFFF;
@@ -213,6 +242,29 @@ body {
      `style="color: #FFFFFF"` inline (priorité). On ne couvre donc pas
      ces cas ici ; ils restent visibles en dark uniquement et seront
      ajustés au cas par cas. */
+
+  /* ── Tones sémantiques Tailwind (utilisés par KpiBenchmarkIndicator
+     et autres badges) → versions FONCÉES en light, lisibles sur fond
+     clair (cf. brief : ratio AA minimum + foncé pour signaler). */
+  & .text-emerald-300,
+  & .text-emerald-400 { color: #166534 !important; }
+  & .text-emerald-500 { color: #16A34A !important; }
+  & .text-amber-200,
+  & .text-amber-300 { color: #9A3412 !important; }
+  & .text-amber-400 { color: #B45309 !important; }
+  & .text-red-300,
+  & .text-red-400 { color: #991B1B !important; }
+  & .text-red-500 { color: #DC2626 !important; }
+
+  /* ── Surfaces sémantiques light (badges benchmark, alerts, banners)
+     → fond opacité 8-12 % + texte version foncée. Le brief : "BAS 25%"
+     en bg rgb(220 38 38 / 8%) + texte #991B1B. */
+  & .bg-emerald-500\/10,
+  & .bg-emerald-500\/20 { background-color: rgb(22 163 74 / 10%) !important; }
+  & .bg-amber-500\/10,
+  & .bg-amber-500\/20 { background-color: rgb(217 119 6 / 10%) !important; }
+  & .bg-red-500\/10,
+  & .bg-red-500\/20 { background-color: rgb(220 38 38 / 10%) !important; }
 }
 
 /* ─── Précisions sur composants stratégiques ─────────────────────── */
@@ -234,7 +286,256 @@ body {
    `bg-quantis-gold/[0.08]` + `text-quantis-gold`. */
 [data-theme="light"] .border-l-quantis-gold,
 [data-theme="light"] .border-l-\[3px\].border-quantis-gold {
-  border-left-color: var(--app-brand-gold) !important;
+  border-left-color: var(--app-brand-gold-deep) !important;
+}
+
+/* ─── Phase 2 — Sidebar premium light (brief 08/05/2026) ────────────
+   Identité claire : fond plus chaud que le canvas, séparateur doux
+   à droite, état actif fort (gold profond + bordure gauche 2px),
+   hover discret pour les routes inactives. */
+[data-theme="light"] .premium-sidebar,
+[data-theme="light"] [data-sidebar-shell] {
+  background-color: var(--app-sidebar-bg) !important;
+  border-right: 1px solid var(--app-sidebar-border) !important;
+}
+
+/* Lien sidebar actif — fond doré dilué + bordure gauche en gold profond.
+   On vise les call-sites qui combinent `text-quantis-gold` ET
+   `bg-quantis-gold/*` (== état actif). Le `[data-active="true"]` est
+   un ajout sémantique pour les composants qui le posent explicitement. */
+[data-theme="light"] [data-sidebar-link][data-active="true"] {
+  color: var(--app-brand-gold-deep) !important;
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 6%) !important;
+  border-left: 2px solid var(--app-brand-gold-deep) !important;
+  border-radius: 12px;
+  transition: background-color 200ms ease, color 200ms ease, border-left-color 200ms ease;
+}
+[data-theme="light"] [data-sidebar-link]:not([data-active="true"]):hover {
+  background-color: rgb(0 0 0 / 3%) !important;
+  color: var(--app-text-secondary) !important;
+}
+
+/* ─── Phase 1 — Utility classes pour l'élévation et le glass warm ──── */
+[data-theme="light"] .elev-1 {
+  box-shadow: var(--app-shadow-elev-1);
+}
+[data-theme="light"] .elev-2 {
+  box-shadow: var(--app-shadow-elev-2);
+}
+/* Hover : les cards N1 montent au N2 sans saut. */
+[data-theme="light"] .elev-1.elev-hover:hover {
+  box-shadow: var(--app-shadow-elev-2);
+  border-color: rgb(0 0 0 / 10%);
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+[data-theme="light"] .glass-warm {
+  background-color: var(--app-glass-warm-bg);
+  border: 1px solid var(--app-glass-warm-border);
+  box-shadow: var(--app-glass-warm-shadow);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+
+/* ─── Phase 4 — Cards KPI (precision-card) en mode clair ──────────────
+   Le composant existant `.precision-card` déjà appliqué partout. On
+   améliore son rendu light : élévation N1 par défaut, hover N2, bordure
+   plus subtile, padding intact (géré par les classes Tailwind du
+   composant). */
+[data-theme="light"] .precision-card {
+  background-color: var(--quantis-card-bg);
+  border: 1px solid rgb(0 0 0 / 6%);
+  box-shadow: var(--app-shadow-elev-1);
+  color: var(--quantis-carbon);
+  transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+[data-theme="light"] .precision-card:hover {
+  box-shadow: var(--app-shadow-elev-2);
+  border-color: rgb(0 0 0 / 10%);
+}
+
+/* ─── Phase 6 — Glassmorphism warm (tooltips / modals / dropdowns) ──
+   Beaucoup de composants utilisent `bg-quantis-base/95 backdrop-blur` ou
+   `backdrop-blur-xl` pour leur fond — en dark, c'est un noir 95 % flou ;
+   en light, il faut le frost warm. On override ciblé sur les classes
+   les plus utilisées (KpiTooltip, KpiBenchmarkIndicator, etc.). */
+[data-theme="light"] .bg-quantis-base\/95,
+[data-theme="light"] .bg-quantis-base\/90 {
+  background-color: var(--app-glass-warm-bg) !important;
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  box-shadow: var(--app-glass-warm-shadow);
+}
+[data-theme="light"] [class*="backdrop-blur"]:where(.bg-quantis-base\/95, .bg-quantis-base\/90) {
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+
+/* ─── Phase 9 — Micro-interactions (transitions douces) ─────────────
+   Le brief : "tout changement d'état visuel doit avoir une transition
+   de 200ms ease". On l'applique aux éléments les plus interactifs
+   (boutons, liens sidebar — déjà couverts plus haut, cards,
+   inputs/selects). Pas de transition globale `*` (impact perf et
+   effets surprenants sur les non-interactifs). */
+[data-theme="light"] button:not([disabled]),
+[data-theme="light"] a {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+}
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
+[data-theme="light"] input:focus,
+[data-theme="light"] select:focus,
+[data-theme="light"] textarea:focus {
+  outline: none;
+  border-color: var(--app-brand-gold-deep) !important;
+  box-shadow: 0 0 0 3px rgb(139 111 42 / 10%);
+}
+
+/* Hover de l'icône engrenage des cards KPI (cf. brief : "rotation
+   subtile de 45° sur hover, 300ms ease"). On vise les Settings/Cog
+   icons à l'intérieur des precision-cards. */
+[data-theme="light"] .precision-card [data-kpi-cog],
+[data-theme="light"] .precision-card svg.lucide-settings {
+  transition: transform 300ms ease, color 200ms ease;
+}
+[data-theme="light"] .precision-card:hover [data-kpi-cog],
+[data-theme="light"] .precision-card:hover svg.lucide-settings {
+  transform: rotate(45deg);
+}
+
+/* ─── Phase 7 — Assistant IA chat conversationnel ────────────────────
+   Le brief : bulle utilisateur warm beige (#EEEDE8), bulle IA blanche
+   avec ombre subtile + bordure, bloc "insight" doré en bordure gauche
+   3px gold + fond rgb(139 111 42 / 4%). Les composants ont reçu des
+   data-ai-bubble pour scoper le style. */
+[data-theme="light"] [data-ai-bubble="user"] {
+  --app-ai-user-bg: #EEEDE8;
+  background-color: #EEEDE8 !important;
+  color: var(--app-text-primary) !important;
+  box-shadow: none !important;
+}
+:root[data-theme="dark"] [data-ai-bubble="user"],
+:root:not([data-theme="light"]) [data-ai-bubble="user"] {
+  --app-ai-user-bg: rgb(255 255 255 / 5%);
+  color: rgb(255 255 255 / 80%) !important;
+}
+
+/* Boutons de suggestion follow-up (cf. brief : fond rgb(139 111 42 / 6%)
+   + bordure rgb(139 111 42 / 12%) + texte gold deep). On cible les
+   call-sites via leur classe `vyzor-followup-chip` (à appliquer dans
+   AiResponseCard) ou via les data-attributes data-ai-followup. */
+[data-theme="light"] [data-ai-followup],
+[data-theme="light"] .vyzor-followup-chip {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 6%) !important;
+  border: 1px solid rgb(var(--app-brand-gold-deep-rgb) / 12%) !important;
+  color: var(--app-brand-gold-deep) !important;
+  border-radius: 12px;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+[data-theme="light"] [data-ai-followup]:hover,
+[data-theme="light"] .vyzor-followup-chip:hover {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 10%) !important;
+  border-color: rgb(var(--app-brand-gold-deep-rgb) / 18%) !important;
+}
+
+/* Bloc insight doré (la barre latérale qui contient l'explication IA).
+   On cible les éléments tagged `data-ai-insight` ou via les classes
+   utilities Tailwind (`border-l-quantis-gold` est typique). */
+[data-theme="light"] [data-ai-insight] {
+  border-left: 3px solid var(--app-brand-gold-deep) !important;
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 4%) !important;
+  border-radius: 0 8px 8px 0 !important;
+}
+
+/* Champ de saisie du chat — focus gold-deep + ring 3px (cohérent avec
+   les inputs globaux Phase 9). Cible explicitement le textarea du chat
+   IA via data-ai-input. */
+[data-theme="light"] [data-ai-input] {
+  background-color: #FFFFFF !important;
+  border: 1px solid rgb(0 0 0 / 10%) !important;
+  border-radius: 12px;
+}
+[data-theme="light"] [data-ai-input]:focus,
+[data-theme="light"] [data-ai-input]:focus-within {
+  border-color: var(--app-brand-gold-deep) !important;
+  box-shadow: 0 0 0 3px rgb(var(--app-brand-gold-deep-rgb) / 10%);
+}
+
+/* ─── Phase 8 — États financiers (P&L / Bilan) lisibilité comptable ─
+   Le brief : zebra striping subtil, en-têtes de section coloriés,
+   codes 2033-SD en mono tertiary, négatifs en danger entre parenthèses,
+   totaux fond gold deep dilué + bordure top, résultat net signature. */
+
+[data-theme="light"] [data-fin-section] {
+  background-color: #FFFFFF !important;
+  border: 1px solid rgb(0 0 0 / 6%) !important;
+  box-shadow: var(--app-shadow-elev-1);
+}
+
+[data-theme="light"] [data-fin-section-header] {
+  background-color: #F5F4F0;
+  color: var(--app-text-secondary) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.05em !important;
+  padding: 12px 16px;
+  margin: -12px -16px 8px;
+  border-radius: 12px 12px 0 0;
+}
+
+/* Zebra striping subtil sur les lignes de données. */
+[data-theme="light"] [data-fin-section] [data-fin-row]:nth-child(even) {
+  background-color: #FAFAF7;
+}
+[data-theme="light"] [data-fin-section] [data-fin-row] {
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+/* Codes 2033-SD en mono tertiary lisible sur fond clair. */
+[data-theme="light"] [data-fin-pcg] {
+  color: var(--app-text-tertiary) !important;
+  font-size: 12px !important;
+}
+
+/* Montants négatifs : danger entre parenthèses (la mise entre paren
+   est déjà faite par formatAmount). */
+[data-theme="light"] [data-fin-amount="negative"] {
+  color: var(--app-danger) !important;
+}
+[data-theme="light"] [data-fin-amount="positive"] {
+  color: var(--app-text-primary) !important;
+}
+
+/* Sous-totaux et résultats — différenciation par intensity. */
+[data-theme="light"] [data-fin-subtotal="section"] {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 4%) !important;
+  border-top: 1px solid rgb(0 0 0 / 10%) !important;
+  font-weight: 600 !important;
+  padding: 8px;
+  margin: 8px -8px 0;
+  border-radius: 6px;
+}
+[data-theme="light"] [data-fin-subtotal="result"] {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 6%) !important;
+  border-top: 1px solid rgb(var(--app-brand-gold-deep-rgb) / 20%) !important;
+  font-weight: 600 !important;
+  color: var(--app-text-primary) !important;
+  padding: 8px;
+  margin: 8px -8px 0;
+  border-radius: 6px;
+}
+[data-theme="light"] [data-fin-subtotal="final"] {
+  background-color: rgb(var(--app-brand-gold-deep-rgb) / 8%) !important;
+  border-top: 1px solid rgb(var(--app-brand-gold-deep-rgb) / 30%) !important;
+  font-weight: 700 !important;
+  padding: 10px 8px;
+  margin: 10px -8px 0;
+  border-radius: 6px;
+}
+[data-theme="light"] [data-fin-subtotal="final"] span {
+  color: var(--app-brand-gold-deep) !important;
 }
 
 /* Glassmorphism panels — beaucoup de composants posent
@@ -912,6 +1213,118 @@ body {
   stroke: rgb(15 23 42 / 10%);
 }
 
+/* ─── Phase 3 — Vyzor Score signature mode clair ─────────────────────
+   L'élément le plus premium de l'interface : gradient SVG sur l'arc,
+   chiffre central pondéré, badge sémantique foncé sur fond opacité 12%,
+   piliers en mini-bars colorées selon le score, bg de la card en
+   gradient radial chaud (centre #FFFFFF, bords #F8F7F3). */
+
+[data-theme="light"] [data-vyzor-score] {
+  /* Bg radial subtil — la "lueur de chaleur" du brief, pas un gradient
+     visible. Override de .precision-card pour ce composant uniquement. */
+  background-image: radial-gradient(
+    ellipse at center,
+    #FFFFFF 0%,
+    #F8F7F3 100%
+  );
+  background-color: #FFFFFF;
+}
+
+/* Dial track / ticks adaptés en light (sans le scope premium-analysis-root) */
+[data-theme="light"] [data-vyzor-score] .dial-track {
+  stroke: rgb(0 0 0 / 6%);
+}
+[data-theme="light"] [data-vyzor-score] .dial-ticks {
+  stroke: rgb(0 0 0 / 12%);
+}
+
+/* L'arc de progression utilise le gradient SVG (gold profond → couleur
+   sémantique du score). Drop-shadow doré atténué — un glow subtil au
+   lieu du flash dark. */
+[data-theme="light"] [data-vyzor-score] .dial-progress {
+  stroke: url(#vyzor-score-gradient);
+  filter: drop-shadow(0 1px 3px rgb(139 111 42 / 18%));
+}
+[data-theme="light"] [data-vyzor-score]:hover .dial-progress {
+  filter: drop-shadow(0 2px 6px rgb(139 111 42 / 28%));
+}
+
+/* Chiffre central — passe à 48px (3rem) en light (cf. brief).
+   Reste à 6.8rem en dark pour l'effet signature plus dramatic. */
+[data-theme="light"] [data-vyzor-score] .tnum {
+  font-size: 3rem !important;
+  line-height: 1 !important;
+  color: var(--app-text-primary) !important;
+  font-weight: 700 !important;
+}
+
+/* Badge sémantique — en light : fond opacité 12% + texte version
+   foncée (cf. brief). On ne peut pas override l'inline style direct ;
+   on applique un layer color via filter pour le pastiller, et un bg
+   color visible via la div parent. */
+[data-theme="light"] [data-vyzor-score][data-score-state="critical"] [data-score-badge] {
+  background-color: rgb(220 38 38 / 12%) !important;
+  border-color: rgb(220 38 38 / 25%) !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="critical"] [data-score-badge] span {
+  color: #991B1B !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="warning"] [data-score-badge] {
+  background-color: rgb(217 119 6 / 12%) !important;
+  border-color: rgb(217 119 6 / 25%) !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="warning"] [data-score-badge] span {
+  color: #9A3412 !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="good"] [data-score-badge] {
+  background-color: rgb(22 163 74 / 12%) !important;
+  border-color: rgb(22 163 74 / 25%) !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="good"] [data-score-badge] span {
+  color: #166534 !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="na"] [data-score-badge] {
+  background-color: rgb(0 0 0 / 4%) !important;
+  border-color: rgb(0 0 0 / 10%) !important;
+}
+[data-theme="light"] [data-vyzor-score][data-score-state="na"] [data-score-badge] span {
+  color: var(--app-text-tertiary) !important;
+}
+
+/* Piliers — en light : on transforme la "card" en row plate avec une
+   mini-bar de progression colorée selon le tone. */
+[data-theme="light"] [data-vyzor-score] [data-piliers-item] {
+  background-color: transparent !important;
+  border-color: transparent !important;
+  padding: 8px 4px !important;
+}
+[data-theme="light"] [data-vyzor-score] [data-piliers-track] {
+  background-color: rgb(0 0 0 / 4%) !important;
+}
+[data-theme="light"] [data-vyzor-score] [data-piliers-item][data-tone="good"] [data-piliers-fill] {
+  background-color: var(--app-success);
+}
+[data-theme="light"] [data-vyzor-score] [data-piliers-item][data-tone="warning"] [data-piliers-fill] {
+  background-color: var(--app-warning);
+}
+[data-theme="light"] [data-vyzor-score] [data-piliers-item][data-tone="critical"] [data-piliers-fill] {
+  background-color: var(--app-danger);
+}
+/* Et en dark, pour cohérence, on remplit aussi les fills (sinon ils
+   sont invisibles puisqu'on a ajouté la track + fill au composant). */
+:root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="good"] [data-piliers-fill],
+:root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="good"] [data-piliers-fill] {
+  background-color: #22C55E;
+}
+:root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="warning"] [data-piliers-fill],
+:root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="warning"] [data-piliers-fill] {
+  background-color: #F59E0B;
+}
+:root[data-theme="dark"] [data-vyzor-score] [data-piliers-item][data-tone="critical"] [data-piliers-fill],
+:root:not([data-theme="light"]) [data-vyzor-score] [data-piliers-item][data-tone="critical"] [data-piliers-fill] {
+  background-color: #EF4444;
+}
+
 /* Animation globale au scroll: révèle progressivement les cartes sans casser la DA premium. */
 [data-scroll-reveal] {
   opacity: 0;
@@ -959,6 +1372,83 @@ body {
     0 14px 30px rgba(216, 172, 47, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
   transform: translateY(-1px);
+}
+
+/* ─── Phase 5 — Hiérarchie boutons mode clair ─────────────────────────
+   En mode clair, on retire le gradient décoratif (cf. brief : "pas de
+   gradients décoratifs") et on passe à un aplat gold profond avec un
+   double box-shadow (key + ring) qui rappelle le style Mercury / Linear
+   sans passer par du faux relief. */
+[data-theme="light"] .btn-gold-premium,
+[data-theme="light"] .cta-gold-pilot {
+  border: 1px solid var(--app-brand-gold-deep);
+  background-image: none;
+  background-color: var(--app-brand-gold-deep);
+  color: #FFFFFF;
+  box-shadow:
+    0 1px 3px rgb(139 111 42 / 20%),
+    0 0 0 1px rgb(139 111 42 / 8%);
+  border-radius: 10px;
+  transition: background-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+[data-theme="light"] .btn-gold-premium:hover,
+[data-theme="light"] .cta-gold-pilot:hover {
+  background-image: none;
+  background-color: #7A6125;
+  box-shadow:
+    0 2px 6px rgb(139 111 42 / 25%),
+    0 0 0 1px rgb(139 111 42 / 12%);
+  transform: none;
+}
+
+/* Boutons secondaires utility — class réutilisable. Convention :
+   transparent + bordure douce + hover discret. À appliquer aux CTA
+   non-primaires (Exporter, Simuler, Annuler…). */
+.btn-vyzor-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgb(0 0 0 / 12%);
+  background-color: transparent;
+  color: var(--app-text-primary);
+  border-radius: 10px;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.btn-vyzor-secondary:hover {
+  background-color: rgb(0 0 0 / 3%);
+  border-color: rgb(0 0 0 / 18%);
+}
+:root[data-theme="dark"] .btn-vyzor-secondary,
+:root:not([data-theme="light"]) .btn-vyzor-secondary {
+  border-color: rgb(255 255 255 / 12%);
+  color: rgb(255 255 255 / 90%);
+}
+:root[data-theme="dark"] .btn-vyzor-secondary:hover,
+:root:not([data-theme="light"]) .btn-vyzor-secondary:hover {
+  background-color: rgb(255 255 255 / 4%);
+  border-color: rgb(255 255 255 / 18%);
+}
+
+/* Boutons destructifs — pour les actions Déconnecter / Supprimer. */
+.btn-vyzor-destructive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgb(220 38 38 / 25%);
+  background-color: transparent;
+  color: var(--app-danger);
+  border-radius: 10px;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.btn-vyzor-destructive:hover {
+  background-color: rgb(220 38 38 / 6%);
+  border-color: rgb(220 38 38 / 40%);
 }
 
 /* ─── Documents — onboarding séquentiel ───────────────────────────────

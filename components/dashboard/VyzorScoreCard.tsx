@@ -40,6 +40,8 @@ export function VyzorScoreCard({
     <article
       className="precision-card group fade-up relative flex h-full flex-col rounded-2xl px-6 pb-6 pt-7"
       data-search-id={searchId}
+      data-vyzor-score
+      data-score-state={getScoreStateKey(score)}
     >
       <div className="card-header mb-5 flex w-full items-center justify-between">
         <div className="flex items-center gap-2 text-white/60 transition-colors group-hover:text-white">
@@ -50,6 +52,16 @@ export function VyzorScoreCard({
 
       <div className="relative mx-auto mt-2 flex h-[286px] w-[286px] items-center justify-center transition-transform duration-700 group-hover:scale-[1.02] md:h-[304px] md:w-[304px]">
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 300 300" aria-hidden="true">
+          <defs>
+            {/* Gradient SVG signature mode clair — l'arc transitionne du
+                gold profond (début, ~6h) vers la couleur sémantique de la
+                santé (fin, dépendant du score). Référencé en CSS light via
+                `stroke: url(#vyzor-score-gradient)` (cf. globals.css). */}
+            <linearGradient id="vyzor-score-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#8B6F2A" />
+              <stop offset="100%" stopColor={scoreState.colorHex} />
+            </linearGradient>
+          </defs>
           <circle
             cx="150"
             cy="150"
@@ -97,7 +109,10 @@ export function VyzorScoreCard({
               {Math.round(animatedScore)}
             </span>
           )}
-          <div className="interactive-badge flex items-center gap-2 rounded border border-white/15 bg-white/[0.03] px-3 py-1">
+          <div
+            className="interactive-badge flex items-center gap-2 rounded border border-white/15 bg-white/[0.03] px-3 py-1"
+            data-score-badge
+          >
             <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: scoreState.colorHex }} />
             <span
               className="text-[11px] font-bold uppercase tracking-widest text-white/90"
@@ -144,11 +159,36 @@ function getVyzorScoreState(score: number | null): { label: string; colorHex: st
   return { label: "Critique", colorHex: "#EF4444" };
 }
 
+/** Clé sémantique de l'état du score, utilisée pour les sélecteurs CSS
+ *  data-attribute (overrides mode clair par état). */
+function getScoreStateKey(score: number | null): "na" | "critical" | "warning" | "good" {
+  if (score === null) return "na";
+  if (score > 80) return "good";
+  if (score >= 50) return "warning";
+  return "critical";
+}
+
 function PiliersItem({ label, value }: { label: string; value: number }) {
+  // Couleur sémantique pour la mini-barre de progression.
+  const tone = value >= 70 ? "good" : value >= 40 ? "warning" : "critical";
+  const safeValue = Math.max(0, Math.min(100, value));
   return (
-    <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2">
-      <p className="text-[11px] uppercase tracking-wide text-white/55">{label}</p>
-      <p className="mt-1 text-base font-semibold text-white">{Math.round(value)} / 100</p>
+    <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2" data-piliers-item data-tone={tone}>
+      <div className="flex items-baseline justify-between">
+        <p className="text-[11px] uppercase tracking-wide text-white/55">{label}</p>
+        <p className="text-base font-semibold text-white">{Math.round(value)} / 100</p>
+      </div>
+      {/* Mini-bar de progression. Visible en mode clair (cf. brief :
+          "barre de fond rgba(0,0,0,0.04), barre de progression colorée
+          selon le score"). En mode dark, elle reste discrète mais
+          présente pour cohérence. */}
+      <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]" data-piliers-track>
+        <div
+          className="h-full rounded-full transition-[width] duration-700 ease-out"
+          data-piliers-fill
+          style={{ width: `${safeValue}%` }}
+        />
+      </div>
     </div>
   );
 }

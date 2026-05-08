@@ -127,6 +127,7 @@ export function AppSidebar({
   return (
     <aside
       data-scroll-reveal-ignore
+      data-sidebar-shell
       className={`precision-card relative h-fit rounded-2xl lg:sticky lg:top-4 ${
         collapsed ? "p-3" : "p-4"
       }`}
@@ -168,6 +169,8 @@ export function AppSidebar({
                   principale navigue, le clic sur la flèche déroule. */}
               {hasSubmenu ? (
                 <div
+                  data-sidebar-link
+                  data-active={active ? "true" : "false"}
                   className={`flex w-full items-center gap-1 rounded-xl transition-colors ${
                     active
                       ? "bg-white/10 text-white"
@@ -286,6 +289,8 @@ function NavRow({
       onClick={onClick}
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
+      data-sidebar-link
+      data-active={active ? "true" : "false"}
       className={`flex w-full items-center rounded-xl transition-colors ${
         collapsed ? "group justify-center px-2 py-2" : "gap-2 px-3 py-2 text-left"
       } ${
