@@ -26,7 +26,6 @@ import {
 } from "@/lib/dashboard/financement/financingViewModel";
 import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
-import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
 import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
 import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
@@ -51,9 +50,6 @@ export function FinancingTest({
   currentAnalysis = null,
   analysisModeLabel = null
 }: FinancingTestProps) {
-  // KPI sélectionné → pilote la courbe d'évolution top. Défaut = capacité de
-  // remboursement qui est la 1re carte affichée.
-  const [selectedKpiId, setSelectedKpiId] = useState<string>("capacite_remboursement_annees");
   // Les compteurs sont animés côté React pour reproduire l'effet du design HTML source.
   const animatedDebtCapacity = useAnimatedNumber(kpis.capacite_remboursement_annees, { durationMs: 1200 });
   const animatedCaf = useAnimatedNumber(kpis.caf, { durationMs: 1350 });
@@ -175,14 +171,7 @@ export function FinancingTest({
       </header>
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
-        {/* Chart top : courbe d'évolution du KPI sélectionné. */}
-        <div className="md:col-span-12">
-          <KpiEvolutionChart
-            kpiId={selectedKpiId}
-            analyses={analyses}
-            currentAnalysis={currentAnalysis}
-          />
-        </div>
+        {/* Chart top "Évolution KPI sélectionné" retiré (brief 09/05/2026). */}
 
         {/* 6 cartes KPI customizable : par défaut Capacité de remboursement,
             CAF, FTE, Solvabilité, Gearing, TN. L'utilisateur peut ajouter
@@ -199,10 +188,6 @@ export function FinancingTest({
             currentAnalysis={currentAnalysis}
             mappedData={currentAnalysis?.mappedData ?? null}
             lockedCategory="financement"
-            kpiSelection={{
-              selectedKpiId,
-              onSelect: setSelectedKpiId
-            }}
           />
         </div>
 

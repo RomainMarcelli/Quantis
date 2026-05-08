@@ -16,7 +16,6 @@ import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
 import { BreakEvenChart } from "@/components/dashboard/navigation/BreakEvenChart";
-import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
 import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
 import { DEFAULT_DASHBOARD_LAYOUTS } from "@/lib/dashboard/defaultDashboardLayouts";
 
@@ -52,8 +51,6 @@ export function ValueCreationTest({
   analysisModeLabel = null
 }: ValueCreationTestProps) {
   const { isDark } = useTheme();
-  // KPI sélectionné → pilote la courbe d'évolution top. Défaut = CA, le plus parlant.
-  const [selectedKpiId, setSelectedKpiId] = useState<string>("ca");
   // Les séries restent alimentées par les KPI backend: aucun recalcul métier côté UI.
   const monthlySeries = useMemo(
     () =>
@@ -226,14 +223,9 @@ export function ValueCreationTest({
           dans le titre principal du AppHeader ("Tableau de bord - …"). */}
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
-        {/* Chart top : courbe d'évolution du KPI sélectionné. */}
-        <div className="md:col-span-12">
-          <KpiEvolutionChart
-            kpiId={selectedKpiId}
-            analyses={analyses}
-            currentAnalysis={currentAnalysis}
-          />
-        </div>
+        {/* Chart top "Évolution KPI sélectionné" retiré (brief 09/05/2026)
+            — l'utilisateur peut ajouter un widget evolutionChart ou
+            lineChart custom dans la grille s'il veut le même rendu. */}
 
         {/* 6 cartes KPI customizable : par défaut CA, TCAM, EBE, VA, marge
             EBITDA, point mort. L'utilisateur peut ajouter d'autres KPIs de la
@@ -249,10 +241,6 @@ export function ValueCreationTest({
             currentAnalysis={currentAnalysis}
             mappedData={mappedData}
             lockedCategory="creation_valeur"
-            kpiSelection={{
-              selectedKpiId,
-              onSelect: setSelectedKpiId
-            }}
           />
         </div>
 

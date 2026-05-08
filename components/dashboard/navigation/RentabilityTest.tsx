@@ -22,7 +22,6 @@ import {
 } from "@/lib/dashboard/rentabilite/rentabilityViewModel";
 import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
-import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
 import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
 import { useTheme } from "@/hooks/useTheme";
 import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
@@ -54,9 +53,6 @@ export function RentabilityTest({
   currentAnalysis = null,
   analysisModeLabel = null
 }: RentabilityTestProps) {
-  // Le KPI sélectionné pilote la courbe top de la page. Par défaut le premier
-  // KPI de l'onglet (ROE = "rendement actionnaire").
-  const [selectedKpiId, setSelectedKpiId] = useState<string>("roe");
   // KPI rentabilité normalisés en % pour afficher une lecture homogène.
   const roePercent = normalizePercentInput(kpis.roe);
   const rocePercent = normalizePercentInput(kpis.roce);
@@ -175,19 +171,11 @@ export function RentabilityTest({
           ("Tableau de bord - …"). */}
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
-        {/* Graphique top : courbe d'évolution du KPI sélectionné. Défaut = ROE. */}
-        <div className="md:col-span-12">
-          <KpiEvolutionChart
-            kpiId={selectedKpiId}
-            analyses={analyses}
-            currentAnalysis={currentAnalysis}
-          />
-        </div>
+        {/* Chart top "Évolution KPI sélectionné" retiré (brief 09/05/2026). */}
 
         {/* Cartes KPI customizable : par défaut ROE + ROCE, l'utilisateur peut
             ajouter d'autres KPIs de la catégorie rentabilite (effet_levier,
-            marge_nette…) ou changer leur viz (gauge, lineChart…). Click sur
-            une carte met à jour le graphique top. */}
+            marge_nette…) ou changer leur viz (gauge, lineChart…). */}
         <div className="md:col-span-12">
           <CustomizableDashboard
             userId={null}
@@ -199,10 +187,6 @@ export function RentabilityTest({
             currentAnalysis={currentAnalysis}
             mappedData={currentAnalysis?.mappedData ?? null}
             lockedCategory="rentabilite"
-            kpiSelection={{
-              selectedKpiId,
-              onSelect: setSelectedKpiId
-            }}
           />
         </div>
 

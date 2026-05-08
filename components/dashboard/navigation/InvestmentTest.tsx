@@ -17,7 +17,6 @@ import { formatPercent, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/f
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiCardLayout } from "@/components/kpi/KpiCardLayout";
 import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
-import { KpiEvolutionChart } from "@/components/synthese/KpiEvolutionChart";
 import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
 import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
@@ -47,8 +46,6 @@ export function InvestmentTest({
   currentAnalysis = null,
   analysisModeLabel = null
 }: InvestmentTestProps) {
-  // KPI sélectionné → pilote la courbe d'évolution top. Défaut = BFR.
-  const [selectedKpiId, setSelectedKpiId] = useState<string>("bfr");
   // Compteurs animés pour conserver le rendu "data-react" de la maquette source.
   const animatedBfr = useAnimatedNumber(kpis.bfr, { durationMs: 1400 });
   const animatedRatioImmo = useAnimatedNumber(kpis.ratio_immo, { durationMs: 1200 });
@@ -130,14 +127,7 @@ export function InvestmentTest({
           dans le titre principal du AppHeader ("Tableau de bord - …"). */}
 
       <div className="relative z-[4] grid grid-cols-1 gap-5 md:grid-cols-12">
-        {/* Chart top : courbe d'évolution du KPI sélectionné. */}
-        <div className="md:col-span-12">
-          <KpiEvolutionChart
-            kpiId={selectedKpiId}
-            analyses={analyses}
-            currentAnalysis={currentAnalysis}
-          />
-        </div>
+        {/* Chart top "Évolution KPI sélectionné" retiré (brief 09/05/2026). */}
 
         {/* KPI cards customizable : par défaut BFR + ratio_immo. L'utilisateur
             peut ajouter d'autres KPIs de la catégorie "investissement" (rot_bfr,
@@ -153,10 +143,6 @@ export function InvestmentTest({
             currentAnalysis={currentAnalysis}
             mappedData={currentAnalysis?.mappedData ?? null}
             lockedCategory="investissement"
-            kpiSelection={{
-              selectedKpiId,
-              onSelect: setSelectedKpiId
-            }}
           />
         </div>
 
@@ -216,8 +202,6 @@ export function InvestmentTest({
               }
               kpiId="dso"
               kpiValue={kpis.dso}
-              onSelect={() => setSelectedKpiId("dso")}
-              isSelected={selectedKpiId === "dso"}
             />
             <DelayCard
               title="Délai stocks (DIO)"
@@ -234,8 +218,6 @@ export function InvestmentTest({
               }
               kpiId="rot_stocks"
               kpiValue={kpis.rot_stocks}
-              onSelect={() => setSelectedKpiId("rot_stocks")}
-              isSelected={selectedKpiId === "rot_stocks"}
             />
             <DelayCard
               title="Délai fournisseurs (DPO)"
@@ -252,8 +234,6 @@ export function InvestmentTest({
               }
               kpiId="dpo"
               kpiValue={kpis.dpo}
-              onSelect={() => setSelectedKpiId("dpo")}
-              isSelected={selectedKpiId === "dpo"}
             />
           </div>
 
