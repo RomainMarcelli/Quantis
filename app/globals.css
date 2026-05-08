@@ -1459,19 +1459,50 @@ body {
 
 /* ─── Brief Synthèse v2 — Section 6 : alerte rouge subtile
    Les blocs d'alerte (BFR élevé, etc.) doivent avoir un fond très
-   doux + bordure gauche 3px en danger + texte foncé pour rester
-   premium sans agresser. On cible les blocs marqués
-   data-vyzor-alert ou les anciennes classes "bg-rose-500/X". */
-[data-theme="light"] [data-vyzor-alert],
-[data-theme="light"] [data-vyzor-alert="danger"] {
+   doux + bordure gauche 3px en danger + TEXTE NOIR (cf. retour
+   utilisateur 08/05/2026 : "texte des alertes en noir"). */
+[data-theme="light"] [data-vyzor-alert] {
   background-color: rgb(220 38 38 / 6%) !important;
   border: 1px solid rgb(220 38 38 / 15%) !important;
   border-left: 3px solid var(--app-danger) !important;
   border-radius: 0 8px 8px 0 !important;
-  color: #991B1B !important;
+  color: var(--app-text-primary) !important;
 }
 [data-theme="light"] [data-vyzor-alert] * {
-  color: #991B1B !important;
+  color: var(--app-text-primary) !important;
+}
+
+/* AlertsWidget — overrides des classes Tailwind sémantiques utilisées
+   par severityClass() (text-rose-100 / text-amber-100 / text-emerald-100).
+   En light : on neutralise au profit de text-primary noir, mais on garde
+   le fond coloré subtil pour signaler la sévérité. */
+[data-theme="light"] .text-rose-100,
+[data-theme="light"] .text-amber-100,
+[data-theme="light"] .text-emerald-100 {
+  color: var(--app-text-primary) !important;
+}
+[data-theme="light"] .bg-rose-500\/15 {
+  background-color: rgb(220 38 38 / 6%) !important;
+  border-color: rgb(220 38 38 / 18%) !important;
+}
+[data-theme="light"] .bg-amber-500\/15 {
+  background-color: rgb(217 119 6 / 6%) !important;
+  border-color: rgb(217 119 6 / 18%) !important;
+}
+[data-theme="light"] .bg-emerald-500\/15 {
+  background-color: rgb(22 163 74 / 6%) !important;
+  border-color: rgb(22 163 74 / 18%) !important;
+}
+
+/* ─── Mouse glow (4 sections dashboard navigation) — overlay sombre
+   en mode clair (cf. retour 08/05/2026 : "la lumière qui suit la
+   souris doit être sombre"). En dark, garde le glow doré original. */
+[data-theme="light"] [data-mouse-glow] {
+  background-image: radial-gradient(
+    circle,
+    rgba(0, 0, 0, 0.07) 0%,
+    transparent 60%
+  ) !important;
 }
 
 /* ─── Brief Synthèse v2 — Section 7 : pastille "Live" pulse

@@ -149,6 +149,7 @@ export function FinancingTest({
       onMouseLeave={handleMouseLeave}
     >
       <div
+        data-mouse-glow
         className="pointer-events-none absolute z-[3] h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(197,160,89,0.12)_0%,transparent_62%)] transition-opacity duration-300"
         style={{
           left: `${mouseGlow.x}px`,
