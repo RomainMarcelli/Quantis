@@ -297,8 +297,14 @@ export function SyntheseDashboard({
       ) : null}
 
       {/* Bandeau meta consolidé (entreprise / date / source / actions) —
-          repositionné après le titre+période pour libérer le haut de page. */}
-      <header className="precision-card fade-up relative z-10 flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
+          repositionné après le titre+période pour libérer le haut de page.
+          data-meta-block + masquage CSS quand body[data-simulation-open] :
+          le simulateur ouvert prend toute la largeur et n'a plus à
+          cohabiter avec les métadonnées (cf. brief 09/05/2026). */}
+      <header
+        data-meta-block
+        className="precision-card fade-up relative z-10 flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5"
+      >
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
@@ -353,6 +359,13 @@ export function SyntheseDashboard({
           ) : null}
         </div>
       </header>
+
+      {/* Container Portal pour le simulateur — quand l'utilisateur clique
+          "Simuler un scénario" dans le header, le widget se rend ici via
+          createPortal pour prendre toute la largeur (vs slot étroit du
+          header). Vide quand le simulateur est fermé (aucun render =
+          aucun espace réservé visible). */}
+      <div id="simulation-portal-container" />
 
       {/* Grille widgets pleine largeur : aucun élément n'est pinned hors-grille,
           le Vyzor Score est lui-même un widget marqué `isFixed:true` dans le

@@ -423,7 +423,12 @@ export function SyntheseView() {
                     : null
               }
               simulationSlot={
-                effective ? <SimulationToggleButton mappedData={effective.mappedData} /> : null
+                effective ? (
+                  <SimulationToggleButton
+                    mappedData={effective.mappedData}
+                    portalContainerId="simulation-portal-container"
+                  />
+                ) : null
               }
               userId={user?.uid ?? null}
               // Sélecteur dynamique (TemporalityBar complète) sous le titre

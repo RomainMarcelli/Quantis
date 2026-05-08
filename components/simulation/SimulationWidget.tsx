@@ -8,7 +8,8 @@
 // est gérée par le parent (modal, panneau latéral, page dédiée — au choix).
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowDownRight, ArrowRight, ArrowUpRight, X } from "lucide-react";
 import {
   clampLeverDelta,
@@ -294,17 +295,60 @@ function isHigherBetter(kpiId: string): boolean {
 }
 
 /**
- * Bouton compact qui ouvre le widget en panneau modal. Pratique à câbler
+ * Bouton compact qui ouvre le widget en panneau inline. Pratique à câbler
  * dans la page Synthèse ou Tableau de bord.
+ *
+ * `portalContainerId` (optionnel) : si fourni ET le DOM contient un élément
+ * avec cet id, le widget est rendu via React Portal dans ce conteneur.
+ * Permet au widget de "sortir" de son emplacement par défaut (par exemple
+ * un slot étroit dans un header) pour prendre toute la largeur.
+ *
+ * En parallèle, body[data-simulation-open] est posé tant que le widget est
+ * ouvert — permet aux CSS d'overrider le rendu de blocs voisins (ex.
+ * masquer le bandeau de métadonnées du dossier qui n'a pas de sens à côté
+ * du simulateur ouvert).
  */
 export function SimulationToggleButton({
   mappedData,
   initialScenarioId,
+  portalContainerId,
 }: {
   mappedData: MappedFinancialData;
   initialScenarioId?: string;
+  portalContainerId?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (open) {
+      document.body.dataset.simulationOpen = "true";
+      if (portalContainerId) {
+        // Le container peut ne pas être encore monté à l'instant du clic ;
+        // on retente au prochain tick si null.
+        const node = document.getElementById(portalContainerId);
+        if (node) setPortalNode(node);
+        else {
+          const t = window.setTimeout(() => {
+            setPortalNode(document.getElementById(portalContainerId));
+          }, 0);
+          return () => {
+            window.clearTimeout(t);
+            delete document.body.dataset.simulationOpen;
+            setPortalNode(null);
+          };
+        }
+      }
+    } else {
+      delete document.body.dataset.simulationOpen;
+      setPortalNode(null);
+    }
+    return () => {
+      delete document.body.dataset.simulationOpen;
+    };
+  }, [open, portalContainerId]);
+
   if (!open) {
     return (
       <button
@@ -318,13 +362,21 @@ export function SimulationToggleButton({
       </button>
     );
   }
-  return (
+
+  const widget = (
     <SimulationWidget
       mappedData={mappedData}
       initialScenarioId={initialScenarioId}
       onClose={() => setOpen(false)}
     />
   );
+
+  // Si un container Portal est dispo, on rend le widget dedans (plein
+  // largeur). Sinon fallback : rendu en place (comportement initial).
+  if (portalContainerId && portalNode) {
+    return createPortal(widget, portalNode);
+  }
+  return widget;
 }
 
 // Helpers exposés pour les tests d'affichage (le moteur de calcul est déjà

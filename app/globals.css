@@ -1665,6 +1665,18 @@ body {
   border-color: rgb(22 163 74 / 18%) !important;
 }
 
+/* ─── Simulateur ouvert : masquer le bandeau de métadonnées du dossier ──
+   Quand SimulationToggleButton ouvre le widget (body[data-simulation-open]),
+   le widget est rendu via Portal dans #simulation-portal-container plein
+   largeur juste sous le bandeau. Pour éviter la cohabitation visuelle
+   (le simulateur n'a pas à voir les métadonnées du dossier), on masque
+   tous les blocs marqués [data-meta-block] le temps que le widget est
+   ouvert. Visible/dark : même comportement (le brief vise l'expérience
+   produit, pas un fix mode clair spécifique). */
+body[data-simulation-open="true"] [data-meta-block] {
+  display: none !important;
+}
+
 /* ─── Mouse glow — supprimé en mode clair (cf. retour 08/05/2026 :
    "supprime le mouse glow pour le mode clair"). On display:none plutôt
    qu'opacity:0 pour éviter tout repaint inutile (le JS continue à
