@@ -270,28 +270,60 @@ body {
      ces cas ici ; ils restent visibles en dark uniquement et seront
      ajustés au cas par cas. */
 
-  /* ── Tones sémantiques Tailwind (utilisés par KpiBenchmarkIndicator
-     et autres badges) → versions FONCÉES en light, lisibles sur fond
-     clair (cf. brief : ratio AA minimum + foncé pour signaler). */
+  /* ── Tones sémantiques Tailwind → versions FONCÉES bien lisibles
+     en mode clair (cf. retour utilisateur 08/05/2026 : "couleurs
+     suffisamment sombres ou peu transparentes pour bien voir sur
+     blanc"). On pousse aux niveaux 800-900 Tailwind pour atteindre
+     un ratio AA confortable (4.5:1+) sur fond #F8F2E5. Couvre tous
+     les niveaux 100-500 que les composants utilisent. */
+  & .text-emerald-100,
+  & .text-emerald-200,
   & .text-emerald-300,
-  & .text-emerald-400 { color: #166534 !important; }
-  & .text-emerald-500 { color: #16A34A !important; }
+  & .text-emerald-400 { color: #14532D !important; }
+  & .text-emerald-500 { color: #166534 !important; }
+  & .text-amber-100,
   & .text-amber-200,
-  & .text-amber-300 { color: #9A3412 !important; }
-  & .text-amber-400 { color: #B45309 !important; }
+  & .text-amber-300,
+  & .text-amber-400 { color: #7C2D12 !important; }
+  & .text-amber-500 { color: #9A3412 !important; }
+  & .text-rose-100,
+  & .text-rose-200,
+  & .text-rose-300,
+  & .text-rose-400,
+  & .text-red-100,
+  & .text-red-200,
   & .text-red-300,
-  & .text-red-400 { color: #991B1B !important; }
-  & .text-red-500 { color: #DC2626 !important; }
+  & .text-red-400 { color: #7F1D1D !important; }
+  & .text-rose-500,
+  & .text-red-500 { color: #991B1B !important; }
 
-  /* ── Surfaces sémantiques light (badges benchmark, alerts, banners)
-     → fond opacité 8-12 % + texte version foncée. Le brief : "BAS 25%"
-     en bg rgb(220 38 38 / 8%) + texte #991B1B. */
+  /* ── Surfaces et bordures sémantiques en light : on les NEUTRALISE
+     pour les composants type KpiTrendPill / variation où le brief
+     demande "garde juste la couleur du chiffre/flèche, pas d'encadré"
+     (cf. retour 08/05/2026). Le texte foncé suffit à signaler la
+     direction — ajouter un fond + bordure colorés en plus est
+     redondant et brouille la hiérarchie visuelle.
+     Note : on garde les fonds dans les vraies bannières d'alerte
+     (data-vyzor-alert) qui sont gérées via leur sélecteur dédié. */
   & .bg-emerald-500\/10,
-  & .bg-emerald-500\/20 { background-color: rgb(22 163 74 / 10%) !important; }
+  & .bg-emerald-500\/12,
+  & .bg-emerald-500\/20 { background-color: transparent !important; }
   & .bg-amber-500\/10,
-  & .bg-amber-500\/20 { background-color: rgb(217 119 6 / 10%) !important; }
+  & .bg-amber-500\/12,
+  & .bg-amber-500\/20 { background-color: transparent !important; }
   & .bg-red-500\/10,
-  & .bg-red-500\/20 { background-color: rgb(220 38 38 / 10%) !important; }
+  & .bg-red-500\/12,
+  & .bg-red-500\/20,
+  & .bg-rose-500\/10,
+  & .bg-rose-500\/12,
+  & .bg-rose-500\/20 { background-color: transparent !important; }
+
+  & .border-emerald-400\/35,
+  & .border-emerald-300\/35,
+  & .border-amber-400\/35,
+  & .border-amber-300\/35,
+  & .border-rose-400\/35,
+  & .border-red-400\/35 { border-color: transparent !important; }
 }
 
 /* ─── Précisions sur composants stratégiques ─────────────────────── */
@@ -1486,15 +1518,44 @@ body {
   background-color: #EF4444;
 }
 
-/* ─── Badges benchmark — mise en page identique dark/light pour
-   cohérence visuelle (cf. retour utilisateur 08/05/2026). On garde
-   les dots colorés + le label texte uppercase tels qu'en dark.
-   Seules les couleurs sémantiques du label (text-rose-300 etc.) sont
-   adaptées en versions foncées via les overrides Tailwind globaux
-   plus haut dans ce fichier (text-rose-300 → #991B1B etc.). Les dots
-   utilisent leurs classes Tailwind originales (bg-emerald-500/30,
-   bg-amber-500/30, bg-rose-500/30) qui restent lisibles sur fond
-   clair grâce à leur opacité 30 %. */
+/* ─── Badges benchmark — mise en page identique dark/light, mais en
+   light on supprime l'encadrement gris (track horizontale + hover bg)
+   qui ajoutait de la confusion (cf. retour 08/05/2026 : "supprime
+   le petit encadrement gris autour"). Les couleurs des dots et du
+   label sont renforcées via les overrides Tailwind plus haut. */
+[data-theme="light"] [data-benchmark-indicator] [data-benchmark-dots] > span[aria-hidden="true"] {
+  background-color: transparent !important;
+}
+[data-theme="light"] [data-benchmark-indicator] button:hover {
+  background-color: transparent !important;
+}
+/* Renforce les dots en mode clair : passer de 30 % opacity (peu visible
+   sur fond beige) à 60 % pour les dots dim, 100 % pour les dots actifs. */
+[data-theme="light"] [data-benchmark-indicator] .bg-emerald-500\/30 {
+  background-color: rgb(22 163 74 / 60%) !important;
+}
+[data-theme="light"] [data-benchmark-indicator] .bg-amber-500\/30 {
+  background-color: rgb(217 119 6 / 60%) !important;
+}
+[data-theme="light"] [data-benchmark-indicator] .bg-rose-500\/30 {
+  background-color: rgb(220 38 38 / 60%) !important;
+}
+[data-theme="light"] [data-benchmark-indicator] .bg-emerald-400 {
+  background-color: #16A34A !important;
+}
+[data-theme="light"] [data-benchmark-indicator] .bg-amber-300 {
+  background-color: #D97706 !important;
+}
+[data-theme="light"] [data-benchmark-indicator] .bg-rose-400 {
+  background-color: #DC2626 !important;
+}
+/* Et on neutralise les ring + shadow gloss (ring-emerald-300/70 etc.) qui
+   créaient un halo coloré agréable en dark mais flou sur fond clair. */
+[data-theme="light"] [data-benchmark-indicator] [class*="ring-"] {
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-shadow: 0 0 #0000 !important;
+  box-shadow: none !important;
+}
 
 /* ─── Brief Synthèse v2 — Section 5 : bannière VYZOR_AGENT
    Distingue immédiatement la recommandation IA des KPI statiques
