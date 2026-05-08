@@ -17,11 +17,13 @@ import {
   ChevronUp,
   Loader2,
   PowerOff,
-  RefreshCw,
   Trash2,
 } from "lucide-react";
 import type { AccountingSource } from "@/types/dataSources";
 import type { ConnectionDto } from "@/app/api/integrations/connections/route";
+import { SyncStatusBadge, type SyncStatus } from "@/components/sync/SyncStatusBadge";
+import { SyncTriggerButton } from "@/components/sync/SyncTriggerButton";
+import { SyncTransparencyNote } from "@/components/sync/SyncTransparencyNote";
 
 type AccountingDetailsPanelProps = {
   source: AccountingSource;
@@ -77,6 +79,19 @@ export function AccountingDetailsPanel({
       ? "—"
       : "Jamais";
 
+  // Statut de sync normalisé pour le badge SyncStatusBadge. Le store
+  // expose un union plus large ("never" | "in_progress" | "success" |
+  // "partial" | "failed") qu'on rétrécit défensivement à la même union
+  // côté composant. "partial" est traité comme "success" visuellement
+  // pour rester simple côté MVP — le détail est dans la connexion.
+  const syncStatus: SyncStatus = (() => {
+    const raw = connection?.lastSyncStatus ?? "never";
+    if (raw === "in_progress") return "in_progress";
+    if (raw === "failed") return "failed";
+    if (raw === "success" || raw === "partial") return "success";
+    return "never";
+  })();
+
   return (
     <section
       className="rounded-2xl p-5"
@@ -110,27 +125,40 @@ export function AccountingDetailsPanel({
                 </span>
               ) : null}
             </p>
-            <p className="mt-0.5" style={{ color: "var(--app-text-secondary)", fontSize: 14 }}>
-              {isFec
-                ? `${fecAnalysisCount} liasse${fecAnalysisCount > 1 ? "s" : ""} dans ce dossier · Dernière mise à jour ${lastSyncLabel}`
-                : `Dernière sync ${lastSyncLabel}`}
-            </p>
+            <div className="mt-0.5">
+              {isFec ? (
+                <p style={{ color: "var(--app-text-secondary)", fontSize: 14 }}>
+                  {`${fecAnalysisCount} liasse${fecAnalysisCount > 1 ? "s" : ""} dans ce dossier · Dernière mise à jour ${lastSyncLabel}`}
+                </p>
+              ) : (
+                // Badge live (5 états) — remplace l'ancien texte plat
+                // "Dernière sync il y a X". Le statut visuel encode
+                // l'âge + l'état (ok / périmé / échec / en cours).
+                <SyncStatusBadge
+                  lastSyncedAt={connection?.lastSyncAt ?? null}
+                  lastSyncStatus={syncStatus}
+                  lastSyncError={connection?.lastSyncError ?? null}
+                />
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       {/* Actions principales */}
       <div className="flex flex-wrap items-center gap-2">
-        {!isFec ? (
-          <ActionButton
-            icon={syncing ? Loader2 : RefreshCw}
-            spinning={syncing}
-            onClick={onSync}
-            disabled={syncing || disconnecting}
-            tone="gold"
-          >
-            {syncing ? "Synchronisation…" : "Synchroniser"}
-          </ActionButton>
+        {!isFec && connection?.id ? (
+          // Nouvelle route /api/sync/trigger (rate-limit 1/5min/user/connection,
+          // toast contextuel sur succès/429/erreur). Le callback onSync du
+          // parent reste appelé pour les flows historiques (rafraîchir la
+          // liste des connections / KPIs après le sync).
+          <SyncTriggerButton
+            connectionId={connection.id}
+            disabled={disconnecting}
+            onSyncSucceeded={async () => {
+              await onSync();
+            }}
+          />
         ) : null}
         <ActionButton
           icon={PowerOff}
@@ -152,6 +180,11 @@ export function AccountingDetailsPanel({
           </ActionButton>
         ) : null}
       </div>
+
+      {/* Note de transparence — explique la philosophie sync manuelle.
+          Affichée seulement pour les sources avec sync API (pas FEC qui
+          est purement upload manuel). */}
+      {!isFec ? <SyncTransparencyNote className="mt-3" /> : null}
 
       {/* Bouton-lien "Changer de source ▾" — discret, aligné à droite,
           au-dessus de la section "Détails techniques". Le rendu de la
