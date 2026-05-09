@@ -29,7 +29,20 @@ import type { AuthenticatedUser } from "@/types/auth";
 
 type FetchState = "idle" | "loading" | "ready" | "error";
 
-export function FinancialStatementsView() {
+/**
+ * Mode d'affichage de la page États financiers. Brief 09/06/2026 : la
+ * page unifiée (bilan + CDR + cohérence) est scindée en deux pages
+ * dédiées accessibles via sous-menu sidebar. La carte de cohérence est
+ * affichée sur les deux pages — l'utilisateur veut la réconciliation
+ * KPI/comptable quel que soit le document consulté.
+ */
+export type FinancialStatementsMode = "bilan" | "cdr";
+
+type FinancialStatementsViewProps = {
+  mode: FinancialStatementsMode;
+};
+
+export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) {
   const router = useRouter();
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
@@ -124,9 +137,10 @@ export function FinancialStatementsView() {
     [activeAnalysis, incomeStatement, balanceSheet]
   );
 
+  const documentLabel = mode === "bilan" ? "Bilan" : "Compte de résultat";
   const subtitle = activeAnalysis
-    ? `Exercice ${activeAnalysis.fiscalYear ?? "—"}`
-    : "États financiers";
+    ? `${documentLabel} · Exercice ${activeAnalysis.fiscalYear ?? "—"}`
+    : documentLabel;
 
   return (
     <section className="w-full space-y-4">
@@ -178,12 +192,15 @@ export function FinancialStatementsView() {
 
         {fetchState === "ready" && activeAnalysis && incomeStatement && balanceSheet && (
           <>
-            <IncomeStatement statement={incomeStatement} />
-            <BalanceSheet sheet={balanceSheet} />
-            {/* La carte de cohérence est volontairement placée APRÈS le compte
-                de résultat et le bilan : un expert-comptable lit d'abord les
-                états chiffrés, puis vérifie la réconciliation avec les KPIs
-                calculés. */}
+            {/* Brief 09/06/2026 : un seul document affiché par page —
+                Bilan (comptes 1 à 5) ou Compte de résultat (6 à 7). La
+                carte de cohérence reste sous chacun pour vérifier la
+                réconciliation avec les KPIs calculés. */}
+            {mode === "bilan" ? (
+              <BalanceSheet sheet={balanceSheet} />
+            ) : (
+              <IncomeStatement statement={incomeStatement} />
+            )}
             <CoherenceChecksCard checks={checks} />
             <p className="text-center text-[10px] italic text-white/35">
               Codes 2033-SD entre crochets sur chaque ligne · survolez pour la

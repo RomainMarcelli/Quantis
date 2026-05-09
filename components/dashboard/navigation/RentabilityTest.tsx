@@ -21,6 +21,9 @@ type RentabilityTestProps = {
   analysisModeLabel?: string | null;
   /** UID Firebase pour persister les modifs du layout. Null = pas de save. */
   userId?: string | null;
+  /** Edition pilotée depuis le AppHeader (brief 09/06/2026). */
+  controlledIsEditing?: boolean;
+  onEditingChange?: (next: boolean) => void;
 };
 
 export function RentabilityTest({
@@ -29,6 +32,8 @@ export function RentabilityTest({
   analyses = [],
   currentAnalysis = null,
   userId = null,
+  controlledIsEditing,
+  onEditingChange,
 }: RentabilityTestProps) {
   const [mouseGlow, setMouseGlow] = useState({ x: 0, y: 0, visible: false });
 
@@ -76,6 +81,9 @@ export function RentabilityTest({
           currentAnalysis={currentAnalysis}
           mappedData={currentAnalysis?.mappedData ?? null}
           lockedCategory="rentabilite"
+          controlledIsEditing={controlledIsEditing}
+          onEditingChange={onEditingChange}
+          hideHeaderTitle
         />
       </div>
     </section>

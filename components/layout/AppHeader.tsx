@@ -24,6 +24,7 @@
 import { useRouter } from "next/navigation";
 import { Lock, LogOut, Settings, UserCircle2 } from "lucide-react";
 import { VyzorLogo } from "@/components/ui/VyzorLogo";
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { firebaseAuthGateway } from "@/services/auth";
 import type { ReactNode } from "react";
 
@@ -75,7 +76,13 @@ export function AppHeader({
   }
 
   return (
-    <header className="precision-card overflow-hidden rounded-2xl">
+    <header
+      // Brief 09/06/2026 : header figé en haut d'écran (style Excel) —
+      // l'utilisateur peut scroller dans la page tout en gardant l'identité,
+      // la TemporalityBar et les actions visibles. z-40 pour passer au-dessus
+      // de la sidebar (qui sticke à un niveau inférieur).
+      className="precision-card sticky top-0 z-40 overflow-hidden rounded-2xl"
+    >
       {/* ─── Ligne 1 — Identité + source + utilitaires ─────────────── */}
       <div className="flex items-center justify-between gap-3 px-5 py-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -101,6 +108,7 @@ export function AppHeader({
 
         <div className="flex flex-shrink-0 items-center gap-2">
           {actionSlot}
+          <NotificationsBell />
           <UtilityButton
             ariaLabel="Paramètres"
             onClick={() => router.push("/settings")}

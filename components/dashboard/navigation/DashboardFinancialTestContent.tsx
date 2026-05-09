@@ -34,6 +34,11 @@ type DashboardFinancialTestContentProps = {
   /** Liste des dashboards custom — utilisée pour résoudre le `name` quand
    *  l'utilisateur clique sur un onglet custom (`custom:<uuid>`). */
   customDashboards?: CustomDashboardSummary[];
+  /** Brief 09/06/2026 — état d'édition contrôlé depuis le bouton
+   *  "Personnaliser" du AppHeader. Quand fourni, on pilote tous les
+   *  CustomizableDashboards des onglets via `controlledIsEditing`. */
+  controlledIsEditing?: boolean;
+  onEditingChange?: (next: boolean) => void;
 };
 
 export function DashboardFinancialTestContent({
@@ -46,7 +51,9 @@ export function DashboardFinancialTestContent({
   currentAnalysis = null,
   analysisModeLabel = null,
   userId = null,
-  customDashboards = []
+  customDashboards = [],
+  controlledIsEditing,
+  onEditingChange
 }: DashboardFinancialTestContentProps) {
   // Props partagés entre les 4 onglets KPI : identiques pour tous, on les
   // factorise ici pour éviter la duplication de 12 lignes. `userId` doit
@@ -58,7 +65,9 @@ export function DashboardFinancialTestContent({
     previousKpis,
     analyses,
     currentAnalysis,
-    analysisModeLabel
+    analysisModeLabel,
+    controlledIsEditing,
+    onEditingChange
   } as const;
 
   if (activeTab === "creation-valeur") {
@@ -107,6 +116,9 @@ export function DashboardFinancialTestContent({
           analyses={analyses}
           currentAnalysis={currentAnalysis}
           mappedData={mappedData}
+          controlledIsEditing={controlledIsEditing}
+          onEditingChange={onEditingChange}
+          hideHeaderTitle
         />
       </section>
     );

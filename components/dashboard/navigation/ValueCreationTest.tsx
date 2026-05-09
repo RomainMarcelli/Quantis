@@ -25,6 +25,11 @@ type ValueCreationTestProps = {
   analysisModeLabel?: string | null;
   /** UID Firebase pour persister les modifs du layout. Null = pas de save. */
   userId?: string | null;
+  /** Brief 09/06/2026 — édition pilotée par le bouton "Personnaliser" du
+   *  AppHeader (lifted state). Le sous-titre "X widgets affichés" du
+   *  bandeau interne est masqué (`hideHeaderTitle`) pour éviter le doublon. */
+  controlledIsEditing?: boolean;
+  onEditingChange?: (next: boolean) => void;
 };
 
 export function ValueCreationTest({
@@ -34,6 +39,8 @@ export function ValueCreationTest({
   analyses = [],
   currentAnalysis = null,
   userId = null,
+  controlledIsEditing,
+  onEditingChange,
 }: ValueCreationTestProps) {
   // Glow local rendu en impératif pour éviter un rerender React à chaque
   // mouvement souris.
@@ -106,6 +113,9 @@ export function ValueCreationTest({
           currentAnalysis={currentAnalysis}
           mappedData={mappedData}
           lockedCategory="creation_valeur"
+          controlledIsEditing={controlledIsEditing}
+          onEditingChange={onEditingChange}
+          hideHeaderTitle
         />
       </div>
     </section>

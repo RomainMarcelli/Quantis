@@ -22,6 +22,9 @@ type InvestmentTestProps = {
   analysisModeLabel?: string | null;
   /** UID Firebase pour persister les modifs du layout. Null = pas de save. */
   userId?: string | null;
+  /** Edition pilotée depuis le AppHeader (brief 09/06/2026). */
+  controlledIsEditing?: boolean;
+  onEditingChange?: (next: boolean) => void;
 };
 
 export function InvestmentTest({
@@ -30,6 +33,8 @@ export function InvestmentTest({
   analyses = [],
   currentAnalysis = null,
   userId = null,
+  controlledIsEditing,
+  onEditingChange,
 }: InvestmentTestProps) {
   // Mouse glow local (visuel premium-analysis-root) — limité à cette section.
   const [mouseGlow, setMouseGlow] = useState({ x: 0, y: 0, visible: false });
@@ -78,6 +83,9 @@ export function InvestmentTest({
           currentAnalysis={currentAnalysis}
           mappedData={currentAnalysis?.mappedData ?? null}
           lockedCategory="investissement"
+          controlledIsEditing={controlledIsEditing}
+          onEditingChange={onEditingChange}
+          hideHeaderTitle
         />
       </div>
     </section>

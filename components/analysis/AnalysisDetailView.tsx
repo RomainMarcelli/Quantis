@@ -3,7 +3,7 @@
 "use client";
 
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
   FileText,
@@ -69,6 +69,7 @@ import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
+import { StaticYearBar } from "@/components/temporality/StaticYearBar";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
 import { useActiveDataSource } from "@/hooks/useActiveDataSource";
 import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
@@ -112,9 +113,16 @@ const DEFAULT_ANALYSIS_TAB: DashboardTestTabId = "creation-valeur";
 
 export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: AnalysisDetailViewProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const currentCalendarYear = new Date().getFullYear();
   const isDocumentsView = viewMode === "documents";
+
+  // Brief 09/06/2026 : depuis la sidebar (sous-menu Tableau de bord visible
+  // partout), un clic sur "Création de valeur" / "Investissement" / etc.
+  // depuis n'importe quelle page navigue vers `/analysis?tab=<id>`. On lit
+  // ici le param et on l'applique sur le state local au montage.
+  const initialTabFromQuery = searchParams.get("tab");
 
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
@@ -140,7 +148,20 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     analysis?.bankingSummary ?? bridgeStatus.status?.summary ?? null;
 
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
-  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
+  // Si `?tab=<id>` est passé dans l'URL (depuis la sidebar globale d'une
+  // autre page), on initialise sur cet onglet — sinon on garde le défaut.
+  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(
+    () => (initialTabFromQuery as DashboardTestTabId | null) ?? DEFAULT_ANALYSIS_TAB
+  );
+
+  // Sync le tab si le query param change (l'utilisateur reclique sur un
+  // sous-item de la sidebar alors qu'il est déjà sur /analysis).
+  useEffect(() => {
+    if (initialTabFromQuery && initialTabFromQuery !== activeDashboardTab) {
+      setActiveDashboardTab(initialTabFromQuery as DashboardTestTabId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTabFromQuery]);
   // Phase 4 — modale "Nouveau tableau de bord" pour créer un dashboard custom.
   const [createDashboardOpen, setCreateDashboardOpen] = useState(false);
   // Modale "Télécharger le rapport" — choix synthèse vs sélection multi-tableaux.
@@ -158,10 +179,11 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
   const [companyName, setCompanyName] = useState("Vyzor");
-  // Phase 3 brief Header unifié 09/05/2026 — state cosmétique du bouton
-  // "Personnaliser" dans la ligne 2 du AppHeader. Cosmétique car les
-  // sections d'onglet (RentabilityTest, etc.) gèrent elles-mêmes leur
-  // mode édition via leur CustomizableDashboard interne.
+  // Brief 09/06/2026 — state d'édition lifté : pilote tous les
+  // CustomizableDashboards des onglets (Création de valeur, Investissement,
+  // etc.) via `controlledIsEditing`. Le bouton "Personnaliser" du AppHeader
+  // est désormais l'UNIQUE point d'entrée pour toggler l'édition (le
+  // doublon interne `DashboardActions` est masqué via `hideHeaderTitle`).
   const [headerEditing, setHeaderEditing] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
@@ -948,12 +970,22 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     userDashboards.dashboards
   );
 
+  // Brief 09/06/2026 : pour les sources statiques (PDF/Excel), on remplace
+  // l'absence de TemporalityBar par un sélecteur "Exercice <année>" qui
+  // permet de basculer entre exercices quand le dossier en contient
+  // plusieurs (ex: 2 liasses Excel pour 2023 et 2024).
   const showHeaderTemporalityBar =
     analysis && shouldShowTemporalityBar(analysis);
   const headerTemporalityBar = showHeaderTemporalityBar ? (
     <TemporalityBar
       availableRange={computeAvailableRange(analysis!)}
       daysInPeriod={null}
+    />
+  ) : analysis && dashboardYearOptions.length > 0 ? (
+    <StaticYearBar
+      options={dashboardYearOptions}
+      value={selectedDashboardYear}
+      onChange={setSelectedDashboardYear}
     />
   ) : null;
 
@@ -1345,6 +1377,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 }
                 userId={user?.uid ?? null}
                 customDashboards={userDashboards.dashboards}
+                controlledIsEditing={headerEditing}
+                onEditingChange={setHeaderEditing}
               />
 
               {/* Modal Phase 4 — création d'un dashboard custom nommé. */}

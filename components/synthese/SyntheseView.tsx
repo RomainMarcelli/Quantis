@@ -47,6 +47,7 @@ import type { AuthenticatedUser } from "@/types/auth";
 import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
 import { ExportSyntheseButton } from "@/components/synthese/ExportSyntheseButton";
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
+import { StaticYearBar } from "@/components/temporality/StaticYearBar";
 import { useTemporality } from "@/lib/temporality/temporalityContext";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
@@ -329,12 +330,23 @@ export function SyntheseView() {
   // bandeau meta interne au SyntheseDashboard, désormais supprimé).
   const [isEditing, setIsEditing] = useState(false);
 
+  // Brief 09/06/2026 : pour les sources statiques (PDF/Excel sans
+  // dailyAccounting), on affiche désormais un sélecteur "Exercice <année>"
+  // dans le slot temporalityBar du AppHeader — même quand un seul
+  // exercice est disponible (badge non-interactif). Permet de naviguer
+  // entre exercices quand le dossier en contient plusieurs.
   const showTemporalityBar =
     analysisPair.current && shouldShowTemporalityBar(analysisPair.current);
   const headerTemporalityBar = showTemporalityBar ? (
     <TemporalityBar
       availableRange={computeAvailableRange(analysisPair.current!)}
       daysInPeriod={null}
+    />
+  ) : analysisPair.current && yearOptions.length > 0 ? (
+    <StaticYearBar
+      options={yearOptions}
+      value={selectedYearValue}
+      onChange={setSelectedYearValue}
     />
   ) : null;
 
