@@ -49,8 +49,12 @@ export function DashboardFinancialTestContent({
   customDashboards = []
 }: DashboardFinancialTestContentProps) {
   // Props partagés entre les 4 onglets KPI : identiques pour tous, on les
-  // factorise ici pour éviter la duplication de 12 lignes.
+  // factorise ici pour éviter la duplication de 12 lignes. `userId` doit
+  // être propagé sinon les modifs de layout (ajout/suppression/resize/move
+  // de widget, alertes/objectifs sur KPI) ne seront pas persistées en
+  // Firestore — `useDashboardLayout` no-op quand userId est null.
   const sharedTabProps = {
+    userId,
     previousKpis,
     analyses,
     currentAnalysis,

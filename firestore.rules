@@ -29,6 +29,18 @@ service cloud.firestore {
         allow read, create, update, delete:
           if request.auth != null && request.auth.uid == userId;
       }
+
+      // Cibles utilisateur sur les KPIs : alertes (seuils déclenchant une
+      // notif) et objectifs (cibles avec barre de progression). Chaque doc
+      // = une cible, scope strict à l'utilisateur authentifié.
+      match /kpiAlerts/{alertId} {
+        allow read, create, update, delete:
+          if request.auth != null && request.auth.uid == userId;
+      }
+      match /kpiObjectives/{objectiveId} {
+        allow read, create, update, delete:
+          if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     match /analyses/{analysisId} {

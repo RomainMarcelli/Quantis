@@ -32,6 +32,11 @@ export type KpiAvailabilityContext = {
  * null / undefined / NaN / Infinity → indisponible.
  */
 export function isKpiAvailable(kpiId: string, ctx: KpiAvailabilityContext): boolean {
+  // Widgets personnalisés (préfixe `custom:<uuid>`) : toujours considérés
+  // comme disponibles. Le `CustomChartWidget` gère lui-même le cas où
+  // les séries n'ont pas de data (affiche "Données insuffisantes").
+  if (kpiId.startsWith("custom:")) return true;
+
   // Widgets contextuels synthèse : règles dédiées par type.
   if (kpiId.startsWith("synthese:")) {
     return isSyntheseWidgetAvailable(kpiId, ctx);

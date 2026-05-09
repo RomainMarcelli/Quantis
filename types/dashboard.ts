@@ -21,7 +21,8 @@ export type WidgetCategory =
   | "investissement"
   | "financement"
   | "rentabilite"
-  | "tresorerie";
+  | "tresorerie"
+  | "personnalise";
 
 // ─── Types de visualisation ─────────────────────────────────────────────
 // Phase 1 livre `kpiCard` et `lineChart` (KPIs du registre) + 4 viz dédiées
@@ -42,7 +43,18 @@ export type WidgetVizType =
   | "aiInsight"        // bandeau Recommandation stratégique (message IA + CTA)
   | "alertList"        // liste d'alertes (synthese.alerts)
   | "actionList"       // plan d'action détaillé (synthese.actions)
-  | "evolutionChart";  // chart multi-séries CA + EBE + Résultat net (Synthèse)
+  | "evolutionChart"   // chart multi-séries CA + EBE + Résultat net (Synthèse)
+  // Widgets dédiés aux onglets dashboard catégorisés (Création de valeur,
+  // Investissement, Financement, Rentabilité). Composants riches (chart +
+  // métriques) auto-suffisants : ils prennent toute la largeur et lisent
+  // les données via mappedData / kpis. L'utilisateur peut les déplacer,
+  // les redimensionner, les supprimer comme n'importe quel widget.
+  | "breakEvenChart"   // Création de valeur — point mort (CA / coûts fixes / coûts totaux + cards résumé)
+  | "bfrCycle"         // Investissement — rotation BFR + DSO/DIO/DPO trio
+  | "liquidityRatios"  // Financement — trio liquidité (générale / réduite / immédiate)
+  | "roeRoceChart"     // Rentabilité — comparatif ROE vs ROCE + écart effet de levier
+  // Widgets personnalisés (onglet Personnalisé du picker)
+  | "customChart";     // chart libre construit par l'utilisateur — multi-séries
 
 // ─── Tailles Apple/PowerPoint-style ────────────────────────────────────
 // Matrice 4×3 = 12 tailles possibles. L'utilisateur tire des poignées aux
@@ -54,16 +66,17 @@ export type WidgetVizType =
 //   - "M"  : col-6 (1/2) — chart medium
 //   - "L"  : col-12 (pleine largeur)
 //
-// HAUTEUR (3 paliers, mappés sur row-span avec auto-rows à 200 px) :
-//   - "S" : 1 rangée (200 px)
-//   - "M" : 2 rangées (420 px)
-//   - "L" : 3 rangées (640 px)
+// HAUTEUR (4 paliers, mappés sur row-span avec auto-rows à 200 px) :
+//   - "S"  : 1 rangée (200 px)
+//   - "M"  : 2 rangées (420 px)
+//   - "L"  : 3 rangées (640 px)
+//   - "XL" : 4 rangées (860 px) — réservé aux charts riches (point mort,
+//             chart custom multi-séries) qui méritent plus de place verticale.
 //
-// `WidgetSize` (3 valeurs) = type historique, conservé pour l'axe hauteur.
-// `WidgetWidth` (4 valeurs) = nouveau type pour l'axe largeur. Comme
-// `WidgetSize ⊂ WidgetWidth`, les layouts persistés avec `size: "S"|"M"|"L"`
-// restent valides sans migration.
-export type WidgetSize = "S" | "M" | "L";
+// `WidgetSize` (4 valeurs) = type historique étendu, conservé pour l'axe
+// hauteur. `WidgetWidth` (4 valeurs) = type pour l'axe largeur. Les layouts
+// persistés avec `size: "S"|"M"|"L"` restent valides sans migration.
+export type WidgetSize = "S" | "M" | "L" | "XL";
 export type WidgetWidth = "XS" | "S" | "M" | "L";
 
 // ─── Instance de widget ─────────────────────────────────────────────────
@@ -77,9 +90,71 @@ export type WidgetInstance = {
   size: WidgetWidth;
   /** Axe HAUTEUR. Optionnel : défaut "S" (1 rangée). */
   height?: WidgetSize;
+  /**
+   * Position explicite dans la grille 12 colonnes — colonne de départ
+   * (0-indexée, 0..11). Optionnel : si absent, le widget est placé en
+   * auto-flow (compatibilité layouts pré-coordonnées). Permet à l'utilisateur
+   * de POSER un widget où il veut, avec des trous éventuels.
+   */
+  col?: number;
+  /**
+   * Position explicite dans la grille — rangée de départ (0-indexée).
+   * Optionnel : voir `col`.
+   */
+  row?: number;
   /** Si true : widget non supprimable (X masqué dans WidgetFrame).
    *  Cas d'usage : Vyzor Score sur la Synthèse — toujours visible. */
   isFixed?: boolean;
+  /**
+   * Configuration des widgets PERSONNALISÉS (vizType === "customChart").
+   * Construite par l'utilisateur via le builder de l'onglet Personnalisé.
+   * Pour les widgets standards (kpiCard, lineChart, …) ce champ est absent.
+   */
+  customConfig?: CustomChartConfig;
+};
+
+// ─── Configuration des widgets personnalisés ───────────────────────────
+/** Type global du chart custom. "mixed" = chaque série choisit son type
+ *  (line ou bar) individuellement via `series[].displayType`. */
+export type CustomChartType = "lineChart" | "barChart" | "mixed";
+
+/** Mode d'analyse du widget custom :
+ *  - "series" : N KPIs superposés sur un axe temporel commun (Jan-Dec ou
+ *    historique annuel). Mode par défaut.
+ *  - "yearly" : 1 SEUL KPI tracé sur Jan-Dec, avec une courbe par année
+ *    sélectionnée → lecture year-over-year (ex. CA 2024 vs 2025 vs 2026). */
+export type CustomChartMode = "series" | "yearly";
+
+export type CustomChartSeries = {
+  /** id du KPI dans le registre (lib/kpi/kpiRegistry.ts). */
+  kpiId: string;
+  /** Couleur de la série (hex) — si null, palette auto. */
+  color?: string;
+  /**
+   * Type d'affichage de cette série quand `chartType === "mixed"`.
+   * Ignoré sinon (toutes les séries prennent le type global).
+   */
+  displayType?: "line" | "bar";
+};
+
+export type CustomChartConfig = {
+  /** Titre affiché en haut du widget (libre, choisi par l'utilisateur). */
+  title: string;
+  /** Type de chart — courbe, barres, ou mixte (par série). */
+  chartType: CustomChartType;
+  /** Mode d'analyse (séries multi-KPI ou comparaison annuelle). Default : "series". */
+  mode?: CustomChartMode;
+  /**
+   * Liste des KPIs à tracer en série superposée. Ordre = ordre des séries
+   * dans la légende. Min 1, max 5 séries pour rester lisible.
+   * Le multi-axes est automatique : si plusieurs unités distinctes (€, %,
+   * jours, ratio…) sont mélangées, on rend deux Y-axes (gauche + droite).
+   * En mode "yearly" : on lit `series[0].kpiId` uniquement, et on superpose
+   * une courbe par année listée dans `years`.
+   */
+  series: CustomChartSeries[];
+  /** Mode "yearly" uniquement : années à comparer (ex. [2024, 2025, 2026]). */
+  years?: number[];
 };
 
 // ─── Layout d'un dashboard ─────────────────────────────────────────────

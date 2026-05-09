@@ -149,8 +149,8 @@ export function DashboardReportModal({
       if (err) {
         const msg =
           err.kind === "http" ? err.message :
-          err.kind === "network" ? "Erreur réseau. Réessaie." :
-          "Session expirée. Reconnecte-toi.";
+          err.kind === "network" ? "Erreur réseau. Réessayez." :
+          "Session expirée. Reconnectez-vous.";
         setErrorMsg(msg);
         return;
       }
@@ -160,7 +160,7 @@ export function DashboardReportModal({
     // mode dashboard
     if (selected.size === 0) {
       setIsLoading(false);
-      setErrorMsg("Sélectionne au moins un tableau de bord.");
+      setErrorMsg("Sélectionnez au moins un tableau de bord.");
       return;
     }
     const dashboardIds = options.filter((o) => selected.has(o.id)).map((o) => o.id);
@@ -174,8 +174,8 @@ export function DashboardReportModal({
     if (err) {
       const msg =
         err.kind === "http" ? err.message :
-        err.kind === "network" ? "Erreur réseau. Réessaie." :
-        "Session expirée. Reconnecte-toi.";
+        err.kind === "network" ? "Erreur réseau. Réessayez." :
+        "Session expirée. Reconnectez-vous.";
       setErrorMsg(msg);
       return;
     }
@@ -211,10 +211,10 @@ export function DashboardReportModal({
             </p>
             <h2 className="mt-1 text-lg font-semibold text-white">
               {lockType === "dashboard"
-                ? "Choisis les tableaux à inclure"
+                ? "Choisissez les tableaux à inclure"
                 : lockType === "synthese"
                 ? "Exporter la synthèse"
-                : "Choisis le format du rapport"}
+                : "Choisissez le format du rapport"}
             </h2>
             <p className="mt-1 text-xs text-white/55">
               {lockType === "dashboard"
@@ -269,7 +269,7 @@ export function DashboardReportModal({
                 Tableaux de bord
               </p>
               <p className="mt-0.5 text-[11px] text-white/55">
-                Choisis les tableaux à inclure.
+                Choisissez les tableaux à inclure.
               </p>
             </button>
           </div>

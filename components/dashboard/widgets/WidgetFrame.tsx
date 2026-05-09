@@ -20,7 +20,7 @@
 "use client";
 
 import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Minus } from "lucide-react";
+import { Minus, Target } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { WidgetInstance, WidgetSize, WidgetWidth } from "@/types/dashboard";
@@ -38,6 +38,10 @@ type WidgetFrameProps = {
   isEditing: boolean;
   onRemove: () => void;
   onUpdateSize: (patch: WidgetSizePatch) => void;
+  /** Callback quand l'utilisateur clique l'icône "cibles" du widget en mode
+   *  édition. Reçoit le `kpiId` du widget pour ouvrir l'éditeur. Si non
+   *  fourni, l'icône n'est pas affichée. */
+  onConfigureTarget?: (kpiId: string) => void;
   /** True si CE widget fait partie de la sélection courante (mode édition).
    *  La sélection est portée par WidgetGrid (clic = sélectionne, shift+clic
    *  = range, cmd/ctrl+clic = toggle, clic ailleurs = reset). */
@@ -76,12 +80,15 @@ const WIDTH_FRACTION: Record<WidgetWidth, number> = {
 };
 
 // Hauteur via row-span — la grille parente déclare un auto-rows fixe (200px)
-// et chaque widget consomme N rangées. Cohérent avec une matrice 3×3
-// stricte : les widgets s'alignent toujours sur la même grille verticale.
+// et chaque widget consomme N rangées. XL (4 rangées = 860 px) est réservé
+// aux charts riches qui exploitent vraiment l'espace vertical (point mort,
+// chart custom multi-séries) ; cf. widgetSizeConstraints.MAX_HEIGHTS qui
+// plafonne les autres widgets à L.
 const HEIGHT_TO_ROW_SPAN: Record<WidgetSize, string> = {
   S: "row-span-1",
   M: "row-span-2",
-  L: "row-span-3"
+  L: "row-span-3",
+  XL: "row-span-4"
 };
 
 // Hauteur effective en px pour le calcul de snap pendant le drag.
@@ -92,29 +99,30 @@ const ROW_GAP_PX = 20;
 const HEIGHT_PX: Record<WidgetSize, number> = {
   S: ROW_HEIGHT_PX,
   M: ROW_HEIGHT_PX * 2 + ROW_GAP_PX,
-  L: ROW_HEIGHT_PX * 3 + ROW_GAP_PX * 2
+  L: ROW_HEIGHT_PX * 3 + ROW_GAP_PX * 2,
+  XL: ROW_HEIGHT_PX * 4 + ROW_GAP_PX * 3
 };
 
-const NEXT_HEIGHT: Record<WidgetSize, WidgetSize> = { S: "M", M: "L", L: "S" };
+const NEXT_HEIGHT: Record<WidgetSize, WidgetSize> = { S: "M", M: "L", L: "XL", XL: "S" };
 const NEXT_WIDTH: Record<WidgetWidth, WidgetWidth> = { XS: "S", S: "M", M: "L", L: "XS" };
 
-// Cherche la dimension cible la plus proche en pixels, restreinte au
-// sous-ensemble `allowed` (filtré par les contraintes du vizType).
+// Snap directionnel : on bascule vers la taille SUIVANTE dès que la cible
+// dépasse 20 % du gap. Très responsive — l'utilisateur drag ~20 % du saut
+// (~45 px pour passer de M à L en hauteur) et la transition se fait.
 function nearestSize<T extends string>(
   allowed: T[],
   target: number,
   resolvePx: (size: T) => number
 ): T {
-  let best = allowed[0];
-  let bestDist = Infinity;
-  for (const s of allowed) {
-    const d = Math.abs(resolvePx(s) - target);
-    if (d < bestDist) {
-      bestDist = d;
-      best = s;
-    }
+  if (allowed.length === 0) return allowed[0];
+  const sorted = [...allowed].sort((a, b) => resolvePx(a) - resolvePx(b));
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = resolvePx(sorted[i]);
+    const b = resolvePx(sorted[i + 1]);
+    const snapThreshold = a + (b - a) * 0.2; // 20 % du gap = bascule
+    if (target < snapThreshold) return sorted[i];
   }
-  return best;
+  return sorted[sorted.length - 1];
 }
 
 export function WidgetFrame({
@@ -122,6 +130,7 @@ export function WidgetFrame({
   isEditing,
   onRemove,
   onUpdateSize,
+  onConfigureTarget,
   isSelected = false,
   gridPosition,
   onSelect,
@@ -266,6 +275,25 @@ export function WidgetFrame({
           >
             <Minus className="h-4 w-4" strokeWidth={3} />
           </button>
+
+          {/* Bouton "cibles" — alertes & objectifs sur ce KPI. Visible
+              uniquement si la prop onConfigureTarget est fournie (donc en
+              édition pour les widgets KPI/Card supportés). */}
+          {onConfigureTarget ? (
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                onConfigureTarget(widget.kpiId);
+              }}
+              aria-label="Définir alertes et objectifs"
+              title="Alertes & objectifs"
+              className="pointer-events-auto absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-neutral-700/95 text-quantis-gold shadow-lg backdrop-blur transition hover:bg-neutral-600"
+            >
+              <Target className="h-3.5 w-3.5" strokeWidth={2.5} />
+            </button>
+          ) : null}
 
           {/* Poignée de redimensionnement style iOS — bottom-right unique,
               snap diagonal sur la matrice (largeur, hauteur). Commit live. */}

@@ -47,7 +47,15 @@ const CHART_MARGIN = {
 } as const;
 const CHART_Y_AXIS_WIDTH = 94;
 
-const INLINE_HEIGHT_CLASS = "min-h-[500px] h-[55vh] max-h-[700px]";
+// Hauteur viewport-based : `h-full` ne fonctionnait pas car le parent
+// direct (`<div className="space-y-5">`) n'a pas de hauteur explicite, donc
+// h-full résolvait à 0 et Recharts ne dessinait pas les courbes.
+//   - min 420 px : plancher pour rester lisible en widget M (~280 px utiles
+//                  pour le chart après le header + summary cards)
+//   - h-[60vh]   : taille naturelle ~650 px sur FHD, ~780 px sur 4K
+//   - max 820 px : permet au widget XL (4 rangées = 860 px) d'exploiter
+//                  presque toute sa place sans déborder du card
+const INLINE_HEIGHT_CLASS = "min-h-[420px] h-[60vh] max-h-[820px]";
 const FULLSCREEN_HEIGHT_CLASS = "min-h-[500px] h-[calc(100vh-12rem)]";
 
 function BreakEvenChartComponent({ model, isDark }: BreakEvenChartProps) {

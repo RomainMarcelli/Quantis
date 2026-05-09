@@ -26,7 +26,8 @@ const WIDTH_TO_SPAN: Record<WidgetWidth, number> = {
 const HEIGHT_TO_SPAN: Record<WidgetSize, number> = {
   S: 1,
   M: 2,
-  L: 3
+  L: 3,
+  XL: 4
 };
 
 export type WidgetGridPosition = {

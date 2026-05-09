@@ -84,6 +84,9 @@ type WidgetGridProps = {
   onReorder: (orderedIds: string[]) => void;
   onRemove: (instanceId: string) => void;
   onUpdateWidget: (instanceId: string, patch: Partial<WidgetInstance>) => void;
+  /** Callback "définir alertes/objectifs" — passé au WidgetFrame pour
+   *  l'icône cible. Si non fourni, l'icône n'apparaît pas. */
+  onConfigureTarget?: (kpiId: string) => void;
 };
 
 export function WidgetGrid({
@@ -92,7 +95,8 @@ export function WidgetGrid({
   renderWidget,
   onReorder,
   onRemove,
-  onUpdateWidget
+  onUpdateWidget,
+  onConfigureTarget
 }: WidgetGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -181,7 +185,7 @@ export function WidgetGrid({
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    // Multi-sélection : on déplace tout le groupe en bloc, à la position
+    // Multi-sélection : on déplace tout le groupe en bloc à la position
     // du widget over (en excluant les sélectionnés du remaining).
     if (selectedIds.has(activeId) && selectedIds.size > 1) {
       if (selectedIds.has(overId)) return;
@@ -199,20 +203,18 @@ export function WidgetGrid({
         ...orderedSelected,
         ...remaining.slice(insertAt)
       ];
-      onReorder(newOrder);
+      if (onReorder) onReorder(newOrder);
       return;
     }
 
-    // Reorder simple : on retire l'actif et on l'insère à l'index du over.
-    // Plus naturel qu'un swap (le déplacement décale les autres au lieu
-    // de les permuter pile à pile).
+    // Reorder simple : retire l'actif, le ré-insère à l'index du over.
     const oldIndex = widgetIds.indexOf(activeId);
     const newIndex = widgetIds.indexOf(overId);
     if (oldIndex < 0 || newIndex < 0) return;
     const newOrder = [...widgetIds];
     const [moved] = newOrder.splice(oldIndex, 1);
     newOrder.splice(newIndex, 0, moved);
-    onReorder(newOrder);
+    if (onReorder) onReorder(newOrder);
   }
 
   function handleRemove(widgetId: string) {
@@ -265,7 +267,7 @@ export function WidgetGrid({
     return (
       <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-10 text-center">
         <p className="text-sm text-white/55">
-          Aucun widget pour l&apos;instant. Passe en mode édition et clique sur
+          Aucun widget pour l&apos;instant. Passez en mode édition et cliquez sur
           {" "}
           <span className="font-medium text-white/80">Ajouter un widget</span>.
         </p>
@@ -296,6 +298,13 @@ export function WidgetGrid({
               onSelect={(mods) => handleSelect(widget.id, mods)}
               onRemove={() => handleRemove(widget.id)}
               onUpdateSize={(patch) => handleUpdateWidget(widget.id, patch)}
+              onConfigureTarget={
+                // Affichée uniquement pour les widgets dont le kpiId
+                // référence un KPI numérique (pas synthese:* ni custom:*).
+                onConfigureTarget && widget.vizType === "kpiCard"
+                  ? onConfigureTarget
+                  : undefined
+              }
             >
               {renderWidget(widget)}
             </WidgetFrame>

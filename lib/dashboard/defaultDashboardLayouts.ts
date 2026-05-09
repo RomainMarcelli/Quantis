@@ -7,6 +7,12 @@
 
 import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
+// Chart widgets dédiés à chaque onglet — placés en bas du layout par défaut.
+// Pleine largeur (L) + hauteur L (point mort) ou M (les autres) pour rester
+// lisibles. `kpiId` arbitraire pour les types non-KPI : on met une string
+// non-vide pour passer le check `isKpiAvailable` qui n'évalue rien quand le
+// vizType n'est pas un kpiCard / lineChart standard.
+
 const VALUE_CREATION_DEFAULT: DashboardLayout = {
   id: "dashboard:creation_valeur",
   constrainedToCategory: "creation_valeur",
@@ -17,6 +23,7 @@ const VALUE_CREATION_DEFAULT: DashboardLayout = {
     { id: "vc-va", kpiId: "va", vizType: "kpiCard", size: "S" },
     { id: "vc-marge-ebitda", kpiId: "marge_ebitda", vizType: "kpiCard", size: "S" },
     { id: "vc-point-mort", kpiId: "point_mort", vizType: "kpiCard", size: "S" },
+    { id: "vc-break-even", kpiId: "point_mort", vizType: "breakEvenChart", size: "L", height: "L" },
   ] as WidgetInstance[],
 };
 
@@ -26,6 +33,7 @@ const INVESTMENT_DEFAULT: DashboardLayout = {
   widgets: [
     { id: "inv-bfr", kpiId: "bfr", vizType: "kpiCard", size: "M" },
     { id: "inv-ratio-immo", kpiId: "ratio_immo", vizType: "kpiCard", size: "M" },
+    { id: "inv-bfr-cycle", kpiId: "rot_bfr", vizType: "bfrCycle", size: "L", height: "M" },
   ] as WidgetInstance[],
 };
 
@@ -39,6 +47,7 @@ const FINANCING_DEFAULT: DashboardLayout = {
     { id: "fin-solva", kpiId: "solvabilite", vizType: "kpiCard", size: "S" },
     { id: "fin-gearing", kpiId: "gearing", vizType: "kpiCard", size: "S" },
     { id: "fin-tn", kpiId: "tn", vizType: "kpiCard", size: "S" },
+    { id: "fin-liquidity", kpiId: "liq_gen", vizType: "liquidityRatios", size: "L", height: "M" },
   ] as WidgetInstance[],
 };
 
@@ -48,6 +57,7 @@ const RENTABILITY_DEFAULT: DashboardLayout = {
   widgets: [
     { id: "rent-roe", kpiId: "roe", vizType: "kpiCard", size: "M" },
     { id: "rent-roce", kpiId: "roce", vizType: "kpiCard", size: "M" },
+    { id: "rent-roe-roce-chart", kpiId: "roe", vizType: "roeRoceChart", size: "L", height: "M" },
   ] as WidgetInstance[],
 };
 
