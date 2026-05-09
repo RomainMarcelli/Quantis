@@ -96,11 +96,22 @@ export function SettingsView() {
 
         <button
           type="button"
-          onClick={() => router.push("/analysis")}
+          // Brief 09/06/2026 : "Retour" doit ramener à la page précédente
+          // (Synthèse, Tableau de bord avec son tab actif, États
+          // financiers, Documents, etc.) — pas systématiquement à
+          // /analysis qui retombait sur "Création de valeur".
+          // Fallback /analysis si pas d'historique (entrée directe).
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/analysis");
+            }
+          }}
           className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour à l&apos;analyse
+          Retour
         </button>
       </header>
 

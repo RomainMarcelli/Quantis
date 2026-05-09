@@ -470,9 +470,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   }, [analysis, analysesFilteredByYear, analysesInCurrentFolder, allAnalyses, currentFolder]);
 
   useEffect(() => {
-    // Lors d'un changement d'analyse, on garde l'entrée par défaut sur "Création de valeur".
-    setActiveDashboardTab(DEFAULT_ANALYSIS_TAB);
-  }, [analysis?.id]);
+    // Brief 09/06/2026 : lors d'un changement d'analyse, on respecte le
+    // tab choisi via l'URL (?tab=<id> poussé par la sidebar globale depuis
+    // Synthèse / Documents). Sans ça, le clic sur "Investissement" depuis
+    // /synthese arrivait sur /analysis?tab=investissement-bfr puis le
+    // chargement de l'analyse écrasait le state pour retomber sur
+    // "Création de valeur".
+    setActiveDashboardTab(
+      (initialTabFromQuery as DashboardTestTabId | null) ?? DEFAULT_ANALYSIS_TAB
+    );
+  }, [analysis?.id, initialTabFromQuery]);
 
   const folderNames = useMemo(() => {
     const set = new Set<string>();
@@ -980,6 +987,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     <TemporalityBar
       availableRange={computeAvailableRange(analysis!)}
       daysInPeriod={null}
+      flat
     />
   ) : analysis && dashboardYearOptions.length > 0 ? (
     <StaticYearBar
@@ -1118,11 +1126,12 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                   activeId: activeDashboardTab,
                   onSelectItem: (id) => {
                     setActiveDashboardTab(id as DashboardTestTabId);
-                    // Bascule sur la page /analysis si l'utilisateur déclenche
-                    // le sous-menu depuis une autre route — sinon on reste
-                    // simplement sur la page courante avec le tab mis à jour.
+                    // Si on est déjà sur /analysis, on met juste à jour le
+                    // state (pas de navigation). Sinon (sécurité depuis
+                    // Documents qui partage cette vue), on push avec le tab
+                    // en query pour que la page cible ouvre la bonne section.
                     if (window.location.pathname !== "/analysis") {
-                      router.push("/analysis");
+                      router.push(`/analysis?tab=${encodeURIComponent(id)}`);
                     }
                   },
                   onCreate: user ? () => setCreateDashboardOpen(true) : undefined,

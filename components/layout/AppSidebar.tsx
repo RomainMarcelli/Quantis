@@ -130,13 +130,11 @@ export function AppSidebar({
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [ready, setReady] = useState(false);
-  // Brief 09/06/2026 : sous-menus toujours visibles peu importe la route —
-  // l'utilisateur voit en permanence toutes les destinations possibles. On
-  // initialise à `true` pour les deux sous-menus (Tableau de bord + États
-  // financiers). L'utilisateur peut toujours replier manuellement via la
-  // chevron.
-  const [dashboardSubmenuOpen, setDashboardSubmenuOpen] = useState(true);
-  const [financialSubmenuOpen, setFinancialSubmenuOpen] = useState(true);
+  // Brief 09/06/2026 : sous-menus FERMÉS par défaut peu importe la route —
+  // seule la flèche reste visible pour les déplier à la demande. Évite
+  // d'encombrer la sidebar avec un long arbre déployé en permanence.
+  const [dashboardSubmenuOpen, setDashboardSubmenuOpen] = useState(false);
+  const [financialSubmenuOpen, setFinancialSubmenuOpen] = useState(false);
 
   // Items rendus sous "Tableau de bord" :
   //   - Si la page courante a fourni son propre `dashboardSubmenu` (cas de
@@ -173,11 +171,14 @@ export function AppSidebar({
     <aside
       data-scroll-reveal-ignore
       data-sidebar-shell
-      // Brief 09/06/2026 : sidebar figée comme l'en-tête — `lg:sticky` avec
-      // `lg:top-28` (112 px) qui passe sous l'AppHeader sticky data variant
-      // (~110 px). `max-h-[calc(100vh-8rem)]` + scroll interne pour ne
-      // jamais dépasser le viewport sur les écrans courts.
-      className={`precision-card relative h-fit rounded-2xl lg:sticky lg:top-28 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto ${
+      // Brief 09/06/2026 : sidebar figée comme l'en-tête — `lg:!sticky` avec
+      // un offset qui passe SOUS le header sticky (top: 1rem + hauteur
+      // header ~108 px data variant + 16 px de gap visuel) ≈ 9rem (144 px).
+      // `max-h-[calc(100vh-9.5rem)]` + scroll interne pour ne jamais
+      // dépasser le viewport sur les écrans courts. Le `!` est requis car
+      // `.precision-card` (définie après @tailwind utilities) impose
+      // `position: relative` et écraserait `sticky`.
+      className={`precision-card h-fit rounded-2xl lg:!sticky lg:top-36 lg:max-h-[calc(100vh-9.5rem)] lg:overflow-y-auto ${
         collapsed ? "p-3" : "p-4"
       }`}
     >

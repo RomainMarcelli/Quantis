@@ -341,6 +341,7 @@ export function SyntheseView() {
     <TemporalityBar
       availableRange={computeAvailableRange(analysisPair.current!)}
       daysInPeriod={null}
+      flat
     />
   ) : analysisPair.current && yearOptions.length > 0 ? (
     <StaticYearBar
@@ -445,7 +446,11 @@ export function SyntheseView() {
               }))
             ],
             activeId: undefined,
-            onSelectItem: () => router.push("/analysis"),
+            // Brief 09/06/2026 : on transmet le tab choisi via ?tab=<id>
+            // pour que /analysis ouvre directement la bonne section
+            // (sinon l'utilisateur retombe systématiquement sur
+            // "Création de valeur").
+            onSelectItem: (id) => router.push(`/analysis?tab=${encodeURIComponent(id)}`),
             onCreate: user ? () => setCreateDashboardOpen(true) : undefined,
             onDelete: async (id) => {
               await userDashboards.deleteDashboard(id);

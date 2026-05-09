@@ -20,10 +20,8 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import { buildIncomeStatement } from "@/lib/financials/buildIncomeStatement";
 import { buildBalanceSheet } from "@/lib/financials/buildBalanceSheet";
-import { buildCoherenceChecks } from "@/lib/financials/coherenceChecks";
 import { IncomeStatement } from "@/components/financials/IncomeStatement";
 import { BalanceSheet } from "@/components/financials/BalanceSheet";
-import { CoherenceChecksCard } from "@/components/financials/CoherenceChecksCard";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 
@@ -125,17 +123,6 @@ export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) 
         : null,
     [activeAnalysis]
   );
-  const checks = useMemo(
-    () =>
-      activeAnalysis && incomeStatement && balanceSheet
-        ? buildCoherenceChecks({
-            analysis: activeAnalysis,
-            incomeStatement,
-            balanceSheet,
-          })
-        : [],
-    [activeAnalysis, incomeStatement, balanceSheet]
-  );
 
   const documentLabel = mode === "bilan" ? "Bilan" : "Compte de résultat";
   const subtitle = activeAnalysis
@@ -193,15 +180,13 @@ export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) 
         {fetchState === "ready" && activeAnalysis && incomeStatement && balanceSheet && (
           <>
             {/* Brief 09/06/2026 : un seul document affiché par page —
-                Bilan (comptes 1 à 5) ou Compte de résultat (6 à 7). La
-                carte de cohérence reste sous chacun pour vérifier la
-                réconciliation avec les KPIs calculés. */}
+                Bilan (comptes 1 à 5) ou Compte de résultat (6 à 7).
+                Section cohérence retirée (demande user). */}
             {mode === "bilan" ? (
               <BalanceSheet sheet={balanceSheet} />
             ) : (
               <IncomeStatement statement={incomeStatement} />
             )}
-            <CoherenceChecksCard checks={checks} />
             <p className="text-center text-[10px] italic text-white/35">
               Codes 2033-SD entre crochets sur chaque ligne · survolez pour la
               définition · postes à zéro masqués pour la lisibilité.

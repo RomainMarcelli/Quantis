@@ -10,7 +10,16 @@
      via var(--app-…). Le mode clair les flip via [data-theme="light"]. */
   --app-bg: #09090b;
   --app-bg-elevated: #0F0F12;
-  --app-card-bg: #1A1A2E;
+  /* Brief 09/06/2026 : aligné sur --quantis-card-bg (#0f0f12) — l'ancienne
+     valeur #1A1A2E avait une teinte bleue qui jurait avec le reste de
+     l'app (.precision-card utilise --quantis-card-bg). Toutes les tuiles
+     du chat IA + Treasury + StaticYearBar partagent désormais la même
+     teinte neutre que les cards principales. */
+  --app-card-bg: #0F0F12;
+  /* Forme "RGB triplet" pour combiner avec rgb(... / alpha) — utilisé
+     par le AppHeader sticky qui applique un fond semi-transparent +
+     backdrop-filter blur quand l'utilisateur a scrollé. */
+  --app-card-bg-rgb: 15 15 18;
   --app-card-glass-bg: rgb(15 15 18 / 85%);
   --app-text-primary: #FFFFFF;
   --app-text-secondary: #9CA3AF;
@@ -77,6 +86,8 @@
   --app-bg: #F8F2E5;
   --app-bg-elevated: #FFFFFF;
   --app-card-bg: #FFFFFF;
+  /* Triplet RGB du card-bg light pour AppHeader sticky en mode clair. */
+  --app-card-bg-rgb: 255 255 255;
   --app-card-glass-bg: rgb(255 255 255 / 85%);
   --app-text-primary: #0A0A0F;        /* presque noir, jamais noir pur */
   --app-text-secondary: #4B5563;
