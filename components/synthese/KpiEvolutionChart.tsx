@@ -22,6 +22,7 @@ import { StableChartContainer } from "@/components/dashboard/widgets/StableChart
 import type { AnalysisRecord } from "@/types/analysis";
 import {
   buildKpiMonthlySeries,
+  buildKpiYearlyFromDaily,
   buildKpiYearlySeries,
   type KpiEvolutionPoint
 } from "@/lib/synthese/kpiEvolutionSeries";
@@ -64,7 +65,12 @@ function KpiEvolutionChartImpl({ kpiId, analyses, currentAnalysis }: KpiEvolutio
     if (mode === "monthly" && currentAnalysis) {
       return buildKpiMonthlySeries(currentAnalysis, kpiId, monthlyWindow);
     }
-    const yearly = buildKpiYearlySeries(analyses, kpiId);
+    // En annuel, si l'analyse courante est dynamique, on agrège ses KPIs
+    // par année depuis dailyAccounting plutôt que de fallback sur le mix
+    // d'analyses statiques de l'historique (incohérent vs mode mensuel).
+    const yearly = monthlyAvailable && currentAnalysis
+      ? buildKpiYearlyFromDaily(currentAnalysis, kpiId)
+      : buildKpiYearlySeries(analyses, kpiId);
     // filterYearlyByRange travaille sur EvolutionPoint (multi-séries), on
     // adapte en wrappant : on transforme la série mono en multi temporaire
     // pour réutiliser la fonction de filtre.

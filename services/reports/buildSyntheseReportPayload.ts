@@ -30,7 +30,7 @@ export type CompanyInfo = {
   effectifBracket?: string;
 };
 
-type BilanRow = {
+export type BilanRow = {
   label: string;
   indent?: number;
   kind?: "section" | "total" | "grand_total";
@@ -40,7 +40,7 @@ type BilanRow = {
   netN1?: string;
 };
 
-type CdrRow = {
+export type CdrRow = {
   label: string;
   indent?: number;
   kind?: "section" | "total" | "grand_total";
@@ -332,7 +332,7 @@ function pruneSection(
   return out;
 }
 
-function buildBilanActif(m: MappedFinancialData): BilanRow[] {
+export function buildBilanActif(m: MappedFinancialData): BilanRow[] {
   const out: BilanRow[] = [];
   out.push(...pruneSection("Actif immobilisé", [
     row("Immobilisations incorporelles", m.immob_incorp),
@@ -358,7 +358,7 @@ function buildBilanActif(m: MappedFinancialData): BilanRow[] {
   return out;
 }
 
-function buildBilanPassif(m: MappedFinancialData): BilanRow[] {
+export function buildBilanPassif(m: MappedFinancialData): BilanRow[] {
   const out: BilanRow[] = [];
   out.push(...pruneSection("Capitaux propres", [
     row("Capital social", m.capital),
@@ -391,7 +391,7 @@ function buildBilanPassif(m: MappedFinancialData): BilanRow[] {
   return out;
 }
 
-function buildCompteResultat(m: MappedFinancialData): CdrRow[] {
+export function buildCompteResultat(m: MappedFinancialData): CdrRow[] {
   const ca = (m.ventes_march ?? 0) + (m.prod_vendue ?? 0);
   const caUsable = ca > 0 ? ca : null;
   const pct = (v: number | null | undefined): string | null => {
@@ -479,22 +479,39 @@ const DEFAULT_FINANCING_KPIS = ["caf", "solvabilite", "gearing", "tn", "liq_gen"
 const DEFAULT_PROFITABILITY_KPIS = ["roe", "roce"];
 
 /**
- * Construit la liste des items "ligne par KPI" à partir d'un layout. On lit
- * uniquement les widgets `kpiCard` (les autres types — chart, custom — n'ont
- * pas de sens ligne à ligne). La description vient du tooltip.explanation
- * du registre, tronquée à ~180 caractères pour rester sur une ligne dans
- * le PDF. Si la valeur du KPI est indisponible, l'item est omis (zéro N/D).
+ * Construit la liste des items "ligne par KPI" à partir d'un layout. On
+ * accepte tous les viz types adossés à un KPI du registre — peu importe
+ * que l'utilisateur ait choisi un kpiCard, un lineChart, un gauge ou un
+ * widget riche (breakEvenChart, bfrCycle, liquidityRatios, roeRoceChart) :
+ * le `kpiId` est le pivot qu'on imprime. `customChart` n'a pas de KPI de
+ * registre → ignoré ici (le contenu est dans le rapport mode "dashboard").
+ * La description vient du tooltip.explanation du registre, tronquée à
+ * ~180 caractères. Si la valeur du KPI est indisponible, l'item est omis.
  */
+const SKIP_VIZ_TYPES = new Set<string>([
+  // Widgets contextuels Synthèse — n'ont pas leur place dans les pages
+  // d'analyse financière. Ils restent sur la page Synthèse.
+  "quantisScore",
+  "aiInsight",
+  "alertList",
+  "actionList",
+  "evolutionChart",
+  // Widget personnalisé : kpiId arbitraire (souvent absent du registre).
+  "customChart",
+]);
+
 function buildItemsFromLayout(
   k: CalculatedKpis,
   layout: DashboardLayout | null,
   fallbackKpiIds: string[],
 ): LabeledItem[] {
   const ctx = { kpis: k, synthese: null, currentAnalysis: null };
-  // KPIs à afficher : kpiCard du layout user (ordre préservé), ou fallback.
+  // KPIs à afficher : tous les widgets du layout user adossés à un KPI
+  // (kpiCard / lineChart / barChart / gauge / donut / comparison / waterfall
+  // + widgets riches catégorisés via leur kpiId pivot), ou fallback.
   const kpiIds = layout
     ? layout.widgets
-        .filter((w) => w.vizType === "kpiCard")
+        .filter((w) => !SKIP_VIZ_TYPES.has(w.vizType))
         .map((w) => w.kpiId)
     : fallbackKpiIds;
 

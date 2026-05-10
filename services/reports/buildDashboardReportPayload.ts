@@ -8,13 +8,14 @@
 // pour produire les KPI tiles, les boîtes de texte, et les placeholders
 // pour les charts (rendu graphique à venir).
 
-import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
+import type { AnalysisRecord, CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { isKpiAvailable } from "@/lib/kpi/kpiAvailability";
+import { getRawVariableDefinition, isRawVariableId } from "@/lib/dashboard/rawVariableCatalog";
 import {
-  fmtMoney, fmtPercent, fmtRatio, fmtDays, fmtYears,
+  fmtMoney, fmtPercent, fmtRatio, fmtDays,
   type CompanyInfo,
 } from "@/services/reports/buildSyntheseReportPayload";
 
@@ -91,6 +92,7 @@ function kpiLabelAndDescription(kpiId: string): { label: string; description: st
 function serializeWidget(
   widget: WidgetInstance,
   kpis: CalculatedKpis,
+  mappedData: MappedFinancialData | null,
   synthese: SyntheseViewModel | null,
 ): DashboardWidgetData | null {
   const { vizType, kpiId } = widget;
@@ -129,6 +131,57 @@ function serializeWidget(
     };
   }
 
+  // Widgets riches catégorisés — chaque widget est rendu comme une kpiCard
+  // standard avec une valeur principale (le KPI pivot) et une description
+  // condensant les métriques secondaires. Visuellement aligné avec les
+  // autres tiles, plus de "bullet list" asymétrique.
+  if (vizType === "breakEvenChart") {
+    const card = buildBreakEvenCard(kpis);
+    if (!card) return null;
+    return card;
+  }
+  if (vizType === "bfrCycle") {
+    const card = buildBfrCycleCard(kpis);
+    if (!card) return null;
+    return card;
+  }
+  if (vizType === "liquidityRatios") {
+    const card = buildLiquidityRatiosCard(kpis);
+    if (!card) return null;
+    return card;
+  }
+  if (vizType === "roeRoceChart") {
+    const card = buildRoeRoceCard(kpis);
+    if (!card) return null;
+    return card;
+  }
+  if (vizType === "customChart") {
+    const title = widget.customConfig?.title?.trim() || "Graphique personnalisé";
+    const seriesCount = widget.customConfig?.series?.length ?? 0;
+    return {
+      vizType: "lineChart",
+      label: title,
+      placeholderNote: seriesCount > 0
+        ? `Graphique personnalisé (${seriesCount} série${seriesCount > 1 ? "s" : ""}) — visible dans l'application.`
+        : "Graphique personnalisé — visible dans l'application.",
+    };
+  }
+
+  // Variables brutes Bilan / CdR (préfixe `raw:`) : valeur lue dans
+  // mappedData via le catalogue, rendue comme une carte KPI standard.
+  if (isRawVariableId(kpiId)) {
+    const def = getRawVariableDefinition(kpiId);
+    if (!def || !mappedData) return null;
+    const value = (mappedData as unknown as Record<string, number | null>)[def.field];
+    if (value === null || value === undefined || !Number.isFinite(value)) return null;
+    return {
+      vizType: "kpiCard",
+      label: def.label,
+      valueLabel: fmtMoney(value) ?? "",
+      description: def.source === "bilan" ? "Variable du bilan" : "Variable du compte de résultat",
+    };
+  }
+
   // Widgets KPI standards.
   const value = (kpis as unknown as Record<string, number | null>)[kpiId];
   if (value === null || value === undefined || !Number.isFinite(value)) return null;
@@ -144,22 +197,118 @@ function serializeWidget(
     };
   }
 
-  // Charts → placeholder pour V1 (rendu graphique à venir).
-  // On caste explicitement le vizType vers le sous-ensemble graphique.
-  type ChartVizType = Extract<
-    DashboardWidgetData,
-    { vizType: "evolutionChart" | "lineChart" | "barChart" | "donut" | "comparison" | "waterfall" | "gauge" }
-  >["vizType"];
-  const allowedChartTypes: readonly ChartVizType[] = [
-    "evolutionChart", "lineChart", "barChart", "donut", "comparison", "waterfall", "gauge",
-  ];
-  const chartViz = (allowedChartTypes as readonly string[]).includes(vizType)
-    ? (vizType as ChartVizType)
-    : "lineChart";
+  // Widgets graphiques (lineChart, barChart, gauge, donut, comparison,
+  // waterfall, evolutionChart) adossés à un KPI réel : rendus comme une
+  // kpiCard avec la valeur courante + une note "Évolution / graphique
+  // dans l'application". Beaucoup plus propre que le placeholder vide.
   return {
-    vizType: chartViz,
+    vizType: "kpiCard",
     label,
-    placeholderNote: `Visualisation ${vizType} — graphique disponible dans l'application.`,
+    valueLabel: formatKpiValue(kpiId, value),
+    description: chartContextNote(vizType, description),
+  };
+}
+
+function chartContextNote(vizType: string, baseDescription: string): string {
+  const visual: Record<string, string> = {
+    lineChart: "Évolution",
+    barChart: "Histogramme",
+    gauge: "Jauge",
+    donut: "Décomposition",
+    comparison: "Comparaison marché",
+    waterfall: "Cascade",
+    evolutionChart: "Évolution multi-séries",
+  };
+  const kind = visual[vizType] ?? "Graphique";
+  // On garde la description du registre KPI tronquée + une note discrète
+  // que la visualisation est dispo dans l'app. La concaténation reste
+  // courte (≤ 200 chars) pour ne pas faire déborder la tile dans le PDF.
+  const truncatedBase = baseDescription.length > 130
+    ? baseDescription.slice(0, 129).replace(/[,;.\s]+$/, "") + "…"
+    : baseDescription;
+  return `${truncatedBase} ${kind} dans l'application.`.trim();
+}
+
+// ─── Builders kpiCard pour les widgets riches catégorisés ──────────────
+// Chaque widget riche concentre 2-4 métriques. On choisit une "valeur
+// principale" (le KPI pivot affiché en gros sur l'écran) et on condense
+// les autres en description compacte → la tile PDF est uniforme avec les
+// kpiCards standards, plutôt qu'une bullet list asymétrique.
+
+type KpiCardData = Extract<DashboardWidgetData, { vizType: "kpiCard" }>;
+
+function buildBreakEvenCard(k: CalculatedKpis): KpiCardData | null {
+  if (k.point_mort === null || !Number.isFinite(k.point_mort)) return null;
+  const parts: string[] = [];
+  if (k.ca !== null && k.point_mort > 0) {
+    const ratio = k.ca / k.point_mort;
+    parts.push(ratio >= 1
+      ? `Dépassé de ${((ratio - 1) * 100).toFixed(0)} %`
+      : `Reste ${((1 - ratio) * 100).toFixed(0)} % à atteindre`);
+  }
+  if (k.tmscv !== null && Number.isFinite(k.tmscv)) {
+    const pct = k.tmscv > 1 ? k.tmscv : k.tmscv * 100;
+    parts.push(`TMSCV ${fmtPercent(pct, 1)}`);
+  }
+  return {
+    vizType: "kpiCard",
+    label: "Seuil de rentabilité",
+    valueLabel: fmtMoney(k.point_mort) ?? "",
+    description: parts.length > 0
+      ? parts.join(" • ")
+      : "CA minimum à réaliser pour couvrir toutes les charges.",
+  };
+}
+
+function buildBfrCycleCard(k: CalculatedKpis): KpiCardData | null {
+  if (k.rot_bfr === null || !Number.isFinite(k.rot_bfr)) return null;
+  const parts: string[] = [];
+  if (k.dso !== null) parts.push(`DSO ${Math.round(k.dso)} j`);
+  if (k.rot_stocks !== null) parts.push(`DIO ${Math.round(k.rot_stocks)} j`);
+  if (k.dpo !== null) parts.push(`DPO ${Math.round(k.dpo)} j`);
+  return {
+    vizType: "kpiCard",
+    label: "Cycle d'exploitation (rotation BFR)",
+    valueLabel: fmtDays(k.rot_bfr) ?? "",
+    description: parts.length > 0
+      ? parts.join(" • ")
+      : "Nombre de jours de CA immobilisés dans le cycle.",
+  };
+}
+
+function buildLiquidityRatiosCard(k: CalculatedKpis): KpiCardData | null {
+  if (k.liq_gen === null || !Number.isFinite(k.liq_gen)) return null;
+  const parts: string[] = [];
+  if (k.liq_red !== null) parts.push(`Réduite ${fmtRatio(k.liq_red)}`);
+  if (k.liq_imm !== null) parts.push(`Immédiate ${fmtRatio(k.liq_imm)}`);
+  return {
+    vizType: "kpiCard",
+    label: "Liquidité générale",
+    valueLabel: fmtRatio(k.liq_gen) ?? "",
+    description: parts.length > 0
+      ? parts.join(" • ")
+      : "Capacité à couvrir les dettes court terme.",
+  };
+}
+
+function buildRoeRoceCard(k: CalculatedKpis): KpiCardData | null {
+  const roePct = k.roe !== null && Number.isFinite(k.roe) ? k.roe * 100 : null;
+  const rocePct = k.roce !== null && Number.isFinite(k.roce) ? k.roce * 100 : null;
+  if (roePct === null) return null;
+  const parts: string[] = [];
+  if (rocePct !== null) parts.push(`ROCE ${fmtPercent(rocePct, 2)}`);
+  if (rocePct !== null) {
+    const spread = roePct - rocePct;
+    const sign = spread >= 0 ? "+" : "";
+    parts.push(`Effet de levier ${sign}${spread.toFixed(2).replace(".", ",")} pts`);
+  }
+  return {
+    vizType: "kpiCard",
+    label: "Rentabilité des capitaux propres (ROE)",
+    valueLabel: fmtPercent(roePct, 2) ?? "",
+    description: parts.length > 0
+      ? parts.join(" • ")
+      : "Rendement des capitaux investis par les actionnaires.",
   };
 }
 
@@ -188,6 +337,7 @@ export function buildDashboardReportPayload(
   options: DashboardReportOptions,
 ): DashboardReportPayload {
   const k = analysis.kpis;
+  const m = analysis.mappedData;
   const meta = analysis.sourceMetadata;
 
   const reportDate = options.reportDate ||
@@ -220,14 +370,16 @@ export function buildDashboardReportPayload(
   // (doctrine "zéro N/D"), MAIS on garde toujours la section dans le rapport
   // si l'utilisateur l'a sélectionnée. Une section sans widget exploitable
   // reste imprimée avec son titre + un message "aucun widget exportable".
+  // mappedData passé au serializer pour résoudre les variables brutes
+  // (raw:*) et les widgets riches qui en ont besoin.
   const sections: DashboardSection[] = [];
-  const ctx = { kpis: k, synthese: null, currentAnalysis: analysis };
+  const ctx = { kpis: k, mappedData: m ?? null, synthese: null, currentAnalysis: analysis };
 
   for (const d of input.dashboards) {
     const widgets: DashboardWidgetData[] = [];
     for (const w of d.layout.widgets) {
       if (!isKpiAvailable(w.kpiId, ctx)) continue;
-      const serialized = serializeWidget(w, k, null);
+      const serialized = serializeWidget(w, k, m ?? null, null);
       if (serialized) widgets.push(serialized);
     }
     sections.push({ title: d.title, description: d.description, widgets });

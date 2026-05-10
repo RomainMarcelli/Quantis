@@ -51,14 +51,10 @@ export function FinancialLineRow({
             : undefined
       }
     >
-      <span className="truncate text-white/85">
-        {line.label}
-        {line.pcgCode ? (
-          <span className="ml-1.5 font-mono text-[9px] text-white/30" data-fin-pcg>
-            [{line.pcgCode}]
-          </span>
-        ) : null}
-      </span>
+      {/* Brief 10/05/2026 — codes 2033-SD masqués visuellement (parasitaient
+          la lecture). On garde le `pcgCode` dans le `title` du parent pour
+          permettre au curieux de le retrouver au survol. */}
+      <span className="truncate text-white/85">{line.label}</span>
       <span
         className={`flex-shrink-0 font-mono tabular-nums ${
           negative ? "text-rose-300/85" : "text-white/85"
@@ -76,14 +72,19 @@ export function FinancialLineRow({
  *   "section" : sous-total d'une section (ex. "Total produits expl.")
  *   "result"  : résultat intermédiaire (EBIT, résultat financier...)
  *   "final"   : résultat net / total bilan — accent doré
+ *
+ * Si `brutValue` est fourni (cf. actif immobilisé), on rend deux colonnes
+ * "Brut · Net" comme un bilan papier. Sinon, simple ligne label + montant.
  */
 export function SectionSubtotal({
   label,
   value,
+  brutValue = null,
   intensity = "section",
 }: {
   label: string;
   value: number | null;
+  brutValue?: number | null;
   intensity?: "section" | "result" | "final";
 }) {
   const negative = typeof value === "number" && value < 0;
@@ -101,6 +102,28 @@ export function SectionSubtotal({
       : negative
         ? "text-rose-300"
         : "text-white";
+
+  // Mode "Brut · Net" : 3 colonnes (label | brut | net) — utilisé pour le
+  // sous-total Actif immobilisé où la distinction valeur brute / valeur
+  // nette comptable est significative (amortissements cumulés).
+  if (brutValue !== null && Number.isFinite(brutValue)) {
+    return (
+      <div
+        className={`grid grid-cols-[1fr_auto_auto] items-baseline gap-4 ${styling}`}
+        data-fin-subtotal={intensity}
+      >
+        <span>{label}</span>
+        <span className="flex-shrink-0 font-mono tabular-nums text-white/55">
+          <span className="mr-1.5 text-[9px] uppercase tracking-wider">Brut</span>
+          {formatAmount(brutValue)}
+        </span>
+        <span className={`flex-shrink-0 font-mono tabular-nums ${amountColor}`}>
+          <span className="mr-1.5 text-[9px] uppercase tracking-wider opacity-70">Net</span>
+          {formatAmount(value)}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -166,6 +189,7 @@ export function SectionCard({
         <SectionSubtotal
           label={`Total ${section.title.toLowerCase()}`}
           value={section.subtotal}
+          brutValue={section.subtotalBrut ?? null}
           intensity="section"
         />
       ) : null}

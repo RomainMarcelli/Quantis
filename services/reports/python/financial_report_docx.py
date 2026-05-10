@@ -593,6 +593,19 @@ def _build_dashboard(doc: Document, payload: dict) -> None:
         build_dashboard_section(doc, section)
 
 
+def _build_statement(doc: Document, payload: dict) -> None:
+    """Mode statement : cover + sommaire + bilan (actif + passif) OU CDR seul.
+    Pas de synthèse ni d'analyse — export ciblé sur l'état financier consulté."""
+    build_cover(doc, payload)
+    build_toc(doc, payload)
+    kind = payload.get("statementKind") or "bilan"
+    if kind == "bilan":
+        build_bilan_actif(doc, payload)
+        build_bilan_passif(doc, payload)
+    else:
+        build_compte_resultat(doc, payload)
+
+
 def build_document(payload: dict[str, Any]) -> bytes:
     doc = Document()
     # Marges raisonnables
@@ -605,6 +618,8 @@ def build_document(payload: dict[str, Any]) -> bytes:
     mode = payload.get("mode") or "synthese"
     if mode == "dashboard":
         _build_dashboard(doc, payload)
+    elif mode == "statement":
+        _build_statement(doc, payload)
     else:
         _build_synthese(doc, payload)
 

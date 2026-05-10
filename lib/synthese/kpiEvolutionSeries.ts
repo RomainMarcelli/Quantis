@@ -29,7 +29,37 @@ function readKpiValue(kpis: CalculatedKpis | null | undefined, kpiId: string): n
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-// ─── Mode annuel ─────────────────────────────────────────────────────────
+// ─── Mode annuel — DYNAMIQUE (agrégation depuis dailyAccounting) ──────────
+// Quand l'analyse courante est dynamique, on agrège ses KPIs par année à
+// partir du dailyAccounting (Jan-Dec par exercice civil) plutôt que de
+// fallback sur l'historique d'analyses (qui mélange dynamique et statique
+// → incohérence visuelle entre mode mensuel et mode annuel).
+
+export function buildKpiYearlyFromDaily(
+  analysis: AnalysisRecord,
+  kpiId: string,
+): KpiEvolutionPoint[] {
+  const daily = analysis.dailyAccounting;
+  if (!daily || daily.length === 0) return [];
+
+  const years = new Set<number>();
+  for (const entry of daily) {
+    const d = new Date(entry.date);
+    if (!Number.isNaN(d.getTime())) years.add(d.getFullYear());
+  }
+  const sortedYears = Array.from(years).sort((a, b) => a - b);
+
+  return sortedYears.map((year) => {
+    const result = recomputeKpisForPeriod(analysis, `${year}-01-01`, `${year}-12-31`);
+    return {
+      key: String(year),
+      label: String(year),
+      value: readKpiValue(result.kpis, kpiId),
+    };
+  });
+}
+
+// ─── Mode annuel — STATIQUE (historique d'analyses) ──────────────────────
 
 export function buildKpiYearlySeries(
   analyses: AnalysisRecord[],

@@ -13,9 +13,15 @@ export type ExportFormat = "pdf" | "docx";
 type Props = {
   onExport: (format: ExportFormat) => void | Promise<void>;
   disabled?: boolean;
+  /** Libellé du bouton (défaut "Exporter la synthèse"). Utilisé pour
+   *  réutiliser le composant sur les pages États financiers ("Exporter le
+   *  bilan" / "Exporter le compte de résultat"). */
+  label?: string;
 };
 
-export function ExportSyntheseButton({ onExport, disabled = false }: Props) {
+export function ExportSyntheseButton({
+  onExport, disabled = false, label = "Exporter la synthèse",
+}: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
@@ -143,7 +149,7 @@ export function ExportSyntheseButton({ onExport, disabled = false }: Props) {
         }}
       >
         <Download className="h-3.5 w-3.5" />
-        {busy ? "Export en cours…" : "Exporter la synthèse"}
+        {busy ? "Export en cours…" : label}
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
       {menu}

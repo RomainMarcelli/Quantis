@@ -22,6 +22,14 @@ import { buildIncomeStatement } from "@/lib/financials/buildIncomeStatement";
 import { buildBalanceSheet } from "@/lib/financials/buildBalanceSheet";
 import { IncomeStatement } from "@/components/financials/IncomeStatement";
 import { BalanceSheet } from "@/components/financials/BalanceSheet";
+import { TemporalityBar } from "@/components/temporality/TemporalityBar";
+import { StaticYearBar } from "@/components/temporality/StaticYearBar";
+import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
+import { useTemporality } from "@/lib/temporality/temporalityContext";
+import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
+import { buildSyntheseYearOptions, filterAnalysesByYear } from "@/lib/synthese/synthesePeriod";
+import { ExportSyntheseButton } from "@/components/synthese/ExportSyntheseButton";
+import { downloadStatementReport } from "@/lib/reports/downloadStatementReport";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 
@@ -101,13 +109,77 @@ export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) 
     }
   }
 
-  const activeAnalysis = useMemo<AnalysisRecord | null>(() => {
+  const baseAnalysis = useMemo<AnalysisRecord | null>(() => {
     return resolveCurrentAnalysisForSource(
       analyses,
       activeAccountingSource,
       activeFecFolderName
     );
   }, [analyses, activeAccountingSource, activeFecFolderName]);
+
+  // ── Temporality (slider de période, dynamique) ──
+  // Utilisé pour recomputer les mappedData/kpis sur la fenêtre choisie.
+  // Sur sources statiques (PDF / Excel = snapshots annuels), la fenêtre
+  // n'a pas d'effet — recomputeKpisForPeriod retourne le snapshot tel quel.
+  const temporality = useTemporality();
+
+  // ── Sélecteur d'année statique ──
+  // Quand le dossier comporte plusieurs analyses statiques (uploads PDF
+  // multi-exercices), l'utilisateur choisit l'exercice à afficher via la
+  // StaticYearBar du header.
+  const currentYearForOptions = useMemo(
+    () => new Date().getFullYear(),
+    [],
+  );
+  const yearOptions = useMemo(
+    () => buildSyntheseYearOptions(analyses, currentYearForOptions),
+    [analyses, currentYearForOptions],
+  );
+  const [selectedYearValue, setSelectedYearValue] = useState<string>("");
+  useEffect(() => {
+    if (!yearOptions.length) return;
+    const exists = yearOptions.some((opt) => opt.value === selectedYearValue);
+    if (!exists || !selectedYearValue) {
+      setSelectedYearValue(yearOptions[0]!.value);
+    }
+  }, [yearOptions, selectedYearValue]);
+
+  // Pour les sources STATIQUES multi-exercices : on bascule l'analyse de
+  // base sur celle de l'année sélectionnée. `filterAnalysesByYear` gère la
+  // résolution. Pour les sources DYNAMIQUES, baseAnalysis reste le snapshot
+  // courant (un seul exercice = celui synchronisé).
+  const yearScopedAnalysis = useMemo<AnalysisRecord | null>(() => {
+    if (!baseAnalysis) return null;
+    if (shouldShowTemporalityBar(baseAnalysis)) return baseAnalysis;
+    if (!selectedYearValue) return baseAnalysis;
+    const filtered = filterAnalysesByYear(analyses, selectedYearValue, currentYearForOptions);
+    return filtered[0] ?? baseAnalysis;
+  }, [analyses, baseAnalysis, selectedYearValue, currentYearForOptions]);
+
+  // ── Analyse effective (post-recompute temporality) ──
+  // Pour le mode dynamique, on recompute les mappedData/kpis sur la fenêtre
+  // [periodStart, periodEnd] choisie via la TemporalityBar. Pour le mode
+  // statique, recomputeKpisForPeriod retourne le snapshot tel quel.
+  const effective = useMemo(() => {
+    if (!yearScopedAnalysis) return null;
+    return recomputeKpisForPeriod(
+      yearScopedAnalysis,
+      temporality.periodStart,
+      temporality.periodEnd,
+    );
+  }, [yearScopedAnalysis, temporality.periodStart, temporality.periodEnd]);
+
+  // L'analyse "active" affichée à l'écran ET utilisée comme base pour
+  // l'export. mappedData/kpis viennent de `effective` (recomputé), tout
+  // le reste vient de `yearScopedAnalysis` (id, fiscalYear, sourceMetadata).
+  const activeAnalysis = useMemo<AnalysisRecord | null>(() => {
+    if (!yearScopedAnalysis || !effective) return null;
+    return {
+      ...yearScopedAnalysis,
+      mappedData: effective.mappedData,
+      kpis: effective.kpis,
+    };
+  }, [yearScopedAnalysis, effective]);
 
   const incomeStatement = useMemo(
     () =>
@@ -129,18 +201,64 @@ export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) 
     ? `${documentLabel} · Exercice ${activeAnalysis.fiscalYear ?? "—"}`
     : documentLabel;
 
+  // ── Ligne 2 du AppHeader : sélecteur de période + actions ──
+  // Aligné sur la Synthèse pour cohérence visuelle. La TemporalityBar
+  // (mode dynamique) recompute les mappedData via `effective` ci-dessus ;
+  // la StaticYearBar (mode statique) bascule entre les analyses du dossier
+  // multi-exercices via `yearScopedAnalysis`.
+  const showDynamicBar = activeAnalysis && shouldShowTemporalityBar(activeAnalysis);
+  const headerTemporalityBar = showDynamicBar
+    ? (
+      <TemporalityBar
+        availableRange={computeAvailableRange(activeAnalysis!)}
+        daysInPeriod={null}
+        flat
+      />
+    )
+    : activeAnalysis && yearOptions.length > 0
+      ? (
+        <StaticYearBar
+          options={yearOptions}
+          value={selectedYearValue}
+          onChange={setSelectedYearValue}
+        />
+      )
+      : null;
+
+  // Action principale : exporter le document courant en PDF / Word.
+  // Pipeline dédié `/api/reports/statement` : cover + sommaire + l'état
+  // sélectionné UNIQUEMENT (pas de synthèse Vyzor ni d'analyse). On pousse
+  // les `effectiveMappedData` (post-recompute par la TemporalityBar /
+  // sélecteur d'année) pour garantir la parité écran ↔ export.
+  const exportLabel = mode === "bilan" ? "Exporter le bilan" : "Exporter le compte de résultat";
+  const headerActions = activeAnalysis ? (
+    <ExportSyntheseButton
+      label={exportLabel}
+      onExport={async (format) => {
+        const err = await downloadStatementReport({
+          analysisId: activeAnalysis.id,
+          kind: mode === "bilan" ? "bilan" : "cdr",
+          effectiveMappedData: activeAnalysis.mappedData,
+          format,
+        });
+        if (err) console.warn("[statement-report] download failed", err);
+      }}
+    />
+  ) : null;
+
   return (
     <section className="w-full space-y-4">
-      {/* Phase 3 brief Header unifié 09/05/2026 :
-          variant="data" pour exposer la ligne 2 (TemporalityBar +
-          actions). Bouton Retour supprimé (la sidebar suffit pour
-          la navigation). Pas de TemporalityBar ici car les états
-          financiers sont des snapshots à un instant T (clôture). */}
+      {/* Phase 3 brief Header unifié 09/05/2026 + brief 10/05/2026 :
+          variant="data" + ligne 2 alignée sur la Synthèse (sélecteur de
+          période + bouton Exporter). Bouton Retour supprimé — la sidebar
+          suffit pour la navigation. */}
       <AppHeader
         variant="data"
         companyName={companyName}
         subtitle={subtitle}
         contextBadge={activeAnalysis ? <ActiveSourceBadge analysis={activeAnalysis} /> : undefined}
+        temporalityBar={headerTemporalityBar}
+        headerActions={headerActions}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
@@ -183,13 +301,29 @@ export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) 
                 Bilan (comptes 1 à 5) ou Compte de résultat (6 à 7).
                 Section cohérence retirée (demande user). */}
             {mode === "bilan" ? (
-              <BalanceSheet sheet={balanceSheet} />
+              <BalanceSheet
+                sheet={balanceSheet}
+                referenceDate={
+                  // Mode dynamique : on utilise periodEnd de la TemporalityBar
+                  // pour afficher "Au {date}" cohérent avec l'année/période
+                  // sélectionnée. Mode statique : referenceDate=undefined →
+                  // le composant retombe sur "Au 31/12/{fiscalYear}" du
+                  // yearScopedAnalysis.
+                  showDynamicBar ? temporality.periodEnd : null
+                }
+              />
             ) : (
-              <IncomeStatement statement={incomeStatement} />
+              <IncomeStatement
+                statement={incomeStatement}
+                periodLabel={
+                  showDynamicBar
+                    ? formatPeriodLabel(temporality.periodStart, temporality.periodEnd)
+                    : null
+                }
+              />
             )}
             <p className="text-center text-[10px] italic text-white/35">
-              Codes 2033-SD entre crochets sur chaque ligne · survolez pour la
-              définition · postes à zéro masqués pour la lisibilité.
+              Survolez une ligne pour sa définition · postes à zéro masqués pour la lisibilité.
             </p>
           </>
         )}
@@ -209,4 +343,17 @@ function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): s
   if (user.displayName?.trim()) return user.displayName.trim().split(" ")[0] || "Utilisateur";
   if (user.email) return user.email.split("@")[0] || "Utilisateur";
   return "Utilisateur";
+}
+
+// Libellé "Du DD/MM/YYYY au DD/MM/YYYY" affiché en tête du compte de
+// résultat en mode dynamique. Le CDR est toujours "sur une période", donc
+// préférable au seul "Exercice 2026" hardcodé qui ne reflète pas la
+// fenêtre choisie via la TemporalityBar.
+function formatPeriodLabel(start: string, end: string): string {
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+  return `Du ${fmt(start)} au ${fmt(end)}`;
 }

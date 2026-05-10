@@ -123,6 +123,16 @@ export const WIDGET_CATEGORIES: WidgetCategoryDefinition[] = [
 // car healthScore est rendu dans son propre VyzorScoreCard, pas dans la grille.
 const HIDDEN_CATEGORIES = new Set(["score"]);
 
+// IDs alias du registre — KPIs qui partagent label/valeur avec un autre id
+// canonique mais existent pour des raisons historiques (tooling premium qui
+// référençait des nomenclatures anglo-saxonnes ou françaises selon le call-site).
+// On les masque du picker pour éviter les doublons visuels du type
+// "Excédent brut d'exploitation / EBE" listé deux fois (ebitda + ebe).
+//   - ebitda → ebe (alias français, même valeur)
+//   - resultat_net → netProfit (alias EN, même valeur)
+//   - bfr → workingCapital (alias EN, même valeur)
+const ALIAS_KPI_IDS = new Set(["ebitda", "netProfit", "workingCapital"]);
+
 // Convertit une SyntheseWidgetDefinition en PickerEntry uniforme.
 function toEntryFromSynthese(def: SyntheseWidgetDefinition): PickerEntry {
   return { id: def.id, label: def.label, shortLabel: def.shortLabel };
@@ -154,7 +164,11 @@ export function listKpisByCategory(category: WidgetCategory): PickerEntry[] {
     return [];
   }
   return Object.values(KPI_REGISTRY)
-    .filter((def) => def.category === category && !HIDDEN_CATEGORIES.has(def.category))
+    .filter((def) =>
+      def.category === category
+      && !HIDDEN_CATEGORIES.has(def.category)
+      && !ALIAS_KPI_IDS.has(def.id),
+    )
     .map(toEntryFromKpi);
 }
 
@@ -165,7 +179,7 @@ export function listAllPickerKpis(): PickerEntry[] {
     ...SYNTHESE_WIDGET_CATALOG.map(toEntryFromSynthese),
     ...RAW_VARIABLE_CATALOG.map(toEntryFromRaw),
     ...Object.values(KPI_REGISTRY)
-      .filter((def) => !HIDDEN_CATEGORIES.has(def.category))
+      .filter((def) => !HIDDEN_CATEGORIES.has(def.category) && !ALIAS_KPI_IDS.has(def.id))
       .map(toEntryFromKpi)
   ];
 }

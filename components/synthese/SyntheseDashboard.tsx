@@ -7,7 +7,6 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Calendar } from "lucide-react";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
 import { resolveDisponibilitesOverride } from "@/lib/banking/disponibilitesOverride";
 import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
@@ -193,15 +192,13 @@ export function SyntheseDashboard({
   // le download direct depuis SyntheseView (un seul format = PDF).
   const analysisModeLabel = resolveAnalysisModeLabel(currentAnalysis);
 
-  // Sélecteur d'année statique (sources PDF/Excel) — rendu UNIQUEMENT si le
-  // parent ne fournit pas déjà un `temporalitySlot` (mode dynamique). Un
-  // sélecteur statique n'a de sens qu'à partir de 2 années comparables.
-  const showStaticYearBar =
-    !temporalitySlot &&
-    yearOptions !== undefined &&
-    yearOptions.length > 1 &&
-    selectedYearValue !== undefined &&
-    onYearChange !== undefined;
+  // Sélecteurs de période retirés du dashboard synthèse — désormais portés
+  // exclusivement par l'AppHeader (cf. brief). Les props legacy sont silen-
+  // cieusement consommées ici pour ne pas casser les callers existants.
+  void temporalitySlot;
+  void yearOptions;
+  void selectedYearValue;
+  void onYearChange;
 
   // Phase 3 brief 09/05/2026 — analysisModeLabel n'est plus consommé par
   // le bandeau "ANALYSE DYNAMIQUE" (supprimé). On garde le calcul pour
@@ -224,40 +221,12 @@ export function SyntheseDashboard({
         </div>
       </header>
 
-      {/* Sélecteur de période — soit la TemporalityBar complète (sources
-          dynamiques : Pennylane/MyUnisoft/Odoo), soit une mini-bar "Année"
-          (sources statiques PDF/Excel). Placée juste sous le titre — le
-          sélecteur jadis présent dans la sidebar a été retiré (doublon). */}
-      {temporalitySlot ? temporalitySlot : null}
-      {showStaticYearBar ? (
-        <div className="precision-card flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3" data-scroll-reveal-ignore>
-          <div className="flex items-center gap-2 text-white/60">
-            <Calendar className="h-4 w-4" />
-            <span className="text-xs uppercase tracking-wider">Période</span>
-          </div>
-          <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-            <button
-              type="button"
-              className="rounded-md bg-quantis-gold px-3 py-1 text-xs font-medium text-black"
-              aria-pressed
-            >
-              Année
-            </button>
-          </div>
-          <select
-            id="synthese-year-static"
-            value={selectedYearValue}
-            onChange={(event) => onYearChange?.(event.target.value)}
-            className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white outline-none transition hover:bg-white/10 focus:border-quantis-gold/70"
-          >
-            {yearOptions!.map((option) => (
-              <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
+      {/* Sélecteurs de période (TemporalityBar dynamique + StaticYearBar
+          statique) supprimés ici — désormais portés exclusivement par
+          l'AppHeader pour éviter le doublon visuel sous le titre Synthèse.
+          Les props `temporalitySlot` / `yearOptions` / `selectedYearValue` /
+          `onYearChange` sont conservés pour compat (legacy callers) mais
+          ne rendent plus rien dans cette vue. */}
 
       {/* Bandeau meta supprimé — brief 09/05/2026.
           L'info entreprise/source est désormais portée par AppHeader

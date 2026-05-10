@@ -23,12 +23,25 @@ import {
   SectionSubtotal,
 } from "@/components/financials/FinancialsCommon";
 
-export function IncomeStatement({ statement }: { statement: IncomeStatementType }) {
+type IncomeStatementProps = {
+  statement: IncomeStatementType;
+  /** Libellé custom de période ("Du DD/MM/YYYY au DD/MM/YYYY"). Override
+   *  le fallback "Exercice {fiscalYear}" — utilisé en mode dynamique pour
+   *  refléter la fenêtre TemporalityBar (sinon le CDR affiche l'exercice
+   *  de l'analyse mère, pas la période sélectionnée). */
+  periodLabel?: string | null;
+};
+
+export function IncomeStatement({ statement, periodLabel }: IncomeStatementProps) {
   return (
     <article className="precision-card rounded-2xl px-5 py-4">
       <header className="mb-4 flex items-baseline justify-between gap-3 border-b border-white/10 pb-3">
         <h2 className="text-sm font-semibold tracking-wide text-white">Compte de résultat</h2>
-        {statement.fiscalYear ? (
+        {periodLabel ? (
+          <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
+            {periodLabel}
+          </span>
+        ) : statement.fiscalYear ? (
           <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
             Exercice {statement.fiscalYear}
           </span>

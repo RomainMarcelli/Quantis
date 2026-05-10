@@ -142,6 +142,19 @@ export async function generateDashboardReportPdf(
   return { buffer, format };
 }
 
+/**
+ * Génère le rapport mode "statement" — cover + sommaire + bilan (actif +
+ * passif) OU compte de résultat. Variante allégée pour la page États
+ * financiers : pas de synthèse Vyzor, pas de pages d'analyse.
+ */
+export async function generateStatementReportPdf(
+  payload: object,
+  format: ReportFormat = "pdf",
+): Promise<{ buffer: Buffer; format: ReportFormat }> {
+  const buffer = await runPython(payload, format);
+  return { buffer, format };
+}
+
 /** Nom de fichier suggéré : rapport-financier-YYYY-MM.{pdf|docx}. */
 export function suggestReportFilename(analysis: AnalysisRecord, format: ReportFormat = "pdf"): string {
   const meta = analysis.sourceMetadata;

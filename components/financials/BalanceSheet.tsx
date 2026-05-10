@@ -18,7 +18,22 @@ import {
   formatAmount,
 } from "@/components/financials/FinancialsCommon";
 
-export function BalanceSheet({ sheet }: { sheet: BalanceSheetType }) {
+type BalanceSheetProps = {
+  sheet: BalanceSheetType;
+  /** Date ISO (YYYY-MM-DD) à afficher en tête du bilan ("Au …"). Override
+   *  le fallback `31/12/{fiscalYear}` — utile en mode dynamique pour
+   *  refléter `periodEnd` de la TemporalityBar (sinon le bilan affiche
+   *  la clôture de l'analyse mère, pas celle de la période sélectionnée). */
+  referenceDate?: string | null;
+};
+
+function formatRefDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+export function BalanceSheet({ sheet, referenceDate }: BalanceSheetProps) {
   const showCcaActif = sheet.actif.cca !== null && sheet.actif.cca !== 0;
   const showPcaPassif = sheet.passif.pca !== null && sheet.passif.pca !== 0;
   const hasActifContent =
@@ -35,7 +50,11 @@ export function BalanceSheet({ sheet }: { sheet: BalanceSheetType }) {
     <article className="precision-card rounded-2xl px-5 py-4">
       <header className="mb-4 flex items-baseline justify-between gap-3 border-b border-white/10 pb-3">
         <h2 className="text-sm font-semibold tracking-wide text-white">Bilan</h2>
-        {sheet.fiscalYear ? (
+        {referenceDate ? (
+          <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
+            Au {formatRefDate(referenceDate)}
+          </span>
+        ) : sheet.fiscalYear ? (
           <span className="font-mono text-[10px] uppercase tracking-wider text-white/45">
             Au 31/12/{sheet.fiscalYear}
           </span>

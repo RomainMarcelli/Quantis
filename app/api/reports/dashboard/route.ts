@@ -54,6 +54,29 @@ const FIXED_DASHBOARD_LABELS: Record<string, { title: string; description: strin
   },
 };
 
+/**
+ * BUG HISTORIQUE (corrigé 10/05/2026) : le rapport dashboard recevait des
+ * IDs en kebab-case venant du modal ("creation-valeur") mais les widgets
+ * sont sauvegardés par `<CustomizableDashboard layoutId="dashboard:..."/>`
+ * sous une clé différente (avec préfixe `dashboard:` et underscore). Le
+ * `readDashboardLayout(userId, "creation-valeur")` retournait donc toujours
+ * null → fallback systématique sur le default en code → l'export ignorait
+ * toute customisation utilisateur.
+ *
+ * Cette table résout les 4 onglets fixes vers leur clé Firestore réelle.
+ * Les ids commençant par `custom:` passent inchangés (déjà alignés).
+ */
+const TAB_ID_TO_FIRESTORE_LAYOUT_ID: Record<string, string> = {
+  "creation-valeur": "dashboard:creation_valeur",
+  "investissement-bfr": "dashboard:investissement",
+  financement: "dashboard:financement",
+  rentabilite: "dashboard:rentabilite",
+};
+
+function resolveFirestoreLayoutId(tabId: string): string {
+  return TAB_ID_TO_FIRESTORE_LAYOUT_ID[tabId] ?? tabId;
+}
+
 type RequestBody = {
   analysisId?: string;
   dashboardIds?: string[];
@@ -127,20 +150,24 @@ export async function POST(request: NextRequest) {
   // customisé verrait son rapport vide, alors que l'écran montre les widgets
   // par défaut.
   const dashboards: DashboardReportInput["dashboards"] = [];
-  for (const id of dashboardIds) {
-    const stored = await readDashboardLayout(userId, id);
-    const fallbackDefault = getDefaultDashboardLayout(id);
+  for (const tabId of dashboardIds) {
+    // Tab id en kebab-case (ex. "creation-valeur") résolu vers la clé
+    // Firestore réelle (ex. "dashboard:creation_valeur"). Custom dashboards
+    // (`custom:<uuid>`) passent inchangés.
+    const firestoreId = resolveFirestoreLayoutId(tabId);
+    const stored = await readDashboardLayout(userId, firestoreId);
+    const fallbackDefault = getDefaultDashboardLayout(tabId);
     const layout: DashboardLayout = stored ?? fallbackDefault ?? {
-      id,
+      id: firestoreId,
       widgets: [] as WidgetInstance[],
     };
-    const meta = FIXED_DASHBOARD_LABELS[id];
+    const meta = FIXED_DASHBOARD_LABELS[tabId];
     let title = meta?.title;
     let description = meta?.description;
-    if (!title && id.startsWith("custom:")) {
+    if (!title && tabId.startsWith("custom:")) {
       title = layout.name || "Tableau personnalisé";
     }
-    if (!title) title = id;
+    if (!title) title = tabId;
     dashboards.push({ layout, title, description });
   }
 

@@ -28,7 +28,45 @@ export type EvolutionPoint = {
 export type EvolutionSeriesMode = "yearly" | "monthly";
 
 // ───────────────────────────────────────────────────────────────────────
-// Mode annuel (statique)
+// Mode annuel — DYNAMIQUE : agrégation des KPIs depuis dailyAccounting
+// ───────────────────────────────────────────────────────────────────────
+// Quand l'analyse courante a un dailyAccounting exploitable (sources
+// connectées Pennylane / MyUnisoft / FEC), on PRÉFÈRE agréger les KPIs
+// année par année à partir de ces données fines, plutôt que de tomber sur
+// `buildYearlySeries(analyses)` qui mélange dynamique et statique. Cela
+// évite l'incohérence visuelle où le mode mensuel montre des courbes
+// fluides mais l'annuel saute brutalement à des valeurs d'analyses
+// statiques (uploads PDF passés) sans rapport avec le dailyAccounting.
+
+export function buildYearlyFromDaily(analysis: AnalysisRecord): EvolutionPoint[] {
+  const daily = analysis.dailyAccounting;
+  if (!daily || daily.length === 0) return [];
+
+  // Collecte des années couvertes par le dailyAccounting (dates ISO).
+  const years = new Set<number>();
+  for (const entry of daily) {
+    const d = new Date(entry.date);
+    if (!Number.isNaN(d.getTime())) years.add(d.getFullYear());
+  }
+  const sortedYears = Array.from(years).sort((a, b) => a - b);
+
+  // Pour chaque année, on recompute les KPIs sur la fenêtre Jan-Dec.
+  // recomputeKpisForPeriod gère l'absence de données dans la fenêtre en
+  // retournant des KPIs null → la courbe Recharts skip naturellement.
+  return sortedYears.map((year) => {
+    const result = recomputeKpisForPeriod(analysis, `${year}-01-01`, `${year}-12-31`);
+    return {
+      key: String(year),
+      label: String(year),
+      ca: result.kpis.ca ?? null,
+      ebe: result.kpis.ebe ?? null,
+      resultatNet: result.kpis.resultat_net ?? null,
+    };
+  });
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// Mode annuel — STATIQUE : historique d'analyses (uploads PDF / Excel)
 // ───────────────────────────────────────────────────────────────────────
 
 export function buildYearlySeries(analyses: AnalysisRecord[]): EvolutionPoint[] {

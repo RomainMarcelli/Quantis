@@ -130,11 +130,30 @@ export function AppSidebar({
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [ready, setReady] = useState(false);
-  // Brief 09/06/2026 : sous-menus FERMÉS par défaut peu importe la route —
-  // seule la flèche reste visible pour les déplier à la demande. Évite
-  // d'encombrer la sidebar avec un long arbre déployé en permanence.
-  const [dashboardSubmenuOpen, setDashboardSubmenuOpen] = useState(false);
-  const [financialSubmenuOpen, setFinancialSubmenuOpen] = useState(false);
+  // L'AppSidebar est rendue À L'INTÉRIEUR de chaque page (pas dans un
+  // layout partagé Next.js), elle remonte donc à chaque navigation. Pour
+  // éviter que le dropdown se ferme à chaque clic sur un sous-onglet, on
+  // dérive l'état initial du pathname : ouvert si on est déjà sur une
+  // sous-route. L'utilisateur peut ensuite toggle librement — la fermeture
+  // explicite ne sera pas conservée entre 2 navigations, mais c'est OK :
+  // le cas typique est "j'ouvre le menu, je clique un sous-item, je veux
+  // voir les autres options à proximité après navigation".
+  const [dashboardSubmenuOpen, setDashboardSubmenuOpen] = useState(
+    () => pathname?.startsWith("/analysis") ?? false,
+  );
+  const [financialSubmenuOpen, setFinancialSubmenuOpen] = useState(
+    () => pathname?.startsWith("/etats-financiers/") ?? false,
+  );
+
+  // Quand le pathname change pendant la session (navigation client-side),
+  // on ouvre le dropdown correspondant si l'utilisateur arrive sur une
+  // sous-route. On NE FERME pas l'autre — l'user peut avoir voulu garder
+  // un dropdown ouvert visuellement même en quittant sa zone.
+  useEffect(() => {
+    if (!pathname) return;
+    if (pathname.startsWith("/etats-financiers/")) setFinancialSubmenuOpen(true);
+    if (pathname.startsWith("/analysis")) setDashboardSubmenuOpen(true);
+  }, [pathname]);
 
   // Items rendus sous "Tableau de bord" :
   //   - Si la page courante a fourni son propre `dashboardSubmenu` (cas de

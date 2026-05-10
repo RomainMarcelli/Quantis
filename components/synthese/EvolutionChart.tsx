@@ -29,6 +29,7 @@ import { useTheme } from "@/hooks/useTheme";
 import type { AnalysisRecord } from "@/types/analysis";
 import {
   buildMonthlySeries,
+  buildYearlyFromDaily,
   buildYearlySeries,
   filterYearlyByRange,
   hasMonthlyDataAvailable,
@@ -80,12 +81,21 @@ function EvolutionChartImpl({ analyses, currentAnalysis }: EvolutionChartProps) 
   // Construction de la série en fonction du mode actif.
   // useMemo : les builders sont O(N) mais buildMonthlySeries appelle
   // recomputeKpisForPeriod à chaque mois (computeKpis × 12-24). Cache strict.
+  //
+  // Mode annuel : si l'analyse courante est dynamique (dailyAccounting
+  // disponible), on agrège ses données année par année via
+  // `buildYearlyFromDaily` — sinon on tomberait sur des valeurs annuelles
+  // venues d'analyses statiques tierces (uploads PDF passés) qui n'ont
+  // aucun rapport avec la timeline dynamique affichée en mode mensuel.
   const series = useMemo<EvolutionPoint[]>(() => {
     if (mode === "monthly" && currentAnalysis) {
       return buildMonthlySeries(currentAnalysis, monthlyWindow);
     }
+    if (mode === "yearly" && monthlyAvailable && currentAnalysis) {
+      return filterYearlyByRange(buildYearlyFromDaily(currentAnalysis), yearlyRange);
+    }
     return filterYearlyByRange(buildYearlySeries(analyses), yearlyRange);
-  }, [mode, monthlyWindow, yearlyRange, analyses, currentAnalysis]);
+  }, [mode, monthlyWindow, yearlyRange, analyses, currentAnalysis, monthlyAvailable]);
 
   const hasData = series.some(
     (p) => p.ca !== null || p.ebe !== null || p.resultatNet !== null

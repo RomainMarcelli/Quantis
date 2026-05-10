@@ -161,10 +161,39 @@ def _build_dashboard_story(payload: dict[str, Any], styles, page_refs: dict) -> 
     return story
 
 
+def _build_statement_story(payload: dict[str, Any], styles, page_refs: dict) -> list:
+    """Mode statement : cover + sommaire + bilan (actif + passif) OU CDR seul.
+    Variante allégée du mode synthèse — l'utilisateur veut juste un export
+    de l'état financier qu'il consulte, sans synthèse ni analyse."""
+    story: list = []
+    story += build_cover(payload, styles)
+    story.append(NextPageTemplate("page"))
+    story.append(PageBreak())
+    story.append(PageMarker("toc", page_refs))
+    story += build_toc(payload, styles)
+
+    kind = payload.get("statementKind") or "bilan"
+    if kind == "bilan":
+        story.append(PageBreak())
+        story.append(PageMarker("bilan_actif", page_refs))
+        story += build_bilan_actif(payload, styles)
+        story.append(PageBreak())
+        story.append(PageMarker("bilan_passif", page_refs))
+        story += build_bilan_passif(payload, styles)
+    else:
+        # kind == "cdr"
+        story.append(PageBreak())
+        story.append(PageMarker("compte_resultat", page_refs))
+        story += build_compte_resultat(payload, styles)
+    return story
+
+
 def _build_story(payload: dict[str, Any], styles, page_refs: dict) -> list:
     mode = payload.get("mode") or "synthese"
     if mode == "dashboard":
         return _build_dashboard_story(payload, styles, page_refs)
+    if mode == "statement":
+        return _build_statement_story(payload, styles, page_refs)
     # Default + "synthese".
     return _build_synthese_story(payload, styles, page_refs)
 
@@ -198,6 +227,26 @@ def _resolve_dynamic_toc(payload: dict[str, Any], page_refs: dict) -> None:
                 "description": section.get("description", "") or "",
                 "page": page,
             })
+        payload["toc"] = toc
+        return
+    if mode == "statement":
+        kind = payload.get("statementKind") or "bilan"
+        sections = (
+            [
+                ("bilan_actif", "Bilan — Actif", "Détail des emplois de l'entreprise"),
+                ("bilan_passif", "Bilan — Passif", "Détail des ressources de l'entreprise"),
+            ]
+            if kind == "bilan"
+            else [
+                ("compte_resultat", "Compte de résultat", "Formation du résultat sur la période"),
+            ]
+        )
+        toc = []
+        for i, (key, title, desc) in enumerate(sections, start=1):
+            page = page_refs.get(key)
+            if page is None:
+                return
+            toc.append({"num": i, "title": title, "description": desc, "page": page})
         payload["toc"] = toc
 
 
