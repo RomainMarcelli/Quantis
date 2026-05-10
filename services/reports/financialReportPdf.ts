@@ -93,6 +93,16 @@ export type GenerateOptions = {
   /** Layout synthèse de l'utilisateur — pour reproduire ses widgets KPI dans
    *  la grille "Indicateurs clés" du rapport. Null = layout par défaut. */
   syntheseLayout?: DashboardLayout | null;
+  /**
+   * Layouts des 4 onglets dashboard catégorisés. Servent à reproduire dans
+   * le PDF EXACTEMENT les KPIs que l'utilisateur a placés sur ses dashboards
+   * (Création de valeur / Investissement / Financement / Rentabilité). Si
+   * un layout est null, fallback sur un set par défaut côté builder.
+   */
+  valueCreationLayout?: DashboardLayout | null;
+  investmentLayout?: DashboardLayout | null;
+  financingLayout?: DashboardLayout | null;
+  rentabilityLayout?: DashboardLayout | null;
   /** Format de sortie (PDF par défaut). */
   format?: ReportFormat;
 };
@@ -110,6 +120,10 @@ export async function generateFinancialReportPdf(
     logoPath: LOGO_PATH,
     companyInfo: options.companyInfo,
     syntheseLayout: options.syntheseLayout ?? null,
+    valueCreationLayout: options.valueCreationLayout ?? null,
+    investmentLayout: options.investmentLayout ?? null,
+    financingLayout: options.financingLayout ?? null,
+    rentabilityLayout: options.rentabilityLayout ?? null,
   });
   const buffer = await runPython(payload, format);
   return { buffer, format };

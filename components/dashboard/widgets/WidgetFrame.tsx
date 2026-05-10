@@ -20,7 +20,7 @@
 "use client";
 
 import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Minus, Target } from "lucide-react";
+import { Minus, MoreHorizontal } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { WidgetInstance, WidgetSize, WidgetWidth } from "@/types/dashboard";
@@ -291,7 +291,7 @@ export function WidgetFrame({
               title="Alertes & objectifs"
               className="pointer-events-auto absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-neutral-700/95 text-quantis-gold shadow-lg backdrop-blur transition hover:bg-neutral-600"
             >
-              <Target className="h-3.5 w-3.5" strokeWidth={2.5} />
+              <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2.5} />
             </button>
           ) : null}
 

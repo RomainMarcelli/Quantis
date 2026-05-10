@@ -108,15 +108,23 @@ export async function POST(request: NextRequest) {
     // Best effort — un rapport sans N-1 reste valide.
   }
 
-  // Layout synthèse de l'utilisateur — sert à reproduire dans le PDF
-  // EXACTEMENT les KPIs qu'il a placés dans son dashboard synthèse. Si
-  // jamais ouvert, fallback sur le layout par défaut côté builder.
-  let syntheseLayout = null;
-  try {
-    syntheseLayout = await readDashboardLayout(userId, "synthese");
-  } catch {
-    // best effort
-  }
+  // Layouts utilisateur — synthèse + 4 onglets catégorisés. Servent à
+  // reproduire dans le PDF EXACTEMENT les KPIs placés par l'utilisateur sur
+  // chaque dashboard. Si jamais ouvert, fallback sur les sets par défaut
+  // côté builder. Lecture en parallèle pour rester sous le timeout Python.
+  const [
+    syntheseLayout,
+    valueCreationLayout,
+    investmentLayout,
+    financingLayout,
+    rentabilityLayout,
+  ] = await Promise.all([
+    readDashboardLayout(userId, "synthese").catch(() => null),
+    readDashboardLayout(userId, "dashboard:creation_valeur").catch(() => null),
+    readDashboardLayout(userId, "dashboard:investissement").catch(() => null),
+    readDashboardLayout(userId, "dashboard:financement").catch(() => null),
+    readDashboardLayout(userId, "dashboard:rentabilite").catch(() => null),
+  ]);
 
   // Génération. `previousAnalysis` est lu plus haut pour de futures variations
   // N-1 dans le rapport — non consommé pour l'instant côté payload (le mode
@@ -127,6 +135,10 @@ export async function POST(request: NextRequest) {
     result = await generateFinancialReportPdf(analysis, {
       companyName,
       syntheseLayout,
+      valueCreationLayout,
+      investmentLayout,
+      financingLayout,
+      rentabilityLayout,
       format: requestedFormat,
     });
   } catch (error) {

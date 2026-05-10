@@ -462,56 +462,68 @@ function buildCompteResultat(m: MappedFinancialData): CdrRow[] {
 
 // ─── KPI sections ──────────────────────────────────────────────────────────
 
-function signalForKpi(value: number | null, kind: "money_pos" | "money_neg" | "ratio_high" | "ratio_low"): "positive" | "risk" | undefined {
-  if (value === null) return undefined;
-  if (kind === "money_pos") return value >= 0 ? "positive" : "risk";
-  if (kind === "money_neg") return value <= 0 ? "positive" : "risk";
-  return undefined;
+// ─── Builders layout-aware ──────────────────────────────────────────────
+// Avant : 4 listes hardcodées (Création valeur, Investissement, Financement,
+// Rentabilité) → le rapport ignorait toute customisation utilisateur des
+// onglets dashboard et affichait toujours les mêmes 18 KPIs.
+//
+// Après : on lit les widgets KpiCard du layout passé en option et on
+// construit la liste à partir d'eux. Le rapport reflète exactement ce que
+// l'utilisateur a placé sur ses dashboards. Si aucun layout n'est fourni
+// (utilisateur n'a jamais customisé), fallback sur un set par défaut
+// aligné sur DEFAULT_DASHBOARD_LAYOUTS.
+
+const DEFAULT_VALUE_CREATION_KPIS = ["va", "ebitda", "marge_ebitda", "tmscv", "point_mort", "resultat_net"];
+const DEFAULT_INVESTMENT_KPIS = ["bfr", "dso", "dpo", "rot_bfr"];
+const DEFAULT_FINANCING_KPIS = ["caf", "solvabilite", "gearing", "tn", "liq_gen", "liq_red", "liq_imm", "disponibilites"];
+const DEFAULT_PROFITABILITY_KPIS = ["roe", "roce"];
+
+/**
+ * Construit la liste des items "ligne par KPI" à partir d'un layout. On lit
+ * uniquement les widgets `kpiCard` (les autres types — chart, custom — n'ont
+ * pas de sens ligne à ligne). La description vient du tooltip.explanation
+ * du registre, tronquée à ~180 caractères pour rester sur une ligne dans
+ * le PDF. Si la valeur du KPI est indisponible, l'item est omis (zéro N/D).
+ */
+function buildItemsFromLayout(
+  k: CalculatedKpis,
+  layout: DashboardLayout | null,
+  fallbackKpiIds: string[],
+): LabeledItem[] {
+  const ctx = { kpis: k, synthese: null, currentAnalysis: null };
+  // KPIs à afficher : kpiCard du layout user (ordre préservé), ou fallback.
+  const kpiIds = layout
+    ? layout.widgets
+        .filter((w) => w.vizType === "kpiCard")
+        .map((w) => w.kpiId)
+    : fallbackKpiIds;
+
+  // Dédup tout en préservant l'ordre — un user pourrait avoir 2 widgets
+  // sur le même KPI (ex. KpiCard + LineChart) → on n'imprime qu'une ligne.
+  const seen = new Set<string>();
+  const items: LabeledItem[] = [];
+  for (const kpiId of kpiIds) {
+    if (seen.has(kpiId)) continue;
+    seen.add(kpiId);
+    if (!isKpiAvailable(kpiId, ctx)) continue;
+    const def = getKpiDefinition(kpiId);
+    if (!def) continue;
+    const value = (k as unknown as Record<string, number | null>)[kpiId];
+    const valueLabel = formatKpiByUnit(kpiId, value ?? null);
+    if (valueLabel === null) continue;
+    items.push({
+      label: def.label,
+      valueLabel,
+      description: truncateText(def.tooltip.explanation, 180),
+      signal: signalForUnit(kpiId, value ?? null),
+    });
+  }
+  return items;
 }
 
-/** Filtre les items dont la valeur n'est pas calculable. */
-function pruneItems(items: LabeledItem[]): LabeledItem[] {
-  return items.filter((i) => i.valueLabel !== null);
-}
-
-function buildValueCreationItems(k: CalculatedKpis): LabeledItem[] {
-  return pruneItems([
-    { label: "Valeur ajoutée (VA)", valueLabel: fmtMoney(k.va), description: "La VA mesure la richesse créée par l'entreprise après déduction des consommations intermédiaires." },
-    { label: "EBITDA", valueLabel: fmtMoney(k.ebitda), description: "L'EBITDA mesure la performance opérationnelle pure, indépendamment de la structure financière.", signal: signalForKpi(k.ebitda, "money_pos") },
-    { label: "Marge EBITDA", valueLabel: fmtPercent(k.marge_ebitda), description: "Une marge supérieure à 10 % est généralement considérée comme saine.", signal: signalForKpi(k.marge_ebitda, "money_pos") },
-    { label: "Taux de marge sur coûts variables (TMSCV)", valueLabel: fmtPercent(k.tmscv ? k.tmscv * 100 : null), description: "Part du chiffre d'affaires restant après couverture des charges variables." },
-    { label: "Point mort", valueLabel: fmtMoney(k.point_mort), description: "Chiffre d'affaires minimum pour couvrir toutes les charges fixes." },
-    { label: "Résultat net", valueLabel: fmtMoney(k.resultat_net), description: "Bénéfice final après toutes charges, impôts et éléments exceptionnels.", signal: signalForKpi(k.resultat_net, "money_pos") },
-  ]);
-}
-
-function buildInvestmentItems(k: CalculatedKpis): LabeledItem[] {
-  return pruneItems([
-    { label: "BFR", valueLabel: fmtMoney(k.bfr), description: "Un BFR négatif signifie que vos fournisseurs vous financent — situation favorable.", signal: signalForKpi(k.bfr, "money_neg") },
-    { label: "DSO (Rotation clients)", valueLabel: fmtDays(k.dso), description: "Nombre de jours moyen pour encaisser vos créances clients." },
-    { label: "DPO (Rotation fournisseurs)", valueLabel: fmtDays(k.dpo), description: "Nombre de jours moyen pour régler vos fournisseurs." },
-    { label: "Rotation BFR", valueLabel: fmtDays(k.rot_bfr), description: "Nombre de jours de chiffre d'affaires immobilisés dans le cycle d'exploitation." },
-  ]);
-}
-
-function buildFinancingItems(k: CalculatedKpis): LabeledItem[] {
-  return pruneItems([
-    { label: "CAF", valueLabel: fmtMoney(k.caf), description: "Capacité de l'entreprise à générer des liquidités par son activité.", signal: signalForKpi(k.caf, "money_pos") },
-    { label: "Solvabilité", valueLabel: fmtPercent(k.solvabilite ? k.solvabilite * 100 : null), description: "Part des actifs financés par les capitaux propres — idéalement > 20 %." },
-    { label: "Gearing (ratio d'endettement)", valueLabel: fmtRatio(k.gearing), description: "Rapport entre la dette nette et les capitaux propres." },
-    { label: "Trésorerie nette", valueLabel: fmtMoney(k.tn), description: "Différence entre les disponibilités et les dettes financières court terme.", signal: signalForKpi(k.tn, "money_pos") },
-    { label: "Liquidité générale", valueLabel: fmtRatio(k.liq_gen), description: "Capacité à faire face aux dettes court terme — idéalement > 1." },
-    { label: "Liquidité réduite", valueLabel: fmtRatio(k.liq_red), description: "Comme la liquidité générale mais hors stocks — test plus strict." },
-    { label: "Liquidité immédiate", valueLabel: fmtRatio(k.liq_imm), description: "Capacité à couvrir les dettes CT uniquement avec la trésorerie." },
-    { label: "Trésorerie disponible", valueLabel: fmtMoney(k.disponibilites), description: "Montant des disponibilités au bilan." },
-  ]);
-}
-
-function buildProfitabilityItems(k: CalculatedKpis): LabeledItem[] {
-  return pruneItems([
-    { label: "ROE", valueLabel: fmtPercent(k.roe !== null ? k.roe * 100 : null), description: "Rentabilité des capitaux propres — mesure l'efficacité du financement actionnaire." },
-    { label: "ROCE", valueLabel: fmtPercent(k.roce !== null ? k.roce * 100 : null), description: "Rentabilité économique des capitaux engagés." },
-  ]);
+function truncateText(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen - 1).replace(/[,;.\s]+$/, "") + "…";
 }
 
 // ─── KPI clés (page synthèse — grille 3x3) ─────────────────────────────────
@@ -683,6 +695,16 @@ export type SyntheseReportOptions = {
    * un set par défaut (CA, EBE, RN, TN, Solva, Marge EBITDA).
    */
   syntheseLayout?: DashboardLayout | null;
+  /**
+   * Layouts des 4 onglets dashboard catégorisés. Servent à construire les
+   * pages "Analyse — Création de valeur / Investissement / Financement /
+   * Rentabilité" en reproduisant les KPIs effectivement placés par
+   * l'utilisateur. Si un layout est null, fallback sur un set par défaut.
+   */
+  valueCreationLayout?: DashboardLayout | null;
+  investmentLayout?: DashboardLayout | null;
+  financingLayout?: DashboardLayout | null;
+  rentabilityLayout?: DashboardLayout | null;
 };
 
 export function buildSyntheseReportPayload(
@@ -834,9 +856,9 @@ export function buildSyntheseReportPayload(
     bilanActif: buildBilanActif(m),
     bilanPassif: buildBilanPassif(m),
     compteResultat: buildCompteResultat(m),
-    valueCreationItems: buildValueCreationItems(k),
-    investmentItems: buildInvestmentItems(k),
-    financingItems: buildFinancingItems(k),
-    profitabilityItems: buildProfitabilityItems(k),
+    valueCreationItems: buildItemsFromLayout(k, options.valueCreationLayout ?? null, DEFAULT_VALUE_CREATION_KPIS),
+    investmentItems: buildItemsFromLayout(k, options.investmentLayout ?? null, DEFAULT_INVESTMENT_KPIS),
+    financingItems: buildItemsFromLayout(k, options.financingLayout ?? null, DEFAULT_FINANCING_KPIS),
+    profitabilityItems: buildItemsFromLayout(k, options.rentabilityLayout ?? null, DEFAULT_PROFITABILITY_KPIS),
   };
 }
