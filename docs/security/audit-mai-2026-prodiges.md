@@ -50,15 +50,29 @@ Les collections internes (`security_audit_logs`) sont gérées exclusivement cô
 - Diff vs `firestore.rules` du code → écart identifié (3 sous-collections présentes en prod mais absentes du code).
 - Validation des invariants : tous les `read`/`write` exigent `request.auth != null` et un check d'identité.
 - Documents immutables (`allow update: if false` sur `analyses`) : OK.
+- **Test isolation cross-user via Firebase Rules Playground (13 mai 2026)** — cf. § ci-dessous.
+
+#### Test isolation cross-user — 13 mai 2026
+
+Trois simulations exécutées dans le **Rules Playground** de la console Firebase prod, avec un UID d'attaquant fictif (`attacker-uid-test-123`) tentant de lire des documents appartenant à d'autres utilisateurs :
+
+| # | Simulation | Location | Auth UID | Résultat |
+|---|---|---|---|---|
+| 1 | `get` doc analyse d'un autre user | `/analyses/7QKGkdbdFomzI9xn2Y6d` | `attacker-uid-test-123` | **Simulated read denied** ✓ |
+| 2 | `get` document `users/{UID}` d'un autre user | `/users/<UID existant ≠ attaquant>` | `attacker-uid-test-123` | **Simulated read denied** ✓ |
+| 3 | `get` doc `connections/{id}` (tokens chiffrés Pennylane/MyUnisoft/Bridge) | `/connections/<id existant>` | `attacker-uid-test-123` | **Simulated read denied** ✓ |
+
+**Conclusion** : la Row-Level Security Firestore est opérationnelle. Un attaquant qui connaîtrait un docID valide (par fuite d'URL, scraping, etc.) ne peut **pas** accéder aux données s'il n'est pas le propriétaire identifié dans `resource.data.userId` ou dans le path `/users/{uid}/…`. Le test critique sur `/connections` confirme que les tokens chiffrés des connecteurs comptables tiers sont protégés.
 
 ### Verdict
 
-**OK** après correctif. Les rules en production sont strictes. Le code de la branche d'audit reflète désormais l'état de production.
+**OK** après correctif. Les rules en production sont strictes, l'isolation cross-user est validée empiriquement par 3 simulations du Rules Playground.
 
 ### Actions
 
 - `firestore.rules` mis à jour pour ajouter les 3 sous-collections manquantes (`settings`, `kpiAlerts`, `kpiObjectives`).
-- Test cross-user manuel à effectuer en pré-prod : ouvrir 2 navigateurs avec 2 comptes différents, tenter de lire les données de l'autre via le SDK web → doit échouer.
+- Test cross-user effectué (3 simulations Rules Playground, toutes `denied`).
+- Déploiement des rules à effectuer juste avant l'audit : `firebase deploy --only firestore:rules` (commande tracée dans le runbook).
 
 ---
 
@@ -174,14 +188,55 @@ La réponse expose un `deletionCounts` détaillé par collection + un compteur a
 
 Les évènements de suppression (`account_deleted_everywhere`, `account_delete_failed`, `account_delete_unauthorized_missing_token`) sont tracés dans `security_audit_logs` avec horodatage serveur, IP, métadonnées de comptage. Permet de prouver la suppression effective en cas de demande CNIL.
 
+#### 4.4 Test manuel bout en bout — 13 mai 2026
+
+Validation manuelle complémentaire aux 30 tests unitaires, exécutée sur l'environnement local connecté à Firebase prod (compte test jetable).
+
+- **Compte test** : UID `oancGWE79RWNKSLe3fFaGZmjcCc2`.
+- **État avant suppression** (query Firestore filtrée par `userId == <UID>`) :
+  - `analyses` : 1 doc
+  - 9 autres collections root (`folders`, `connections`, `accounting_entries`, `invoices`, `ledger_accounts`, `contacts`, `journals`, `bank_accounts`, `bank_transactions`) : 0 doc chacune
+  - `users/{UID}` : présent avec sous-collection `dashboards`
+  - Firebase Authentication : user présent
+- **Action utilisateur** : bouton « Supprimer mon compte » depuis `/account`.
+- **Réponse `/api/account/delete`** : HTTP 200, payload de retour cohérent.
+- **Log d'audit** écrit dans `security_audit_logs` (timestamp `2026-05-13 12:19:41 UTC+2`) :
+
+  ```json
+  {
+    "eventType": "account_deleted_everywhere",
+    "method": "POST",
+    "path": "/api/account/delete",
+    "status": 200,
+    "message": "Suppression complète confirmée (Firestore + Auth).",
+    "userId": "oancGWE79RWNKSLe3fFaGZmjcCc2",
+    "metadata": {
+      "totalRootDocsDeleted": 1,
+      "deletionCounts": {
+        "analyses": 1, "folders": 0, "connections": 0,
+        "invoices": 0, "contacts": 0, "journals": 0,
+        "ledger_accounts": 0, "accounting_entries": 0,
+        "bank_accounts": 0, "bank_transactions": 0
+      }
+    }
+  }
+  ```
+
+- **Vérification post-suppression** :
+  - Query `analyses` filtrée par UID test : 0 résultat (écart attendu -1).
+  - `users/{UID}` + sous-collections : entièrement purgés via `firestore.recursiveDelete`.
+  - Firebase Authentication : user supprimé de la liste.
+- **Conclusion** : le droit à l'effacement RGPD (art. 17) est opérationnel de bout en bout. Le log auditable permet de produire la preuve de la suppression à toute autorité de contrôle.
+
 ### Verdict
 
-**OK** après correctif.
+**OK** après correctif, validé par tests unitaires (30/30) + test manuel bout en bout du 13 mai 2026.
 
 ### Actions
 
 - `/api/account/delete` étendu (cf. § 4.2 ci-dessus).
 - Tests existants (30 tests sécurité passants) : aucune régression. Le contrat de réponse est rétro-compatible.
+- Test manuel exécuté et tracé (cf. § 4.4 ci-dessus).
 
 ---
 
