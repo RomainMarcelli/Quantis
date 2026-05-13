@@ -805,6 +805,13 @@ body {
   opacity: 0.6;
 }
 
+/* Variante état d'erreur (utilisée par le wizard d'inscription AuthPage
+   quand un champ select n'est pas valide). Garde la priorité sur :hover. */
+.quantis-select-trigger.has-error,
+.quantis-select-trigger.has-error:hover {
+  border-color: rgb(239 68 68 / 50%);
+}
+
 .quantis-select-menu {
   z-index: 240;
   max-height: 18rem;
