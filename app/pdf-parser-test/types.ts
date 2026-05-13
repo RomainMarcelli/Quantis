@@ -1,4 +1,4 @@
-export type QuantisData = {
+export type VyzorData = {
   ca: number | null;
   totalCharges: number | null;
   netResult: number | null;
@@ -18,7 +18,7 @@ export type ParserSuccessPayload = {
   success: true;
   parserVersion?: string;
   requestId?: string | null;
-  quantisData: QuantisData;
+  quantisData: VyzorData;
   mappedData?: NumericRecord;
   kpis?: NumericRecord;
   confidenceScore: number;
@@ -64,7 +64,7 @@ export type ParserHistoryItem = {
   id: string;
   createdAt: string;
   source: "pdf";
-  quantisData: QuantisData;
+  quantisData: VyzorData;
   confidenceScore: number;
   warnings: string[];
 };

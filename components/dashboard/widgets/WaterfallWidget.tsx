@@ -8,7 +8,7 @@
 // soustractives sont en rose, les positives en vert/or, le total en blanc.
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { formatCurrency, INSUFFICIENT_DATA_LABEL } from "@/components/dashboard/formatting";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import type { MappedFinancialData } from "@/types/analysis";
@@ -105,7 +105,7 @@ function posVal(v: number | null | undefined): number {
   return v;
 }
 
-export function WaterfallWidget({ kpiId, mappedData }: WaterfallWidgetProps) {
+function WaterfallWidgetImpl({ kpiId, mappedData }: WaterfallWidgetProps) {
   const definition = getKpiDefinition(kpiId);
   const steps = useMemo(() => buildWaterfallSteps(kpiId, mappedData), [kpiId, mappedData]);
   const title = definition?.label ?? kpiId;
@@ -227,5 +227,7 @@ export function getWaterfallTotal(kpiId: string, m: MappedFinancialData | null):
   const total = steps.find((s) => s.kind === "total");
   return total?.value ?? null;
 }
+
+export const WaterfallWidget = memo(WaterfallWidgetImpl);
 
 void formatCurrency; // garde l'import au cas où on ré-active le tooltip Recharts plus tard

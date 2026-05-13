@@ -14,7 +14,7 @@ type WidgetPreviewProps = {
   kpiId: string;
 };
 
-// Couleurs Quantis utilisées dans toutes les illustrations.
+// Couleurs Vyzor utilisées dans toutes les illustrations.
 const C_GOLD = "#D4AF37";
 const C_WHITE = "#FFFFFF";
 const C_GREEN = "#10B981";
@@ -56,7 +56,7 @@ function renderVizPreview(vizType: WidgetVizType, title: string) {
     case "evolutionChart":
       return <EvolutionPreview />;
     case "quantisScore":
-      return <QuantisScorePreview />;
+      return <VyzorScorePreview />;
     case "aiInsight":
       return <AiInsightPreview />;
     case "alertList":
@@ -297,7 +297,7 @@ function EvolutionPreview() {
   );
 }
 
-function QuantisScorePreview() {
+function VyzorScorePreview() {
   // Arc circulaire + nombre central + 4 piliers en bas.
   return (
     <div className="flex h-full w-full flex-col items-center justify-between py-1">

@@ -19,8 +19,8 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Quantis",
-  description: "Quantis - Plateforme d'intelligence financière",
+  title: "Vyzor",
+  description: "Vyzor - Plateforme d'intelligence financière",
   icons: {
     icon: "/images/LogoV3.png",
     apple: "/images/LogoV3.png",

@@ -4,7 +4,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { writeActiveAnalysisId } from "@/lib/source/activeSource";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -21,7 +20,7 @@ import {
 } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
 
-type ProviderId = "pennylane" | "myunisoft" | "odoo" | "tiime" | "other";
+export type ProviderId = "pennylane" | "myunisoft" | "odoo" | "tiime" | "other";
 
 type ProviderCard = {
   id: ProviderId;
@@ -59,10 +58,19 @@ type ConnectedRecap = {
 type WizardProps = {
   /** Appelé après une synchro réussie pour rafraîchir le parent (analyses, panneau de connections, etc.). */
   onSyncCompleted?: () => void | Promise<void>;
+  /**
+   * Provider à pré-sélectionner. Court-circuite l'écran "choisir un
+   * logiciel" — utilisé quand le wizard est ouvert depuis une tuile
+   * spécifique de la grille /documents.
+   */
+  initialProvider?: ProviderId | null;
 };
 
-export function AccountingConnectionWizard({ onSyncCompleted }: WizardProps) {
-  const [chosen, setChosen] = useState<ProviderId | null>(null);
+export function AccountingConnectionWizard({
+  onSyncCompleted,
+  initialProvider = null,
+}: WizardProps) {
+  const [chosen, setChosen] = useState<ProviderId | null>(initialProvider);
   const [recap, setRecap] = useState<ConnectedRecap | null>(null);
 
   function reset() {
@@ -365,21 +373,11 @@ function totalPersisted(data: unknown): number {
   return report?.entities?.reduce((s, e) => s + e.itemsPersisted, 0) ?? 0;
 }
 
-/**
- * Si la réponse du sync contient une analyse fraîchement persistée (champ
- * `analysis.analysisId`), bascule l'analyse active sur celle-ci.
- *
- * Pourquoi ici plutôt que côté serveur : la notion de "source active" est
- * locale au navigateur (localStorage `quantis.activeAnalysis`) — un sync
- * réussi ne doit pas forcer ce changement pour les autres devices de
- * l'utilisateur. C'est uniquement la session courante qui bascule.
- */
-function activateAnalysisFromSync(data: unknown): void {
-  const analysisId = (data as { analysis?: { analysisId?: string } }).analysis?.analysisId;
-  if (analysisId) {
-    writeActiveAnalysisId(analysisId);
-  }
-}
+// L'auto-activation post-sync a été retirée : avec le nouveau modèle
+// "source active" stocké en Firestore, l'activation est explicite via le
+// toggle binaire vert/rouge de /documents (cf. useActiveDataSource).
+// Une sync ne doit plus forcer la bascule pour respecter le choix
+// utilisateur (notamment cross-device).
 
 type ConnectedHandler = (recap: ConnectedRecap) => void;
 
@@ -489,7 +487,7 @@ function PennylaneStep({
       // dashboard. Sans ça l'utilisateur sync mais reste sur sa source précédente
       // (PDF, Excel) sans s'en rendre compte — c'est exactement la friction
       // qu'on cherche à éliminer.
-      activateAnalysisFromSync(sync.data);
+
       onConnected({
         provider: "pennylane",
         connectionId,
@@ -521,7 +519,7 @@ function PennylaneStep({
       // Idem que handleConnect : on bascule la source active sur la nouvelle
       // analyse Pennylane générée par ce resync, pour que le dashboard reflète
       // immédiatement les chiffres frais.
-      activateAnalysisFromSync(sync.data);
+
       onConnected({
         provider: "pennylane",
         connectionId: existing.id,
@@ -668,21 +666,21 @@ function MyUnisoftStep({
   onSyncCompleted?: () => void | Promise<void>;
 }) {
   const [jwt, setJwt] = useState("");
-  const [companyId, setCompanyId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleConnect() {
-    if (!jwt.trim() || !companyId.trim()) {
-      setError("Token JWT et ID société sont obligatoires.");
+    if (!jwt.trim()) {
+      setError("Token JWT obligatoire.");
       return;
     }
     setError(null);
     setBusy(true);
     try {
+      // L'externalCompanyId est dérivé côté serveur depuis le JWT
+      // (claim `sub`/`cabinet_id`) — l'utilisateur n'a pas à le saisir.
       const connect = await callApi("/api/integrations/myunisoft/connect", {
         accessToken: jwt.trim(),
-        externalCompanyId: companyId.trim(),
       });
       if (!connect.ok) throw new Error(extractError(connect.data, "Connexion refusée"));
       const connectionId = (connect.data as { connectionId: string }).connectionId;
@@ -711,9 +709,9 @@ function MyUnisoftStep({
     <div className="flex flex-col gap-4">
       <Header title="Connectez votre MyUnisoft" subtitle="Synchronisation en lecture seule depuis votre dossier." />
       <Instruction>
-        Dans MyUnisoft, allez dans <strong className="text-white">Paramètres → Connecteurs dossier → Sélectionnez Quantis → Cliquez Générer</strong>.
+        Dans MyUnisoft, allez dans <strong className="text-white">Paramètres → Connecteurs dossier → Sélectionnez Vyzor → Cliquez Générer</strong>.
       </Instruction>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3">
         <SecureField
           label="Token JWT"
           value={jwt}
@@ -723,18 +721,11 @@ function MyUnisoftStep({
           sensitive
           disabled={busy}
         />
-        <SecureField
-          label="ID de votre société"
-          value={companyId}
-          onChange={setCompanyId}
-          placeholder="ex. 227732"
-          disabled={busy}
-        />
       </div>
       <div>
         <PrimaryButton
           onClick={() => void handleConnect()}
-          disabled={busy || !jwt.trim() || !companyId.trim()}
+          disabled={busy || !jwt.trim()}
           busy={busy}
         >
           {busy ? "Connexion en cours…" : "Connecter"}

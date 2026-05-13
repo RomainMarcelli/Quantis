@@ -214,7 +214,11 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
 
   const popoverStyle: React.CSSProperties = {
     position: "fixed",
-    backgroundColor: "rgba(197, 160, 89, 0.12)",
+    // Fond pilotable par CSS var pour le flip dark/light :
+    //   dark   → gold dilué (fallback hex)
+    //   light  → gris neutre #F5F5F5 (cf. retour utilisateur 08/05/2026
+    //            sur le fond gris des tooltips)
+    backgroundColor: "var(--kpi-tooltip-bg, rgba(197, 160, 89, 0.12))",
     opacity: animateIn ? 1 : 0,
     transform,
     // Ease-out-expo : démarre vite puis se cale doucement — signature des UI
@@ -222,7 +226,7 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
     transition: `opacity ${ENTER_DURATION_MS}ms cubic-bezier(0.16, 1, 0.3, 1), transform ${ENTER_DURATION_MS}ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow ${ENTER_DURATION_MS}ms ease-out`,
     transformOrigin,
     boxShadow: animateIn
-      ? "0 12px 32px rgba(0, 0, 0, 0.55), 0 0 24px rgba(197, 160, 89, 0.18)"
+      ? "var(--kpi-tooltip-shadow, 0 12px 32px rgba(0, 0, 0, 0.55), 0 0 24px rgba(197, 160, 89, 0.18))"
       : "0 0 0 rgba(0, 0, 0, 0)",
     ...positionStyle,
   };
@@ -274,18 +278,35 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                   role="tooltip"
                   onMouseEnter={handleEnter}
                   onMouseLeave={handleLeave}
-                  className="z-[999] w-[320px] max-w-[350px] max-h-[400px] overflow-y-auto rounded-xl border border-quantis-gold/40 border-l-4 border-l-[#C5A059] p-4 text-left backdrop-blur-xl will-change-[opacity,transform]"
-                  style={popoverStyle}
+                  className="z-[999] w-[320px] max-w-[350px] max-h-[400px] overflow-y-auto rounded-xl border border-quantis-gold/40 p-4 text-left backdrop-blur-xl will-change-[opacity,transform]"
+                  style={{
+                    ...popoverStyle,
+                    // Trait gauche en gold profond — flip auto dark/light
+                    // via la CSS var (--app-brand-gold-deep = #C5A059
+                    // en dark, #8B6F2A en light cf. retour utilisateur).
+                    borderLeft: "4px solid var(--app-brand-gold-deep)",
+                  }}
                 >
                   {/* Ligne 1 — Nom complet du KPI */}
-                  <p className="text-sm font-semibold text-white" style={{ margin: 0, lineHeight: 1.3 }}>
+                  <p
+                    className="text-sm font-semibold"
+                    style={{
+                      margin: 0,
+                      lineHeight: 1.3,
+                      color: "var(--app-text-primary)",
+                    }}
+                  >
                     {definition.label}
                   </p>
 
                   {/* Ligne 2 — Définition (depuis tooltip.explanation) */}
                   <p
                     className="text-xs leading-relaxed"
-                    style={{ color: "#D1D5DB", marginTop: 10, marginBottom: 0 }}
+                    style={{
+                      color: "var(--app-text-secondary)",
+                      marginTop: 10,
+                      marginBottom: 0,
+                    }}
                   >
                     {definition.tooltip.explanation}
                   </p>
@@ -316,7 +337,7 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                         marginTop: 10,
                         marginBottom: 0,
                         fontSize: 11,
-                        color: "rgba(255, 255, 255, 0.7)",
+                        color: "var(--app-text-secondary)",
                         lineHeight: 1.5,
                       }}
                     >
@@ -329,12 +350,12 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                     style={{
                       marginTop: 10,
                       padding: "6px 10px",
-                      backgroundColor: "rgba(255, 255, 255, 0.05)",
+                      backgroundColor: "var(--app-surface-soft)",
                       borderRadius: 6,
                       fontFamily:
                         '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
                       fontSize: 11,
-                      color: "rgba(255, 255, 255, 0.65)",
+                      color: "var(--app-text-secondary)",
                       wordBreak: "break-word",
                     }}
                   >
@@ -345,7 +366,7 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                   <div
                     style={{
                       height: 1,
-                      backgroundColor: "rgba(255, 255, 255, 0.06)",
+                      backgroundColor: "var(--app-border)",
                       margin: "10px 0",
                     }}
                   />
@@ -364,6 +385,7 @@ export function KpiTooltip({ kpiId, value, align = "right" }: KpiTooltipProps) {
                       }
                       router.push(`/assistant-ia/chat?${params.toString()}`);
                     }}
+                    data-tooltip-question
                     className="flex w-full items-center gap-2 rounded-lg border border-quantis-gold/60 bg-quantis-gold/10 px-3 py-2 text-left text-[12px] font-medium text-quantis-gold transition hover:border-quantis-gold/90 hover:bg-quantis-gold/20"
                   >
                     <MessageCircle className="h-3.5 w-3.5 flex-shrink-0" />

@@ -190,4 +190,64 @@ describe("buildDailyAccounting (variable codes 2033-SD)", () => {
     expect(v.charges_soc).toBe(1500);
     expect(v.total_charges_expl).toBe(4500);
   });
+
+  // ─── cashBalance : solde cumulé classe 5 fin de jour ─────────────────
+  // Régression du 08/05/2026 : le KPI Disponibilités sur /synthese ne
+  // réagissait pas à la TemporalityBar parce que `recomputeKpisForPeriod`
+  // retournait `mappedData.dispo` (snapshot annuel) au lieu d'un solde
+  // dérivé de la période sélectionnée. Le builder doit exposer pour chaque
+  // jour le solde cumulé classe 5 ; `recomputeKpisForPeriod` l'utilise.
+
+  describe("cashBalance — solde cumulé classe 5 fin de jour", () => {
+    it("cumule les mouvements 5x jour par jour (encaissement client → décaissement fournisseur)", () => {
+      const entries: AccountingEntry[] = [
+        // Jour 1 : encaissement client 12 000 € sur compte 512
+        mkEntry("2026-03-01", [
+          mkLine("512000", 12000, 0),
+          mkLine("411000", 0, 12000),
+        ]),
+        // Jour 2 : décaissement fournisseur 4 500 €
+        mkEntry("2026-03-15", [
+          mkLine("401000", 4500, 0),
+          mkLine("512000", 0, 4500),
+        ]),
+        // Jour 3 : second encaissement 3 200 €
+        mkEntry("2026-03-31", [
+          mkLine("512000", 3200, 0),
+          mkLine("411000", 0, 3200),
+        ]),
+      ];
+      const days = buildDailyAccounting(entries);
+      expect(days).toHaveLength(3);
+      // Le solde cumulé doit progresser : 12000 → 7500 → 10700
+      expect(days[0]!.cashBalance).toBe(12000);
+      expect(days[1]!.cashBalance).toBe(7500);
+      expect(days[2]!.cashBalance).toBe(10700);
+    });
+
+    it("retourne 0 si aucun mouvement classe 5 (cas dégénéré : que des écritures non bancaires)", () => {
+      const entries: AccountingEntry[] = [
+        mkEntry("2026-04-01", [
+          mkLine("641", 3000, 0),
+          mkLine("421", 0, 3000),
+        ]),
+      ];
+      const days = buildDailyAccounting(entries);
+      expect(days[0]!.cashBalance).toBe(0);
+    });
+
+    it("ignore les comptes 519 (concours bancaires courants — passif, pas trésorerie)", () => {
+      // Le mapping pcgAggregator classe 519 en shortTermBankDebt (passif),
+      // donc 519 ne doit PAS impacter le solde dispo.
+      const entries: AccountingEntry[] = [
+        mkEntry("2026-05-01", [
+          mkLine("512000", 5000, 0), // banque +5000
+          mkLine("519100", 0, 5000), // découvert 519 (passif, pas dispo)
+        ]),
+      ];
+      const days = buildDailyAccounting(entries);
+      // dispo = 5000 (seul 512), 519 va dans shortTermBankDebt (passif)
+      expect(days[0]!.cashBalance).toBe(5000);
+    });
+  });
 });

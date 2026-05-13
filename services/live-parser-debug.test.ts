@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
 import { analyzeFinancialDocument } from "@/services/pdfAnalysis";
-import { mapToQuantisData } from "@/services/financialMapping";
+import { mapToVyzorData } from "@/services/financialMapping";
 
 describe("live parser debug", () => {
   it("prints latest suspicious analyses", async () => {
@@ -58,7 +58,7 @@ describe("live parser debug", () => {
         pages: [],
         tables: []
       });
-      const rerunQuantis = mapToQuantisData(rerun.parsedFinancialData);
+      const rerunQuantis = mapToVyzorData(rerun.parsedFinancialData);
       const targetFields = new Set([
         "netTurnover",
         "totalOperatingCharges",

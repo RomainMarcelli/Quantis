@@ -8,11 +8,11 @@ export function exportAnalysisDataAsJson(input: {
 
   const score = analysis.quantisScore;
   const level =
-    score && score.quantis_score >= 80
+    score && score.vyzor_score >= 80
       ? "Excellent"
-      : score && score.quantis_score >= 65
+      : score && score.vyzor_score >= 65
         ? "Bon"
-        : score && score.quantis_score >= 50
+        : score && score.vyzor_score >= 50
           ? "Fragile"
           : "Critique";
 
@@ -34,7 +34,7 @@ export function exportAnalysisDataAsJson(input: {
     kpis: analysis.kpis,
     quantisScore: score
       ? {
-          score: score.quantis_score,
+          score: score.vyzor_score,
           level,
           piliers: score.piliers
         }

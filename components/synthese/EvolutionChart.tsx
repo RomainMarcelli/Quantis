@@ -12,22 +12,24 @@
 // - Annuel  : 3 ans / 5 ans / Tout l'historique
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Legend,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
   type TooltipContentProps
 } from "recharts";
 import { Calendar, TrendingUp } from "lucide-react";
+import { StableChartContainer } from "@/components/dashboard/widgets/StableChartContainer";
+import { useTheme } from "@/hooks/useTheme";
 import type { AnalysisRecord } from "@/types/analysis";
 import {
   buildMonthlySeries,
+  buildYearlyFromDaily,
   buildYearlySeries,
   filterYearlyByRange,
   hasMonthlyDataAvailable,
@@ -45,8 +47,11 @@ type EvolutionChartProps = {
   currentAnalysis: AnalysisRecord | null;
 };
 
-const COLOR_CA = "#FFFFFF";
-const COLOR_EBE = "#C5A059";
+// Couleurs des séries — référencent les CSS vars qui flip selon le theme.
+// COLOR_CA pointe vers `--app-text-primary` : blanc en dark, noir en light.
+// COLOR_EBE pointe vers `--app-brand-gold` : flip aussi.
+const COLOR_CA = "var(--app-text-primary)";
+const COLOR_EBE = "var(--app-brand-gold)";
 const COLOR_RESULTAT = "#34D399";
 
 const SERIES_LABELS = {
@@ -55,8 +60,17 @@ const SERIES_LABELS = {
   resultatNet: "Résultat net"
 } as const;
 
-export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProps) {
+function EvolutionChartImpl({ analyses, currentAnalysis }: EvolutionChartProps) {
   const monthlyAvailable = hasMonthlyDataAvailable(currentAnalysis);
+  // Theme-aware chart colors. En dark : ticks/labels blancs translucides.
+  // En light : ticks/labels gris foncé + texte de légende noir (cf. brief
+  // Synthèse : "légende des graphiques en noir").
+  const { isDark } = useTheme();
+  const tickColor = isDark ? "rgba(255,255,255,0.55)" : "rgba(10,10,15,0.65)";
+  const tickColorMuted = isDark ? "rgba(255,255,255,0.45)" : "rgba(10,10,15,0.55)";
+  const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+  const axisColor = isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.12)";
+  const legendColor = isDark ? "rgba(255,255,255,0.7)" : "rgba(10,10,15,0.95)";
 
   const [mode, setMode] = useState<EvolutionSeriesMode>(
     monthlyAvailable ? "monthly" : "yearly"
@@ -67,12 +81,21 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
   // Construction de la série en fonction du mode actif.
   // useMemo : les builders sont O(N) mais buildMonthlySeries appelle
   // recomputeKpisForPeriod à chaque mois (computeKpis × 12-24). Cache strict.
+  //
+  // Mode annuel : si l'analyse courante est dynamique (dailyAccounting
+  // disponible), on agrège ses données année par année via
+  // `buildYearlyFromDaily` — sinon on tomberait sur des valeurs annuelles
+  // venues d'analyses statiques tierces (uploads PDF passés) qui n'ont
+  // aucun rapport avec la timeline dynamique affichée en mode mensuel.
   const series = useMemo<EvolutionPoint[]>(() => {
     if (mode === "monthly" && currentAnalysis) {
       return buildMonthlySeries(currentAnalysis, monthlyWindow);
     }
+    if (mode === "yearly" && monthlyAvailable && currentAnalysis) {
+      return filterYearlyByRange(buildYearlyFromDaily(currentAnalysis), yearlyRange);
+    }
     return filterYearlyByRange(buildYearlySeries(analyses), yearlyRange);
-  }, [mode, monthlyWindow, yearlyRange, analyses, currentAnalysis]);
+  }, [mode, monthlyWindow, yearlyRange, analyses, currentAnalysis, monthlyAvailable]);
 
   const hasData = series.some(
     (p) => p.ca !== null || p.ebe !== null || p.resultatNet !== null
@@ -126,17 +149,17 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
 
       {hasData ? (
         <div className="h-[260px] flex-1 min-h-[220px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <StableChartContainer>
             <LineChart data={series} margin={{ top: 10, right: 18, bottom: 0, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fill: "rgba(255,255,255,0.55)", fontSize: 10, fontFamily: "monospace" }}
+                tick={{ fill: tickColor, fontSize: 10, fontFamily: "monospace" }}
                 tickLine={false}
-                axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+                axisLine={{ stroke: axisColor }}
               />
               <YAxis
-                tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 10, fontFamily: "monospace" }}
+                tick={{ fill: tickColorMuted, fontSize: 10, fontFamily: "monospace" }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={formatYAxisValue}
@@ -151,7 +174,7 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
                 iconType="line"
                 wrapperStyle={{ fontSize: "10px", paddingTop: "8px" }}
                 formatter={(value: string) => (
-                  <span style={{ color: "rgba(255,255,255,0.7)" }}>{value}</span>
+                  <span style={{ color: legendColor }}>{value}</span>
                 )}
               />
               <Line
@@ -163,6 +186,7 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
                 dot={{ r: 2.5, fill: COLOR_CA, strokeWidth: 0 }}
                 activeDot={{ r: 5, stroke: COLOR_CA, strokeWidth: 1, fill: "#0f0f12" }}
                 connectNulls={false}
+                isAnimationActive={false}
               />
               <Line
                 type="monotone"
@@ -173,6 +197,7 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
                 dot={{ r: 2.5, fill: COLOR_EBE, strokeWidth: 0 }}
                 activeDot={{ r: 5, stroke: COLOR_EBE, strokeWidth: 1, fill: "#0f0f12" }}
                 connectNulls={false}
+                isAnimationActive={false}
               />
               <Line
                 type="monotone"
@@ -183,9 +208,10 @@ export function EvolutionChart({ analyses, currentAnalysis }: EvolutionChartProp
                 dot={{ r: 2.5, fill: COLOR_RESULTAT, strokeWidth: 0 }}
                 activeDot={{ r: 5, stroke: COLOR_RESULTAT, strokeWidth: 1, fill: "#0f0f12" }}
                 connectNulls={false}
+                isAnimationActive={false}
               />
             </LineChart>
-          </ResponsiveContainer>
+          </StableChartContainer>
         </div>
       ) : (
         <EmptyState mode={mode} hasAnyAnalysis={analyses.length > 0} />
@@ -339,3 +365,12 @@ function formatTooltipValue(value: number | null): string {
     maximumFractionDigits: 0
   }).format(value);
 }
+
+// React.memo : prévient les re-renders pendant le drag (les seuls cas où
+// les props pourraient changer sont des changements de données, pas des
+// updates UI). Recharts a un useEffect interne sensible aux re-renders
+// fréquents — sans memo, un drag déclenche "Maximum update depth exceeded"
+// dans XAxis. Comparaison shallow par défaut suffit (analyses et
+// currentAnalysis sont des références stables tant que les données ne
+// changent pas).
+export const EvolutionChart = memo(EvolutionChartImpl);

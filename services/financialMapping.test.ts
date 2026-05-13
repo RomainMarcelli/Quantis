@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mapToQuantisData } from "@/services/financialMapping";
+import { mapToVyzorData } from "@/services/financialMapping";
 import type { ParsedFinancialData } from "@/services/pdfAnalysis";
 
-describe("mapToQuantisData", () => {
-  it("mappe les donnees financieres vers le format Quantis", () => {
+describe("mapToVyzorData", () => {
+  it("mappe les donnees financieres vers le format Vyzor", () => {
     const sampleFinancialData = createFinancialData({
       incomeStatement: {
         netTurnover: 1200000,
@@ -17,7 +17,7 @@ describe("mapToQuantisData", () => {
       }
     });
 
-    expect(mapToQuantisData(sampleFinancialData)).toEqual({
+    expect(mapToVyzorData(sampleFinancialData)).toEqual({
       ca: 1200000,
       totalCharges: 900000,
       netResult: 300000,
@@ -36,7 +36,7 @@ describe("mapToQuantisData", () => {
       }
     });
 
-    expect(mapToQuantisData(sampleFinancialData).ca).toBe(1200000);
+    expect(mapToVyzorData(sampleFinancialData).ca).toBe(1200000);
   });
 
   it("utilise totalOperatingCharges en fallback", () => {
@@ -47,7 +47,7 @@ describe("mapToQuantisData", () => {
       }
     });
 
-    expect(mapToQuantisData(sampleFinancialData).totalCharges).toBe(650000);
+    expect(mapToVyzorData(sampleFinancialData).totalCharges).toBe(650000);
   });
 
   it("evite un fallback ambigu sur totalCharges global trop eleve", () => {
@@ -59,13 +59,13 @@ describe("mapToQuantisData", () => {
       }
     });
 
-    expect(mapToQuantisData(sampleFinancialData).totalCharges).toBeNull();
+    expect(mapToVyzorData(sampleFinancialData).totalCharges).toBeNull();
   });
 
   it("retourne null sur les champs absents", () => {
     const sampleFinancialData = createFinancialData();
 
-    expect(mapToQuantisData(sampleFinancialData)).toEqual({
+    expect(mapToVyzorData(sampleFinancialData)).toEqual({
       ca: null,
       totalCharges: null,
       netResult: null,

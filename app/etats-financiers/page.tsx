@@ -1,12 +1,10 @@
 // app/etats-financiers/page.tsx
-// Page "États financiers" : bilan + compte de résultat + vérifications
-// de cohérence. Source = analyse active (cf. lib/source/activeSource).
-import { FinancialStatementsView } from "@/components/financials/FinancialStatementsView";
+// Brief 09/06/2026 : la page unifiée (bilan + CDR cumulés) est
+// supprimée — l'utilisateur accède désormais à chaque document via
+// le sous-menu sidebar. On redirige par défaut sur /bilan pour ne
+// pas casser les liens externes / l'icône principale de sidebar.
+import { redirect } from "next/navigation";
 
-export default function EtatsFinanciersPage() {
-  return (
-    <main className="premium-analysis-root relative min-h-screen w-full overflow-hidden px-3 py-8 md:px-4 lg:px-6">
-      <FinancialStatementsView />
-    </main>
-  );
+export default function EtatsFinanciersIndexPage() {
+  redirect("/etats-financiers/bilan");
 }

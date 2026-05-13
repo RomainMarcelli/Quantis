@@ -1,5 +1,5 @@
 # PROJECT_TECH_STATUS.md
-> Snapshot global du projet Quantis — 2026-04-13
+> Snapshot global du projet Vyzor — 2026-04-13
 
 ---
 

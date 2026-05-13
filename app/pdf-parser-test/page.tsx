@@ -198,7 +198,7 @@ export default function PdfParserTestPage() {
 
   return (
     <AdminGate>
-    <main className="premium-analysis-root relative mx-auto min-h-screen w-full overflow-hidden px-4 py-10">
+    <main className="premium-analysis-root relative mx-auto min-h-screen w-full px-4 py-10">
       <div className="noise-overlay" aria-hidden="true" />
       <div className="spotlight" aria-hidden="true" />
 

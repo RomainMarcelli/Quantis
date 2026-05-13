@@ -53,7 +53,7 @@ describe("loginWithEmailPassword", () => {
     const signIn = vi.fn().mockResolvedValue({
       uid: "uid-123",
       email: "user@quantis.io",
-      displayName: "User Quantis",
+      displayName: "User Vyzor",
       emailVerified: true
     });
     const gateway: LoginGateway = { signIn };
@@ -68,7 +68,7 @@ describe("loginWithEmailPassword", () => {
       user: {
         uid: "uid-123",
         email: "user@quantis.io",
-        displayName: "User Quantis",
+        displayName: "User Vyzor",
         emailVerified: true
       }
     });

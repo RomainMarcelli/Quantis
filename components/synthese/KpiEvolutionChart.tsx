@@ -7,21 +7,22 @@
 // dailyAccounting) ou annuelle (historique des analyses du dossier).
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
   type TooltipContentProps
 } from "recharts";
 import { Calendar, TrendingUp } from "lucide-react";
+import { StableChartContainer } from "@/components/dashboard/widgets/StableChartContainer";
 import type { AnalysisRecord } from "@/types/analysis";
 import {
   buildKpiMonthlySeries,
+  buildKpiYearlyFromDaily,
   buildKpiYearlySeries,
   type KpiEvolutionPoint
 } from "@/lib/synthese/kpiEvolutionSeries";
@@ -52,7 +53,7 @@ type KpiEvolutionChartProps = {
 
 const COLOR_LINE = "#C5A059"; // or quantis-gold
 
-export function KpiEvolutionChart({ kpiId, analyses, currentAnalysis }: KpiEvolutionChartProps) {
+function KpiEvolutionChartImpl({ kpiId, analyses, currentAnalysis }: KpiEvolutionChartProps) {
   const monthlyAvailable = hasMonthlyDataAvailable(currentAnalysis);
   const definition = getKpiDefinition(kpiId);
 
@@ -64,7 +65,12 @@ export function KpiEvolutionChart({ kpiId, analyses, currentAnalysis }: KpiEvolu
     if (mode === "monthly" && currentAnalysis) {
       return buildKpiMonthlySeries(currentAnalysis, kpiId, monthlyWindow);
     }
-    const yearly = buildKpiYearlySeries(analyses, kpiId);
+    // En annuel, si l'analyse courante est dynamique, on agrège ses KPIs
+    // par année depuis dailyAccounting plutôt que de fallback sur le mix
+    // d'analyses statiques de l'historique (incohérent vs mode mensuel).
+    const yearly = monthlyAvailable && currentAnalysis
+      ? buildKpiYearlyFromDaily(currentAnalysis, kpiId)
+      : buildKpiYearlySeries(analyses, kpiId);
     // filterYearlyByRange travaille sur EvolutionPoint (multi-séries), on
     // adapte en wrappant : on transforme la série mono en multi temporaire
     // pour réutiliser la fonction de filtre.
@@ -133,7 +139,7 @@ export function KpiEvolutionChart({ kpiId, analyses, currentAnalysis }: KpiEvolu
 
       {hasData ? (
         <div className="h-[220px] min-h-[200px]">
-          <ResponsiveContainer width="100%" height="100%">
+          <StableChartContainer>
             <LineChart data={series} margin={{ top: 8, right: 18, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
               <XAxis
@@ -162,9 +168,10 @@ export function KpiEvolutionChart({ kpiId, analyses, currentAnalysis }: KpiEvolu
                 dot={{ r: 2.5, fill: COLOR_LINE, strokeWidth: 0 }}
                 activeDot={{ r: 5, stroke: COLOR_LINE, strokeWidth: 1, fill: "#0f0f12" }}
                 connectNulls={false}
+                isAnimationActive={false}
               />
             </LineChart>
-          </ResponsiveContainer>
+          </StableChartContainer>
         </div>
       ) : (
         <div className="flex h-[220px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
@@ -298,3 +305,5 @@ function formatTooltipValue(value: number | null, unit: KpiUnit): string {
   if (unit === "ratio" || unit === "score") return formatNumber(value, 2);
   return formatNumber(value);
 }
+
+export const KpiEvolutionChart = memo(KpiEvolutionChartImpl);

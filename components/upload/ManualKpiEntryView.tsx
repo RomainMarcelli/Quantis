@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, Info, Save } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import { buildCompleteKpis, type ManualKpiInput } from "@/lib/kpiBuilder";
-import { calculateQuantisScore } from "@/lib/quantisScore";
-import { DEFAULT_FOLDER_NAME, setActiveFolderName } from "@/lib/folders/activeFolder";
+import { calculateVyzorScore } from "@/lib/vyzorScore";
+import { DEFAULT_FOLDER_NAME, registerKnownFolderName } from "@/lib/folders/folderRegistry";
+import { writeActiveAccountingSource } from "@/services/dataSourcesStore";
 import { createEmptyMappedFinancialData } from "@/services/mapping/financialDataMapper";
 import { saveAnalysisDraft } from "@/services/analysisStore";
 import { firebaseAuthGateway } from "@/services/auth";
@@ -134,10 +135,10 @@ export function ManualKpiEntryView() {
       // Pipeline demandé:
       // 1) input utilisateur
       // 2) buildCompleteKpis
-      // 3) calculateQuantisScore
+      // 3) calculateVyzorScore
       // 4) sauvegarde + affichage synthèse
       const completeKpis = buildCompleteKpis(parsed.value);
-      const quantisScore = calculateQuantisScore(completeKpis);
+      const quantisScore = calculateVyzorScore(completeKpis);
 
       const mappedData = createEmptyMappedFinancialData();
       mappedData.total_actif = parsed.value.total_actif;
@@ -198,7 +199,16 @@ export function ManualKpiEntryView() {
 
       await saveAnalysisDraft(draft);
       setLocalAnalysisHint(true);
-      setActiveFolderName(DEFAULT_FOLDER_NAME);
+      registerKnownFolderName(DEFAULT_FOLDER_NAME);
+      // Saisie manuelle = équivalent d'un upload FEC → on active la source
+      // pour que la synthèse affiche les données saisies (sinon
+      // activeAccountingSource = null → "Aucune synthèse disponible").
+      try {
+        await writeActiveAccountingSource(user.uid, "fec", DEFAULT_FOLDER_NAME);
+      } catch (err) {
+        // eslint-disable-next-line no-console -- monitoring temporaire
+        console.warn("[manual-entry] auto-activate FEC source failed", err);
+      }
       router.push("/synthese");
     } catch (error) {
       setErrorMessage(
@@ -228,12 +238,12 @@ export function ManualKpiEntryView() {
               Saisie manuelle <span className="text-quantis-gold">des KPI</span>
             </h1>
             <p className="mt-2 text-sm text-white/70">
-              Renseignez quelques indicateurs simples. Quantis calcule ensuite automatiquement les KPI avancés
-              pour produire un Quantis Score fiable.
+              Renseignez quelques indicateurs simples. Vyzor calcule ensuite automatiquement les KPI avancés
+              pour produire un Vyzor Score fiable.
             </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-2">
-            <QuantisLogo withText={false} size={34} />
+            <VyzorLogo withText={false} size={34} />
           </div>
         </div>
       </header>

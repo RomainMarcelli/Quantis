@@ -38,7 +38,7 @@ describe("premium dashboard components", () => {
   it("keeps child sections rendered inside DashboardLayout", () => {
     const html = renderToStaticMarkup(
       <DashboardLayout
-        companyName="Quantis"
+        companyName="Vyzor"
         greetingName="Romain"
         kpis={{
           ca: 100000,

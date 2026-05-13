@@ -14,7 +14,7 @@ import {
   Sun
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
 import { useProductTour } from "@/hooks/useProductTour";
 import { useTheme } from "@/hooks/useTheme";
@@ -87,20 +87,31 @@ export function SettingsView() {
 
       <header className="precision-card relative z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl p-5">
         <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={24} />
+          <VyzorLogo withText={false} size={24} />
           <div>
             <h1 className="text-2xl font-semibold text-white">Paramètres</h1>
-            <p className="text-sm text-white/60">Configuration essentielle de votre espace Quantis.</p>
+            <p className="text-sm text-white/60">Configuration essentielle de votre espace Vyzor.</p>
           </div>
         </div>
 
         <button
           type="button"
-          onClick={() => router.push("/analysis")}
+          // Brief 09/06/2026 : "Retour" doit ramener à la page précédente
+          // (Synthèse, Tableau de bord avec son tab actif, États
+          // financiers, Documents, etc.) — pas systématiquement à
+          // /analysis qui retombait sur "Création de valeur".
+          // Fallback /analysis si pas d'historique (entrée directe).
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) {
+              router.back();
+            } else {
+              router.push("/analysis");
+            }
+          }}
           className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10"
         >
           <ArrowLeft className="h-4 w-4" />
-          Retour à l&apos;analyse
+          Retour
         </button>
       </header>
 

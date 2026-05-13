@@ -21,12 +21,12 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
-  ChevronDown,
   Eye,
   EyeOff,
   Loader2,
 } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
+import { VyzorSelect } from "@/components/ui/VyzorSelect";
 import { LegalFooter } from "@/components/layout/LegalFooter";
 import { firebaseAuthGateway } from "@/services/auth";
 import {
@@ -287,7 +287,7 @@ export function AuthPage({
             {/* Logo mobile : la colonne branding est masquée → on remet un
                 logo en haut du form pour ne pas laisser l'écran nu. */}
             <div className="mb-8 flex justify-center lg:hidden">
-              <QuantisLogo withText size={28} />
+              <VyzorLogo withText size={28} />
             </div>
 
             {mode === "login" && (
@@ -429,7 +429,7 @@ function BrandingPanel() {
 
       {/* Header : logo centré. */}
       <div className="relative z-10 flex justify-center">
-        <QuantisLogo withText size={32} />
+        <VyzorLogo withText size={32} />
       </div>
 
       {/* Contenu central — centré horizontalement et verticalement. */}
@@ -1281,6 +1281,11 @@ function Input({
   );
 }
 
+// Wrapper du select dark utilisé dans le wizard (étapes 2 et 3). Délègue à
+// VyzorSelect (dropdown custom rendu via portal) au lieu d'un `<select>`
+// natif : les `<option>` natifs s'affichaient en blanc avec highlight bleu
+// par défaut du navigateur, ce qui cassait la DA dark de l'AuthPage.
+// Signature publique inchangée — les appelants ne changent pas.
 function NativeSelect({
   value,
   onChange,
@@ -1295,48 +1300,13 @@ function NativeSelect({
   hasError?: boolean;
 }) {
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="block w-full appearance-none rounded-lg pl-3 pr-9 text-white"
-        style={{
-          height: 44,
-          fontSize: 14,
-          backgroundColor: "rgba(255, 255, 255, 0.04)",
-          border: hasError
-            ? "1px solid rgba(239, 68, 68, 0.5)"
-            : "1px solid rgba(255, 255, 255, 0.08)",
-          outline: "none",
-          colorScheme: "dark",
-        }}
-        onFocus={(e) => {
-          if (!hasError) {
-            e.currentTarget.style.borderColor = "rgba(197, 160, 89, 0.4)";
-            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(197, 160, 89, 0.08)";
-          }
-        }}
-        onBlurCapture={(e) => {
-          e.currentTarget.style.boxShadow = "none";
-          if (!hasError) {
-            e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.08)";
-          }
-        }}
-      >
-        <option value="" disabled>
-          {placeholder}
-        </option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2"
-        style={{ color: "#6B7280" }}
-      />
-    </div>
+    <VyzorSelect
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      options={options.map((o) => ({ value: o.value, label: o.label }))}
+      buttonClassName={`h-11 px-3 text-sm ${hasError ? "has-error" : ""}`}
+    />
   );
 }
 

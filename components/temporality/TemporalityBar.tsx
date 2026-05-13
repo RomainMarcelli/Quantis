@@ -34,9 +34,16 @@ type TemporalityBarProps = {
    * une période vide même quand elle est dans la plage globale (gap de données).
    */
   daysInPeriod?: number | null;
+  /**
+   * Brief 09/06/2026 : quand la barre est rendue à l'intérieur du AppHeader
+   * (ligne 2 sticky), on supprime l'enveloppe `precision-card` pour éviter
+   * l'effet "card dans card" (visuellement écrasé/entassé). La carte
+   * extérieure du header fournit déjà le chrome.
+   */
+  flat?: boolean;
 };
 
-export function TemporalityBar({ compact = false, rightLabel, availableRange, daysInPeriod }: TemporalityBarProps) {
+export function TemporalityBar({ compact = false, rightLabel, availableRange, daysInPeriod, flat = false }: TemporalityBarProps) {
   const t = useTemporality();
 
   // Bornes de navigation : si la période courante touche déjà la borne min/max
@@ -56,8 +63,12 @@ export function TemporalityBar({ compact = false, rightLabel, availableRange, da
 
   return (
     <div
-      className={`precision-card flex flex-wrap items-center gap-3 rounded-2xl ${
-        compact ? "px-3 py-2" : "px-4 py-3"
+      className={`flex flex-wrap items-center gap-3 ${
+        flat
+          ? compact
+            ? "px-0 py-0"
+            : "px-0 py-0"
+          : `precision-card rounded-2xl ${compact ? "px-3 py-2" : "px-4 py-3"}`
       }`}
       data-scroll-reveal-ignore
     >

@@ -63,7 +63,7 @@ export function CreateDashboardModal({
             <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/45">Phase 4</p>
             <h2 className="text-lg font-semibold text-white">Nouveau tableau de bord</h2>
             <p className="mt-1 text-xs text-white/55">
-              Crée un dashboard 100 % personnalisable, sans contrainte de catégorie.
+              Créez un dashboard 100 % personnalisable, sans contrainte de catégorie.
             </p>
           </div>
           <button

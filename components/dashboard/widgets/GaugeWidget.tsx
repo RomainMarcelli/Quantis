@@ -10,6 +10,7 @@
 //   - Au-dessus de good : vert (emerald)
 "use client";
 
+import { memo } from "react";
 import { getKpiDefinition, type KpiThresholds, type KpiUnit } from "@/lib/kpi/kpiRegistry";
 import {
   formatCurrency,
@@ -28,7 +29,7 @@ const ARC_RADIUS = 80;
 const ARC_STROKE = 14;
 const ARC_VIEWBOX = 200;
 
-export function GaugeWidget({ kpiId, kpis }: GaugeWidgetProps) {
+function GaugeWidgetImpl({ kpiId, kpis }: GaugeWidgetProps) {
   const definition = getKpiDefinition(kpiId);
   const value = readKpiValue(kpis, kpiId);
   const unit = definition?.unit ?? "ratio";
@@ -136,3 +137,5 @@ function describeArc(cx: number, cy: number, radius: number, startAngle: number,
   const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
   return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
 }
+
+export const GaugeWidget = memo(GaugeWidgetImpl);

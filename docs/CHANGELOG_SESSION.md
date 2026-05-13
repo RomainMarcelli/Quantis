@@ -65,7 +65,7 @@ dynamiques (Pennylane + MyUnisoft) ainsi que la TemporalityBar.
 - **Assets** : logos providers (Pennylane, MyUnisoft, Odoo, Tiime).
 - **Décision** : interdire les doublons à la source plutôt que de les nettoyer en post-traitement.
 
-### `3ca7179` — feat: financial PDF report v2 — Quantis branding, trend chart, recommendations, condensed layout
+### `3ca7179` — feat: financial PDF report v2 — Vyzor branding, trend chart, recommendations, condensed layout
 
 - **Route** : `app/api/reports/financial/route.ts`.
 - **Service** : `services/reports/financialReportPdf.ts` (TS) + `services/reports/python/financial_report.py` (génération PDF via reportlab côté Python).
@@ -98,7 +98,7 @@ Trois garde-fous critiques contre les données pourries :
 ### `7c6be84` — feat(dashboard): replace "N/D" by "Données insuffisantes" across all KPI tiles
 
 - Constante `INSUFFICIENT_DATA_LABEL` ajoutée à `components/dashboard/formatting.ts`.
-- 11 fichiers modifiés (KPIBlock, KPIWide, QuantisScoreCard, BreakEvenChart, BreakEvenTooltip, 4 onglets navigation, formatting, test).
+- 11 fichiers modifiés (KPIBlock, KPIWide, VyzorScoreCard, BreakEvenChart, BreakEvenTooltip, 4 onglets navigation, formatting, test).
 - Test `dashboardPremium.test.tsx` aligné.
 
 ### `f5a7f61` — feat(source): explicit active analysis selection + dashboard source indicator
@@ -329,7 +329,7 @@ Refactor final : alignement **coin à coin** entre popover et tuile.
 ### Rapport PDF financier
 
 - Génération côté Python (reportlab) via service appelé par la route `/api/reports/financial`.
-- Branding Quantis (logo, palette dorée).
+- Branding Vyzor (logo, palette dorée).
 - Trend chart, recommandations textuelles dérivées des KPI.
 - Layout condensé sur 2-3 pages.
 

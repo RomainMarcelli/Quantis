@@ -38,8 +38,16 @@ export type FinancialSection = {
    */
   kind: "produit" | "charge" | "actif" | "capitaux" | "dette" | "neutre";
   lines: FinancialLine[];
-  /** Sous-total calculé automatiquement. Null si toutes les lignes sont null. */
+  /** Sous-total NET calculé automatiquement. Null si toutes les lignes sont null. */
   subtotal: number | null;
+  /**
+   * Sous-total BRUT (avant amortissements / provisions) — uniquement
+   * pertinent pour la section "Actif immobilisé" du bilan où la valeur
+   * brute (coût d'acquisition) diffère de la valeur nette comptable. Null
+   * pour toutes les autres sections (produits, charges, circulant, dettes…)
+   * où Brut = Net par construction.
+   */
+  subtotalBrut?: number | null;
 };
 
 /**

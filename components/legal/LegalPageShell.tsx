@@ -10,7 +10,7 @@
 
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { LegalFooter } from "@/components/layout/LegalFooter";
 
 type LegalPageShellProps = {
@@ -34,7 +34,7 @@ export function LegalPageShell({ title, lastUpdated, children }: LegalPageShellP
       >
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <Link href="/" aria-label="Retour à l'accueil">
-            <QuantisLogo withText size={28} />
+            <VyzorLogo withText size={28} />
           </Link>
           <Link
             href="/"

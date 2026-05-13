@@ -1,5 +1,5 @@
 // lib/email/templates/passwordResetEmailTemplate.ts
-// Génère le template transactionnel de réinitialisation mot de passe dans la DA Quantis.
+// Génère le template transactionnel de réinitialisation mot de passe dans la DA Vyzor.
 type PasswordResetEmailTemplateInput = {
   firstName?: string;
   resetUrl: string;
@@ -9,7 +9,7 @@ export function buildPasswordResetEmailTemplate({
   firstName,
   resetUrl
 }: PasswordResetEmailTemplateInput): { subject: string; html: string; text: string } {
-  const subject = "Réinitialisez votre mot de passe Quantis";
+  const subject = "Réinitialisez votre mot de passe Vyzor";
   const safeFirstName = firstName?.trim() || "Bonjour";
 
   const html = `
@@ -26,7 +26,7 @@ export function buildPasswordResetEmailTemplate({
           <td align="center">
             <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="max-width:640px;background:#111218;border:1px solid #27272a;border-radius:16px;overflow:hidden;">
               <tr>
-                <td style="padding:26px 32px 10px 32px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:#a1a1aa;">Quantis</td>
+                <td style="padding:26px 32px 10px 32px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:#a1a1aa;">Vyzor</td>
               </tr>
               <tr>
                 <td style="padding:0 32px 0 32px;font-size:30px;line-height:1.2;font-weight:700;color:#ffffff;">
@@ -35,7 +35,7 @@ export function buildPasswordResetEmailTemplate({
               </tr>
               <tr>
                 <td style="padding:14px 32px 0 32px;font-size:15px;line-height:1.65;color:#d4d4d8;">
-                  ${safeFirstName}, une demande de réinitialisation a été effectuée pour votre compte Quantis.
+                  ${safeFirstName}, une demande de réinitialisation a été effectuée pour votre compte Vyzor.
                 </td>
               </tr>
               <tr>
@@ -69,7 +69,7 @@ export function buildPasswordResetEmailTemplate({
               </tr>
               <tr>
                 <td style="padding:14px 32px 22px 32px;border-top:1px solid #27272a;font-size:12px;color:#71717a;">
-                  Quantis - Cockpit financier pour PME
+                  Vyzor - Cockpit financier pour PME
                 </td>
               </tr>
             </table>
@@ -80,7 +80,7 @@ export function buildPasswordResetEmailTemplate({
   </html>
   `;
 
-  const text = `${safeFirstName}, réinitialisez votre mot de passe Quantis via ce lien: ${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`;
+  const text = `${safeFirstName}, réinitialisez votre mot de passe Vyzor via ce lien: ${resetUrl}\n\nSi vous n'êtes pas à l'origine de cette demande, ignorez cet email.`;
 
   return {
     subject,

@@ -187,7 +187,7 @@ export type AnalysisRecord = {
   financialFacts: FinancialFacts;
   kpis: CalculatedKpis;
   quantisScore: {
-    quantis_score: number;
+    vyzor_score: number;
     piliers: {
       rentabilite: number;
       solvabilite: number;

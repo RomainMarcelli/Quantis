@@ -11,8 +11,9 @@
 "use client";
 
 import { Plus, SlidersHorizontal, Check, Loader2 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { useDashboardLayout } from "@/hooks/useDashboardLayout";
+import { isKpiAvailable, type KpiAvailabilityContext } from "@/lib/kpi/kpiAvailability";
 import { WidgetGrid } from "@/components/dashboard/widgets/WidgetGrid";
 import { KpiPickerDrawer } from "@/components/dashboard/widgets/KpiPickerDrawer";
 import { KpiCardWidget } from "@/components/dashboard/widgets/KpiCardWidget";
@@ -27,8 +28,18 @@ import { RecommendationWidget } from "@/components/dashboard/widgets/Recommendat
 import { AlertsWidget } from "@/components/dashboard/widgets/AlertsWidget";
 import { ActionPlanWidget } from "@/components/dashboard/widgets/ActionPlanWidget";
 import { EvolutionChart } from "@/components/synthese/EvolutionChart";
-import { QuantisScoreCard } from "@/components/dashboard/QuantisScoreCard";
+import { CustomChartWidget } from "@/components/dashboard/widgets/CustomChartWidget";
+import { BreakEvenChartWidget } from "@/components/dashboard/widgets/BreakEvenChartWidget";
+import { BfrCycleWidget } from "@/components/dashboard/widgets/BfrCycleWidget";
+import { LiquidityRatiosWidget } from "@/components/dashboard/widgets/LiquidityRatiosWidget";
+import { RoeRoceChartWidget } from "@/components/dashboard/widgets/RoeRoceChartWidget";
+import { KpiTargetEditor } from "@/components/dashboard/widgets/KpiTargetEditor";
+import { KpiTargetNotifier } from "@/components/dashboard/widgets/KpiTargetNotifier";
+import { useKpiTargets } from "@/hooks/useKpiTargets";
+import { VyzorScoreCard } from "@/components/dashboard/VyzorScoreCard";
 import { isRawVariableId } from "@/lib/dashboard/rawVariableCatalog";
+import { resolveAnalysisFiscalYear } from "@/services/analysisHistory";
+import { hasMonthlyDataAvailable } from "@/lib/synthese/evolutionSeries";
 import type { AnalysisRecord, CalculatedKpis, MappedFinancialData } from "@/types/analysis";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import type {
@@ -36,6 +47,7 @@ import type {
   WidgetCategory,
   WidgetInstance
 } from "@/types/dashboard";
+import type { KpiAlert, KpiObjective } from "@/types/kpiTargets";
 
 type CustomizableDashboardProps = {
   userId: string | null;
@@ -71,7 +83,7 @@ type CustomizableDashboardProps = {
   synthese?: SyntheseViewModel | null;
   /**
    * Slot rendu en haut de la grille, AVANT les widgets. Utilisé pour la
-   * Quantis Score qui reste visible en permanence (non personnalisable
+   * Vyzor Score qui reste visible en permanence (non personnalisable
    * en V1 — sa forme variera en Phase 2).
    */
   pinnedHeaderSlot?: ReactNode;
@@ -130,6 +142,79 @@ export function CustomizableDashboard({
   };
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Cibles utilisateur (alertes + objectifs) sur les KPIs.
+  // Le feature n'est actif qu'en analyse DYNAMIQUE (dailyAccounting présent —
+  // sources connectées Pennylane / MyUnisoft / FEC). En analyse statique
+  // (PDF / Excel = annuel + passé), alertes et objectifs n'ont pas de sens :
+  // les valeurs ne bougent plus, aucune notif ne peut être déclenchée. On
+  // masque donc l'icône cible, la modale, les badges/barres et le notifier.
+  const targets = useKpiTargets(userId);
+  const [targetEditorKpiId, setTargetEditorKpiId] = useState<string | null>(null);
+  const isDynamicAnalysis = (currentAnalysis?.dailyAccounting?.length ?? 0) > 0;
+
+  // Dédup local des triggers de notif — protège contre une re-évaluation
+  // qui interviendrait avant que `lastTriggeredAt` / `lastReachedAt` ne soit
+  // persisté en Firestore (saveAlert est async). Sans ça, un re-render avec
+  // les anciennes valeurs déclencherait à nouveau le toast pour la même cible.
+  const triggeredAlertsRef = useRef<Set<string>>(new Set());
+  const reachedObjectivesRef = useRef<Set<string>>(new Set());
+
+  const handleAlertTriggered = useCallback((alert: KpiAlert) => {
+    if (triggeredAlertsRef.current.has(alert.id)) return;
+    triggeredAlertsRef.current.add(alert.id);
+    void targets.saveAlert({ ...alert, lastTriggeredAt: new Date().toISOString() })
+      .catch((err) => {
+        console.warn("[kpi-target-notifier] persist alert failed", err);
+        triggeredAlertsRef.current.delete(alert.id);
+      });
+  }, [targets.saveAlert]);
+
+  const handleObjectiveReached = useCallback((objective: KpiObjective) => {
+    if (reachedObjectivesRef.current.has(objective.id)) return;
+    reachedObjectivesRef.current.add(objective.id);
+    void targets.saveObjective({ ...objective, lastReachedAt: new Date().toISOString() })
+      .catch((err) => {
+        console.warn("[kpi-target-notifier] persist objective failed", err);
+        reachedObjectivesRef.current.delete(objective.id);
+      });
+  }, [targets.saveObjective]);
+
+  // Contexte d'availability — partagé entre le filtrage du layout et le
+  // graying-out du picker. Pas de N/D affiché : un widget dont la donnée
+  // n'est pas disponible n'apparaît tout simplement pas dans la grille.
+  // mappedData inclus pour que les variables brutes (Bilan/CdR) soient
+  // évaluées au même titre que les KPIs calculés.
+  const availabilityCtx: KpiAvailabilityContext = useMemo(() => ({
+    kpis,
+    mappedData: mappedData ?? null,
+    synthese: synthese ?? null,
+    currentAnalysis,
+  }), [kpis, mappedData, synthese, currentAnalysis]);
+
+  // Layout effectif : on filtre les widgets dont la donnée n'est pas
+  // disponible (KPI calculé OU variable brute Bilan/CdR).
+  const effectiveLayout = useMemo<DashboardLayout>(() => {
+    const visibleWidgets = layout.widgets.filter((w) =>
+      isKpiAvailable(w.kpiId, availabilityCtx),
+    );
+    return { ...layout, widgets: visibleWidgets };
+  }, [layout, availabilityCtx]);
+
+  // Années disponibles pour le mode "Comparaison annuelle" du builder
+  // personnalisé. On ne garde QUE les années dont l'analyse correspondante
+  // a un dailyAccounting exploitable (sources dynamiques type Pennylane /
+  // MyUnisoft / FEC) — sinon impossible de tracer une courbe Jan-Déc, on
+  // n'a qu'un agrégat annuel. Le mode est désactivé si < 2 années valides.
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    for (const a of analyses) {
+      if (!hasMonthlyDataAvailable(a)) continue;
+      const y = resolveAnalysisFiscalYear(a);
+      if (y !== null) years.add(y);
+    }
+    return Array.from(years).sort((a, b) => a - b);
+  }, [analyses]);
+
   // Dispatcher de rendu : selon le `vizType` du widget, choisit le composant.
   // Phase 1 :
   //   - `kpiCard` (registre KPI), `lineChart` (registre KPI)
@@ -184,9 +269,20 @@ export function CustomizableDashboard({
         return <ActionPlanWidget actions={synthese?.actions ?? []} />;
       case "evolutionChart":
         return <EvolutionChart analyses={analyses} currentAnalysis={currentAnalysis} />;
+      case "customChart":
+        // Widget construit par l'utilisateur via le builder Personnalisé
+        // — config persistée sur le widget. Si elle manque (cas d'erreur),
+        // on rend rien (le widget reste invisible plutôt que de crasher).
+        return widget.customConfig ? (
+          <CustomChartWidget
+            config={widget.customConfig}
+            analyses={analyses}
+            currentAnalysis={currentAnalysis}
+          />
+        ) : null;
       case "quantisScore":
         return synthese ? (
-          <QuantisScoreCard
+          <VyzorScoreCard
             score={synthese.score}
             scoreLabel={synthese.scoreLabel}
             scorePiliers={synthese.scorePiliers}
@@ -194,6 +290,14 @@ export function CustomizableDashboard({
             searchId="synthese-quantis-score"
           />
         ) : null;
+      case "breakEvenChart":
+        return <BreakEvenChartWidget mappedData={mappedData ?? null} />;
+      case "bfrCycle":
+        return <BfrCycleWidget kpis={kpis} />;
+      case "liquidityRatios":
+        return <LiquidityRatiosWidget kpis={kpis} />;
+      case "roeRoceChart":
+        return <RoeRoceChartWidget kpis={kpis} />;
       case "kpiCard":
       default:
         return (
@@ -201,6 +305,8 @@ export function CustomizableDashboard({
             kpiId={widget.kpiId}
             kpis={kpis}
             previousKpis={previousKpis}
+            alerts={isDynamicAnalysis ? targets.alertsForKpi(widget.kpiId) : []}
+            objectives={isDynamicAnalysis ? targets.objectivesForKpi(widget.kpiId) : []}
             onSelect={kpiSelection ? () => kpiSelection.onSelect(widget.kpiId) : undefined}
             isSelected={kpiSelection?.selectedKpiId === widget.kpiId}
             isEditing={isEditing}
@@ -222,8 +328,8 @@ export function CustomizableDashboard({
             <h2 className="text-sm font-semibold text-white">Mes widgets</h2>
             <p className="text-xs text-white/55">
               {isEditing
-                ? "Glisse pour réordonner, redimensionne, ou supprime un widget."
-                : `${layout.widgets.length} widget${layout.widgets.length > 1 ? "s" : ""} affiché${layout.widgets.length > 1 ? "s" : ""}.`}
+                ? "Glissez pour réordonner, redimensionnez, ou supprimez un widget."
+                : `${effectiveLayout.widgets.length} widget${effectiveLayout.widgets.length > 1 ? "s" : ""} affiché${effectiveLayout.widgets.length > 1 ? "s" : ""}.`}
             </p>
           </div>
 
@@ -238,7 +344,7 @@ export function CustomizableDashboard({
       ) : isEditing ? (
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-white/55">
-            Glisse pour réordonner, redimensionne, ou supprime un widget.
+            Glissez pour réordonner, redimensionnez, ou supprimez un widget.
           </p>
           <button
             type="button"
@@ -251,7 +357,7 @@ export function CustomizableDashboard({
         </div>
       ) : null}
 
-      {/* Slot pinned : Quantis Score reste affiché tout le temps en V1. */}
+      {/* Slot pinned : Vyzor Score reste affiché tout le temps en V1. */}
       {pinnedHeaderSlot}
 
       {isLoading ? (
@@ -260,21 +366,69 @@ export function CustomizableDashboard({
         </div>
       ) : (
         <WidgetGrid
-          layout={layout}
+          layout={effectiveLayout}
           isEditing={isEditing}
           renderWidget={renderWidget}
           onReorder={reorderWidgets}
           onRemove={removeWidget}
           onUpdateWidget={updateWidget}
+          onConfigureTarget={isEditing && isDynamicAnalysis ? setTargetEditorKpiId : undefined}
         />
       )}
 
       <KpiPickerDrawer
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        onAdd={(kpiId, vizType) => addWidget(kpiId, vizType, "M")}
+        availableYears={availableYears}
+        onAdd={(kpiId, vizType, customConfig) => {
+          // Default custom chart : L × M (12 cols × 2 rows = 420 px) — chart
+          // lisible avec axes + légende, sans écraser le reste du dashboard.
+          // L'utilisateur peut agrandir vers L × L via la poignée resize.
+          const isCustomChart = vizType === "customChart";
+          addWidget(
+            kpiId,
+            vizType,
+            isCustomChart ? "L" : "M",
+            customConfig,
+            isCustomChart ? "M" : undefined,
+          );
+        }}
         lockedCategory={lockedCategory}
+        availabilityCtx={availabilityCtx}
       />
+
+      {/* Modale de config alertes / objectifs — ouverte par l'icône cible
+          du widget. Filtre les listes globales sur le kpiId courant.
+          `currentValue` : valeur du KPI à l'instant T — capturée par
+          l'éditeur comme baseline de l'objectif à sa création (figée). */}
+      <KpiTargetEditor
+        open={targetEditorKpiId !== null}
+        onClose={() => setTargetEditorKpiId(null)}
+        kpiId={targetEditorKpiId ?? ""}
+        alerts={targetEditorKpiId ? targets.alertsForKpi(targetEditorKpiId) : []}
+        objectives={targetEditorKpiId ? targets.objectivesForKpi(targetEditorKpiId) : []}
+        currentValue={targetEditorKpiId ? readKpiNumeric(kpis, targetEditorKpiId) : null}
+        onSaveAlert={targets.saveAlert}
+        onSaveObjective={targets.saveObjective}
+        onRemoveAlert={targets.removeAlert}
+        onRemoveObjective={targets.removeObjective}
+      />
+
+      {/* Notifs in-app : observe les KPIs vs alertes/objectifs. Un toast
+          pop-up signale tout franchissement de seuil ou objectif atteint,
+          puis disparaît seul. La persistance de `lastTriggeredAt` /
+          `lastReachedAt` empêche le re-déclenchement (cooldown 24 h).
+          Réservé à l'analyse dynamique : en statique (PDF / Excel = passé),
+          les valeurs sont figées, déclencher une notif n'aurait pas de sens. */}
+      {isDynamicAnalysis ? (
+        <KpiTargetNotifier
+          kpis={kpis}
+          alerts={targets.alerts}
+          objectives={targets.objectives}
+          onAlertTriggered={handleAlertTriggered}
+          onObjectiveReached={handleObjectiveReached}
+        />
+      ) : null}
     </section>
   );
 }
@@ -348,4 +502,12 @@ export function DashboardActions({
       {trailingActions}
     </div>
   );
+}
+
+// Lit une valeur numérique du sac CalculatedKpis sans imposer la connaissance
+// du shape complet — on accepte toute clé string. Utilisé pour récupérer la
+// valeur courante d'un KPI à passer à l'éditeur d'objectif (baseline).
+function readKpiNumeric(kpis: CalculatedKpis, kpiId: string): number | null {
+  const v = (kpis as unknown as Record<string, number | null | undefined>)[kpiId];
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }

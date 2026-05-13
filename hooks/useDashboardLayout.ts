@@ -10,8 +10,10 @@ import {
   saveDashboardLayout
 } from "@/services/dashboardLayoutStore";
 import type {
+  CustomChartConfig,
   DashboardLayout,
   WidgetInstance,
+  WidgetSize,
   WidgetVizType,
   WidgetWidth
 } from "@/types/dashboard";
@@ -28,7 +30,13 @@ export type UseDashboardLayoutResult = {
   layout: DashboardLayout;
   isLoading: boolean;
   isSaving: boolean;
-  addWidget: (kpiId: string, vizType: WidgetVizType, size?: WidgetWidth) => void;
+  addWidget: (
+    kpiId: string,
+    vizType: WidgetVizType,
+    size?: WidgetWidth,
+    customConfig?: CustomChartConfig,
+    height?: WidgetSize,
+  ) => void;
   removeWidget: (instanceId: string) => void;
   reorderWidgets: (orderedIds: string[]) => void;
   updateWidget: (instanceId: string, patch: Partial<WidgetInstance>) => void;
@@ -160,7 +168,13 @@ export function useDashboardLayout({
   }, []);
 
   const addWidget = useCallback(
-    (kpiId: string, vizType: WidgetVizType, size: WidgetWidth = "M") => {
+    (
+      kpiId: string,
+      vizType: WidgetVizType,
+      size: WidgetWidth = "M",
+      customConfig?: CustomChartConfig,
+      height?: WidgetSize,
+    ) => {
       setLayout((prev) => ({
         ...prev,
         widgets: [
@@ -169,23 +183,21 @@ export function useDashboardLayout({
             id: generateWidgetId(),
             kpiId,
             vizType,
-            size
-          }
-        ]
+            size,
+            ...(height ? { height } : {}),
+            ...(customConfig ? { customConfig } : {}),
+          },
+        ],
       }));
     },
     []
   );
 
   const removeWidget = useCallback((instanceId: string) => {
-    setLayout((prev) => {
-      const target = prev.widgets.find((w) => w.id === instanceId);
-      if (target?.isFixed) return prev; // garde-fou : on ne retire pas un widget marqué fixe.
-      return {
-        ...prev,
-        widgets: prev.widgets.filter((w) => w.id !== instanceId)
-      };
-    });
+    setLayout((prev) => ({
+      ...prev,
+      widgets: prev.widgets.filter((w) => w.id !== instanceId)
+    }));
   }, []);
 
   const reorderWidgets = useCallback((orderedIds: string[]) => {

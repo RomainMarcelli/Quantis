@@ -10,7 +10,7 @@ export default async function AnalysisDetailPage({ params }: AnalysisDetailPageP
   const { id } = await params;
 
   return (
-    <main className="premium-analysis-root relative min-h-screen w-full overflow-hidden px-3 py-8 md:px-4 lg:px-6">
+    <main className="premium-analysis-root relative min-h-screen w-full px-3 py-8 md:px-4 lg:px-6">
       <AuthGate>
         <VyzorBenchmarkProvider>
           <AnalysisDetailView analysisId={id} />

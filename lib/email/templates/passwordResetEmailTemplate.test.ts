@@ -10,7 +10,7 @@ describe("buildPasswordResetEmailTemplate", () => {
       resetUrl: "https://quantis.app/reset-password?oobCode=abc"
     });
 
-    expect(result.subject).toBe("Réinitialisez votre mot de passe Quantis");
+    expect(result.subject).toBe("Réinitialisez votre mot de passe Vyzor");
     expect(result.html).toContain("Romain");
     expect(result.html).toContain("https://quantis.app/reset-password?oobCode=abc");
     expect(result.text).toContain("Romain");

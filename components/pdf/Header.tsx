@@ -86,7 +86,7 @@ export function Header({ data, logoSrc }: HeaderProps) {
         )}
 
         <View>
-          <Text style={styles.brand}>Quantis</Text>
+          <Text style={styles.brand}>Vyzor</Text>
           <Text style={styles.title}>Rapport de synthèse financière</Text>
           <Text style={styles.subtitle}>Entreprise : {data.companyName}</Text>
           {data.userName && (

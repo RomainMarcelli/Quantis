@@ -3,12 +3,11 @@
 "use client";
 
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
   FileText,
   Bot,
-  Calendar,
   Folder,
   LayoutDashboard,
   Lock,
@@ -25,24 +24,20 @@ import {
   Upload,
   UserCircle2
 } from "lucide-react";
-import {
-  DashboardFinancialTestMenu,
-  type DashboardTestTabId
-} from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
+import { SimulationToggleButton } from "@/components/simulation/SimulationWidget";
+import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
+import type { DashboardTestTabId } from "@/components/dashboard/navigation/DashboardFinancialTestMenu";
 import { DashboardFinancialTestContent } from "@/components/dashboard/navigation/DashboardFinancialTestContent";
 import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashboardModal";
 import { useUserDashboards } from "@/hooks/useUserDashboards";
 import { clearLocalAnalysisHint, setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
 import {
   DEFAULT_FOLDER_NAME,
-  ensureFolderName,
-  getActiveFolderName,
   getKnownFolderNames,
-  removeKnownFolderName,
-  renameKnownFolderName,
   registerKnownFolderName,
-  setActiveFolderName
-} from "@/lib/folders/activeFolder";
+  removeKnownFolderName,
+  renameKnownFolderName
+} from "@/lib/folders/folderRegistry";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
@@ -74,9 +69,10 @@ import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
-import { SourceBadge } from "@/components/analysis/SourceBadge";
-import { resolveActiveAnalysis } from "@/lib/source/activeSource";
-import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
+import { StaticYearBar } from "@/components/temporality/StaticYearBar";
+import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
 import type { AnalysisDraft, AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import {
@@ -91,9 +87,12 @@ import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference
 } from "@/lib/ui/sidebarPreference";
-import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
-import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
+import {
+  DashboardReportModal,
+  type DashboardOption,
+} from "@/components/dashboard/DashboardReportModal";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
+import { computeShowTresorerie } from "@/lib/banking/disponibilitesOverride";
 
 type AnalysisDetailViewProps = {
   analysisId?: string;
@@ -114,19 +113,32 @@ const DEFAULT_ANALYSIS_TAB: DashboardTestTabId = "creation-valeur";
 
 export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: AnalysisDetailViewProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const currentCalendarYear = new Date().getFullYear();
   const isDocumentsView = viewMode === "documents";
+
+  // Brief 09/06/2026 : depuis la sidebar (sous-menu Tableau de bord visible
+  // partout), un clic sur "Création de valeur" / "Investissement" / etc.
+  // depuis n'importe quelle page navigue vers `/analysis?tab=<id>`. On lit
+  // ici le param et on l'applique sur le state local au montage.
+  const initialTabFromQuery = searchParams.get("tab");
 
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
 
-  // L'onglet Trésorerie n'apparaît que si :
-  //  - une connexion Bridge active existe (useBridgeStatus polle /status)
-  //  - OU l'analyse courante porte un bankingSummary (résultat d'un sync
-  //    précédent attaché à cette analyse, même si la connexion vient d'être
-  //    supprimée — l'historique reste exploitable).
+  // L'onglet Trésorerie n'apparaît que si LES TROIS conditions sont vraies :
+  //   1. l'utilisateur a activé Bridge via le toggle de /documents
+  //      (`activeBankingSource === "bridge"`, lu plus bas via useActiveDataSource).
+  //   2. une connexion Bridge active existe (useBridgeStatus polle /status)
+  //      OU l'analyse courante porte un bankingSummary (sync précédent attaché
+  //      à cette analyse, même si la connexion vient d'être supprimée).
+  //   3. (implicite) le toggle l'emporte sur les données en cache : un
+  //      bankingSummary historique n'est plus rendu si l'utilisateur a
+  //      explicitement désactivé sa source banque dans /documents.
+  // L'expression finale est dérivée plus bas, après l'appel à
+  // useActiveDataSource (qui est plus tardif dans la fonction).
   const bridgeStatus = useBridgeStatus();
   // Fallback summary : si l'analyse courante n'a pas de bankingSummary
   // attaché (cas typique : sync standalone effectué depuis Documents sans
@@ -134,20 +146,45 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // status endpoint.
   const bankingSummary =
     analysis?.bankingSummary ?? bridgeStatus.status?.summary ?? null;
-  const showTresorerie = Boolean(bridgeStatus.status?.connected) || bankingSummary !== null;
 
   // L'onglet principal "Création de valeur" est affiché par défaut sur /analysis.
-  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(DEFAULT_ANALYSIS_TAB);
+  // Si `?tab=<id>` est passé dans l'URL (depuis la sidebar globale d'une
+  // autre page), on initialise sur cet onglet — sinon on garde le défaut.
+  const [activeDashboardTab, setActiveDashboardTab] = useState<DashboardTestTabId>(
+    () => (initialTabFromQuery as DashboardTestTabId | null) ?? DEFAULT_ANALYSIS_TAB
+  );
+
+  // Sync le tab si le query param change (l'utilisateur reclique sur un
+  // sous-item de la sidebar alors qu'il est déjà sur /analysis).
+  useEffect(() => {
+    if (initialTabFromQuery && initialTabFromQuery !== activeDashboardTab) {
+      setActiveDashboardTab(initialTabFromQuery as DashboardTestTabId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTabFromQuery]);
   // Phase 4 — modale "Nouveau tableau de bord" pour créer un dashboard custom.
   const [createDashboardOpen, setCreateDashboardOpen] = useState(false);
+  // Modale "Télécharger le rapport" — choix synthèse vs sélection multi-tableaux.
+  const [dashboardReportOpen, setDashboardReportOpen] = useState(false);
   // Phase 4 — liste des dashboards custom de l'utilisateur (CRUD Firestore).
   const userDashboards = useUserDashboards(user?.uid ?? null);
   // Le select du menu pilote l'année d'analyse affichée dans le dashboard.
   const [selectedDashboardYear, setSelectedDashboardYear] = useState<string>("");
-  const [currentFolder, setCurrentFolder] = useState<string>(getActiveFolderName() ?? DEFAULT_FOLDER_NAME);
+  // currentFolder = sous-sélection locale dans la vue Documents (liste des
+  // fichiers d'un dossier). Distinct de `activeFecFolderName` (Firestore) qui
+  // est l'éventuel folder utilisé comme source active du dashboard. Initialisé
+  // à DEFAULT — sera resync'é depuis useActiveDataSource si une source FEC est
+  // active (cf. effet ci-dessous).
+  const [currentFolder, setCurrentFolder] = useState<string>(DEFAULT_FOLDER_NAME);
   const [knownFolders, setKnownFolders] = useState<string[]>(() => getKnownFolderNames());
   const [greetingName, setGreetingName] = useState("Utilisateur");
-  const [companyName, setCompanyName] = useState("Quantis");
+  const [companyName, setCompanyName] = useState("Vyzor");
+  // Brief 09/06/2026 — state d'édition lifté : pilote tous les
+  // CustomizableDashboards des onglets (Création de valeur, Investissement,
+  // etc.) via `controlledIsEditing`. Le bouton "Personnaliser" du AppHeader
+  // est désormais l'UNIQUE point d'entrée pour toggler l'édition (le
+  // doublon interne `DashboardActions` est masqué via `hideHeaderTitle`).
+  const [headerEditing, setHeaderEditing] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   // Loader visible uniquement si le chargement dépasse 400 ms (cf. hook).
@@ -215,14 +252,31 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     return unsubscribe;
   }, [router]);
 
-  // Source active globale (localStorage `quantis.activeAnalysis`). Mise à jour
-  // par le bouton "Synchroniser et activer" du panneau de connexions et par
-  // "Utiliser comme source active" sur les cards de /documents. Si l'URL ne
+  // Source active globale (Firestore via useActiveDataSource). Si l'URL ne
   // pointe pas explicitement sur une analyse (analysisId dans la prop), on
-  // se base dessus pour résoudre quelle analyse afficher dans le tableau de
-  // bord. Sans ça, /analysis restait coincé sur la première analyse de
-  // l'historique même après changement de source côté Synthèse.
-  const activeAnalysisIdFromStorage = useActiveAnalysisId();
+  // résout l'analyse à afficher en filtrant la liste par
+  // `activeAccountingSource` (et `activeFecFolderName` si FEC).
+  const { activeAccountingSource, activeFecFolderName, activeBankingSource } = useActiveDataSource({
+    analyses: allAnalyses,
+  });
+
+  // Onglet Trésorerie : visible UNIQUEMENT si l'utilisateur a activé Bridge
+  // via le toggle de /documents. Le toggle l'emporte sur le cache : un
+  // bankingSummary historique attaché à une analyse passée n'est plus
+  // exploité quand l'utilisateur a désactivé sa source banque (cf. brief
+  // data-sources : "désactiver Bridge masque l'onglet Trésorerie").
+  const showTresorerie = computeShowTresorerie({
+    activeBankingSource,
+    bridgeConnected: Boolean(bridgeStatus.status?.connected),
+    hasBankingSummary: bankingSummary !== null,
+  });
+
+  // Sync currentFolder local avec l'éventuel folder FEC actif.
+  useEffect(() => {
+    if (activeAccountingSource === "fec" && activeFecFolderName) {
+      setCurrentFolder(activeFecFolderName);
+    }
+  }, [activeAccountingSource, activeFecFolderName]);
 
   useEffect(() => {
     if (!user) {
@@ -230,15 +284,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     }
 
     // Priorité 1 : l'analysisId explicite venant de l'URL (/analysis/{id}).
-    // Priorité 2 : l'analyse marquée active dans localStorage.
-    // Priorité 3 (fallback dans loadDashboardData) : dossier actif → history[0].
-    const target = analysisId ?? activeAnalysisIdFromStorage ?? undefined;
-    void loadDashboardData(user, target);
-  }, [user, analysisId, activeAnalysisIdFromStorage]);
+    // Priorité 2 : on laisse loadDashboardData résoudre via la source active
+    // (filtrage par provider + folder dans le matcher).
+    void loadDashboardData(user, analysisId ?? undefined);
+  }, [user, analysisId, activeAccountingSource, activeFecFolderName]);
 
   useEffect(() => {
     if (currentFolder.trim()) {
-      setActiveFolderName(currentFolder);
+      // On enregistre le folder dans le registre local (apparaît dans les
+      // menus de déplacement). L'activation comme source FEC se fait via
+      // le toggle binaire de /documents (cf. useActiveDataSource).
       setKnownFolders(registerKnownFolderName(currentFolder));
     }
   }, [currentFolder]);
@@ -415,9 +470,16 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   }, [analysis, analysesFilteredByYear, analysesInCurrentFolder, allAnalyses, currentFolder]);
 
   useEffect(() => {
-    // Lors d'un changement d'analyse, on garde l'entrée par défaut sur "Création de valeur".
-    setActiveDashboardTab(DEFAULT_ANALYSIS_TAB);
-  }, [analysis?.id]);
+    // Brief 09/06/2026 : lors d'un changement d'analyse, on respecte le
+    // tab choisi via l'URL (?tab=<id> poussé par la sidebar globale depuis
+    // Synthèse / Documents). Sans ça, le clic sur "Investissement" depuis
+    // /synthese arrivait sur /analysis?tab=investissement-bfr puis le
+    // chargement de l'analyse écrasait le state pour retomber sur
+    // "Création de valeur".
+    setActiveDashboardTab(
+      (initialTabFromQuery as DashboardTestTabId | null) ?? DEFAULT_ANALYSIS_TAB
+    );
+  }, [analysis?.id, initialTabFromQuery]);
 
   const folderNames = useMemo(() => {
     const set = new Set<string>();
@@ -491,7 +553,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
 
       setAllAnalyses(history);
       setGreetingName(resolveFirstName(currentUser, profile?.firstName));
-      setCompanyName(profile?.companyName?.trim() || "Quantis");
+      setCompanyName(profile?.companyName?.trim() || "Vyzor");
       const persistedFolderNames = persistedFolders.map((folder) => normalizeFolderName(folder.name));
       persistedFolderNames.forEach((folderName) => registerKnownFolderName(folderName));
       setKnownFolders(getKnownFolderNames());
@@ -500,7 +562,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         // Aucun historique: on retire l'indicateur local d'existence d'analyses.
         clearLocalAnalysisHint();
         setAnalysis(null);
-        setCurrentFolder(getActiveFolderName() ?? persistedFolderNames[0] ?? DEFAULT_FOLDER_NAME);
+        setCurrentFolder(persistedFolderNames[0] ?? DEFAULT_FOLDER_NAME);
         setErrorMessage(
           "Aucune analyse disponible pour le moment. Importez un fichier pour démarrer votre analyse financière."
         );
@@ -519,18 +581,24 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
         }
       }
 
-      if (!selected) {
-        const storedFolder = getActiveFolderName();
-        if (storedFolder) {
-          selected = history.find((item) => normalizeFolderName(item.folderName) === normalizeFolderName(storedFolder)) ?? null;
-        }
+      // Pas d'analyse ciblée par l'URL : on utilise la source active globale
+      // (Firestore via useActiveDataSource) pour choisir la liasse à afficher.
+      // Le helper `resolveCurrentAnalysisForSource` est testé unitairement.
+      if (!selected && activeAccountingSource) {
+        selected = resolveCurrentAnalysisForSource(
+          history,
+          activeAccountingSource,
+          activeFecFolderName
+        );
       }
 
       selected = selected ?? history[0];
 
       setAnalysis(selected);
       setCurrentFolder(normalizeFolderName(selected.folderName));
-      setActiveFolderName(normalizeFolderName(selected.folderName));
+      // Note: on n'écrit PLUS dans le localStorage legacy "active folder" —
+      // l'écriture Firestore se fait explicitement via le toggle binaire de
+      // /documents (cf. useActiveDataSource).
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : "Erreur inattendue pendant le chargement."
@@ -545,11 +613,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       return;
     }
 
-    const folderName = ensureFolderName(currentFolder);
-    if (!folderName) {
-      setErrorMessage("Le nom de dossier est requis pour ajouter des fichiers.");
-      return;
-    }
+    const folderName = currentFolder.trim() || DEFAULT_FOLDER_NAME;
+    registerKnownFolderName(folderName);
 
     setUploading(true);
     setErrorMessage(null);
@@ -898,12 +963,116 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     );
   }
 
+  // ─── Header unifié — Phase 3 brief 09/05/2026 ──────────────────────
+  // Mêmes 3 boutons que la page Synthèse : Simuler / Exporter la synthèse
+  // / Personnaliser. Le state `isEditing` est tracké au niveau de la vue
+  // (cosmétique pour le bouton ; les sections d'onglet — RentabilityTest,
+  // etc. — gèrent elles-mêmes leur mode édition via leur CustomizableDashboard).
+
+  // Titre combiné "Tableau de bord - <section>" : on résout le label de
+  // l'onglet actif en cherchant d'abord parmi les 5 fixes, puis dans la
+  // liste des dashboards custom de l'utilisateur.
+  const activeDashboardLabel = resolveActiveDashboardLabel(
+    activeDashboardTab,
+    userDashboards.dashboards
+  );
+
+  // Brief 09/06/2026 : pour les sources statiques (PDF/Excel), on remplace
+  // l'absence de TemporalityBar par un sélecteur "Exercice <année>" qui
+  // permet de basculer entre exercices quand le dossier en contient
+  // plusieurs (ex: 2 liasses Excel pour 2023 et 2024).
+  const showHeaderTemporalityBar =
+    analysis && shouldShowTemporalityBar(analysis);
+  const headerTemporalityBar = showHeaderTemporalityBar ? (
+    <TemporalityBar
+      availableRange={computeAvailableRange(analysis!)}
+      daysInPeriod={null}
+      flat
+    />
+  ) : analysis && dashboardYearOptions.length > 0 ? (
+    <StaticYearBar
+      options={dashboardYearOptions}
+      value={selectedDashboardYear}
+      onChange={setSelectedDashboardYear}
+    />
+  ) : null;
+
+  const headerActions = analysis ? (
+    <>
+      {effectiveAnalysis ? (
+        <SimulationToggleButton
+          mappedData={effectiveAnalysis.mappedData}
+          portalContainerId="simulation-portal-container"
+        />
+      ) : null}
+      <button
+        type="button"
+        onClick={() => setDashboardReportOpen(true)}
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition"
+        style={{
+          border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 30%)",
+          color: "var(--app-brand-gold-deep)",
+          backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 10%)",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor =
+            "rgb(var(--app-brand-gold-deep-rgb) / 18%)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor =
+            "rgb(var(--app-brand-gold-deep-rgb) / 10%)";
+        }}
+      >
+        <FileText className="h-3.5 w-3.5" />
+        Exporter les tableaux
+      </button>
+      <button
+        type="button"
+        onClick={() => setHeaderEditing((v) => !v)}
+        aria-pressed={headerEditing}
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition"
+        style={{
+          border: "1px solid var(--app-border-strong)",
+          color: headerEditing ? "var(--app-brand-gold-deep)" : "var(--app-text-primary)",
+          backgroundColor: headerEditing
+            ? "rgb(var(--app-brand-gold-deep-rgb) / 8%)"
+            : "transparent",
+        }}
+        onMouseEnter={(e) => {
+          if (!headerEditing) {
+            e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!headerEditing) {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }
+        }}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        {headerEditing ? "Terminer" : "Personnaliser"}
+      </button>
+    </>
+  ) : null;
+
   return (
     <section className="w-full space-y-4">
+      {/* Phase 3 brief Header unifié 09/05/2026 — variant="data" + 3 actions
+          (Simuler / Exporter la synthèse / Personnaliser) en ligne 2.
+          Les onglets (Création de valeur / Investissement / etc.) restent
+          dans la zone de contenu sous le header. */}
       <AppHeader
+        variant="data"
         companyName={companyName}
-        searchPlaceholder="Rechercher un KPI, une section ou un document..."
+        contextBadge={analysis ? <ActiveSourceBadge analysis={analysis} /> : undefined}
+        temporalityBar={headerTemporalityBar}
+        headerActions={headerActions}
       />
+
+      {/* Container Portal pour le simulateur (cf. brief simulator panneau
+          autonome 08/05/2026). Le widget se rend ici plein largeur quand
+          le bouton "Simuler" est activé. */}
+      <div id="simulation-portal-container" />
 
       {/* Loader retardé : ne s'affiche que si le chargement dépasse 400 ms. */}
       {showAnalysisLoader ? (
@@ -957,11 +1126,12 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                   activeId: activeDashboardTab,
                   onSelectItem: (id) => {
                     setActiveDashboardTab(id as DashboardTestTabId);
-                    // Bascule sur la page /analysis si l'utilisateur déclenche
-                    // le sous-menu depuis une autre route — sinon on reste
-                    // simplement sur la page courante avec le tab mis à jour.
+                    // Si on est déjà sur /analysis, on met juste à jour le
+                    // state (pas de navigation). Sinon (sécurité depuis
+                    // Documents qui partage cette vue), on push avec le tab
+                    // en query pour que la page cible ouvre la bonne section.
                     if (window.location.pathname !== "/analysis") {
-                      router.push("/analysis");
+                      router.push(`/analysis?tab=${encodeURIComponent(id)}`);
                     }
                   },
                   onCreate: user ? () => setCreateDashboardOpen(true) : undefined,
@@ -1178,122 +1348,24 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
             </>
           ) : analysis ? (
             <>
-              {/* Titre remonté en haut — l'utilisateur voit immédiatement le
-                  contexte. Le sélecteur de période vient juste dessous. */}
+              {/* Titre combiné "Tableau de bord - <section>" — la section est
+                  déterminée par l'onglet actif (5 fixes + dashboards custom).
+                  Le format reste constant quelle que soit la page (fixe ou
+                  custom) — cf. brief 09/05/2026. */}
               <div className="px-1">
-                <h1 className="text-2xl font-semibold text-white md:text-3xl">Tableau de bord</h1>
+                <h1 className="text-2xl font-semibold text-white md:text-3xl">
+                  Tableau de bord{activeDashboardLabel ? ` - ${activeDashboardLabel}` : ""}
+                </h1>
                 <p className="mt-1 text-sm text-white/65">
                   Bonjour {greetingName}, voici la vue détaillée de vos indicateurs financiers.
                 </p>
               </div>
 
-              {/* Sélecteur de période sous le titre :
-                   - Sources dynamiques (Pennylane/MyUnisoft/Odoo) → TemporalityBar
-                     complète (jour/semaine/mois/trimestre/année + nav).
-                   - Sources statiques (PDF/Excel) → mini-bar "Année" + dropdown
-                     pour switcher entre les exercices disponibles. Le sélecteur
-                     historique de la sidebar a été retiré (doublon). */}
-              {shouldShowTemporalityBar(analysis) ? (
-                <TemporalityBar
-                  availableRange={computeAvailableRange(analysis)}
-                  daysInPeriod={effectiveAnalysis?.isFiltered ? effectiveAnalysis.filterSummary.daysInPeriod : null}
-                  rightLabel={
-                    effectiveAnalysis?.isFiltered
-                      ? `${effectiveAnalysis.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
-                      : undefined
-                  }
-                />
-              ) : dashboardYearOptions.length > 1 ? (
-                <div className="precision-card flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3" data-scroll-reveal-ignore>
-                  <div className="flex items-center gap-2 text-white/60">
-                    <Calendar className="h-4 w-4" />
-                    <span className="text-xs uppercase tracking-wider">Période</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-                    <button
-                      type="button"
-                      className="rounded-md bg-quantis-gold px-3 py-1 text-xs font-medium text-black"
-                      aria-pressed
-                    >
-                      Année
-                    </button>
-                  </div>
-                  <select
-                    id="dashboard-year-static"
-                    value={selectedDashboardYear}
-                    onChange={(event) => setSelectedDashboardYear(event.target.value)}
-                    className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white outline-none transition hover:bg-white/10 focus:border-quantis-gold/70"
-                  >
-                    {dashboardYearOptions.map((option) => (
-                      <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
-
-              {/* Bandeau meta consolidé : société + date + source + période
-                  (statique uniquement) + actions. */}
-              <header className="precision-card flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
-                    <span>Analyse du {new Date(analysis.createdAt).toLocaleString("fr-FR")}</span>
-                    <SourceBadge
-                      sourceMetadata={analysis.sourceMetadata ?? null}
-                      analysisCreatedAt={analysis.createdAt}
-                    />
-                    {!shouldShowTemporalityBar(analysis) && analysis.fiscalYear ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-white/75">
-                        Exercice {analysis.fiscalYear}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 self-start md:self-auto">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!analysis) return;
-                      const err = await downloadFinancialReport({ analysisId: analysis.id });
-                      if (err) {
-                        // Erreur silencieuse : on log côté console pour debug.
-                        console.warn("[financial-report] download failed", err);
-                      }
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    Télécharger le rapport PDF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!analysis) return;
-                      exportAnalysisDataAsJson({ analysis, companyName });
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
-                  >
-                    Exporter données
-                  </button>
-                </div>
-              </header>
-
-              <DashboardFinancialTestMenu
-                activeTab={activeDashboardTab}
-                onChange={handleFinancialTabChange}
-                showTresorerie={showTresorerie}
-                customDashboards={userDashboards.dashboards}
-                onCreateDashboard={user ? () => setCreateDashboardOpen(true) : undefined}
-                onDeleteDashboard={async (id) => {
-                  await userDashboards.deleteDashboard(id);
-                  // Si l'utilisateur supprime l'onglet courant, on retombe sur Création de valeur.
-                  if (activeDashboardTab === id) {
-                    setActiveDashboardTab(DEFAULT_ANALYSIS_TAB);
-                  }
-                }}
-              />
+              {/* Phase 3 brief Header unifié 09/05/2026 — bandeaux meta /
+                  TemporalityBar interne / sélecteur d'année statique /
+                  DashboardFinancialTestMenu supprimés. La TemporalityBar
+                  globale est désormais portée par le AppHeader (ligne 2),
+                  la navigation entre onglets se fait via la sidebar. */}
               {/* previousKpis :
                    - Priorité 1 = KPIs de la période antérieure de même durée
                      (Année → N-1, Mois → M-1…) calculés via dailyAccounting.
@@ -1304,7 +1376,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 kpis={effectiveAnalysis?.kpis ?? analysis.kpis}
                 mappedData={effectiveAnalysis?.mappedData ?? analysis.mappedData}
                 previousKpis={previousPeriodKpis ?? previousAnalysis?.kpis ?? null}
-                bankingSummary={bankingSummary}
+                bankingSummary={showTresorerie ? bankingSummary : null}
                 analyses={allAnalyses}
                 currentAnalysis={analysis}
                 analysisModeLabel={
@@ -1314,6 +1386,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                 }
                 userId={user?.uid ?? null}
                 customDashboards={userDashboards.dashboards}
+                controlledIsEditing={headerEditing}
+                onEditingChange={setHeaderEditing}
               />
 
               {/* Modal Phase 4 — création d'un dashboard custom nommé. */}
@@ -1328,6 +1402,30 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
                     setActiveDashboardTab(newId as DashboardTestTabId);
                   }
                 }}
+              />
+
+              {/* Modale "Rapport tableau de bord" — verrouillée en mode
+                  dashboard (l'export synthèse est dans l'onglet Synthèse). */}
+              <DashboardReportModal
+                open={dashboardReportOpen}
+                onClose={() => setDashboardReportOpen(false)}
+                analysisId={analysis.id}
+                lockType="dashboard"
+                effectiveKpis={effectiveAnalysis?.kpis ?? analysis.kpis}
+                options={(((): DashboardOption[] => {
+                  const fixed: DashboardOption[] = [
+                    { id: "creation-valeur", label: "Création de valeur", description: "Indicateurs de richesse créée et marges opérationnelles" },
+                    { id: "investissement-bfr", label: "Investissement & BFR", description: "Cycle d'exploitation et besoin en fonds de roulement" },
+                    { id: "financement", label: "Financement", description: "Structure financière et capacité de remboursement" },
+                    { id: "rentabilite", label: "Rentabilité", description: "Performance des capitaux engagés (ROE, ROCE)" },
+                  ];
+                  const customs: DashboardOption[] = userDashboards.dashboards.map((d) => ({
+                    id: d.id,
+                    label: d.name || "Tableau personnalisé",
+                    description: "Tableau personnalisé",
+                  }));
+                  return [...fixed, ...customs];
+                }))()}
               />
             </>
           ) : (
@@ -1449,6 +1547,26 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       ) : null}
     </section>
   );
+}
+
+// Labels des 5 onglets fixes — alignés sur DashboardFinancialTestMenu.
+// Source unique pour le titre combiné "Tableau de bord - <section>".
+const FIXED_DASHBOARD_LABELS: Record<string, string> = {
+  "creation-valeur": "Création de valeur",
+  "investissement-bfr": "Investissement",
+  financement: "Financement",
+  rentabilite: "Rentabilité",
+  tresorerie: "Trésorerie",
+};
+
+function resolveActiveDashboardLabel(
+  activeTab: DashboardTestTabId,
+  customDashboards: ReadonlyArray<{ id: string; name: string }>
+): string | null {
+  const fixed = FIXED_DASHBOARD_LABELS[activeTab];
+  if (fixed) return fixed;
+  const custom = customDashboards.find((d) => d.id === activeTab);
+  return custom?.name?.trim() || null;
 }
 
 function resolveFirstName(user: AuthenticatedUser, profileFirstName?: string): string {

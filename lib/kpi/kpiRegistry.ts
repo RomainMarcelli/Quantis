@@ -1,5 +1,5 @@
 // File: lib/kpi/kpiRegistry.ts
-// Role: source de vérité unique pour les KPIs Quantis.
+// Role: source de vérité unique pour les KPIs Vyzor.
 //
 // Chaque KPI est décrit par une `KpiDefinition` qui contient :
 //   - sa formule (humaine et code)
@@ -184,7 +184,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
   ebitda: {
     id: "ebitda",
     label: "Excédent brut d'exploitation",
-    shortLabel: "EBITDA",
+    shortLabel: "EBE",
     category: "creation_valeur",
     formula: "VA - Impôts et taxes - Salaires - Charges sociales",
     formulaCode: "va - impots_taxes - salaires - charges_soc",
@@ -235,8 +235,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   marge_ebitda: {
     id: "marge_ebitda",
-    label: "Marge EBITDA",
-    shortLabel: "Marge EBITDA",
+    label: "Marge d'excédent brut d'exploitation",
+    shortLabel: "Marge EBE",
     category: "creation_valeur",
     formula: "EBITDA / CA × 100",
     formulaCode: "(ebitda / ca) * 100",
@@ -339,7 +339,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
   charges_var: {
     id: "charges_var",
     label: "Charges variables",
-    shortLabel: "Charges var.",
+    shortLabel: "Ch. variables",
     category: "creation_valeur",
     formula: "Achats marchandises + Achats matières + Variations de stocks",
     formulaCode: "achats_march + achats_mp + var_stock_march + var_stock_mp",
@@ -362,7 +362,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
   charges_fixes: {
     id: "charges_fixes",
     label: "Charges fixes",
-    shortLabel: "Charges fixes",
+    shortLabel: "Ch. fixes",
     category: "creation_valeur",
     formula: "Autres charges externes + Salaires + Charges sociales + Dotations aux amortissements",
     formulaCode: "ace + salaires + charges_soc + dap",
@@ -388,8 +388,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   point_mort: {
     id: "point_mort",
-    label: "Point mort (seuil de rentabilité)",
-    shortLabel: "Point mort",
+    label: "Seuil de rentabilité",
+    shortLabel: "Seuil rentab.",
     category: "creation_valeur",
     formula: "Charges fixes / TMSCV",
     formulaCode: "charges_fixes / tmscv",
@@ -411,8 +411,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   resultat_net: {
     id: "resultat_net",
-    label: "Résultat net comptable",
-    shortLabel: "Résultat net",
+    label: "Résultat net",
+    shortLabel: "Rés. net",
     category: "creation_valeur",
     formula: "Résultat de l'exercice (après impôts, charges financières et exceptionnelles)",
     formulaCode: "res_net ?? resultat_exercice",
@@ -435,8 +435,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   netProfit: {
     id: "netProfit",
-    label: "Résultat net (alias frontend)",
-    shortLabel: "Net Profit",
+    label: "Résultat net",
+    shortLabel: "Rés. net",
     category: "creation_valeur",
     formula: "Identique à resultat_net",
     formulaCode: "resultat_net",
@@ -458,7 +458,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
   grossMarginRate: {
     id: "grossMarginRate",
     label: "Taux de marge brute",
-    shortLabel: "Marge brute",
+    shortLabel: "Marge brute %",
     category: "creation_valeur",
     formula: "TMSCV × 100 (en %)",
     formulaCode: "tmscv * 100",
@@ -508,8 +508,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   workingCapital: {
     id: "workingCapital",
-    label: "Working Capital (alias front)",
-    shortLabel: "WC",
+    label: "Besoin en fonds de roulement",
+    shortLabel: "BFR",
     category: "investissement",
     formula: "Identique au BFR",
     formulaCode: "bfr",
@@ -527,7 +527,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   rot_bfr: {
     id: "rot_bfr",
-    label: "Rotation du BFR (en jours)",
+    label: "Rotation du besoin en fonds de roulement",
     shortLabel: "Rot. BFR",
     category: "investissement",
     formula: "(BFR / (Total production × 1.2)) × jours_période",
@@ -551,7 +551,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   dso: {
     id: "dso",
-    label: "Délai moyen de paiement client",
+    label: "Délai de paiement clients",
     shortLabel: "DSO",
     category: "investissement",
     formula: "(Créances clients × jours_période) / (Total production × 1.2)",
@@ -580,7 +580,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   dpo: {
     id: "dpo",
-    label: "Délai moyen de paiement fournisseur",
+    label: "Délai de paiement fournisseurs",
     shortLabel: "DPO",
     category: "investissement",
     formula: "(Dettes fournisseurs × jours_période) / ((Achats marchandises + Autres charges externes) × 1.2)",
@@ -628,8 +628,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   ratio_immo: {
     id: "ratio_immo",
-    label: "Ratio d'immobilisations",
-    shortLabel: "Immo",
+    label: "Ratio d'usure des immobilisations",
+    shortLabel: "Ratio immo.",
     category: "investissement",
     formula: "Total actif immobilisé net / Total actif immobilisé brut",
     formulaCode: "total_actif_immo_net / total_actif_immo_brut",
@@ -652,7 +652,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   etat_materiel_indice: {
     id: "etat_materiel_indice",
-    label: "État du matériel (indice)",
+    label: "Indice d'état du matériel",
     shortLabel: "État matériel",
     category: "investissement",
     formula: "Ratio d'immobilisations × 100",
@@ -725,7 +725,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   solvabilite: {
     id: "solvabilite",
-    label: "Solvabilité (ratio d'autonomie financière)",
+    label: "Ratio de solvabilité",
     shortLabel: "Solvabilité",
     category: "financement",
     formula: "Capitaux propres / Total passif",
@@ -750,7 +750,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   gearing: {
     id: "gearing",
-    label: "Gearing (taux d'endettement net)",
+    label: "Ratio d'endettement net",
     shortLabel: "Gearing",
     category: "financement",
     formula: "(Emprunts - Disponibilités) / EBITDA",
@@ -774,8 +774,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   capacite_remboursement_annees: {
     id: "capacite_remboursement_annees",
-    label: "Capacité de remboursement (années)",
-    shortLabel: "Capa. rembours.",
+    label: "Capacité de remboursement",
+    shortLabel: "Cap. remb.",
     category: "financement",
     formula: "Emprunts / CAF",
     formulaCode: "emprunts / caf",
@@ -799,7 +799,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
   // ─── Rentabilité ────────────────────────────────────────────────────────
   roe: {
     id: "roe",
-    label: "Return on Equity",
+    label: "Rentabilité des capitaux propres",
     shortLabel: "ROE",
     category: "rentabilite",
     formula: "Résultat net / Capitaux propres",
@@ -823,7 +823,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   roce: {
     id: "roce",
-    label: "Return on Capital Employed",
+    label: "Rentabilité des capitaux employés",
     shortLabel: "ROCE",
     category: "rentabilite",
     formula: "(EBIT × 0.75) / (Actif immobilisé + BFR)",
@@ -872,7 +872,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
   disponibilites: {
     id: "disponibilites",
     label: "Disponibilités",
-    shortLabel: "Dispo",
+    shortLabel: "Dispo.",
     category: "tresorerie",
     formula: "Solde des comptes 512 (banque) + 53 (caisse)",
     formulaCode: "dispo",
@@ -895,7 +895,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
   tn: {
     id: "tn",
     label: "Trésorerie nette",
-    shortLabel: "Tréso nette",
+    shortLabel: "TN",
     category: "tresorerie",
     formula: "Disponibilités - Emprunts",
     formulaCode: "dispo - emprunts",
@@ -917,8 +917,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   monthlyBurnRate: {
     id: "monthlyBurnRate",
-    label: "Burn rate mensuel",
-    shortLabel: "Burn",
+    label: "Consommation mensuelle de trésorerie",
+    shortLabel: "Burn rate",
     category: "tresorerie",
     formula: "|Résultat net mensuel| si négatif, sinon 0",
     formulaCode: "netProfit < 0 ? abs(netProfit) / 12 : 0",
@@ -940,7 +940,7 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   cashRunwayMonths: {
     id: "cashRunwayMonths",
-    label: "Runway (mois de trésorerie)",
+    label: "Autonomie de trésorerie",
     shortLabel: "Runway",
     category: "tresorerie",
     formula: "Disponibilités / Burn rate mensuel",
@@ -964,8 +964,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   liq_gen: {
     id: "liq_gen",
-    label: "Liquidité générale",
-    shortLabel: "Liq. gén.",
+    label: "Ratio de liquidité générale",
+    shortLabel: "Liq. générale",
     category: "tresorerie",
     formula: "Actif circulant / Dettes court terme",
     formulaCode: "total_actif_circ / (fournisseurs + dettes_fisc_soc)",
@@ -988,8 +988,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   liq_red: {
     id: "liq_red",
-    label: "Liquidité réduite",
-    shortLabel: "Liq. réd.",
+    label: "Ratio de liquidité réduite",
+    shortLabel: "Liq. réduite",
     category: "tresorerie",
     formula: "(Créances + Disponibilités) / Dettes court terme",
     formulaCode: "(creances + dispo) / (fournisseurs + dettes_fisc_soc)",
@@ -1012,8 +1012,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
 
   liq_imm: {
     id: "liq_imm",
-    label: "Liquidité immédiate",
-    shortLabel: "Liq. imm.",
+    label: "Ratio de liquidité immédiate",
+    shortLabel: "Liq. immédiate",
     category: "tresorerie",
     formula: "Disponibilités / Dettes court terme",
     formulaCode: "dispo / (fournisseurs + dettes_fisc_soc)",
@@ -1253,8 +1253,8 @@ export const KPI_REGISTRY: Record<string, KpiDefinition> = {
   // ─── Score synthétique ──────────────────────────────────────────────────
   healthScore: {
     id: "healthScore",
-    label: "Indice de santé financière",
-    shortLabel: "Health Score",
+    label: "Indice de santé Vyzor",
+    shortLabel: "Score Vyzor",
     category: "score",
     formula: "Score pondéré (35% marge brute, 30% résultat positif, 20% BFR positif, 15% runway)",
     formulaCode: "weighted(grossMarginRate, netProfit, workingCapital, cashRunwayMonths)",

@@ -4,6 +4,7 @@
 // Vyzor + position absolue de la valeur entreprise sur l'axe.
 "use client";
 
+import { memo } from "react";
 import {
   formatCurrency,
   formatNumber,
@@ -24,7 +25,7 @@ type ComparisonWidgetProps = {
   kpis: CalculatedKpis;
 };
 
-export function ComparisonWidget({ kpiId, kpis }: ComparisonWidgetProps) {
+function ComparisonWidgetImpl({ kpiId, kpis }: ComparisonWidgetProps) {
   const definition = getKpiDefinition(kpiId);
   const value = readKpiValue(kpis, kpiId);
   const mapping = KPI_BENCHMARK_MAPPING[kpiId as BenchmarkableKpiKey];
@@ -241,3 +242,5 @@ function formatDeltaMessage(deltaPct: number): string {
 }
 
 void INSUFFICIENT_DATA_LABEL;
+
+export const ComparisonWidget = memo(ComparisonWidgetImpl);

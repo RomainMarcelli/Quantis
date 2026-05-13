@@ -25,7 +25,7 @@ export type SyntheseWidgetDefinition = {
 export const SYNTHESE_WIDGET_CATALOG: SyntheseWidgetDefinition[] = [
   {
     id: "synthese:score",
-    label: "Quantis Score",
+    label: "Vyzor Score",
     shortLabel: "Score",
     description:
       "Indicateur synthétique de santé financière : rentabilité, solvabilité, liquidité, efficacité.",
@@ -44,7 +44,7 @@ export const SYNTHESE_WIDGET_CATALOG: SyntheseWidgetDefinition[] = [
     label: "Recommandation stratégique",
     shortLabel: "Reco IA",
     description:
-      "Bandeau d'agent Quantis : action prioritaire suggérée à partir de votre santé financière.",
+      "Bandeau d'agent Vyzor : action prioritaire suggérée à partir de votre santé financière.",
     vizType: "aiInsight"
   },
   {
@@ -60,7 +60,7 @@ export const SYNTHESE_WIDGET_CATALOG: SyntheseWidgetDefinition[] = [
     label: "Plan d'action détaillé",
     shortLabel: "Plan d'action",
     description:
-      "Actions concrètes recommandées par Quantis cette période (recouvrement, relance, BFR…).",
+      "Actions concrètes recommandées par Vyzor cette période (recouvrement, relance, BFR…).",
     vizType: "actionList"
   }
 ];

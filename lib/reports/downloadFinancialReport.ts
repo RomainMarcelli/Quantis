@@ -4,9 +4,18 @@
 // utiliser le nom de fichier proposé par le serveur.
 
 import { firebaseAuthGateway } from "@/services/auth";
+import type { CalculatedKpis } from "@/types/analysis";
 
 export type DownloadFinancialReportInput = {
   analysisId: string;
+  /**
+   * KPIs effectifs côté client (avec overrides Bridge / slider temporalité).
+   * Quand fournis, le serveur les utilise au lieu de `analysis.kpis` —
+   * garantit la parité score / valeurs entre l'écran et le PDF.
+   */
+  effectiveKpis?: CalculatedKpis | null;
+  /** Format de sortie (PDF par défaut). */
+  format?: "pdf" | "docx";
 };
 
 export type DownloadFinancialReportError =
@@ -33,7 +42,11 @@ export async function downloadFinancialReport(
         Authorization: `Bearer ${idToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ analysisId: input.analysisId }),
+      body: JSON.stringify({
+        analysisId: input.analysisId,
+        effectiveKpis: input.effectiveKpis ?? null,
+        format: input.format ?? "pdf",
+      }),
     });
   } catch (err) {
     return { kind: "network", message: err instanceof Error ? err.message : "unknown" };
@@ -51,8 +64,9 @@ export async function downloadFinancialReport(
   }
 
   const blob = await res.blob();
+  const fallbackName = `rapport-financier.${input.format ?? "pdf"}`;
   const filename = parseFilenameFromContentDisposition(res.headers.get("Content-Disposition"))
-    ?? "rapport-financier.pdf";
+    ?? fallbackName;
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Circle, Eye, EyeOff, Info } from "lucide-react";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import {
   confirmPasswordResetFlow,
   verifyPasswordResetLink,
@@ -144,7 +144,7 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
     return (
       <section className="quantis-panel w-full max-w-xl p-8">
         {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
-        <QuantisLogo className="mb-1" />
+        <VyzorLogo className="mb-1" />
         <h1 className="mt-2 text-2xl font-semibold text-quantis-carbon">Lien invalide</h1>
         <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
           {codeMessage ?? "Ce lien de réinitialisation est invalide ou expiré."}
@@ -169,7 +169,7 @@ export function ResetPasswordForm({ oobCode = "" }: ResetPasswordFormProps) {
   return (
     <section className="quantis-panel mesh-gradient relative w-full max-w-xl p-8">
       {toast ? <FeedbackToast type={toast.type} message={toast.message} /> : null}
-      <QuantisLogo className="mb-1" />
+      <VyzorLogo className="mb-1" />
       <h1 className="mt-2 text-3xl font-semibold leading-tight text-quantis-carbon">
         Nouveau mot de
         <span className="ml-2 text-quantis-gold">passe</span>

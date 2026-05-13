@@ -20,5 +20,5 @@ export function getResendClient(): Resend {
 
 export function getResendFromEmail(): string {
   // Adresse expediteur configurable pour brancher un domaine verified Resend.
-  return process.env.RESEND_FROM_EMAIL ?? "Quantis <onboarding@resend.dev>";
+  return process.env.RESEND_FROM_EMAIL ?? "Vyzor <onboarding@resend.dev>";
 }

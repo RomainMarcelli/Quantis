@@ -126,7 +126,7 @@ describe("pdfReportModel", () => {
 
   it("affiche N/D pour les KPI manquants (sans kpis)", () => {
     const data = buildPdfReportData({
-      companyName: "Quantis",
+      companyName: "Vyzor",
       greetingName: "Romain",
       analysisCreatedAt: "2026-03-23T11:00:00.000Z",
       selectedYearLabel: "2025",
@@ -142,7 +142,7 @@ describe("pdfReportModel", () => {
   it("génère un PDF 6 pages sans crash", async () => {
     const blob = await renderSyntheseReportBlob(
       {
-        companyName: "Quantis",
+        companyName: "Vyzor",
         greetingName: "Romain",
         analysisCreatedAt: "2026-03-23T11:00:00.000Z",
         selectedYearLabel: "2025",

@@ -83,6 +83,18 @@ export function recomputeKpisForPeriod(
   for (const code of PNL_CODES) {
     (mappedData as Record<string, number | null>)[code] = periodTotals[code];
   }
+  // Disponibilités : exception au "bilan = snapshot annuel". Le solde de
+  // trésorerie est l'unique poste bilan que l'utilisateur attend de voir
+  // évoluer avec la TemporalityBar (cf. retour Antoine 08/05/2026 :
+  // "même avec Bridge OFF, le KPI dispo ne change pas si je change le mois").
+  // Le builder dailyAccounting expose `cashBalance` = solde cumulé fin de
+  // jour. On prend celui du DERNIER jour ≤ periodEnd dans la fenêtre filtrée
+  // pour avoir le solde à la fin de la période sélectionnée. Fallback :
+  // analyses pré-fix sans cashBalance → on garde la valeur snapshot.
+  const lastFilteredDay = filtered[filtered.length - 1];
+  if (lastFilteredDay && typeof lastFilteredDay.cashBalance === "number") {
+    mappedData.dispo = lastFilteredDay.cashBalance;
+  }
   // ca = ventes_march + prod_vendue (déjà calculé via le bridge dans analysis.kpis pour l'annuel ;
   // ici on le recalcule). On conserve la cohérence avec les formules PM.
 

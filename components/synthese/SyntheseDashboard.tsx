@@ -1,29 +1,27 @@
 // File: components/synthese/SyntheseDashboard.tsx
 // Role: Synthèse — vue cockpit principal, désormais 100% personnalisable.
-// Le seul élément fixe est le Quantis Score (forme variera en Phase 2).
+// Le seul élément fixe est le Vyzor Score (forme variera en Phase 2).
 // Tous les autres blocs (chart d'évolution, KPI cards, recommandation,
 // alertes, plan d'action, tiles fiscales) sont des widgets ajoutables /
 // supprimables / réordonnables / redimensionnables via CustomizableDashboard.
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Calendar, CalendarRange, Download, Radio } from "lucide-react";
-import { SourceBadge } from "@/components/analysis/SourceBadge";
 import { useBridgeStatus } from "@/lib/banking/useBridgeStatus";
-import {
-  CustomizableDashboard,
-  DashboardActions
-} from "@/components/dashboard/widgets/CustomizableDashboard";
+import { resolveDisponibilitesOverride } from "@/lib/banking/disponibilitesOverride";
+import { CustomizableDashboard } from "@/components/dashboard/widgets/CustomizableDashboard";
 import type { SyntheseViewModel } from "@/lib/synthese/syntheseViewModel";
 import type { SourceMetadata } from "@/types/connectors";
 import type { AnalysisRecord, CalculatedKpis } from "@/types/analysis";
+import type { BankingSource } from "@/types/dataSources";
 import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
 type SyntheseDashboardProps = {
   greetingName: string;
   companyName: string;
   analysisCreatedAt: string;
-  onDownloadFinancialReport?: () => void;
+  /** Callback déclenché à la sélection du format dans le menu déroulant. */
+  onDownloadFinancialReport?: (format: "pdf" | "docx") => void;
   onExportData?: () => void;
   onReupload: () => void;
   onManualEntry: () => void;
@@ -61,25 +59,43 @@ type SyntheseDashboardProps = {
   /**
    * Slot pour la `TemporalityBar` (mode dynamique). Rendu sous le titre, à la
    * place du sélecteur statique. Le parent décide lequel passer.
+   * @deprecated brief 09/05/2026 — la TemporalityBar est désormais portée
+   *  par le AppHeader (ligne 2). Cette prop reste pour compat mais n'est
+   *  plus consommée par la SyntheseView.
    */
   temporalitySlot?: ReactNode;
+  /**
+   * Source banque active de l'utilisateur (toggle de /documents). Si
+   * différent de "bridge", on N'override PAS `disponibilites` avec le solde
+   * Bridge — la valeur reste celle calculée par la source comptable active
+   * (post-fix MyUnisoft 12 mois). Cf. brief data-sources : "désactiver
+   * Bridge désactive l'override Disponibilités".
+   */
+  activeBankingSource?: BankingSource | null;
+  /**
+   * Mode édition controlled — quand fourni, le state isEditing est piloté
+   * par le parent (cf. brief Header unifié 09/05/2026, le bouton
+   * "Personnaliser" est désormais dans la ligne 2 du AppHeader).
+   */
+  isEditingControlled?: boolean;
+  onEditingChange?: (next: boolean) => void;
 };
 
 // ─── Default layout Synthèse ───────────────────────────────────────────
 // Reprend exactement le contenu de l'ancien cockpit fixe :
-//   - Quantis Score (fixe — non supprimable)
+//   - Vyzor Score
 //   - Courbe d'évolution multi-séries
 //   - 3 KPI cards (CA, Trésorerie, EBE)
 //   - Recommandation IA, plan d'action, alertes
 //   - Tiles fiscales TVA + IS
-// L'utilisateur peut tout réordonner / redimensionner ; seul le Quantis Score
-// est marqué `isFixed:true` pour être conservé en permanence sur la Synthèse.
+// L'utilisateur peut tout réordonner / redimensionner / supprimer — y compris
+// le Vyzor Score, qu'il peut rajouter ensuite via le picker s'il le souhaite.
 const DEFAULT_SYNTHESE_LAYOUT: DashboardLayout = {
   id: "synthese",
   widgets: [
-    // Quantis Score : viz composite (jauge + 4 piliers + message) — exige
+    // Vyzor Score : viz composite (jauge + 4 piliers + message) — exige
     // hauteur L (560 px+ natif) et largeur M minimum.
-    { id: "default-quantis-score", kpiId: "synthese:score", vizType: "quantisScore", size: "M", height: "L", isFixed: true },
+    { id: "default-quantis-score", kpiId: "synthese:score", vizType: "quantisScore", size: "M", height: "L" },
     // Charts pleine largeur sur 2 rangées (440 px) — confortable pour
     // lire les axes + légende.
     { id: "default-evolution", kpiId: "synthese:evolution", vizType: "evolutionChart", size: "L", height: "M" },
@@ -118,23 +134,37 @@ export function SyntheseDashboard({
   selectedYearValue,
   onYearChange,
   temporalitySlot = null,
+  activeBankingSource = null,
+  isEditingControlled,
+  onEditingChange,
 }: SyntheseDashboardProps) {
+  void temporalitySlot; // @deprecated brief 09/05/2026 — non rendu
   // Bridge connecté → on substitue le solde "Disponibilités" par le solde
-  // bancaire temps réel. Le badge "Live" apparaît dans le bandeau meta.
+  // bancaire temps réel UNIQUEMENT si l'utilisateur a activé Bridge via le
+  // toggle de /documents (`activeBankingSource === "bridge"`).
+  //
+  // Sinon : on ignore Bridge même si la connexion est techniquement active —
+  // c'est l'engagement du brief data-sources ("désactiver Bridge désactive
+  // l'override Disponibilités"). Conséquence : la valeur affichée reste
+  // celle calculée par la source comptable active (MyUnisoft / Pennylane /
+  // FEC), respecte la TemporalityBar et reste cohérente avec /etats-financiers.
   const bridgeStatus = useBridgeStatus();
-  const liveBalance =
+  const rawBalance =
     bridgeStatus.status?.connected && typeof bridgeStatus.status.totalBalance === "number"
       ? bridgeStatus.status.totalBalance
       : null;
+  const liveBalance = resolveDisponibilitesOverride({
+    activeBankingSource,
+    liveBalance: rawBalance,
+  });
 
-  // Surcharge des disponibilités quand Bridge est connecté — utilisé par les
-  // widgets KpiCard qui affichent "disponibilites".
+  // Surcharge des disponibilités quand Bridge est actif (toggle ON + connexion
+  // OK) — utilisé par les widgets KpiCard qui affichent "disponibilites".
   //
-  // CRITIQUE : on s'appuie sur `currentKpis` (KPI déjà filtrés sur la période
-  // sélectionnée par la TemporalityBar côté SyntheseView). Avant ce fix, on
-  // lisait `currentAnalysis.kpis` qui contient les KPI ANNUELS figés au sync —
-  // résultat, changer le mois sur la TemporalityBar n'avait aucun effet sur
-  // les valeurs affichées (bug remonté par Antoine le 06/05/2026).
+  // On s'appuie sur `currentKpis` (KPI déjà filtrés sur la période sélectionnée
+  // par la TemporalityBar côté SyntheseView). Avant le fix temporality du
+  // 06/05/2026, on lisait `currentAnalysis.kpis` qui contient les KPI ANNUELS
+  // figés — changer le mois n'avait aucun effet sur les valeurs.
   const effectiveKpis = useMemo<CalculatedKpis>(() => {
     const baseKpis = currentKpis ?? currentAnalysis?.kpis ?? ({} as CalculatedKpis);
     if (liveBalance === null) {
@@ -146,151 +176,73 @@ export function SyntheseDashboard({
     };
   }, [currentKpis, currentAnalysis, liveBalance]);
 
-  // Mode édition — état lifté pour pouvoir mettre Personnaliser dans le
-  // bandeau title haut (au lieu de near "Mes widgets" comme avant).
-  const [isEditing, setIsEditing] = useState(false);
-  // L'ouverture du picker reste interne à CustomizableDashboard, mais on
-  // tracke aussi le `isSaving` via un nudge state. Pour V1 : pas de feedback
-  // visuel custom dans le header — l'animation interne au CustomizableDashboard
-  // suffit.
+  // Mode édition — controlled si le parent fournit `isEditingControlled`
+  // (cf. brief 09/05/2026 — bouton Personnaliser dans la ligne 2 du
+  // AppHeader). Fallback uncontrolled pour les call sites qui ne lèvent
+  // pas encore le state.
+  const [internalIsEditing, setInternalIsEditing] = useState(false);
+  const isEditing = isEditingControlled ?? internalIsEditing;
+  const setIsEditing = (next: boolean | ((v: boolean) => boolean)) => {
+    const nextValue = typeof next === "function" ? next(isEditing) : next;
+    if (onEditingChange) onEditingChange(nextValue);
+    else setInternalIsEditing(nextValue);
+  };
+  // Phase 3 brief 09/05/2026 — le menu d'export multi-format (PDF/Word)
+  // a été retiré : le bouton "Exporter la synthèse" déclenche désormais
+  // le download direct depuis SyntheseView (un seul format = PDF).
   const analysisModeLabel = resolveAnalysisModeLabel(currentAnalysis);
 
-  // Sélecteur d'année statique (sources PDF/Excel) — rendu UNIQUEMENT si le
-  // parent ne fournit pas déjà un `temporalitySlot` (mode dynamique). Un
-  // sélecteur statique n'a de sens qu'à partir de 2 années comparables.
-  const showStaticYearBar =
-    !temporalitySlot &&
-    yearOptions !== undefined &&
-    yearOptions.length > 1 &&
-    selectedYearValue !== undefined &&
-    onYearChange !== undefined;
+  // Sélecteurs de période retirés du dashboard synthèse — désormais portés
+  // exclusivement par l'AppHeader (cf. brief). Les props legacy sont silen-
+  // cieusement consommées ici pour ne pas casser les callers existants.
+  void temporalitySlot;
+  void yearOptions;
+  void selectedYearValue;
+  void onYearChange;
+
+  // Phase 3 brief 09/05/2026 — analysisModeLabel n'est plus consommé par
+  // le bandeau "ANALYSE DYNAMIQUE" (supprimé). On garde le calcul pour
+  // compat éventuelle (ex. tests existants).
+  void analysisModeLabel;
 
   return (
     <section className="space-y-4">
-      {/* Bandeau titre Synthèse — remonté en haut (avant le meta) pour donner
-          immédiatement le contexte de la page. Le toggle Personnaliser est
-          ici uniquement (pas de bouton "+ Ajouter un widget" pour éviter le
-          doublon avec celui rendu par CustomizableDashboard quand isEditing). */}
-      <header className="fade-up relative z-10 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+      {/* Bandeau titre Synthèse — refonte 09/05/2026 :
+          - Titre + sous-titre "Bonjour …" conservés.
+          - Badge "ANALYSE DYNAMIQUE" supprimé (bruit visuel inutile).
+          - DashboardActions (Personnaliser) déplacé dans la ligne 2 du
+            AppHeader (cf. brief Header unifié). */}
+      <header className="fade-up relative z-10 flex flex-col items-start justify-between gap-4">
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">Synthèse</h1>
           <p className="text-sm text-quantis-muted">
             Bonjour {greetingName}, voici la vue d&apos;ensemble de vos indicateurs clés.
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <div className="interactive-badge flex items-center gap-2 rounded border border-white/10 bg-white/[0.02] px-3 py-1">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10B981]" />
-            <span className="text-[10px] font-medium uppercase tracking-widest text-white/80">
-              {analysisModeLabel}
-            </span>
-          </div>
-
-          <DashboardActions
-            isEditing={isEditing}
-            isSaving={false}
-            onToggleEditing={() => setIsEditing(!isEditing)}
-            onOpenPicker={() => {
-              // No-op : "+ Ajouter un widget" est rendu par CustomizableDashboard
-              // (showAddButton=false ici pour éviter le doublon).
-            }}
-            showAddButton={false}
-          />
-        </div>
       </header>
 
-      {/* Sélecteur de période — soit la TemporalityBar complète (sources
-          dynamiques : Pennylane/MyUnisoft/Odoo), soit une mini-bar "Année"
-          (sources statiques PDF/Excel). Placée juste sous le titre — le
-          sélecteur jadis présent dans la sidebar a été retiré (doublon). */}
-      {temporalitySlot ? temporalitySlot : null}
-      {showStaticYearBar ? (
-        <div className="precision-card flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3" data-scroll-reveal-ignore>
-          <div className="flex items-center gap-2 text-white/60">
-            <Calendar className="h-4 w-4" />
-            <span className="text-xs uppercase tracking-wider">Période</span>
-          </div>
-          <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-            <button
-              type="button"
-              className="rounded-md bg-quantis-gold px-3 py-1 text-xs font-medium text-black"
-              aria-pressed
-            >
-              Année
-            </button>
-          </div>
-          <select
-            id="synthese-year-static"
-            value={selectedYearValue}
-            onChange={(event) => onYearChange?.(event.target.value)}
-            className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-white outline-none transition hover:bg-white/10 focus:border-quantis-gold/70"
-          >
-            {yearOptions!.map((option) => (
-              <option key={option.value} value={option.value} className="bg-[#10141f] text-white">
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
+      {/* Sélecteurs de période (TemporalityBar dynamique + StaticYearBar
+          statique) supprimés ici — désormais portés exclusivement par
+          l'AppHeader pour éviter le doublon visuel sous le titre Synthèse.
+          Les props `temporalitySlot` / `yearOptions` / `selectedYearValue` /
+          `onYearChange` sont conservés pour compat (legacy callers) mais
+          ne rendent plus rien dans cette vue. */}
 
-      {/* Bandeau meta consolidé (entreprise / date / source / actions) —
-          repositionné après le titre+période pour libérer le haut de page. */}
-      <header className="precision-card fade-up relative z-10 flex flex-col gap-3 rounded-2xl px-4 py-3 md:flex-row md:items-center md:justify-between md:px-5">
-        <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-quantis-muted">{companyName}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/70">
-            <span>Analyse du {new Date(analysisCreatedAt).toLocaleString("fr-FR")}</span>
-            <SourceBadge sourceMetadata={sourceMetadata} analysisCreatedAt={analysisCreatedAt} />
-            {periodLabel ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-white/75">
-                <CalendarRange className="h-3 w-3 text-white/55" />
-                {periodLabel}
-              </span>
-            ) : null}
-            {parserVersion === "v2" && (
-              <span className="inline-block rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
-                Parser V2
-              </span>
-            )}
-            {liveBalance !== null && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-emerald-900/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300"
-                title="Soldes bancaires temps réel via Bridge"
-              >
-                <Radio className="h-3 w-3 animate-pulse" />
-                Live
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
-          {simulationSlot}
-          {onDownloadFinancialReport ? (
-            <button
-              type="button"
-              onClick={onDownloadFinancialReport}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-quantis-gold/30 bg-quantis-gold/10 px-3 py-1.5 text-xs font-medium text-quantis-gold hover:bg-quantis-gold/20"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Télécharger le rapport PDF
-            </button>
-          ) : null}
-          {onExportData ? (
-            <button
-              type="button"
-              onClick={onExportData}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white/70"
-            >
-              Exporter données
-            </button>
-          ) : null}
-        </div>
-      </header>
+      {/* Bandeau meta supprimé — brief 09/05/2026.
+          L'info entreprise/source est désormais portée par AppHeader
+          ligne 1 (companyName + contextBadge). Les boutons Simuler /
+          Exporter la synthèse / Personnaliser vivent dans la ligne 2
+          du AppHeader (headerActions de SyntheseView). */}
+
+      {/* Container Portal pour le simulateur — quand l'utilisateur clique
+          "Simuler un scénario" dans le header, le widget se rend ici via
+          createPortal pour prendre toute la largeur (vs slot étroit du
+          header). Vide quand le simulateur est fermé (aucun render =
+          aucun espace réservé visible). */}
+      <div id="simulation-portal-container" />
 
       {/* Grille widgets pleine largeur : aucun élément n'est pinned hors-grille,
-          le Quantis Score est lui-même un widget marqué `isFixed:true` dans le
+          le Vyzor Score est lui-même un widget marqué `isFixed:true` dans le
           default layout (non supprimable, repositionnable). L'utilisateur peut
           mettre des widgets au-dessus, à côté ou en-dessous du score. */}
       <CustomizableDashboard
@@ -307,6 +259,7 @@ export function SyntheseDashboard({
         onEditingChange={setIsEditing}
         hideHeaderTitle
       />
+
     </section>
   );
 }

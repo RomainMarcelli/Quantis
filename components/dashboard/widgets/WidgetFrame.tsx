@@ -20,7 +20,7 @@
 "use client";
 
 import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { Minus, MoreHorizontal } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { WidgetInstance, WidgetSize, WidgetWidth } from "@/types/dashboard";
@@ -33,23 +33,32 @@ import {
 
 type WidgetSizePatch = { size?: WidgetWidth; height?: WidgetSize };
 
-type ResizePreview = {
-  widthPx: number;
-  heightPx: number;
-  anchor: { left?: number; right?: number; top?: number; bottom?: number };
-};
-
 type WidgetFrameProps = {
   widget: WidgetInstance;
   isEditing: boolean;
   onRemove: () => void;
   onUpdateSize: (patch: WidgetSizePatch) => void;
-  /** True si CE widget est le widget actuellement sélectionné en mode édition.
-   *  La sélection est portée par WidgetGrid (clic = sélectionne, clic ailleurs
-   *  = désélectionne). Quand sélectionné : poignées toujours visibles + wiggle. */
+  /** Callback quand l'utilisateur clique l'icône "cibles" du widget en mode
+   *  édition. Reçoit le `kpiId` du widget pour ouvrir l'éditeur. Si non
+   *  fourni, l'icône n'est pas affichée. */
+  onConfigureTarget?: (kpiId: string) => void;
+  /** True si CE widget fait partie de la sélection courante (mode édition).
+   *  La sélection est portée par WidgetGrid (clic = sélectionne, shift+clic
+   *  = range, cmd/ctrl+clic = toggle, clic ailleurs = reset). */
   isSelected?: boolean;
-  /** Callback quand l'utilisateur clique le widget en mode édition (sélection). */
-  onSelect?: () => void;
+  /** Position explicite calculée par WidgetGrid (gridColumn / gridRow).
+   *  Quand fournie, on l'applique en inline style et on bypasse les
+   *  classes col-span/row-span responsive. Permet à WidgetGrid de gérer
+   *  les positions pour la danse iOS-style + animations FLIP. */
+  gridPosition?: {
+    col: number;
+    row: number;
+    colSpan: number;
+    rowSpan: number;
+  };
+  /** Callback quand l'utilisateur clique le widget en mode édition.
+   *  Reçoit les modificateurs clavier pour piloter la multi-sélection. */
+  onSelect?: (mods: { shift: boolean; meta: boolean }) => void;
   children: ReactNode;
 };
 
@@ -71,12 +80,15 @@ const WIDTH_FRACTION: Record<WidgetWidth, number> = {
 };
 
 // Hauteur via row-span — la grille parente déclare un auto-rows fixe (200px)
-// et chaque widget consomme N rangées. Cohérent avec une matrice 3×3
-// stricte : les widgets s'alignent toujours sur la même grille verticale.
+// et chaque widget consomme N rangées. XL (4 rangées = 860 px) est réservé
+// aux charts riches qui exploitent vraiment l'espace vertical (point mort,
+// chart custom multi-séries) ; cf. widgetSizeConstraints.MAX_HEIGHTS qui
+// plafonne les autres widgets à L.
 const HEIGHT_TO_ROW_SPAN: Record<WidgetSize, string> = {
   S: "row-span-1",
   M: "row-span-2",
-  L: "row-span-3"
+  L: "row-span-3",
+  XL: "row-span-4"
 };
 
 // Hauteur effective en px pour le calcul de snap pendant le drag.
@@ -87,29 +99,30 @@ const ROW_GAP_PX = 20;
 const HEIGHT_PX: Record<WidgetSize, number> = {
   S: ROW_HEIGHT_PX,
   M: ROW_HEIGHT_PX * 2 + ROW_GAP_PX,
-  L: ROW_HEIGHT_PX * 3 + ROW_GAP_PX * 2
+  L: ROW_HEIGHT_PX * 3 + ROW_GAP_PX * 2,
+  XL: ROW_HEIGHT_PX * 4 + ROW_GAP_PX * 3
 };
 
-const NEXT_HEIGHT: Record<WidgetSize, WidgetSize> = { S: "M", M: "L", L: "S" };
+const NEXT_HEIGHT: Record<WidgetSize, WidgetSize> = { S: "M", M: "L", L: "XL", XL: "S" };
 const NEXT_WIDTH: Record<WidgetWidth, WidgetWidth> = { XS: "S", S: "M", M: "L", L: "XS" };
 
-// Cherche la dimension cible la plus proche en pixels, restreinte au
-// sous-ensemble `allowed` (filtré par les contraintes du vizType).
+// Snap directionnel : on bascule vers la taille SUIVANTE dès que la cible
+// dépasse 20 % du gap. Très responsive — l'utilisateur drag ~20 % du saut
+// (~45 px pour passer de M à L en hauteur) et la transition se fait.
 function nearestSize<T extends string>(
   allowed: T[],
   target: number,
   resolvePx: (size: T) => number
 ): T {
-  let best = allowed[0];
-  let bestDist = Infinity;
-  for (const s of allowed) {
-    const d = Math.abs(resolvePx(s) - target);
-    if (d < bestDist) {
-      bestDist = d;
-      best = s;
-    }
+  if (allowed.length === 0) return allowed[0];
+  const sorted = [...allowed].sort((a, b) => resolvePx(a) - resolvePx(b));
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = resolvePx(sorted[i]);
+    const b = resolvePx(sorted[i + 1]);
+    const snapThreshold = a + (b - a) * 0.2; // 20 % du gap = bascule
+    if (target < snapThreshold) return sorted[i];
   }
-  return best;
+  return sorted[sorted.length - 1];
 }
 
 export function WidgetFrame({
@@ -117,7 +130,9 @@ export function WidgetFrame({
   isEditing,
   onRemove,
   onUpdateSize,
+  onConfigureTarget,
   isSelected = false,
+  gridPosition,
   onSelect,
   children
 }: WidgetFrameProps) {
@@ -126,14 +141,39 @@ export function WidgetFrame({
     disabled: !isEditing
   });
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [preview, setPreview] = useState<ResizePreview | null>(null);
+  // Resize en cours — sert à garder le chrome visible et à figer le wiggle
+  // pendant qu'on tire la poignée. Pas de preview overlay : le widget se
+  // ré-aligne directement à la taille snap (commit live).
+  const [isResizing, setIsResizing] = useState(false);
   // Hover du widget — visible le chrome au survol même si non sélectionné.
   const [isHovered, setIsHovered] = useState(false);
 
+  // Style dnd-kit : on N'APPLIQUE le transform/transition inline QUE si
+  // dnd-kit a quelque chose à dire (drag actif, ou snap-back en cours).
+  // Sinon le transform inline (même undefined) bloque l'animation CSS
+  // `widget-wiggle-rotate` qui s'appuie sur `transform: rotate(...)`.
+  const positionStyle: React.CSSProperties = gridPosition
+    ? {
+        gridColumn: `${gridPosition.col} / span ${gridPosition.colSpan}`,
+        gridRow: `${gridPosition.row} / span ${gridPosition.rowSpan}`
+      }
+    : {};
+  const dndTransform = transform ? CSS.Transform.toString(transform) : null;
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1
+    ...positionStyle,
+    ...(dndTransform || isDragging
+      ? {
+          transform: dndTransform ?? undefined,
+          transition,
+        }
+      : {}),
+    ...(isDragging
+      ? {
+          zIndex: 50,
+          boxShadow: "0 18px 48px rgba(0,0,0,0.55)",
+          cursor: "grabbing"
+        }
+      : {})
   };
 
   // Auto-corrige les tailles persistées qui violent les contraintes
@@ -145,9 +185,19 @@ export function WidgetFrame({
   const rowSpanClass = HEIGHT_TO_ROW_SPAN[heightAxis];
 
   // Chrome visible : hover, sélectionné, drag actif, ou resize en cours.
-  const showChrome = isEditing && (isHovered || isSelected || isDragging || preview !== null);
-  // Wiggle : seulement quand sélectionné (signal "tu manipules ce widget").
-  const wiggleClass = isEditing && isSelected && !isDragging && !preview ? "widget-wiggle" : "";
+  const showChrome = isEditing && (isHovered || isSelected || isDragging || isResizing);
+  // Wiggle : actif dès qu'un widget est sélectionné (y compris au hover —
+  // l'utilisateur veut le voir bouger même quand il regarde le widget).
+  // Le hit-test précis est garanti par :
+  //   - sélection au `pointerdown` (avant toute frame d'animation, on capte
+  //     immédiatement l'élément sous le curseur) — cf. handlePointerDown
+  //   - guard `closest("[data-widget-id]")` qui bloque la propagation si la
+  //     cible n'est pas dans CE widget
+  // Désactivé pendant drag/resize pour ne pas perturber les manipulations.
+  const wiggleClass =
+    isEditing && isSelected && !isDragging && !isResizing
+      ? "widget-wiggle"
+      : "";
 
   function setRefs(node: HTMLDivElement | null) {
     setNodeRef(node);
@@ -155,80 +205,99 @@ export function WidgetFrame({
   }
 
   // En mode édition, on attache les listeners de drag à TOUT le widget
-  // (pas juste à la poignée GripVertical) pour permettre de drag depuis
-  // n'importe où. Les boutons internes (X remove + 8 ResizeHandle) ont
-  // leur propre stopPropagation pour ne pas interférer. Le PointerSensor
-  // a un activationConstraint distance=5 (cf. WidgetGrid) → un clic court
-  // ne déclenche pas de drag, donc le simple click pour sélectionner
-  // continue de fonctionner.
-  const dragProps = isEditing ? { ...attributes, ...listeners } : {};
+  // (pas juste à une poignée) pour permettre de drag depuis n'importe où.
+  // Les boutons internes (X remove + 8 ResizeHandle) ont leur propre
+  // stopPropagation pour ne pas interférer. Le PointerSensor a un
+  // activationConstraint distance=5 (cf. WidgetGrid) → un clic court ne
+  // déclenche pas de drag.
+  //
+  // On COMPOSE manuellement onPointerDown avec dnd-kit pour faire deux
+  // choses dans l'ordre : (1) sélection immédiate, (2) bootstrap drag-kit.
+  // Sans cette composition, un simple `{...listeners}` après notre
+  // onPointerDown l'écraserait, et inversement.
+  const dndPointerDown = listeners?.onPointerDown as
+    | ((e: React.PointerEvent<HTMLDivElement>) => void)
+    | undefined;
+
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    // Garde : on ne sélectionne que si la cible réelle du clic appartient
+    // à CE widget. Sans ça, un événement qui buble depuis un descendant
+    // hors-widget (ex. tooltip Recharts portalisé, overlay z-index) peut
+    // faire fire le handler du voisin et expliquer les sélections "fantômes"
+    // sur les côtés d'un gros widget.
+    const target = e.target as HTMLElement | null;
+    const closestWidget = target?.closest<HTMLElement>("[data-widget-id]");
+    if (closestWidget && closestWidget.dataset.widgetId !== widget.id) {
+      return;
+    }
+
+    // 1. Sélection au pointerdown (avant que le wiggle ne déplace l'élément
+    //    entre press et release — sinon clic perdu sur un voisin).
+    if (isEditing && e.button === 0 && onSelect) {
+      onSelect({ shift: e.shiftKey, meta: e.metaKey || e.ctrlKey });
+    }
+    // 2. Forward à dnd-kit pour qu'il puisse activer le drag à 5px de move.
+    if (dndPointerDown) dndPointerDown(e);
+  }
 
   return (
     <div
       ref={setRefs}
       style={style}
-      className={`group/widget relative ${colSpanClass} ${rowSpanClass} ${wiggleClass} ${
-        isEditing ? "cursor-grab active:cursor-grabbing" : ""
+      className={`group/widget relative ${gridPosition ? "" : `${colSpanClass} ${rowSpanClass}`} ${wiggleClass} ${
+        isEditing ? "cursor-grab select-none active:cursor-grabbing" : ""
       } ${isSelected ? "ring-2 ring-quantis-gold/50 ring-offset-2 ring-offset-quantis-base rounded-2xl" : ""}`}
       data-widget-id={widget.id}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={(e) => {
-        if (!isEditing) return;
-        // On ne sélectionne que si le clic vient du widget lui-même, pas
-        // d'un bouton interne (drag handle, X, resize). stopPropagation
-        // côté boutons internes empêche de remonter ici.
-        if (onSelect) onSelect();
-      }}
-      {...dragProps}
+      {...(isEditing ? { ...attributes, ...listeners } : {})}
+      onPointerDown={isEditing ? handlePointerDown : undefined}
     >
       {/* Wrapper plein-cadre pour que le card enfant remplisse le BBOX. */}
       <div className="h-full w-full">
         {children}
       </div>
 
-      {preview ? (
-        <div
-          className="pointer-events-none absolute z-20 rounded-2xl border-2 border-dashed border-quantis-gold/50 bg-quantis-gold/5"
-          style={{
-            left: preview.anchor.left,
-            right: preview.anchor.right,
-            top: preview.anchor.top,
-            bottom: preview.anchor.bottom,
-            width: preview.widthPx,
-            height: preview.heightPx
-          }}
-        />
-      ) : null}
-
       {showChrome ? (
         <div className="pointer-events-none absolute inset-0 z-10">
-          {/* Bouton de suppression — pour les widgets non-fixes uniquement.
+          {/* Bouton de suppression — disponible sur tous les widgets.
               stopPropagation au pointerdown ET au click pour ne pas déclencher
               le drag global du widget parent ni le onSelect. */}
-          {widget.isFixed ? null : (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            aria-label="Supprimer le widget"
+            className="pointer-events-auto absolute -left-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-neutral-700/95 text-white shadow-lg backdrop-blur transition hover:bg-neutral-600"
+          >
+            <Minus className="h-4 w-4" strokeWidth={3} />
+          </button>
+
+          {/* Bouton "cibles" — alertes & objectifs sur ce KPI. Visible
+              uniquement si la prop onConfigureTarget est fournie (donc en
+              édition pour les widgets KPI/Card supportés). */}
+          {onConfigureTarget ? (
             <button
               type="button"
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                onRemove();
+                onConfigureTarget(widget.kpiId);
               }}
-              aria-label="Supprimer le widget"
-              className="pointer-events-auto absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-md border border-rose-400/30 bg-rose-500/15 text-rose-200 backdrop-blur transition hover:bg-rose-500/25 hover:text-rose-100"
+              aria-label="Définir alertes et objectifs"
+              title="Alertes & objectifs"
+              className="pointer-events-auto absolute -right-1.5 -top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-full bg-neutral-700/95 text-quantis-gold shadow-lg backdrop-blur transition hover:bg-neutral-600"
             >
-              <X className="h-3.5 w-3.5" />
+              <MoreHorizontal className="h-3.5 w-3.5" strokeWidth={2.5} />
             </button>
-          )}
+          ) : null}
 
-          <ResizeHandle position="top" dirX={0} dirY={-1} containerRef={containerRef} widget={widget} onUpdateSize={onUpdateSize} onPreview={setPreview} />
-          <ResizeHandle position="bottom" dirX={0} dirY={1} containerRef={containerRef} widget={widget} onUpdateSize={onUpdateSize} onPreview={setPreview} />
-          <ResizeHandle position="left" dirX={-1} dirY={0} containerRef={containerRef} widget={widget} onUpdateSize={onUpdateSize} onPreview={setPreview} />
-          <ResizeHandle position="right" dirX={1} dirY={0} containerRef={containerRef} widget={widget} onUpdateSize={onUpdateSize} onPreview={setPreview} />
-          <ResizeHandle position="top-left" dirX={-1} dirY={-1} containerRef={containerRef} widget={widget} onUpdateSize={onUpdateSize} onPreview={setPreview} />
-          <ResizeHandle position="top-right" dirX={1} dirY={-1} containerRef={containerRef} widget={widget} onUpdateSize={onUpdateSize} onPreview={setPreview} />
-          <ResizeHandle position="bottom-left" dirX={-1} dirY={1} containerRef={containerRef} widget={widget} onUpdateSize={onUpdateSize} onPreview={setPreview} />
-          <ResizeHandle position="bottom-right" dirX={1} dirY={1} containerRef={containerRef} widget={widget} onUpdateSize={onUpdateSize} onPreview={setPreview} />
+          {/* Poignée de redimensionnement style iOS — bottom-right unique,
+              snap diagonal sur la matrice (largeur, hauteur). Commit live. */}
+          <ResizeHandle position="bottom-right" dirX={1} dirY={1} containerRef={containerRef} widget={widget} onUpdateSize={onUpdateSize} onResizingChange={setIsResizing} />
         </div>
       ) : null}
     </div>
@@ -258,17 +327,6 @@ const HANDLE_STYLES: Record<HandlePosition, { position: string; cursor: string }
   "bottom-right": { position: "right-0 bottom-0 translate-x-1/2 translate-y-1/2", cursor: "cursor-nwse-resize" }
 };
 
-const HANDLE_ANCHOR: Record<HandlePosition, ResizePreview["anchor"]> = {
-  top: { left: 0, bottom: 0 },
-  bottom: { left: 0, top: 0 },
-  left: { right: 0, top: 0 },
-  right: { left: 0, top: 0 },
-  "top-left": { right: 0, bottom: 0 },
-  "top-right": { left: 0, bottom: 0 },
-  "bottom-left": { right: 0, top: 0 },
-  "bottom-right": { left: 0, top: 0 }
-};
-
 function widthPxForSize(size: WidgetWidth, gridWidthPx: number): number {
   return gridWidthPx * WIDTH_FRACTION[size];
 }
@@ -280,7 +338,7 @@ function ResizeHandle({
   containerRef,
   widget,
   onUpdateSize,
-  onPreview
+  onResizingChange
 }: {
   position: HandlePosition;
   dirX: -1 | 0 | 1;
@@ -288,10 +346,9 @@ function ResizeHandle({
   containerRef: React.RefObject<HTMLDivElement | null>;
   widget: WidgetInstance;
   onUpdateSize: (patch: WidgetSizePatch) => void;
-  onPreview: (preview: ResizePreview | null) => void;
+  onResizingChange: (resizing: boolean) => void;
 }) {
   const { position: posClass, cursor } = HANDLE_STYLES[position];
-  const anchor = HANDLE_ANCHOR[position];
 
   function handlePointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -315,44 +372,50 @@ function ResizeHandle({
     const allowedH = getAllowedHeights(widget.vizType);
 
     let moved = false;
-    let targetW: WidgetWidth = clampWidth(widget.vizType, widget.size);
-    let targetH: WidgetSize = clampHeight(widget.vizType, widget.height ?? "S");
+    // Dernière taille committée — on commit live à chaque saut de palier.
+    // On compare contre cette ref locale (pas widget.size, qui ne se met
+    // à jour qu'au prochain render via les props).
+    let committedW: WidgetWidth = clampWidth(widget.vizType, widget.size);
+    let committedH: WidgetSize = clampHeight(widget.vizType, widget.height ?? "S");
+
+    onResizingChange(true);
 
     function handleMove(moveEvent: PointerEvent) {
       const dx = moveEvent.clientX - startX;
       const dy = moveEvent.clientY - startY;
       if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
 
+      let nextW = committedW;
+      let nextH = committedH;
       if (dirX !== 0) {
         const desiredW = startW + dx * dirX;
-        targetW = nearestSize(allowedW, desiredW, (s) => widthPxForSize(s, parentRect.width));
+        nextW = nearestSize(allowedW, desiredW, (s) => widthPxForSize(s, parentRect.width));
       }
       if (dirY !== 0) {
         const desiredH = startH + dy * dirY;
-        targetH = nearestSize(allowedH, desiredH, (s) => HEIGHT_PX[s]);
+        nextH = nearestSize(allowedH, desiredH, (s) => HEIGHT_PX[s]);
       }
 
-      if (moved) {
-        onPreview({
-          widthPx: dirX !== 0 ? widthPxForSize(targetW, parentRect.width) : startW,
-          heightPx: dirY !== 0 ? HEIGHT_PX[targetH] : startH,
-          anchor
-        });
+      // Commit live : on n'envoie un patch que si on a sauté à un nouveau
+      // palier — pas à chaque frame. Le snap discret limite la fréquence.
+      if (moved && (nextW !== committedW || nextH !== committedH)) {
+        const patch: WidgetSizePatch = {};
+        if (nextW !== committedW) patch.size = nextW;
+        if (nextH !== committedH) patch.height = nextH;
+        committedW = nextW;
+        committedH = nextH;
+        onUpdateSize(patch);
       }
     }
 
     function handleUp() {
       window.removeEventListener("pointermove", handleMove);
       window.removeEventListener("pointerup", handleUp);
-      onPreview(null);
+      onResizingChange(false);
 
-      if (moved) {
-        const patch: WidgetSizePatch = {};
-        if (dirX !== 0 && targetW !== widget.size) patch.size = targetW;
-        if (dirY !== 0 && targetH !== (widget.height ?? "S")) patch.height = targetH;
-        if (patch.size || patch.height) onUpdateSize(patch);
-      } else {
-        // Clic = cycle vers la prochaine taille autorisée par les contraintes.
+      // Drag = déjà committé live. Click sans drag = cycle vers la prochaine
+      // taille autorisée (raccourci historique conservé).
+      if (!moved) {
         const patch: WidgetSizePatch = {};
         if (dirX !== 0) {
           const next = NEXT_WIDTH[widget.size];
@@ -370,6 +433,31 @@ function ResizeHandle({
     window.addEventListener("pointerup", handleUp);
   }
 
+  // Visuel iOS-style pour bottom-right : petit grip arrondi en gris foncé,
+  // chevauchant le coin du widget (offset négatif). Les autres positions
+  // gardent leur petit dot historique au cas où on les remettrait.
+  const isIosGrip = position === "bottom-right";
+  if (isIosGrip) {
+    return (
+      <button
+        type="button"
+        onPointerDown={handlePointerDown}
+        aria-label="Redimensionner"
+        className="pointer-events-auto absolute -bottom-1 -right-1 cursor-nwse-resize inline-flex h-6 w-6 items-center justify-center rounded-full bg-neutral-700/95 text-white/80 shadow-lg backdrop-blur transition hover:bg-neutral-600"
+      >
+        <svg viewBox="0 0 16 16" className="h-3 w-3" aria-hidden="true">
+          <path
+            d="M5 13 L13 13 L13 5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+    );
+  }
   return (
     <button
       type="button"

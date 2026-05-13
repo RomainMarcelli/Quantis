@@ -1,32 +1,57 @@
 // File: components/assistant/AssistantConversationsView.tsx
-// Role: page Assistant IA — version branchée à l'API IA (mock par défaut,
-// Claude réel si la clé est configurée).
+// Role: page d'accueil Assistant IA — refonte 09/05/2026 (cf. brief
+// "Refonte page d'accueil Assistant IA"). Structure :
+//   1. Hero centré (icône + titre + sous-titre) — invitation à interagir.
+//   2. Champ de saisie large + bouton envoi gold-deep — action principale.
+//   3. Compteur quota sous l'input (texte discret).
+//   4. Suggestions en grille 2×2 (4 premières) avec icônes contextuelles.
+//   5. Historique compact (3 plus récentes) + lien "Tout voir (N)".
 //
-// Affiche :
-//   - une liste des conversations passées (date, KPI, première question,
-//     preview de la dernière réponse) — fetchée via /api/ai/conversations,
-//   - 5 questions modèles cliquables qui ouvrent l'AiChatPanel,
-//   - un état d'accueil quand l'utilisateur n'a pas encore de conversation,
-//   - un mode contextuel (?kpi=…&q=…) qui ouvre directement le panel avec
-//     la question pré-remplie.
+// Aucune couleur hardcodée — tout passe par les CSS vars (--app-*) pour
+// flip auto dark/light.
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, MessageCircle, Sparkles } from "lucide-react";
+import {
+  ArrowUp,
+  ChevronRight,
+  Clock,
+  GitCompare,
+  MessageCircle,
+  Percent,
+  RefreshCw,
+  Sparkles,
+  TrendingDown,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
 import type { ConversationSummary } from "@/lib/ai/types";
 
-const GLOBAL_SAMPLE_QUESTIONS: Array<{ kpiId: string | null; question: string }> = [
-  { kpiId: "ebitda", question: "Pourquoi mon EBITDA est-il négatif ce trimestre ?" },
-  { kpiId: "bfr", question: "Quels leviers prioriser pour faire baisser mon BFR ?" },
-  { kpiId: "dso", question: "Mon DSO est anormalement long — par où commencer ?" },
-  { kpiId: null, question: "Combien d'euros une hausse de prix de 5 % rapporterait sur mon résultat ?" },
-  { kpiId: "healthScore", question: "Ma santé financière s'est-elle améliorée vs l'an dernier ?" },
+type SampleQuestion = {
+  kpiId: string | null;
+  question: string;
+  Icon: LucideIcon;
+};
+
+// 5 questions modèles — la 5e (healthScore) est intentionnellement
+// au-delà du slice 4 utilisé par l'UI (cf. brief : "afficher les 4
+// premières et cacher la 5e"). On la garde dans le tableau pour
+// préserver l'option de l'afficher ailleurs (ou d'en faire tourner
+// la sélection plus tard).
+const GLOBAL_SAMPLE_QUESTIONS: SampleQuestion[] = [
+  { kpiId: "ebitda", question: "Pourquoi mon EBITDA est-il négatif ce trimestre ?", Icon: TrendingDown },
+  { kpiId: "bfr", question: "Quels leviers prioriser pour faire baisser mon BFR ?", Icon: RefreshCw },
+  { kpiId: "dso", question: "Mon DSO est anormalement long — par où commencer ?", Icon: Clock },
+  { kpiId: null, question: "Combien d'euros une hausse de prix de 5 % rapporterait sur mon résultat ?", Icon: Percent },
+  { kpiId: "healthScore", question: "Ma santé financière s'est-elle améliorée vs l'an dernier ?", Icon: GitCompare },
 ];
+
+const VISIBLE_SUGGESTIONS = 4;
+const VISIBLE_CONVERSATIONS = 3;
 
 type FetchState = "idle" | "loading" | "ready" | "error" | "unauth";
 
@@ -38,12 +63,14 @@ function AssistantConversationsViewInner() {
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [fetchState, setFetchState] = useState<FetchState>("idle");
-  // Loader visible uniquement si la requête dépasse 400 ms (cf. hook).
   const showSlowLoader = useDelayedFlag(fetchState === "loading");
   const [quota, setQuota] = useState<{ remaining: number; total: number } | null>(null);
-  // Prénom affiché dans le bloc Compte de la sidebar — synchronisé avec
-  // l'auth gateway pour rester cohérent entre les pages.
   const [greetingName, setGreetingName] = useState("Utilisateur");
+  // Local input state pour le hero — quand l'utilisateur tape une question
+  // libre puis Enter / clic bouton envoi → navigation vers /assistant-ia/chat.
+  const [draftQuestion, setDraftQuestion] = useState("");
+  // Toggle pour afficher toutes les conversations vs les 3 dernières.
+  const [showAllConversations, setShowAllConversations] = useState(false);
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -62,15 +89,11 @@ function AssistantConversationsViewInner() {
   }, []);
 
   const definition = kpiIdParam ? getKpiDefinition(kpiIdParam) : null;
+  void definition; // gardé pour compat avec le query param ?kpi (cf. effet ci-dessous)
 
-  // Charge la liste des conversations + quota courant.
   const refresh = useCallback(async () => {
     setFetchState("loading");
     try {
-      // Import dynamique : la page Assistant IA peut être rendue depuis un
-      // contexte de test ou un build SSR — on évite de forcer le chargement
-      // des credentials Firebase tant que l'utilisateur ne déclenche pas
-      // un appel réseau.
       const { firebaseAuthGateway } = await import("@/services/auth");
       const idToken = await firebaseAuthGateway.getIdToken();
       if (!idToken) {
@@ -101,24 +124,16 @@ function AssistantConversationsViewInner() {
   }, [refresh]);
 
   // Si on arrive depuis un tooltip avec ?kpi=…&q=…, on bascule directement
-  // sur la page plein écran /assistant-ia/chat. La liste des conversations
-  // n'a pas de raison d'être affichée quand l'utilisateur veut juste poser
-  // une question contextuelle.
+  // sur la page plein écran /assistant-ia/chat (comportement préservé).
   useEffect(() => {
     if (!kpiIdParam) return;
     const params = new URLSearchParams();
     params.set("kpiId", kpiIdParam);
     if (initialQuestion) params.set("q", initialQuestion);
     router.replace(`/assistant-ia/chat?${params.toString()}`);
-    // On ne déclenche qu'une fois au mount avec les params initiaux.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Ouvre la page plein écran `/assistant-ia/chat` avec les bons query
-   * params. Centralisé pour ne pas dupliquer la logique d'encodage
-   * d'URL à chaque CTA (sample question / conversation existante).
-   */
   function navigateToChat(payload: {
     kpiId?: string | null;
     initialQuestion?: string | null;
@@ -132,166 +147,375 @@ function AssistantConversationsViewInner() {
     router.push(`/assistant-ia/chat${qs ? `?${qs}` : ""}`);
   }
 
-  const subtitle = quota
-    ? `${quota.remaining}/${quota.total} questions disponibles aujourd'hui`
-    : "Posez vos questions sur vos KPIs";
+  function handleSubmitDraft() {
+    const trimmed = draftQuestion.trim();
+    if (!trimmed) return;
+    navigateToChat({ initialQuestion: trimmed });
+  }
+
+  const visibleSuggestions = useMemo(
+    () => GLOBAL_SAMPLE_QUESTIONS.slice(0, VISIBLE_SUGGESTIONS),
+    []
+  );
+  const visibleConversations = useMemo(
+    () =>
+      showAllConversations
+        ? conversations
+        : conversations.slice(0, VISIBLE_CONVERSATIONS),
+    [conversations, showAllConversations]
+  );
+
+  // Sous-titre selon le brief Header unifié (09/05/2026).
+  const headerSubtitle = "Posez vos questions sur vos KPIs";
 
   return (
     <section className="w-full space-y-4">
       <AppHeader
+        variant="simple"
         companyName="Assistant IA Vyzor"
-        subtitle={subtitle}
-        searchPlaceholder="Rechercher une conversation, un KPI…"
-        actionSlot={
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Retour
-          </button>
-        }
+        subtitle={headerSubtitle}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_minmax(0,1fr)]">
         <AppSidebar activeRoute="assistant-ia" accountFirstName={greetingName} />
 
-        <section className="space-y-6">
-
-      {/* Bloc 5 questions modèles — toujours affichées en haut. */}
-      <div className="precision-card rounded-2xl border-l-4 border-l-[#C5A059] bg-[#1A1A2E] p-6">
-        <div className="mb-4 flex items-center gap-3">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-quantis-gold/40 bg-quantis-gold/10 text-quantis-gold">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <div>
-            <p className="text-[10px] font-mono uppercase tracking-wider text-quantis-gold/70">
-              {definition ? `Contexte : ${definition.shortLabel}` : "Pour démarrer"}
-            </p>
-            <h1 className="text-lg font-semibold text-white">
-              {definition ? `Discutons de votre ${definition.label}` : "5 questions à poser tout de suite"}
-            </h1>
-          </div>
-        </div>
-
-        <ul className="space-y-2">
-          {GLOBAL_SAMPLE_QUESTIONS.map((q) => (
-            <li key={q.question}>
-              <button
-                type="button"
-                onClick={() => navigateToChat({ kpiId: q.kpiId, initialQuestion: q.question })}
-                className="group flex w-full items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-left transition hover:border-quantis-gold/60 hover:bg-quantis-gold/[0.06]"
-              >
-                <span aria-hidden className="text-quantis-gold/70 group-hover:text-quantis-gold">
-                  ✨
-                </span>
-                <span className="flex-1 text-sm text-white/85 group-hover:text-white">
-                  {q.question}
-                </span>
-                <span className="font-mono text-[10px] uppercase text-quantis-gold/70 opacity-0 transition group-hover:opacity-100">
-                  Demander →
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Liste des conversations passées. */}
-      <div className="precision-card rounded-2xl bg-[#0F0F12] p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-[10px] font-mono uppercase tracking-wider text-white/45">
-            Vos conversations
-          </p>
-          {fetchState === "ready" && conversations.length > 0 && (
-            <span className="font-mono text-[10px] text-white/40">
-              {conversations.length} discussion{conversations.length > 1 ? "s" : ""}
+        <section className="precision-card w-full rounded-2xl">
+          {/* La tuile occupe toute la largeur disponible mais le contenu
+              (hero, input, suggestions, historique) reste centré dans une
+              colonne lisible — cf. brief 09/05/2026. */}
+          <div className="mx-auto w-full max-w-3xl">
+          {/* ─── 1. Hero centré ──────────────────────────────────────── */}
+          <div className="flex flex-col items-center px-6 pb-9 pt-12 text-center md:px-8">
+            <span
+              aria-hidden="true"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-[14px]"
+              style={{ backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 8%)" }}
+            >
+              <Sparkles className="h-6 w-6" style={{ color: "var(--app-brand-gold-deep)" }} />
             </span>
-          )}
-        </div>
-
-        {fetchState === "loading" && showSlowLoader && (
-          <p className="text-sm text-white/55">Chargement de vos conversations...</p>
-        )}
-
-        {fetchState === "error" && (
-          <p className="text-sm text-rose-300">
-            Impossible de récupérer vos conversations. Réessayez dans un instant.
-          </p>
-        )}
-
-        {fetchState === "unauth" && (
-          <p className="text-sm text-white/55">
-            Connectez-vous pour retrouver vos conversations.
-          </p>
-        )}
-
-        {fetchState === "ready" && conversations.length === 0 && (
-          <div className="rounded-xl border border-quantis-gold/20 bg-quantis-gold/[0.04] p-6 text-center">
-            <Sparkles className="mx-auto mb-3 h-6 w-6 text-quantis-gold/70" />
-            <p className="text-sm font-medium text-white">
-              Posez votre première question en cliquant sur l&apos;icône IA ✨ de n&apos;importe quel indicateur.
-            </p>
-            <p className="mt-2 text-xs text-white/60">
-              Ou cliquez sur l&apos;une des questions modèles ci-dessus.
+            <h1
+              className="mt-4 text-[22px] font-medium leading-tight"
+              style={{ color: "var(--app-text-primary)" }}
+            >
+              Que voulez-vous analyser ?
+            </h1>
+            <p
+              className="mt-1.5 max-w-md text-sm leading-relaxed"
+              style={{ color: "var(--app-text-secondary)" }}
+            >
+              Posez une question sur vos données financières. Vyzor analyse et vous répond.
             </p>
           </div>
-        )}
 
-        {fetchState === "ready" && conversations.length > 0 && (
-          <ul className="space-y-2">
-            {conversations.map((conv) => (
-              <li key={conv.id}>
-                <button
-                  type="button"
+          {/* ─── 2. Champ de saisie + bouton envoi ────────────────────── */}
+          <div className="relative px-6 md:px-8">
+            <input
+              type="text"
+              value={draftQuestion}
+              onChange={(e) => setDraftQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSubmitDraft();
+              }}
+              placeholder="Ex : Pourquoi mon BFR a augmenté ce trimestre ?"
+              aria-label="Posez votre question"
+              className="block w-full text-[15px] outline-none"
+              style={{
+                height: 48,
+                borderRadius: 14,
+                border: "1px solid var(--app-border-strong)",
+                padding: "0 56px 0 18px",
+                backgroundColor: "var(--app-card-bg)",
+                color: "var(--app-text-primary)",
+                transition: "border-color 200ms ease, box-shadow 200ms ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "var(--app-brand-gold-deep)";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgb(var(--app-brand-gold-deep-rgb) / 10%)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "var(--app-border-strong)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleSubmitDraft}
+              disabled={!draftQuestion.trim()}
+              aria-label="Envoyer la question"
+              className="absolute inline-flex items-center justify-center transition disabled:cursor-not-allowed disabled:opacity-40"
+              style={{
+                top: 8,
+                right: 32,
+                width: 32,
+                height: 32,
+                borderRadius: 10,
+                border: "none",
+                backgroundColor: "var(--app-brand-gold-deep)",
+                color: "#FFFFFF",
+              }}
+              onMouseEnter={(e) => {
+                if (!e.currentTarget.disabled) {
+                  e.currentTarget.style.backgroundColor = "#7A6125";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--app-brand-gold-deep)";
+              }}
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* ─── 3. Compteur quota ────────────────────────────────────── */}
+          {quota ? (
+            <p
+              className="mt-2.5 text-center text-[11px]"
+              style={{ color: "var(--app-text-tertiary)" }}
+            >
+              {quota.remaining} questions restantes aujourd&apos;hui
+            </p>
+          ) : null}
+
+          {/* ─── 4. Suggestions grille 2×2 ────────────────────────────── */}
+          <div className="mt-9 px-6 pb-9 md:px-8">
+            <p
+              className="mb-3 text-[11px] font-medium uppercase tracking-[0.06em]"
+              style={{ color: "var(--app-text-tertiary)" }}
+            >
+              Suggestions basées sur vos données
+            </p>
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+              {visibleSuggestions.map((sugg) => (
+                <SuggestionCard
+                  key={sugg.question}
+                  question={sugg.question}
+                  Icon={sugg.Icon}
                   onClick={() =>
                     navigateToChat({
-                      kpiId: conv.kpiId,
-                      conversationId: conv.id,
+                      kpiId: sugg.kpiId,
+                      initialQuestion: sugg.question,
                     })
                   }
-                  className="flex w-full items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-quantis-gold/40 hover:bg-quantis-gold/[0.05]"
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* ─── 5. Historique compact ────────────────────────────────── */}
+          <div
+            className="px-6 pb-8 pt-5 md:px-8"
+            style={{ borderTop: "1px solid var(--app-border)" }}
+          >
+            <header className="mb-3 flex items-center justify-between">
+              <p
+                className="text-[11px] font-medium uppercase tracking-[0.06em]"
+                style={{ color: "var(--app-text-tertiary)" }}
+              >
+                Conversations récentes
+              </p>
+              {fetchState === "ready" && conversations.length > VISIBLE_CONVERSATIONS ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllConversations((v) => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-medium transition"
+                  style={{ color: "var(--app-brand-gold-deep)" }}
                 >
-                  <span className="mt-0.5 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full border border-quantis-gold/30 bg-quantis-gold/10 text-quantis-gold">
-                    <MessageCircle className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-white">
-                        {conv.title}
-                      </span>
-                      {conv.kpiId && (
-                        <span className="flex-shrink-0 rounded-full border border-quantis-gold/30 bg-quantis-gold/[0.08] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-quantis-gold/80">
-                          {getKpiDefinition(conv.kpiId)?.shortLabel ?? conv.kpiId}
-                        </span>
-                      )}
-                    </span>
-                    {conv.lastAnswerPreview && (
-                      <span className="mt-1 block line-clamp-2 text-xs text-white/55">
-                        {conv.lastAnswerPreview}
-                      </span>
-                    )}
-                    <span className="mt-1.5 block font-mono text-[10px] text-white/40">
-                      {formatRelativeDate(conv.lastMessageAt)} · {conv.messageCount} message
-                      {conv.messageCount > 1 ? "s" : ""}
-                    </span>
-                  </span>
+                  {showAllConversations
+                    ? "Voir moins"
+                    : `Tout voir (${conversations.length})`}
+                  <ChevronRight
+                    className="h-3 w-3 transition-transform"
+                    style={{
+                      transform: showAllConversations ? "rotate(90deg)" : "rotate(0deg)",
+                    }}
+                  />
                 </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+              ) : null}
+            </header>
+
+            {fetchState === "loading" && showSlowLoader ? (
+              <p className="text-sm" style={{ color: "var(--app-text-tertiary)" }}>
+                Chargement de vos conversations...
+              </p>
+            ) : null}
+
+            {fetchState === "error" ? (
+              <p className="text-sm" style={{ color: "var(--app-danger)" }}>
+                Impossible de récupérer vos conversations. Réessayez dans un instant.
+              </p>
+            ) : null}
+
+            {fetchState === "unauth" ? (
+              <p className="text-sm" style={{ color: "var(--app-text-tertiary)" }}>
+                Connectez-vous pour retrouver vos conversations.
+              </p>
+            ) : null}
+
+            {fetchState === "ready" && conversations.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--app-text-tertiary)" }}>
+                Aucune conversation pour l&apos;instant. Posez votre première question
+                ci-dessus ou utilisez l&apos;icône ✨ d&apos;un indicateur.
+              </p>
+            ) : null}
+
+            {fetchState === "ready" && visibleConversations.length > 0 ? (
+              <ul className="space-y-1">
+                {visibleConversations.map((conv) => (
+                  <ConversationRow
+                    key={conv.id}
+                    conv={conv}
+                    onOpen={() =>
+                      navigateToChat({
+                        kpiId: conv.kpiId,
+                        conversationId: conv.id,
+                      })
+                    }
+                  />
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          </div>
         </section>
       </div>
     </section>
   );
 }
 
+// ─── Carte suggestion ─────────────────────────────────────────────────
+
+function SuggestionCard({
+  question,
+  Icon,
+  onClick,
+}: {
+  question: string;
+  Icon: LucideIcon;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-start gap-2.5 text-left transition"
+      style={{
+        padding: "14px 16px",
+        borderRadius: 12,
+        border: "1px solid var(--app-border)",
+        backgroundColor: "var(--app-card-bg)",
+        fontSize: 14,
+        lineHeight: 1.4,
+        color: "var(--app-text-primary)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor =
+          "rgb(var(--app-brand-gold-deep-rgb) / 30%)";
+        e.currentTarget.style.backgroundColor =
+          "rgb(var(--app-brand-gold-deep-rgb) / 3%)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "var(--app-border)";
+        e.currentTarget.style.backgroundColor = "var(--app-card-bg)";
+      }}
+    >
+      <span
+        aria-hidden="true"
+        className="inline-flex shrink-0 items-center justify-center"
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 6%)",
+        }}
+      >
+        <Icon className="h-3.5 w-3.5" style={{ color: "var(--app-brand-gold-deep)" }} />
+      </span>
+      <span className="flex-1">{question}</span>
+    </button>
+  );
+}
+
+// ─── Ligne conversation historique ────────────────────────────────────
+
+function ConversationRow({
+  conv,
+  onOpen,
+}: {
+  conv: ConversationSummary;
+  onOpen: () => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center gap-3 text-left transition"
+        style={{
+          padding: "10px 12px",
+          borderRadius: 10,
+          backgroundColor: "transparent",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }}
+      >
+        <span
+          aria-hidden="true"
+          className="inline-flex shrink-0 items-center justify-center"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 9,
+            backgroundColor: "var(--app-surface-soft)",
+          }}
+        >
+          <MessageCircle
+            className="h-3.5 w-3.5"
+            style={{ color: "var(--app-text-tertiary)" }}
+          />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span
+              className="truncate text-[13px]"
+              style={{ color: "var(--app-text-primary)" }}
+            >
+              {conv.title}
+            </span>
+            {conv.kpiId ? (
+              <span
+                className="shrink-0 font-mono text-[10px] font-semibold uppercase"
+                style={{
+                  padding: "2px 7px",
+                  borderRadius: 5,
+                  backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 8%)",
+                  color: "var(--app-brand-gold-deep)",
+                  letterSpacing: "0.03em",
+                }}
+              >
+                {getKpiDefinition(conv.kpiId)?.shortLabel ?? conv.kpiId}
+              </span>
+            ) : null}
+          </span>
+          <span
+            className="mt-0.5 block text-[11px]"
+            style={{ color: "var(--app-text-tertiary)" }}
+          >
+            {formatRelativeDate(conv.lastMessageAt)} · {conv.messageCount} message
+            {conv.messageCount > 1 ? "s" : ""}
+          </span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
 /**
- * Formatte une date en relatif court (aujourd'hui / hier / il y a N jours)
- * pour la liste — plus lisible qu'une date absolue dans une vue dense.
+ * Format relatif court (aujourd'hui / hier / il y a N jours / date).
  */
 function formatRelativeDate(timestampMs: number): string {
   const now = Date.now();
@@ -308,7 +532,10 @@ export function AssistantConversationsView() {
   return (
     <Suspense
       fallback={
-        <div className="precision-card mx-auto max-w-4xl rounded-2xl p-8 text-sm text-white/55">
+        <div
+          className="precision-card mx-auto max-w-4xl rounded-2xl p-8 text-sm"
+          style={{ color: "var(--app-text-tertiary)" }}
+        >
           Chargement...
         </div>
       }

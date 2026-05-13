@@ -1,4 +1,4 @@
-# PARSER_STATUS.md — Quantis PDF Parser
+# PARSER_STATUS.md — Vyzor PDF Parser
 
 > Dernière mise à jour : 2026-04-13 (Lot 2)
 > Branche active : `feature/parser`
@@ -7,7 +7,7 @@
 
 ## Vue d'ensemble
 
-Le parser PDF Quantis est un pipeline complet de bout en bout :
+Le parser PDF Vyzor est un pipeline complet de bout en bout :
 
 ```
 PDF Upload
@@ -17,7 +17,7 @@ PDF Upload
  → valueMapping         (ParsedFinancialData)
  → parsedFinancialDataBridge (MappedFinancialData)
  → kpiEngine            (CalculatedKpis)
- → financialMapping     (QuantisFinancialData — 6 champs critiques)
+ → financialMapping     (VyzorFinancialData — 6 champs critiques)
  → pdfAnalysisStore     (Firestore)
 ```
 
@@ -37,7 +37,7 @@ PDF Upload
 | `services/pdf-analysis/diagnostics.ts` | Calcul confidence score, warnings, consistency checks |
 | `services/mapping/parsedFinancialDataBridge.ts` | Bridge `ParsedFinancialData` → `MappedFinancialData` |
 | `services/kpiEngine.ts` | Calcul des ~35 KPIs depuis `MappedFinancialData` |
-| `services/financialMapping.ts` | Mapping `ParsedFinancialData` → `QuantisFinancialData` (6 champs) |
+| `services/financialMapping.ts` | Mapping `ParsedFinancialData` → `VyzorFinancialData` (6 champs) |
 | `services/pdfAnalysisStore.ts` | Persistance Firestore |
 | `app/api/pdf-parser/route.ts` | Route API Next.js (POST upload, GET historique/progress) |
 
@@ -45,7 +45,7 @@ PDF Upload
 
 ## Champs critiques (validés sur PDF réel)
 
-Ces 6 champs sont les plus importants pour Quantis :
+Ces 6 champs sont les plus importants pour Vyzor :
 
 | Champ interne | Clé `ParsedFinancialData` | Statut |
 |---|---|---|
