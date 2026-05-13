@@ -1,4 +1,4 @@
-# Audit UI/UX — Vyzor (ex-Quantis)
+# Audit UI/UX — Vyzor (ex-Vyzor)
 
 **Date** : 2026-04-20
 **Branche** : main
@@ -14,10 +14,10 @@
   - `ThemeProvider` : dark/light avec persistance localStorage + sync profil
   - `ProductTourProvider` : onboarding pas-à-pas, événements custom
   - `ScrollRevealInitializer` : animations d'apparition au scroll
-- **Métadonnées** : title = "Quantis" (pas Vyzor), description "Quantis — Plateforme d'intelligence financière", favicon `/images/LogoV3.png`.
+- **Métadonnées** : title = "Vyzor" (pas Vyzor), description "Vyzor — Plateforme d'intelligence financière", favicon `/images/LogoV3.png`.
 - **Configuration HTML** : `lang="fr"`, `class="dark"`, `data-theme="dark"`, body class `premium-app-shell`.
 - **Observations** :
-  - Marque rebrandée Vyzor mais **title / description / favicon / provider names restent "Quantis"** — inconsistance à traiter lors d'une passe branding globale.
+  - Marque rebrandée Vyzor mais **title / description / favicon / provider names restent "Vyzor"** — inconsistance à traiter lors d'une passe branding globale.
 
 ---
 
@@ -46,7 +46,7 @@
 - **Route** : `/login`
 - **Fichier** : `app/login/page.tsx` + `components/LoginForm.tsx`
 - **Rôle** : Authentification avec bascule possible vers inscription, gestion du redirect post-login.
-- **Composants principaux utilisés** : `LoginForm` (dual login/register), `QuantisLogo`, `QuantisSelect`, `FeedbackToast`.
+- **Composants principaux utilisés** : `LoginForm` (dual login/register), `VyzorLogo`, `VyzorSelect`, `FeedbackToast`.
 - **Boutons / actions principaux présents** :
   - "Retour" → `/` (flèche header)
   - Tabs "Connexion" / "Inscription"
@@ -76,7 +76,7 @@
 - **Route** : `/forgot-password`
 - **Fichier** : `app/forgot-password/page.tsx` + `components/auth/ForgotPasswordForm.tsx`
 - **Rôle** : Demande email de réinitialisation de mot de passe.
-- **Composants principaux utilisés** : `ForgotPasswordForm`, `QuantisLogo`, `FeedbackToast`.
+- **Composants principaux utilisés** : `ForgotPasswordForm`, `VyzorLogo`, `FeedbackToast`.
 - **Boutons / actions principaux présents** :
   - "Envoyer un lien de réinitialisation" (submit) → `requestPasswordReset()`
   - "Retour à la connexion" → `/`
@@ -90,7 +90,7 @@
 - **Route** : `/reset-password`
 - **Fichier** : `app/reset-password/page.tsx` + `components/auth/ResetPasswordForm.tsx`
 - **Rôle** : Finalisation du reset avec vérification du token Firebase `oobCode`.
-- **Composants principaux utilisés** : `ResetPasswordForm`, `QuantisLogo`, `FeedbackToast`, icônes `CheckCircle2/Circle/Eye/EyeOff/Info`.
+- **Composants principaux utilisés** : `ResetPasswordForm`, `VyzorLogo`, `FeedbackToast`, icônes `CheckCircle2/Circle/Eye/EyeOff/Info`.
 - **Boutons / actions principaux présents** :
   - "Mettre à jour le mot de passe" (submit) → `confirmPasswordResetFlow()`
   - "Demander un nouveau lien" → `/forgot-password` (si lien invalide)
@@ -106,7 +106,7 @@
 - **Route** : `/pricing`
 - **Fichier** : `app/pricing/page.tsx` + `components/pricing/PricingView.tsx`
 - **Rôle** : Présentation des 3 offres (Free, Pro recommandé, Enterprise).
-- **Composants principaux utilisés** : `PricingView`, lucide `ArrowRight`/`Check`/`ShieldCheck`/`Sparkles`, `QuantisLogo`.
+- **Composants principaux utilisés** : `PricingView`, lucide `ArrowRight`/`Check`/`ShieldCheck`/`Sparkles`, `VyzorLogo`.
 - **Boutons / actions principaux présents** :
   - "Retour à l'analyse" → `/analysis` (header)
   - "Choisir Free" → **aucune action attachée**
@@ -137,7 +137,7 @@
 - **Route** : `/upload`
 - **Fichier** : `app/upload/page.tsx` + `components/upload/UploadPageView.tsx`
 - **Rôle** : Import de PDF/Excel/CSV avec saisie contexte entreprise et lancement du pipeline Claude Vision.
-- **Composants principaux utilisés** : `UploadPageView`, `UploadProcessingOverlay`, `QuantisSelect`, `QuantisLogo`, `StepCard`, `InlineError`.
+- **Composants principaux utilisés** : `UploadPageView`, `UploadProcessingOverlay`, `VyzorSelect`, `VyzorLogo`, `StepCard`, `InlineError`.
 - **Boutons / actions principaux présents** :
   - "Accueil" → `/`
   - "Synthèse" → `/synthese` (si connecté)
@@ -157,14 +157,14 @@
 - **Route** : `/upload/manual`
 - **Fichier** : `app/upload/manual/page.tsx` + `components/upload/ManualKpiEntryView.tsx`
 - **Rôle** : Saisie manuelle des KPI quand l'utilisateur n'a pas de PDF.
-- **Composants principaux utilisés** : `ManualKpiEntryView`, `QuantisLogo`, `FormBlock`, `InputField`.
+- **Composants principaux utilisés** : `ManualKpiEntryView`, `VyzorLogo`, `FormBlock`, `InputField`.
 - **Boutons / actions principaux présents** :
   - "Retour" → `history.back()` ou `/upload`
   - **"Calculer et enregistrer"** (gold premium) → `onSubmit()`
   - "Retour à l'upload" → `/upload`
   - `<details>` "D. Optionnel (avancé)"
 - **Données affichées** : 4 blocs de formulaire (A. Activité, B. Rentabilité, C. Trésorerie & BFR, D. Optionnel), champs avec tooltips, errors inline.
-- **Dépendances** : `buildCompleteKpis`, `calculateQuantisScore`, `createEmptyMappedFinancialData`, `saveAnalysisDraft`, redirect `/register?next=/upload/manual` si non connecté.
+- **Dépendances** : `buildCompleteKpis`, `calculateVyzorScore`, `createEmptyMappedFinancialData`, `saveAnalysisDraft`, redirect `/register?next=/upload/manual` si non connecté.
 - **Observations** :
   - Pas de sauvegarde brouillon (perte si fermeture).
   - Validation métier stricte (DSO/DPO ≥0, immo_net ≤ immo_brut, CA > 0).
@@ -172,8 +172,8 @@
 ## Page : Synthèse
 - **Route** : `/synthese`
 - **Fichier** : `app/synthese/page.tsx` + `components/synthese/SyntheseView.tsx` + `SyntheseDashboard.tsx`
-- **Rôle** : Lecture executive (Quantis Score, KPI clés, alertes, plan d'action) + navigation inter-analyses.
-- **Composants principaux utilisés** : `SyntheseView`, `SyntheseDashboard`, `GlobalSearchBar`, `QuantisLogo`, `NavRow`, `FeedbackToast`.
+- **Rôle** : Lecture executive (Vyzor Score, KPI clés, alertes, plan d'action) + navigation inter-analyses.
+- **Composants principaux utilisés** : `SyntheseView`, `SyntheseDashboard`, `GlobalSearchBar`, `VyzorLogo`, `NavRow`, `FeedbackToast`.
 - **Boutons / actions principaux présents** :
   - **Header (precision-card)** : icônes Settings → `/settings`, Lock → `/pricing`, UserCircle2 → `/account?from=analysis`, LogOut → `onLogout()`
   - **Sidebar** : Synthèse (actif), Tableau de bord → `/analysis`, Documents → `/documents`, sélecteur d'année, bloc Compte
@@ -181,7 +181,7 @@
     - **"Télécharger le rapport"** (lucide `Download`, border blanc/15 secondaire) → `onDownloadReport()` → `downloadSyntheseReport()`
     - **"Exporter données"** (conditionnel si `onExportData` défini, border blanc/10 tertiaire très discret) → `exportAnalysisDataAsJson()`
   - "Importer un nouveau fichier" / "Saisie manuelle" (si pas de données)
-- **Données affichées** : nom entreprise, Quantis Score, KPI clés (CA, Cash, EBE), scorePiliers, alertes, plan d'action, date d'analyse, badge parserVersion (v1/v2).
+- **Données affichées** : nom entreprise, Vyzor Score, KPI clés (CA, Cash, EBE), scorePiliers, alertes, plan d'action, date d'analyse, badge parserVersion (v1/v2).
 - **Dépendances** : `listUserAnalyses`, `getUserProfile`, `persistPendingAnalysisForUser`, `downloadSyntheseReport`, `exportAnalysisDataAsJson`, `SEARCH_NAVIGATE_EVENT`, localStorage `sidebarCollapsedPreference`.
 - **Observations** :
   - Boutons export implémentés **dans le composant enfant** `SyntheseDashboard`, pas dans `SyntheseView`.
@@ -244,7 +244,7 @@
 - **Route** : `/account`
 - **Fichier** : `app/account/page.tsx` + `components/account/AccountView.tsx`
 - **Rôle** : Gestion profil (personnel + entreprise), suppression données ou compte.
-- **Composants principaux utilisés** : `AccountView`, `QuantisLogo`, `QuantisSelect`, `FeedbackToast`, modales de confirmation.
+- **Composants principaux utilisés** : `AccountView`, `VyzorLogo`, `VyzorSelect`, `FeedbackToast`, modales de confirmation.
 - **Boutons / actions principaux présents** :
   - Header : "Retour à l'analyse" ou "Aller à l'upload" (gold premium) / "Se déconnecter" (rose danger)
   - Section profil : "Mettre à jour le profil" (gold premium)
@@ -261,7 +261,7 @@
 - **Route** : `/settings`
 - **Fichier** : `app/settings/page.tsx` + `components/settings/SettingsView.tsx`
 - **Rôle** : Préférences métier + session + relance du guide.
-- **Composants principaux utilisés** : `SettingsView`, `QuantisLogo`, `FeedbackToast`, `ToggleRow`.
+- **Composants principaux utilisés** : `SettingsView`, `VyzorLogo`, `FeedbackToast`, `ToggleRow`.
 - **Boutons / actions principaux présents** :
   - Header : "Retour à l'analyse" → `/analysis`
   - Préférences métier : input "Exercice fiscal par défaut" (2000-2100), select "Format d'export préféré" (xlsx/csv/pdf), 3 toggles (debug, auto-open, confirmation destructive)
@@ -380,7 +380,7 @@
 2. **Thème auth clair vs dark app** : `/forgot-password` et `/reset-password` utilisent `quantis-panel` clair alors que `/login`, `/register`, `/` sont sombres.
 3. **Timing des toasts** : 2.6s sur `/settings`, 3.5s sur `/account`, 3.5s sur `/login`.
 4. **Format d'export préféré** dans `/settings` : la valeur sauvée n'est **jamais lue** par `downloadSyntheseReport` ou `exportAnalysisDataAsJson` (code mort fonctionnel).
-5. **Marque Vyzor vs Quantis** : layout root, title, meta, favicon, `QuantisLogo`, classes CSS (`quantis-panel`, `btn-gold-premium`, `quantis-gold`…) — **aucune trace de rebranding**.
+5. **Marque Vyzor vs Vyzor** : layout root, title, meta, favicon, `VyzorLogo`, classes CSS (`quantis-panel`, `btn-gold-premium`, `quantis-gold`…) — **aucune trace de rebranding**.
 6. **Pages debug en prod** : `/pdf-parser-test` et `/test-kpi` accessibles sans garde admin → risque de fuite de données techniques.
 7. **Styles boutons dorés** variables : `btn-gold-premium`, `border-quantis-gold/30 bg-quantis-gold/10`, `bg-quantis-gold text-black` → au moins 3 variantes de "bouton primaire".
 8. **Coins arrondis** : `rounded-lg` (Synthèse), `rounded-xl` (Analysis, Documents), `rounded-2xl` (précisions cards) — grammaire visuelle non normée.
@@ -394,7 +394,7 @@
 |---|---|---|---|
 | 1 | Haute | **Unifier "Télécharger le rapport"** dans un composant `<DownloadReportButton>` unique (style, icône, props), utilisé sur `/synthese`, `/analysis`, `/analysis/[id]` et à ajouter sur `/documents`. | Cohérence UX + maintenance |
 | 2 | Haute | **Supprimer "Exporter données"** (peu utile pour l'utilisateur final — JSON brut) + supprimer `lib/export/exportAnalysisData.ts` et les appels. | Réduction surface + clarté |
-| 3 | Haute | **Rebrand complet Quantis → Vyzor** (title, meta, logo, classes CSS, composants, fichiers). Passe dédiée. | Marque |
+| 3 | Haute | **Rebrand complet Vyzor → Vyzor** (title, meta, logo, classes CSS, composants, fichiers). Passe dédiée. | Marque |
 | 4 | Haute | **Protéger `/pdf-parser-test` et `/test-kpi`** derrière un feature flag ou une garde admin (env var, email whitelist). | Sécurité |
 | 5 | Moyenne | **Factoriser la sidebar** de `/analysis` et `/documents` dans un composant `<AppSidebar>` commun. | Maintenance |
 | 6 | Moyenne | **Repositionner "Télécharger le rapport"** dans un emplacement cohérent et global (ex : header d'app, barre d'action sticky, ou menu latéral — à discuter en tâche 2). | UX |

@@ -34,6 +34,11 @@ type DashboardFinancialTestContentProps = {
   /** Liste des dashboards custom — utilisée pour résoudre le `name` quand
    *  l'utilisateur clique sur un onglet custom (`custom:<uuid>`). */
   customDashboards?: CustomDashboardSummary[];
+  /** Brief 09/06/2026 — état d'édition contrôlé depuis le bouton
+   *  "Personnaliser" du AppHeader. Quand fourni, on pilote tous les
+   *  CustomizableDashboards des onglets via `controlledIsEditing`. */
+  controlledIsEditing?: boolean;
+  onEditingChange?: (next: boolean) => void;
 };
 
 export function DashboardFinancialTestContent({
@@ -46,15 +51,23 @@ export function DashboardFinancialTestContent({
   currentAnalysis = null,
   analysisModeLabel = null,
   userId = null,
-  customDashboards = []
+  customDashboards = [],
+  controlledIsEditing,
+  onEditingChange
 }: DashboardFinancialTestContentProps) {
   // Props partagés entre les 4 onglets KPI : identiques pour tous, on les
-  // factorise ici pour éviter la duplication de 12 lignes.
+  // factorise ici pour éviter la duplication de 12 lignes. `userId` doit
+  // être propagé sinon les modifs de layout (ajout/suppression/resize/move
+  // de widget, alertes/objectifs sur KPI) ne seront pas persistées en
+  // Firestore — `useDashboardLayout` no-op quand userId est null.
   const sharedTabProps = {
+    userId,
     previousKpis,
     analyses,
     currentAnalysis,
-    analysisModeLabel
+    analysisModeLabel,
+    controlledIsEditing,
+    onEditingChange
   } as const;
 
   if (activeTab === "creation-valeur") {
@@ -92,17 +105,8 @@ export function DashboardFinancialTestContent({
     };
     return (
       <section className="space-y-4">
-        <header className="precision-card rounded-2xl px-4 py-3">
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-white/45">
-            Dashboard personnalisé
-          </p>
-          <h2 className="text-2xl font-semibold text-white">
-            {dashboard?.name ?? "Dashboard sans nom"}
-          </h2>
-          <p className="mt-1 text-xs text-white/55">
-            Compose librement ton tableau avec n&apos;importe quel widget.
-          </p>
-        </header>
+        {/* Titre du dashboard custom supprimé — désormais mergé dans le
+            titre principal du AppHeader ("Tableau de bord - <nom>"). */}
         <CustomizableDashboard
           userId={userId}
           layoutId={activeTab}
@@ -112,6 +116,9 @@ export function DashboardFinancialTestContent({
           analyses={analyses}
           currentAnalysis={currentAnalysis}
           mappedData={mappedData}
+          controlledIsEditing={controlledIsEditing}
+          onEditingChange={onEditingChange}
+          hideHeaderTitle
         />
       </section>
     );

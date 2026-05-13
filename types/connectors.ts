@@ -525,6 +525,17 @@ export type DailyAccountingEntry = {
   date: string; // "YYYY-MM-DD"
   values: Record<PnlVariableCode, number>;
   entryCount: number;
+  /**
+   * Solde cumulé des comptes de trésorerie (classe 5 hors 519) à la fin
+   * du jour. Permet à `recomputeKpisForPeriod` d'exposer un
+   * `disponibilites` dynamique : on prend le `cashBalance` du dernier
+   * jour ≤ periodEnd plutôt que la valeur snapshot annuelle figée.
+   *
+   * Optionnel (rétrocompat) : les analyses synchronisées avant le
+   * câblage de ce champ n'ont pas la valeur ; les consommateurs doivent
+   * fallback sur `mappedData.dispo`.
+   */
+  cashBalance?: number;
 };
 
 // ─── Snapshot bilan (dernière date connue) ─────────────────────────────────

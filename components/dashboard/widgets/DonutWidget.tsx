@@ -8,7 +8,9 @@
 //   - total_passif : capitaux propres + emprunts + fournisseurs + autres dettes
 "use client";
 
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, type TooltipContentProps } from "recharts";
+import { memo } from "react";
+import { Cell, Pie, PieChart, Tooltip, type TooltipContentProps } from "recharts";
+import { StableChartContainer } from "@/components/dashboard/widgets/StableChartContainer";
 import {
   formatCurrency,
   INSUFFICIENT_DATA_LABEL
@@ -83,7 +85,7 @@ function posVal(v: number | null): number {
   return Math.abs(v);
 }
 
-export function DonutWidget({ kpiId, mappedData }: DonutWidgetProps) {
+function DonutWidgetImpl({ kpiId, mappedData }: DonutWidgetProps) {
   const definition = getKpiDefinition(kpiId);
   const slices = buildSlices(kpiId, mappedData);
   const total = slices.reduce((acc, s) => acc + s.value, 0);
@@ -102,7 +104,7 @@ export function DonutWidget({ kpiId, mappedData }: DonutWidgetProps) {
       {slices.length > 0 ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[200px_1fr]">
           <div className="relative h-[180px]">
-            <ResponsiveContainer width="100%" height="100%">
+            <StableChartContainer>
               <PieChart>
                 <Pie
                   data={slices}
@@ -115,6 +117,7 @@ export function DonutWidget({ kpiId, mappedData }: DonutWidgetProps) {
                   paddingAngle={2}
                   stroke="rgba(0,0,0,0.4)"
                   strokeWidth={1}
+                  isAnimationActive={false}
                 >
                   {slices.map((s, i) => (
                     <Cell key={`cell-${i}`} fill={s.color} />
@@ -122,7 +125,7 @@ export function DonutWidget({ kpiId, mappedData }: DonutWidgetProps) {
                 </Pie>
                 <Tooltip content={(props) => <DonutTooltip {...props} total={total} />} />
               </PieChart>
-            </ResponsiveContainer>
+            </StableChartContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
               <span className="text-[10px] font-mono uppercase text-white/55">Total</span>
               <span className="tnum text-base font-semibold text-white">{formatCurrency(total)}</span>
@@ -174,3 +177,5 @@ function DonutTooltip(props: TooltipContentProps & { total: number }) {
     </div>
   );
 }
+
+export const DonutWidget = memo(DonutWidgetImpl);

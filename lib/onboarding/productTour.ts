@@ -3,16 +3,16 @@ import type { ProductTourAudience, ProductTourStep } from "@/types/onboarding";
 export const AUTHENTICATED_TOUR_STEPS: ProductTourStep[] = [
   {
     id: "tour-welcome",
-    title: "Bienvenue sur Quantis",
+    title: "Bienvenue sur Vyzor",
     description:
-      "Ravi de vous compter parmi nous. Quantis est votre nouvel allié dans le pilotage de votre entreprise. Commençons par découvrir les fonctionnalités.",
+      "Ravi de vous compter parmi nous. Vyzor est votre nouvel allié dans le pilotage de votre entreprise. Commençons par découvrir les fonctionnalités.",
     route: "/synthese",
     targetId: "body",
     preferredPlacement: "center"
   },
   {
     id: "tour-synthese-sidebar",
-    title: "Naviguer dans Quantis",
+    title: "Naviguer dans Vyzor",
     description:
       "Utilisez ce menu pour passer instantanément entre votre synthèse globale, vos analyses détaillées, vos documents et la gestion de votre compte.",
     route: "/synthese",
@@ -30,7 +30,7 @@ export const AUTHENTICATED_TOUR_STEPS: ProductTourStep[] = [
   },
   {
     id: "tour-synthese-score",
-    title: "Le Quantis Score",
+    title: "Le Vyzor Score",
     description:
       "Cet indicateur résume la santé financière globale de votre entreprise. Votre objectif : optimiser vos leviers pour atteindre les 100.",
     route: "/synthese",
@@ -115,7 +115,7 @@ export const AUTHENTICATED_TOUR_STEPS: ProductTourStep[] = [
   },
   {
     id: "tour-final",
-    title: "Vous êtes prêt à utiliser Quantis",
+    title: "Vous êtes prêt à utiliser Vyzor",
     description:
       "Le guide est terminé. Vous pouvez le relancer à tout moment depuis les paramètres ou nous contacter directement si vous avez des questions.",
     route: "/synthese",

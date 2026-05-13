@@ -10,7 +10,7 @@ describe("buildVerificationEmailTemplate", () => {
       verificationUrl: "https://quantis.app/verify?token=abc"
     });
 
-    expect(result.subject).toBe("Confirmez votre compte Quantis");
+    expect(result.subject).toBe("Confirmez votre compte Vyzor");
     expect(result.html).toContain("Marie");
     expect(result.html).toContain("https://quantis.app/verify?token=abc");
     expect(result.text).toContain("Marie");

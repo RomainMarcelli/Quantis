@@ -145,7 +145,7 @@ const EMPTY_KPIS: AnalysisRecord["kpis"] = {
 };
 
 const EMPTY_QUANTIS_SCORE: NonNullable<AnalysisRecord["quantisScore"]> = {
-  quantis_score: 50,
+  vyzor_score: 50,
   piliers: {
     rentabilite: 50,
     solvabilite: 50,

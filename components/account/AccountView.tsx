@@ -6,12 +6,12 @@ import { type FormEvent, useEffect, useState } from "react";
 import { AlertTriangle, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { QuantisSelect } from "@/components/ui/QuantisSelect";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
+import { VyzorSelect } from "@/components/ui/VyzorSelect";
 import { useTheme } from "@/hooks/useTheme";
 import { deleteAccountData, updateAccountProfile } from "@/lib/account/account";
 import { clearLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
-import { clearActiveFolderName } from "@/lib/folders/activeFolder";
+import { clearKnownFolderNames } from "@/lib/folders/folderRegistry";
 import {
   COMPANY_SIZE_OPTIONS,
   OTHER_SECTOR_OPTION_VALUE,
@@ -187,7 +187,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
     // Les dossiers visibles dans l'UI dérivent des analyses + du dossier actif local.
     // On purge aussi le dossier actif local pour repartir sur une session propre.
-    clearActiveFolderName();
+    clearKnownFolderNames();
 
     // Les analyses étant supprimées, on retire aussi l'indicateur local utilisé sur /dashboard.
     clearLocalAnalysisHint();
@@ -242,7 +242,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
       });
 
       // Le compte est détruit: on nettoie aussi les traces locales.
-      clearActiveFolderName();
+      clearKnownFolderNames();
       clearLocalAnalysisHint();
       try {
         await firebaseAuthGateway.signOut();
@@ -305,10 +305,10 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
           {/* Branding: logo agrandi et mieux encadré pour un rendu net dans le header compte. */}
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/20 bg-black/30 shadow-[0_8px_20px_rgba(0,0,0,0.35)]">
-              <QuantisLogo withText={false} size={40} imageClassName="h-9 w-9 object-contain" />
+              <VyzorLogo withText={false} size={40} imageClassName="h-9 w-9 object-contain" />
             </div>
             <div>
-              <p className="text-base font-semibold text-white">Quantis</p>
+              <p className="text-base font-semibold text-white">Vyzor</p>
               <p className="text-xs text-white/70">Espace compte</p>
             </div>
           </div>
@@ -378,7 +378,7 @@ export function AccountView({ fromAnalysis = false }: AccountViewProps) {
 
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-white/85">Secteur</span>
-            <QuantisSelect
+            <VyzorSelect
               value={sector}
               onChange={(value) => {
                 setSector(value);
@@ -613,7 +613,7 @@ function SelectField({
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-medium text-white/85">{label}</span>
-      <QuantisSelect value={value} onChange={onChange} options={options} placeholder={placeholder} />
+      <VyzorSelect value={value} onChange={onChange} options={options} placeholder={placeholder} />
       {error ? <span className="mt-1 block text-sm text-rose-300">{error}</span> : null}
     </label>
   );

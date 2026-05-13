@@ -15,7 +15,7 @@ import { ConfirmDialog } from "@/components/documents/ConfirmDialog";
 import {
   describeAnalysisSource,
   getAnalysisSourceKind,
-} from "@/lib/source/activeSource";
+} from "@/lib/source/sourceKind";
 import type { AnalysisRecord } from "@/types/analysis";
 
 type AnalysisCardProps = {
@@ -48,7 +48,7 @@ export function AnalysisCard({ analysis, folders, onDelete, onMove, isActive = f
     ? sourceKind
     : (sourceFile?.type ?? "pdf");
   const ca = analysis.kpis.ca;
-  const score = analysis.quantisScore?.quantis_score ?? null;
+  const score = analysis.quantisScore?.vyzor_score ?? null;
 
   // Couleurs par type — étendues aux sources dynamiques pour qu'elles ne
   // ressemblent pas à un PDF (palette rouge) par accident.

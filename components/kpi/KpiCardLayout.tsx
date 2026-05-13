@@ -25,7 +25,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { KpiTooltip } from "@/components/kpi/KpiTooltip";
 import { KpiBenchmarkAutoIndicator } from "@/components/synthese/KpiBenchmarkAutoIndicator";
@@ -77,31 +77,58 @@ export type KpiCardLayoutProps = {
    * survol qui distrait du chrome d'édition.
    */
   disableTooltip?: boolean;
+  /**
+   * Décoration au bord BAS de la card, rendue à l'intérieur de l'article
+   * pour bénéficier du `overflow: hidden` + `rounded-2xl` (la barre épouse
+   * automatiquement les coins arrondis). Utilisé par la barre de progression
+   * d'objectif sur KpiCardWidget. Le wrapper applique le positionnement
+   * absolu via inline style — l'inline style écrase la règle globale
+   * `.precision-card > * { position: relative }` qui sinon casserait le
+   * layout (children forcés en relative).
+   */
+  bottomChrome?: ReactNode;
 };
 
-const HEADER_NAME_STYLE: React.CSSProperties = {
+// Couleurs sourcées des CSS vars sémantiques (cf. app/globals.css) pour
+// que ces inline styles flip automatiquement entre dark et light. Sans ça
+// les hex hardcodés #FFFFFF restaient blancs sur fond clair = illisibles.
+//
+// Hiérarchie visuelle :
+//   - KICKER_STYLE  : nom officiel complet en haut (ex. "Excédent brut
+//                     d'exploitation"). Mono UPPERCASE 10 px gris secondaire,
+//                     joue le rôle de kicker / sur-titre. Truncate + tooltip
+//                     natif au survol pour les noms longs ("Capacité de
+//                     remboursement", "Excédent brut d'exploitation"…).
+//   - HEADING_STYLE : acronyme court juste en dessous (ex. "EBE"). Gras
+//                     blanc 16 px, c'est le focal point visuel. Court par
+//                     définition → ne déborde jamais.
+//   - Si nom officiel == acronyme (cas DSO/DSO, ROE/ROE…), on n'affiche que
+//     l'acronyme (pas de doublon kicker).
+const KICKER_STYLE: React.CSSProperties = {
   fontSize: "10px",
   letterSpacing: "0.05em",
-  color: "#9CA3AF",
+  color: "var(--app-text-secondary)",
 };
 
-const TITLE_STYLE: React.CSSProperties = {
+const HEADING_STYLE: React.CSSProperties = {
   fontSize: "16px",
-  color: "#FFFFFF",
+  color: "var(--app-text-primary)",
 };
 
 const VALUE_STYLE: React.CSSProperties = {
   fontSize: "32px",
-  color: "#FFFFFF",
+  color: "var(--app-text-primary)",
 };
 
 const VARIATION_STYLE: React.CSSProperties = {
   fontSize: "14px",
 };
 
-const COLOR_GREEN = "#22C55E";
-const COLOR_RED = "#EF4444";
-const COLOR_GREY = "#9CA3AF";
+// Couleurs sémantiques liées aux CSS vars : flip automatique entre dark
+// (#22C55E vif) et light (#16A34A profond) sans dupliquer la logique.
+const COLOR_GREEN = "var(--app-success)";
+const COLOR_RED = "var(--app-danger)";
+const COLOR_GREY = "var(--app-text-tertiary)";
 
 export function KpiCardLayout({
   kpiId,
@@ -116,9 +143,20 @@ export function KpiCardLayout({
   onSelect,
   isSelected = false,
   disableTooltip = false,
+  bottomChrome,
 }: KpiCardLayoutProps) {
   const definition = kpiId ? getKpiDefinition(kpiId) : null;
-  const resolvedFullName = (fullName ?? definition?.label ?? "").toUpperCase();
+  // Nom officiel complet — joue le rôle de kicker (sur-titre gris en haut).
+  // Affiché en mono UPPERCASE pour rester aligné sur le langage typo Vyzor
+  // (le mono uppercase fonctionne bien à 10 px comme étiquette discrète).
+  const resolvedFullName = (fullName ?? definition?.label ?? "").trim();
+  const acronym = (title ?? "").trim();
+  // Kicker masqué si l'acronyme est strictement identique au nom officiel
+  // (case-insensitive, ex. "DSO" / "DSO" ou "ROE" / "ROE"). Sinon doublon
+  // visuel inutile — l'acronyme bold suffit.
+  const showKicker =
+    resolvedFullName.length > 0 &&
+    resolvedFullName.toLowerCase() !== acronym.toLowerCase();
 
   // ─── Variation période-vs-période ────────────────────────────────────
   // Convention : on ne calcule la variation que si previousValue est
@@ -160,17 +198,29 @@ export function KpiCardLayout({
       data-search-id={searchId}
       {...interactiveProps}
     >
-      {/* Ligne 1 — Header : nom complet uppercase + tooltip ✨ */}
-      <div className="flex items-start justify-between">
-        <span className="font-mono uppercase" style={HEADER_NAME_STYLE}>
-          {resolvedFullName || " "}
+      {/* Ligne 1 — Kicker (nom officiel mono UPPERCASE 10 px gris) + tooltip ✨.
+          Forcé en mono-ligne avec ellipsis : "Excédent brut d'exploitation",
+          "Capacité de remboursement"… seraient sinon sur 2 lignes sur les
+          cards étroites. Le `title` natif fait office de tooltip pour révéler
+          le nom complet ; le KpiTooltip ✨ donne aussi la définition complète. */}
+      <div className="flex items-start justify-between gap-2">
+        <span
+          className="min-w-0 flex-1 truncate font-mono uppercase"
+          style={KICKER_STYLE}
+          title={showKicker ? resolvedFullName : undefined}
+        >
+          {showKicker ? resolvedFullName : " "}
         </span>
         {kpiId && !disableTooltip ? <KpiTooltip kpiId={kpiId} value={value} /> : null}
       </div>
 
-      {/* Ligne 2 — Titre vulgarisé (4 px sous header) */}
-      <h3 className="font-bold" style={{ ...TITLE_STYLE, marginTop: "4px" }}>
-        {title}
+      {/* Ligne 2 — Acronyme (gras blanc 16 px). Court par construction → pas
+          de risque de débordement. C'est le focal point visuel de la card. */}
+      <h3
+        className="font-bold leading-tight"
+        style={{ ...HEADING_STYLE, marginTop: "4px" }}
+      >
+        {acronym}
       </h3>
 
       {/* Ligne 3 — Valeur principale (8 px sous titre) */}
@@ -181,17 +231,28 @@ export function KpiCardLayout({
         {formattedValue}
       </div>
 
-      {/* Ligne 4 — Variation conditionnelle (4 px sous valeur).
-          Ligne entière masquée si pas de previousValue exploitable. */}
+      {/* Ligne 4 — Variation conditionnelle (4 px sous valeur), rendue
+          comme un pill/chip outline avec fond légèrement teinté de la
+          couleur sémantique (vert / rouge / gris). Flèche diagonale style
+          ↗ / ↘ au lieu du trend-line — visuellement plus iOS / Linear.
+          `self-start` empêche le flex-col parent de l'étirer en pleine
+          largeur. Ligne entière masquée si pas de previousValue exploitable. */}
       {variation ? (
         <div
-          className="flex items-center gap-1.5 font-medium"
-          style={{ ...VARIATION_STYLE, marginTop: "4px", color: variation.color }}
+          className="inline-flex items-center gap-1 self-start rounded-full border px-2 py-0.5 font-medium"
+          style={{
+            ...VARIATION_STYLE,
+            fontSize: "12px",
+            marginTop: "4px",
+            color: variation.color,
+            borderColor: `color-mix(in srgb, ${variation.color} 32%, transparent)`,
+            backgroundColor: `color-mix(in srgb, ${variation.color} 9%, transparent)`,
+          }}
         >
           {variation.direction === "up" ? (
-            <TrendingUp className="h-4 w-4" />
+            <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.25} />
           ) : variation.direction === "down" ? (
-            <TrendingDown className="h-4 w-4" />
+            <ArrowDownRight className="h-3.5 w-3.5" strokeWidth={2.25} />
           ) : null}
           <span>{variation.label}</span>
         </div>
@@ -201,7 +262,7 @@ export function KpiCardLayout({
           de position). Auto-résolu via le `kpiId` quand un mapping Vyzor existe
           pour ce KPI ; rien rendu sinon (graceful — KPIs banking, point_mort,
           healthScore...). Voir lib/benchmark/kpiMapping.ts pour la couverture.
-          Le badge "Excellent / Critique" basé sur les seuils Quantis a été
+          Le badge "Excellent / Critique" basé sur les seuils Vyzor a été
           retiré : sa lecture entre en conflit avec la position marché (un KPI
           peut être "Excellent" sur les seuils internes mais "Médiane" sur le
           marché — confusion). Le tooltip ✨ continue d'expliquer le diagnostic
@@ -214,6 +275,17 @@ export function KpiCardLayout({
 
       {/* Slot extra — rendu sous le benchmark si fourni (jauge EBE, sparkline). */}
       {extra ? <div style={{ marginTop: "8px" }}>{extra}</div> : null}
+
+      {/* Décoration au bord bas — positionnée absolument à l'intérieur de
+          l'article. L'inline style passe outre la règle globale
+          `.precision-card > * { position: relative }` (cf. globals.css).
+          Le `overflow: hidden` de l'article clippe automatiquement le contenu
+          aux coins arrondis du `rounded-2xl`. */}
+      {bottomChrome ? (
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 2 }}>
+          {bottomChrome}
+        </div>
+      ) : null}
     </article>
   );
 }

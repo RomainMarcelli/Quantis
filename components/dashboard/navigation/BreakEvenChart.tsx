@@ -47,7 +47,15 @@ const CHART_MARGIN = {
 } as const;
 const CHART_Y_AXIS_WIDTH = 94;
 
-const INLINE_HEIGHT_CLASS = "min-h-[500px] h-[55vh] max-h-[700px]";
+// Hauteur viewport-based : `h-full` ne fonctionnait pas car le parent
+// direct (`<div className="space-y-5">`) n'a pas de hauteur explicite, donc
+// h-full résolvait à 0 et Recharts ne dessinait pas les courbes.
+//   - min 420 px : plancher pour rester lisible en widget M (~280 px utiles
+//                  pour le chart après le header + summary cards)
+//   - h-[60vh]   : taille naturelle ~650 px sur FHD, ~780 px sur 4K
+//   - max 820 px : permet au widget XL (4 rangées = 860 px) d'exploiter
+//                  presque toute sa place sans déborder du card
+const INLINE_HEIGHT_CLASS = "min-h-[420px] h-[60vh] max-h-[820px]";
 const FULLSCREEN_HEIGHT_CLASS = "min-h-[500px] h-[calc(100vh-12rem)]";
 
 function BreakEvenChartComponent({ model, isDark }: BreakEvenChartProps) {
@@ -207,14 +215,18 @@ function BreakEvenChartCanvas({
         >
           <defs>
             <linearGradient id={lossGradientId} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor={isDark ? "rgba(248,113,113,0.22)" : "rgba(239,68,68,0.22)"} />
-              <stop offset="55%" stopColor={isDark ? "rgba(248,113,113,0.1)" : "rgba(239,68,68,0.1)"} />
-              <stop offset="100%" stopColor={isDark ? "rgba(248,113,113,0.02)" : "rgba(239,68,68,0.03)"} />
+              {/* En light : intensité uniforme faible sur toute la zone
+                  (cf. retour utilisateur 08/05/2026 : pas de dégradé,
+                  même opacité partout). En dark : on conserve le dégradé
+                  original qui marche bien sur fond sombre. */}
+              <stop offset="0%" stopColor={isDark ? "rgba(248,113,113,0.22)" : "rgba(239,68,68,0.06)"} />
+              <stop offset="55%" stopColor={isDark ? "rgba(248,113,113,0.1)" : "rgba(239,68,68,0.06)"} />
+              <stop offset="100%" stopColor={isDark ? "rgba(248,113,113,0.02)" : "rgba(239,68,68,0.06)"} />
             </linearGradient>
             <linearGradient id={profitGradientId} x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor={isDark ? "rgba(16,185,129,0.03)" : "rgba(16,185,129,0.03)"} />
-              <stop offset="45%" stopColor={isDark ? "rgba(16,185,129,0.09)" : "rgba(16,185,129,0.09)"} />
-              <stop offset="100%" stopColor={isDark ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.18)"} />
+              <stop offset="0%" stopColor={isDark ? "rgba(16,185,129,0.03)" : "rgba(16,185,129,0.06)"} />
+              <stop offset="45%" stopColor={isDark ? "rgba(16,185,129,0.09)" : "rgba(16,185,129,0.06)"} />
+              <stop offset="100%" stopColor={isDark ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.06)"} />
             </linearGradient>
 
             <filter id={caGlowId} x="-45%" y="-45%" width="190%" height="190%">

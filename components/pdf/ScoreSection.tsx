@@ -1,5 +1,5 @@
 // File: components/pdf/ScoreSection.tsx
-// Role: section hero du Quantis Score avec badge circulaire et interprétation.
+// Role: section hero du Vyzor Score avec badge circulaire et interprétation.
 
 import { StyleSheet, Text, View } from "@react-pdf/renderer";
 import type { PdfReportData } from "@/lib/synthese/pdfReportModel";
@@ -78,7 +78,7 @@ export function ScoreSection({ score }: ScoreSectionProps) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Quantis Score</Text>
+      <Text style={styles.title}>Vyzor Score</Text>
       <View style={styles.body}>
         <View style={styles.left}>
           <View style={{ ...styles.gaugeOuter, borderColor: tone.main }}>

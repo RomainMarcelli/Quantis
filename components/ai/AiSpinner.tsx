@@ -40,7 +40,7 @@ export function AiSpinner({ label = "Analyse en cours" }: { label?: string }) {
       </div>
       <p
         className="mt-4 text-xs italic"
-        style={{ color: "rgba(255, 255, 255, 0.4)" }}
+        style={{ color: "var(--app-text-tertiary)" }}
       >
         {label}
         <span className="vyzor-typing-dot" style={{ animationDelay: "0ms" }}>.</span>

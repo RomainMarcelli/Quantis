@@ -91,7 +91,7 @@ export function AiDataCard({
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span
           className="truncate text-[10px] uppercase tracking-[0.18em]"
-          style={{ color: "#C5A059" }}
+          style={{ color: "var(--app-brand-gold-deep)" }}
         >
           {label}
         </span>

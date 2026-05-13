@@ -86,6 +86,16 @@ export function buildBalanceSheet(
       ),
     ]
   );
+  // Brut au niveau du sous-total uniquement (la donnée par ligne n'est pas
+  // exposée dans MappedFinancialData — seuls les agrégats `total_actif_immo_brut`
+  // et `total_actif_immo_net` existent). Affiché en complément du Net dans
+  // SectionSubtotal pour respecter la convention bilan papier "Brut · Net".
+  if (
+    mapped.total_actif_immo_brut !== null
+    && Number.isFinite(mapped.total_actif_immo_brut)
+  ) {
+    immobilise.subtotalBrut = mapped.total_actif_immo_brut;
+  }
 
   // ─── Actif circulant ─────────────────────────────────────────────────
   const circulant = section(

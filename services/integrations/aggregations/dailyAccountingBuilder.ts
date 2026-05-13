@@ -73,7 +73,10 @@ export function buildDailyAccounting(entries: AccountingEntry[]): DailyAccountin
   }
 
   // 2. Pour chaque jour : rejouer la chaîne pcgAggregator → bridge → extraire les variables P&L.
-  const result: DailyAccountingEntry[] = [];
+  // On collecte aussi le DELTA cash du jour (mvts nets classe 5x hors 519) pour pouvoir
+  // calculer ensuite le solde cumulé en un 2ᵉ passage.
+  type DayDraft = DailyAccountingEntry & { cashDelta: number };
+  const result: DayDraft[] = [];
   for (const [date, dayEntries] of byDate.entries()) {
     const periodStart = new Date(`${date}T00:00:00.000Z`);
     const periodEnd = new Date(`${date}T23:59:59.999Z`);
@@ -85,15 +88,36 @@ export function buildDailyAccounting(entries: AccountingEntry[]): DailyAccountin
     const mapped = mapParsedFinancialDataToMappedFinancialData(parsed);
 
     const values = extractPnlValues(mapped);
+    // mapped.dispo agrégé sur les seules entries du jour = mouvement net du
+    // jour sur les comptes de trésorerie (classe 5 hors 519, conformément à
+    // BS_MAPPING dans pcgAggregator). On ne convertit pas en absolu : la
+    // valeur peut être négative si les sorties dépassent les entrées.
+    const cashDelta =
+      typeof mapped.dispo === "number" && Number.isFinite(mapped.dispo) ? mapped.dispo : 0;
     result.push({
       date,
       values,
       entryCount: dayEntries.length,
+      cashBalance: 0, // hydraté en 3ᵉ passage
+      cashDelta,
     });
   }
 
+  // 3. Tri chronologique puis cumul des deltas pour produire le solde fin de
+  // jour. Hypothèse : entries d'à-nouveau incluses dans le sync (cas
+  // MyUnisoft post-fix 12 mois — l'écriture d'à-nouveau de l'exercice est
+  // dans les entries puisque le sync remonte 36 mois). Si ce n'est pas le
+  // cas, le solde est relatif au début du dailyAccounting.
   result.sort((a, b) => a.date.localeCompare(b.date));
-  return result;
+  let runningCash = 0;
+  for (const day of result) {
+    runningCash += day.cashDelta;
+    day.cashBalance = roundMoney(runningCash);
+  }
+
+  // On droppe `cashDelta` du résultat final — c'était un champ de travail
+  // interne, pas exposé au front (le front a besoin du solde, pas du delta).
+  return result.map(({ cashDelta: _drop, ...entry }) => entry);
 }
 
 function extractPnlValues(mapped: MappedFinancialData): Record<PnlVariableCode, number> {

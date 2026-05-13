@@ -14,13 +14,13 @@ vi.mock("@/lib/analysis/analysisAvailability", () => ({
   setLocalAnalysisHint: vi.fn()
 }));
 
-vi.mock("@/lib/folders/activeFolder", () => ({
-  setActiveFolderName: vi.fn()
+vi.mock("@/lib/folders/folderRegistry", () => ({
+  registerKnownFolderName: vi.fn()
 }));
 
 import { getPendingAnalysisDraft, clearPendingAnalysisDraft } from "@/lib/analysis/pendingAnalysis";
 import { setLocalAnalysisHint } from "@/lib/analysis/analysisAvailability";
-import { setActiveFolderName } from "@/lib/folders/activeFolder";
+import { registerKnownFolderName } from "@/lib/folders/folderRegistry";
 import { saveAnalysisDraft } from "@/services/analysisStore";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 
@@ -94,7 +94,7 @@ describe("persistPendingAnalysisForUser", () => {
     );
     expect(clearPendingAnalysisDraft).toHaveBeenCalledTimes(1);
     expect(setLocalAnalysisHint).toHaveBeenCalledWith(true);
-    expect(setActiveFolderName).toHaveBeenCalledWith("Dossier principal");
+    expect(registerKnownFolderName).toHaveBeenCalledWith("Dossier principal");
     expect(result?.id).toBe("analysis-123");
   });
 

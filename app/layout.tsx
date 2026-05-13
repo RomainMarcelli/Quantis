@@ -6,7 +6,6 @@ import { ScrollRevealInitializer } from "@/components/ui/ScrollRevealInitializer
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { ProductTourProvider } from "@/components/product-tour/ProductTourProvider";
 import { TemporalityProvider } from "@/lib/temporality/temporalityContext";
-import { AiChatProvider } from "@/components/ai/AiChatProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -20,8 +19,8 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Quantis",
-  description: "Quantis - Plateforme d'intelligence financière",
+  title: "Vyzor",
+  description: "Vyzor - Plateforme d'intelligence financière",
   icons: {
     icon: "/images/LogoV3.png",
     apple: "/images/LogoV3.png",
@@ -40,10 +39,8 @@ export default function RootLayout({
         <ThemeProvider>
           <ProductTourProvider>
             <TemporalityProvider>
-              <AiChatProvider>
-                <ScrollRevealInitializer />
-                {children}
-              </AiChatProvider>
+              <ScrollRevealInitializer />
+              {children}
             </TemporalityProvider>
           </ProductTourProvider>
         </ThemeProvider>

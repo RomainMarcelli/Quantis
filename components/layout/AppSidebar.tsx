@@ -17,7 +17,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Bot,
   ChevronDown,
@@ -35,6 +35,7 @@ import {
   readSidebarCollapsedPreference,
   writeSidebarCollapsedPreference,
 } from "@/lib/ui/sidebarPreference";
+import { LegalFooter } from "@/components/layout/LegalFooter";
 
 export type SidebarRoute =
   | "synthese"
@@ -66,6 +67,25 @@ export type DashboardSubmenuItem = {
   label: string;
   kind: "fixed" | "custom";
 };
+
+// Sous-onglets fixes du Tableau de bord — source unique référencée par la
+// sidebar quand la page courante ne fournit pas son propre `dashboardSubmenu`
+// (ex: depuis Documents, Synthèse, Assistant IA, États financiers).
+// L'onglet Trésorerie n'est PAS inclus ici : sa visibilité dépend d'une
+// connexion Bridge active, ce que seul le parent /analysis sait évaluer.
+const DASHBOARD_FIXED_TABS: ReadonlyArray<{ id: string; label: string }> = [
+  { id: "creation-valeur", label: "Création de valeur" },
+  { id: "investissement-bfr", label: "Investissement" },
+  { id: "financement", label: "Financement" },
+  { id: "rentabilite", label: "Rentabilité" },
+];
+
+// Sous-pages des États financiers — brief 09/06/2026 : la page unifiée a
+// été scindée en deux documents séparés (Bilan = comptes 1-5, CDR = 6-7).
+const FINANCIAL_DOCS: ReadonlyArray<{ id: string; label: string; href: string }> = [
+  { id: "bilan", label: "Bilan", href: "/etats-financiers/bilan" },
+  { id: "cdr", label: "Compte de résultat", href: "/etats-financiers/compte-de-resultat" },
+];
 
 type AppSidebarProps = {
   activeRoute: SidebarRoute;
@@ -107,11 +127,54 @@ export function AppSidebar({
   dashboardSubmenu,
 }: AppSidebarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [ready, setReady] = useState(false);
-  // Sous-menu Tableau de bord : ouvert par défaut quand on est sur la route
-  // analysis (l'utilisateur voit immédiatement les sous-onglets disponibles).
-  const [dashboardSubmenuOpen, setDashboardSubmenuOpen] = useState(activeRoute === "analysis");
+  // L'AppSidebar est rendue À L'INTÉRIEUR de chaque page (pas dans un
+  // layout partagé Next.js), elle remonte donc à chaque navigation. Pour
+  // éviter que le dropdown se ferme à chaque clic sur un sous-onglet, on
+  // dérive l'état initial du pathname : ouvert si on est déjà sur une
+  // sous-route. L'utilisateur peut ensuite toggle librement — la fermeture
+  // explicite ne sera pas conservée entre 2 navigations, mais c'est OK :
+  // le cas typique est "j'ouvre le menu, je clique un sous-item, je veux
+  // voir les autres options à proximité après navigation".
+  const [dashboardSubmenuOpen, setDashboardSubmenuOpen] = useState(
+    () => pathname?.startsWith("/analysis") ?? false,
+  );
+  const [financialSubmenuOpen, setFinancialSubmenuOpen] = useState(
+    () => pathname?.startsWith("/etats-financiers/") ?? false,
+  );
+
+  // Quand le pathname change pendant la session (navigation client-side),
+  // on ouvre le dropdown correspondant si l'utilisateur arrive sur une
+  // sous-route. On NE FERME pas l'autre — l'user peut avoir voulu garder
+  // un dropdown ouvert visuellement même en quittant sa zone.
+  useEffect(() => {
+    if (!pathname) return;
+    if (pathname.startsWith("/etats-financiers/")) setFinancialSubmenuOpen(true);
+    if (pathname.startsWith("/analysis")) setDashboardSubmenuOpen(true);
+  }, [pathname]);
+
+  // Items rendus sous "Tableau de bord" :
+  //   - Si la page courante a fourni son propre `dashboardSubmenu` (cas de
+  //     /analysis qui connaît les dashboards custom + tresorerie + state
+  //     d'onglet actif), on l'utilise tel quel.
+  //   - Sinon, on rend les onglets fixes (DASHBOARD_FIXED_TABS) avec une
+  //     navigation vers `/analysis?tab=<id>`. Les dashboards custom et
+  //     l'onglet Trésorerie n'apparaissent pas ici (info non disponible
+  //     hors de la page analysis).
+  const effectiveDashboardSubmenu = dashboardSubmenu ?? {
+    items: DASHBOARD_FIXED_TABS.map((t) => ({ ...t, kind: "fixed" as const })),
+    activeId: undefined,
+    onSelectItem: (id: string) => router.push(`/analysis?tab=${encodeURIComponent(id)}`),
+  };
+
+  // Active sub-id pour États financiers — dérivé du pathname courant.
+  const financialActiveId = pathname?.startsWith("/etats-financiers/compte-de-resultat")
+    ? "cdr"
+    : pathname?.startsWith("/etats-financiers")
+      ? "bilan"
+      : undefined;
 
   useEffect(() => {
     setCollapsed(readSidebarCollapsedPreference());
@@ -126,7 +189,15 @@ export function AppSidebar({
   return (
     <aside
       data-scroll-reveal-ignore
-      className={`precision-card relative h-fit rounded-2xl lg:sticky lg:top-4 ${
+      data-sidebar-shell
+      // Brief 09/06/2026 : sidebar figée comme l'en-tête — `lg:!sticky` avec
+      // un offset qui passe SOUS le header sticky (top: 1rem + hauteur
+      // header ~108 px data variant + 16 px de gap visuel) ≈ 9rem (144 px).
+      // `max-h-[calc(100vh-9.5rem)]` + scroll interne pour ne jamais
+      // dépasser le viewport sur les écrans courts. Le `!` est requis car
+      // `.precision-card` (définie après @tailwind utilities) impose
+      // `position: relative` et écraserait `sticky`.
+      className={`precision-card h-fit rounded-2xl lg:!sticky lg:top-36 lg:max-h-[calc(100vh-9.5rem)] lg:overflow-y-auto ${
         collapsed ? "p-3" : "p-4"
       }`}
     >
@@ -152,21 +223,38 @@ export function AppSidebar({
         {PRIMARY_NAV.map((item) => {
           const Icon = item.icon;
           const active = item.id === activeRoute;
-          // Cas spécial : "Tableau de bord" reçoit un sous-menu expandable
-          // listant les sous-onglets (Création de valeur, Investissement…)
-          // et les dashboards custom utilisateur. Sous-menu caché en mode
-          // replié (les sous-items réapparaîtront en dépliant la sidebar).
-          const hasSubmenu =
-            item.id === "analysis" && dashboardSubmenu !== undefined && !collapsed;
+          // Brief 09/06/2026 : sous-menus toujours visibles peu importe la
+          // page courante. Tableau de bord ET États financiers exposent
+          // leur sous-arborescence depuis n'importe quelle route. Caché
+          // en mode replié (réapparaît en dépliant la sidebar).
+          const submenuKind: "dashboard" | "financial" | null =
+            !collapsed
+              ? item.id === "analysis"
+                ? "dashboard"
+                : item.id === "etats-financiers"
+                  ? "financial"
+                  : null
+              : null;
+          const submenuOpen =
+            submenuKind === "dashboard"
+              ? dashboardSubmenuOpen
+              : submenuKind === "financial"
+                ? financialSubmenuOpen
+                : false;
+          const toggleSubmenu = () => {
+            if (submenuKind === "dashboard") setDashboardSubmenuOpen((v) => !v);
+            else if (submenuKind === "financial") setFinancialSubmenuOpen((v) => !v);
+          };
 
           return (
             <div key={item.id}>
-              {/* Cas spécial : "Tableau de bord" avec sous-menu — rangée
-                  composée de 2 boutons FRÈRES (jamais imbriqués, sinon HTML
-                  invalide → écran noir sous React 19). Le clic sur la zone
-                  principale navigue, le clic sur la flèche déroule. */}
-              {hasSubmenu ? (
+              {/* Rangée avec sous-menu : 2 boutons FRÈRES (jamais imbriqués,
+                  sinon HTML invalide → écran noir sous React 19). Clic
+                  zone principale = navigation ; clic flèche = toggle. */}
+              {submenuKind ? (
                 <div
+                  data-sidebar-link
+                  data-active={active ? "true" : "false"}
                   className={`flex w-full items-center gap-1 rounded-xl transition-colors ${
                     active
                       ? "bg-white/10 text-white"
@@ -183,13 +271,13 @@ export function AppSidebar({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDashboardSubmenuOpen((v) => !v)}
-                    aria-label={dashboardSubmenuOpen ? "Replier le sous-menu" : "Déplier le sous-menu"}
+                    onClick={toggleSubmenu}
+                    aria-label={submenuOpen ? "Replier le sous-menu" : "Déplier le sous-menu"}
                     className="mr-1 inline-flex h-6 w-6 items-center justify-center rounded text-white/45 hover:bg-white/10 hover:text-white/80"
                   >
                     <ChevronDown
                       className={`h-3.5 w-3.5 transition-transform ${
-                        dashboardSubmenuOpen ? "rotate-0" : "-rotate-90"
+                        submenuOpen ? "rotate-0" : "-rotate-90"
                       }`}
                     />
                   </button>
@@ -205,8 +293,14 @@ export function AppSidebar({
                 </NavRow>
               )}
 
-              {hasSubmenu && dashboardSubmenuOpen ? (
-                <DashboardSubmenuList submenu={dashboardSubmenu!} />
+              {submenuKind === "dashboard" && submenuOpen ? (
+                <DashboardSubmenuList submenu={effectiveDashboardSubmenu} />
+              ) : null}
+              {submenuKind === "financial" && submenuOpen ? (
+                <FinancialSubmenuList
+                  activeId={financialActiveId}
+                  onSelect={(href) => router.push(href)}
+                />
               ) : null}
             </div>
           );
@@ -249,6 +343,16 @@ export function AppSidebar({
           )}
         </button>
       ) : null}
+
+      {/* Liens légaux : visibles uniquement en mode déplié, en bas de la
+          sidebar avec un séparateur fin. Masqués en mode replié pour
+          économiser la verticalité — ils restent accessibles via le footer
+          de la page d'auth ou directement par URL (/cgu, /privacy). */}
+      {!collapsed ? (
+        <div className="mt-4 border-t border-white/[0.06] pt-3">
+          <LegalFooter variant="stacked" tone="subtle" showCopyright />
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -275,6 +379,8 @@ function NavRow({
       onClick={onClick}
       aria-label={collapsed ? label : undefined}
       title={collapsed ? label : undefined}
+      data-sidebar-link
+      data-active={active ? "true" : "false"}
       className={`flex w-full items-center rounded-xl transition-colors ${
         collapsed ? "group justify-center px-2 py-2" : "gap-2 px-3 py-2 text-left"
       } ${
@@ -358,6 +464,40 @@ function DashboardSubmenuList({
           </button>
         </li>
       ) : null}
+    </ul>
+  );
+}
+
+// ─── Sous-menu États financiers (brief 09/06/2026) ─────────────────────
+
+function FinancialSubmenuList({
+  activeId,
+  onSelect,
+}: {
+  activeId: string | undefined;
+  onSelect: (href: string) => void;
+}) {
+  return (
+    <ul className="ml-2 mt-1 space-y-0.5 border-l border-white/10 pl-3">
+      {FINANCIAL_DOCS.map((doc) => {
+        const isActive = doc.id === activeId;
+        return (
+          <li key={doc.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(doc.href)}
+              className={`flex w-full items-center rounded-md px-2 py-1.5 text-left text-[13px] transition-colors ${
+                isActive
+                  ? "bg-quantis-gold/10 text-quantis-gold"
+                  : "text-white/65 hover:bg-white/5 hover:text-white"
+              }`}
+              aria-pressed={isActive}
+            >
+              <span className="truncate">{doc.label}</span>
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }

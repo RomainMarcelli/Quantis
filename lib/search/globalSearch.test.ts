@@ -18,7 +18,7 @@ describe("globalSearch", () => {
   });
 
   it("retrouve les éléments de synthèse", () => {
-    const results = searchGlobalItems("Quantis Score", 5);
+    const results = searchGlobalItems("Vyzor Score", 5);
     const ids = results.map((item) => item.id);
     expect(ids).toContain("synthese-score");
   });

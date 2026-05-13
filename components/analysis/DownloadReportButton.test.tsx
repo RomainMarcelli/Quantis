@@ -8,7 +8,7 @@ vi.mock("@/lib/synthese/downloadSyntheseReport", () => ({
 }));
 
 const fakeInputGetter = (): DownloadSyntheseReportInput => ({
-  companyName: "Quantis",
+  companyName: "Vyzor",
   greetingName: "Romain",
   analysisCreatedAt: "2026-04-20T10:00:00.000Z",
   selectedYearLabel: "2025",

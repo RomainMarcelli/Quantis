@@ -19,11 +19,28 @@ import {
 } from "@/lib/dashboard/rawVariableCatalog";
 import type { WidgetCategory } from "@/types/dashboard";
 
+/** Groupe visuel dans le picker — sépare les catégories en 4 macro-buckets
+ *  (indicateurs métier, états financiers bruts, pilotage contextuel,
+ *  personnalisé pour les widgets construits par l'utilisateur). */
+export type WidgetCategoryGroup =
+  | "indicateurs"
+  | "etats_financiers"
+  | "pilotage"
+  | "personnalise";
+
 export type WidgetCategoryDefinition = {
   id: WidgetCategory;
   label: string;
   description: string;
+  group: WidgetCategoryGroup;
 };
+
+export const WIDGET_CATEGORY_GROUPS: Array<{ id: WidgetCategoryGroup; label: string }> = [
+  { id: "indicateurs", label: "Indicateurs" },
+  { id: "etats_financiers", label: "États financiers" },
+  { id: "pilotage", label: "Pilotage" },
+  { id: "personnalise", label: "Personnalisé" },
+];
 
 // Forme uniforme pour le picker — accepte à la fois des KpiDefinition (du
 // registre) et des SyntheseWidgetDefinition (catalogue synthétique). Le picker
@@ -34,54 +51,87 @@ export type PickerEntry = {
   shortLabel: string;
 };
 
-// Ordre = ordre d'affichage dans le picker. "Synthèse" en tête car les
-// widgets contextuels (Recommandation, Alertes…) sont les plus utilisés.
+// Ordre = ordre d'affichage dans le picker. Groupé en 3 macro-buckets :
+// Indicateurs (KPIs métier) → États financiers (raw) → Pilotage (contextuel).
+// L'id "synthese" est conservé en interne pour la rétro-compat Firestore —
+// seul le label affiché bascule à "Pilotage".
 export const WIDGET_CATEGORIES: WidgetCategoryDefinition[] = [
-  {
-    id: "synthese",
-    label: "Synthèse",
-    description: "Recommandation stratégique, alertes, plan d'action."
-  },
-  {
-    id: "bilan",
-    label: "Bilan",
-    description: "Variables brutes du bilan : actif, passif, capitaux propres."
-  },
-  {
-    id: "compte_resultat",
-    label: "Compte de résultat",
-    description: "Variables brutes du CDR : produits, charges, résultat."
-  },
+  // ── Indicateurs ──
   {
     id: "creation_valeur",
+    group: "indicateurs",
     label: "Création de valeur",
     description: "Ce que l'activité produit : CA, VA, EBITDA, marges."
   },
   {
     id: "investissement",
+    group: "indicateurs",
     label: "Investissement & BFR",
     description: "Cycle d'exploitation : BFR, DSO, DPO, immobilisations."
   },
   {
     id: "financement",
+    group: "indicateurs",
     label: "Financement",
     description: "Structure financière : CAF, gearing, solvabilité, liquidité."
   },
   {
     id: "rentabilite",
+    group: "indicateurs",
     label: "Rentabilité",
     description: "Retour sur capitaux : ROE, ROCE, effet de levier."
   },
   {
     id: "tresorerie",
+    group: "indicateurs",
     label: "Trésorerie & Liquidité",
     description: "Cash disponible, runway, burn rate."
-  }
+  },
+
+  // ── États financiers (variables brutes) ──
+  {
+    id: "bilan",
+    group: "etats_financiers",
+    label: "Bilan",
+    description: "Variables brutes du bilan : actif, passif, capitaux propres."
+  },
+  {
+    id: "compte_resultat",
+    group: "etats_financiers",
+    label: "Compte de résultat",
+    description: "Variables brutes du CDR : produits, charges, résultat."
+  },
+
+  // ── Pilotage (widgets contextuels Vyzor) ──
+  {
+    id: "synthese",
+    group: "pilotage",
+    label: "Pilotage",
+    description: "Score Vyzor, recommandation, alertes, plan d'action."
+  },
+
+  // ── Personnalisé (builder libre — multi-séries) ──
+  {
+    id: "personnalise",
+    group: "personnalise",
+    label: "Personnalisé",
+    description: "Composez vos propres widgets en combinant plusieurs KPIs."
+  },
 ];
 
 // Catégories du registre KPI hors picker (Phase 1) : "score" reste invisible
-// car healthScore est rendu dans son propre QuantisScoreCard, pas dans la grille.
+// car healthScore est rendu dans son propre VyzorScoreCard, pas dans la grille.
 const HIDDEN_CATEGORIES = new Set(["score"]);
+
+// IDs alias du registre — KPIs qui partagent label/valeur avec un autre id
+// canonique mais existent pour des raisons historiques (tooling premium qui
+// référençait des nomenclatures anglo-saxonnes ou françaises selon le call-site).
+// On les masque du picker pour éviter les doublons visuels du type
+// "Excédent brut d'exploitation / EBE" listé deux fois (ebitda + ebe).
+//   - ebitda → ebe (alias français, même valeur)
+//   - resultat_net → netProfit (alias EN, même valeur)
+//   - bfr → workingCapital (alias EN, même valeur)
+const ALIAS_KPI_IDS = new Set(["ebitda", "netProfit", "workingCapital"]);
 
 // Convertit une SyntheseWidgetDefinition en PickerEntry uniforme.
 function toEntryFromSynthese(def: SyntheseWidgetDefinition): PickerEntry {
@@ -108,8 +158,17 @@ export function listKpisByCategory(category: WidgetCategory): PickerEntry[] {
   if (category === "bilan" || category === "compte_resultat") {
     return listRawVariablesBySource(category).map(toEntryFromRaw);
   }
+  if (category === "personnalise") {
+    // Catégorie spéciale : pas de liste pré-faite — le picker bascule
+    // sur un BUILDER (constructeur libre). Voir KpiPickerDrawer.
+    return [];
+  }
   return Object.values(KPI_REGISTRY)
-    .filter((def) => def.category === category && !HIDDEN_CATEGORIES.has(def.category))
+    .filter((def) =>
+      def.category === category
+      && !HIDDEN_CATEGORIES.has(def.category)
+      && !ALIAS_KPI_IDS.has(def.id),
+    )
     .map(toEntryFromKpi);
 }
 
@@ -120,7 +179,7 @@ export function listAllPickerKpis(): PickerEntry[] {
     ...SYNTHESE_WIDGET_CATALOG.map(toEntryFromSynthese),
     ...RAW_VARIABLE_CATALOG.map(toEntryFromRaw),
     ...Object.values(KPI_REGISTRY)
-      .filter((def) => !HIDDEN_CATEGORIES.has(def.category))
+      .filter((def) => !HIDDEN_CATEGORIES.has(def.category) && !ALIAS_KPI_IDS.has(def.id))
       .map(toEntryFromKpi)
   ];
 }

@@ -27,8 +27,8 @@ import {
 import { loginWithEmailPassword } from "@/lib/auth/login";
 import { registerWithEmailPassword } from "@/lib/auth/register";
 import { FeedbackToast } from "@/components/ui/FeedbackToast";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { QuantisSelect } from "@/components/ui/QuantisSelect";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
+import { VyzorSelect } from "@/components/ui/VyzorSelect";
 import { firebaseAuthGateway } from "@/services/auth";
 import { logClientSecurityEvent } from "@/services/securityAuditClient";
 import { markUserEmailAsVerified, saveUserProfile } from "@/services/userProfileStore";
@@ -390,14 +390,14 @@ export function LoginForm({
 
         <div className="flex items-center gap-4">
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-transparent p-1.5">
-            <QuantisLogo
+            <VyzorLogo
               withText={false}
               size={56}
               imageClassName="h-14 w-14 shrink-0 object-contain"
             />
           </div>
           <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-quantis-gold">Quantis</p>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-quantis-gold">Vyzor</p>
             <p className="mt-1 text-xs text-white/55">Plateforme financière</p>
           </div>
         </div>
@@ -405,7 +405,7 @@ export function LoginForm({
         <div>
           <h1 className="text-3xl font-semibold leading-tight text-white md:text-4xl">
             {mode === "login" ? "Connexion" : "Création de compte"}
-            <span className="ml-2 text-quantis-gold">Quantis</span>
+            <span className="ml-2 text-quantis-gold">Vyzor</span>
           </h1>
           <p className="mt-3 text-sm text-white/60">
             {mode === "login"
@@ -574,7 +574,7 @@ export function LoginForm({
 
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-white">Taille d&apos;entreprise</span>
-                <QuantisSelect
+                <VyzorSelect
                   value={companySize}
                   onChange={(value) => setCompanySize(value as CompanySizeValue | "")}
                   placeholder="Choisir une taille"
@@ -588,7 +588,7 @@ export function LoginForm({
 
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-white">Secteur</span>
-                <QuantisSelect
+                <VyzorSelect
                   value={sector}
                   onChange={(value) => setSector(value)}
                   placeholder="Choisir un secteur"

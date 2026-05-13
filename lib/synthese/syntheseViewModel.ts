@@ -1,7 +1,7 @@
 ﻿// File: lib/synthese/syntheseViewModel.ts
 // Role: transforme les KPI d'analyse en données de synthèse lisibles (score, tendances, actions, alertes).
 import type { CalculatedKpis } from "@/types/analysis";
-import { calculateQuantisScore } from "@/lib/quantisScore";
+import { calculateVyzorScore } from "@/lib/vyzorScore";
 import { buildKpiTrend, type KpiTrend } from "@/lib/kpi/kpiTrend";
 import { buildSectorBenchmark } from "@/lib/synthese/sectorBenchmark";
 
@@ -60,8 +60,8 @@ export function buildSyntheseViewModel(
   previousKpis?: CalculatedKpis | null,
   sector?: string | null
 ): SyntheseViewModel {
-  // Le Quantis Score est recalculé dynamiquement à partir des KPI courants.
-  const quantisScore = calculateQuantisScore(currentKpis);
+  // Le Vyzor Score est recalculé dynamiquement à partir des KPI courants.
+  const quantisScore = calculateVyzorScore(currentKpis);
 
   const metrics: SyntheseMetric[] = [
     {
@@ -108,7 +108,7 @@ export function buildSyntheseViewModel(
   const alerts: SyntheseAlert[] = [];
 
   // Les seuils restent simples en MVP pour fournir une lecture immédiate et actionnable.
-  if (quantisScore.quantis_score < 50) {
+  if (quantisScore.vyzor_score < 50) {
     alerts.push({
       id: "health-critical",
       label: "Score global fragile : renforcer la structure financière court terme.",
@@ -160,8 +160,8 @@ export function buildSyntheseViewModel(
   const fiscalTiles = buildFiscalTiles(currentKpis);
 
   return {
-    score: quantisScore.quantis_score,
-    scoreLabel: resolveScoreLabel(quantisScore.quantis_score),
+    score: quantisScore.vyzor_score,
+    scoreLabel: resolveScoreLabel(quantisScore.vyzor_score),
     scorePiliers: quantisScore.piliers,
     alerteInvestissement: quantisScore.alerte_investissement,
     metrics,

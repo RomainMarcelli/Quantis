@@ -25,7 +25,7 @@ export function AIInsight({ message, ctaLabel, searchId }: AIInsightProps) {
           </div>
           <div className="flex flex-col gap-1.5">
             <span className="agent-kicker text-[10px] font-mono">
-              QUANTIS_AGENT &gt; RECOMMANDATION STRATÉGIQUE
+              VYZOR_AGENT &gt; RECOMMANDATION STRATÉGIQUE
             </span>
             <p className="text-[14px] font-medium agent-message">
               {message}{" "}

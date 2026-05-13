@@ -1,5 +1,5 @@
 ﻿// File: lib/synthese/syntheseViewModel.test.ts
-// Role: tests unitaires de la logique de synthèse (tendances, score Quantis, alertes, actions) sans dépendance UI.
+// Role: tests unitaires de la logique de synthèse (tendances, score Vyzor, alertes, actions) sans dépendance UI.
 import { describe, expect, it } from "vitest";
 import type { CalculatedKpis } from "@/types/analysis";
 import { buildSyntheseViewModel, buildTrend } from "@/lib/synthese/syntheseViewModel";

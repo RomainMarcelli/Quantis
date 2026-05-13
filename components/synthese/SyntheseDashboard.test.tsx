@@ -53,11 +53,11 @@ const sampleSynthese: SyntheseViewModel = {
 };
 
 describe("SyntheseDashboard", () => {
-  it("affiche le bloc Quantis Score", () => {
+  it("affiche le bloc Vyzor Score", () => {
     const html = renderToStaticMarkup(
       <SyntheseDashboard
         greetingName="Romain"
-        companyName="Quantis"
+        companyName="Vyzor"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
         onReupload={() => {}}
         onManualEntry={() => {}}
@@ -65,7 +65,7 @@ describe("SyntheseDashboard", () => {
       />
     );
 
-    expect(html).toContain("Quantis Score");
+    expect(html).toContain("Vyzor Score");
     expect(html).toContain(">74<");
     expect(html).toContain("Santé globale solide");
   });
@@ -74,7 +74,7 @@ describe("SyntheseDashboard", () => {
     const html = renderToStaticMarkup(
       <SyntheseDashboard
         greetingName="Romain"
-        companyName="Quantis"
+        companyName="Vyzor"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
         onReupload={() => {}}
         onManualEntry={() => {}}
@@ -109,7 +109,7 @@ describe("SyntheseDashboard", () => {
     const html = renderToStaticMarkup(
       <SyntheseDashboard
         greetingName="Romain"
-        companyName="Quantis"
+        companyName="Vyzor"
         analysisCreatedAt="2026-03-20T10:00:00.000Z"
         onReupload={() => {}}
         onManualEntry={() => {}}

@@ -5,7 +5,7 @@ import { KpiBeforeAfterView } from "@/components/debug/KpiBeforeAfterView";
 
 export default function TestKpiPage() {
   return (
-    <main className="premium-analysis-root relative mx-auto min-h-screen w-full overflow-hidden px-4 py-8">
+    <main className="premium-analysis-root relative mx-auto min-h-screen w-full px-4 py-8">
       <AdminGate>
         <div className="noise-overlay" aria-hidden="true" />
         <div className="spotlight" aria-hidden="true" />

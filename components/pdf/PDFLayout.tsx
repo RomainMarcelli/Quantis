@@ -107,7 +107,7 @@ export function PDFLayout({ data, logoSrc }: PDFLayoutProps) {
   const resolvedLogo = logoSrc ?? (typeof window !== "undefined" ? `${window.location.origin}${LOGO_PATH}` : undefined);
 
   return (
-    <Document title={`Rapport Quantis - ${data.meta.companyName}`} author="Quantis" subject="Analyse financière">
+    <Document title={`Rapport Vyzor - ${data.meta.companyName}`} author="Vyzor" subject="Analyse financière">
       <CoverPage data={data} logoSrc={resolvedLogo} />
       <SynthesePage data={data} logoSrc={resolvedLogo} />
       <KpiPage
@@ -315,7 +315,7 @@ function ProfitabilityPage({ data, logoSrc }: { data: PdfReportData; logoSrc?: s
       </View>
 
       <Text style={s.conclusionText}>
-        Ce rapport a été généré automatiquement par Quantis. Les données proviennent des documents financiers fournis et sont présentées à titre informatif.
+        Ce rapport a été généré automatiquement par Vyzor. Les données proviennent des documents financiers fournis et sont présentées à titre informatif.
       </Text>
 
       <PageFooter />
@@ -343,7 +343,7 @@ function PageHeader({ logoSrc, companyName, pageNum }: { logoSrc?: string; compa
 function PageFooter() {
   return (
     <View style={s.footer} fixed>
-      <Text style={s.footerText}>Rapport confidentiel — Quantis</Text>
+      <Text style={s.footerText}>Rapport confidentiel — Vyzor</Text>
     </View>
   );
 }

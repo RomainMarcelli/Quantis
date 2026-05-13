@@ -1,4 +1,4 @@
-# Claude Code Log — Quantis
+# Claude Code Log — Vyzor
 Derniere mise a jour : 2026-04-17 11:00
 
 ## Diagnostic dashboard N/D (2026-04-17)
@@ -290,7 +290,7 @@ Upload :
 - Construire un `ParsedFileData` minimal pour le PDF (fileName, extractedAt, fiscalYear)
 - Fusionner avec les fichiers Excel eventuels
 - Utiliser `documentAiMappedData` a la place de `mapRawDataToMappedFinancialData(rawData)` si dispo
-- Le reste du pipeline (computeKpis, calculateQuantisScore, etc.) reste inchange
+- Le reste du pipeline (computeKpis, calculateVyzorScore, etc.) reste inchange
 - Structure `AnalysisDraft` identique — pas de breaking change
 
 ### Implementation : ✅ APPLIQUEE
@@ -323,7 +323,7 @@ Upload :
 /upload → /api/analyses → runAnalysisPipeline()
   → PDF detecte → extractFinancialPages → processPdfWithDocumentAI → analyzeFinancialDocument (11 fixes)
   → mapParsedFinancialDataToMappedFinancialData → documentAiMappedData
-  → computeKpis(documentAiMappedData) → calculateQuantisScore
+  → computeKpis(documentAiMappedData) → calculateVyzorScore
   → AnalysisDraft complet {kpis, mappedData, quantisScore}
   → saveAnalysisDraft → collection "analyses" (racine)
   → /synthese lit "analyses" → KPI affiches ✅
@@ -426,7 +426,7 @@ Quand un PDF est uploade via `/upload` :
 | `components/documents/DocumentsView.tsx` | Layout 2 colonnes : sidebar dossiers (25%) + contenu (75%) |
 | `components/documents/FolderSidebar.tsx` | Liste dossiers, hover rename/delete, bouton creer, actif en dore |
 | `components/documents/AnalysisCardGrid.tsx` | Grille de cards analyses du dossier selectionne |
-| `components/documents/AnalysisCard.tsx` | Card : nom fichier, badge PDF/Excel, date, CA, score Quantis, boutons actions |
+| `components/documents/AnalysisCard.tsx` | Card : nom fichier, badge PDF/Excel, date, CA, score Vyzor, boutons actions |
 | `components/documents/FolderDialog.tsx` | Modal creer/renommer dossier |
 | `components/documents/EmptyFolderState.tsx` | Empty state : icone + "Aucune analyse" + bouton upload |
 
@@ -448,7 +448,7 @@ Quand un PDF est uploade via `/upload` :
 |---------|--------|--------|
 | `components/documents/FolderDialog.tsx` | ✅ | Modal creer/renommer dossier, ESC/Enter, focus auto |
 | `components/documents/EmptyFolderState.tsx` | ✅ | Icone + message + bouton CTA upload |
-| `components/documents/AnalysisCard.tsx` | ✅ | Card : nom fichier, badge PDF/Excel, date FR, CA, score Quantis couleur, boutons voir/deplacer/supprimer |
+| `components/documents/AnalysisCard.tsx` | ✅ | Card : nom fichier, badge PDF/Excel, date FR, CA, score Vyzor couleur, boutons voir/deplacer/supprimer |
 | `components/documents/AnalysisCardGrid.tsx` | ✅ | Grille responsive sm:2 xl:3 colonnes |
 | `components/documents/FolderSidebar.tsx` | ✅ | Sidebar avec dossiers, actif en dore, hover rename/delete, bouton creer |
 | `components/documents/DocumentsView.tsx` | ✅ | Layout 2 colonnes (25%/75%), gestion etats loading/empty/liste, toutes les operations CRUD |
@@ -467,7 +467,7 @@ Quand un PDF est uploade via `/upload` :
 - Supprimer analyse (confirmation + delete Firestore)
 - Deplacer analyse entre dossiers (dropdown + updateDoc folderName)
 - Tri par date decroissante
-- Score Quantis couleur (Excellent vert, Bon dore, Fragile orange, Critique rouge)
+- Score Vyzor couleur (Excellent vert, Bon dore, Fragile orange, Critique rouge)
 - Empty state avec CTA upload
 - Responsive : sidebar passe en colonne sur mobile
 
@@ -477,7 +477,7 @@ Quand un PDF est uploade via `/upload` :
 - Cards plus grandes : padding p-5, gap inter-elements augmente
 - Nom fichier sur 2 lignes max (`line-clamp-2`) au lieu de tronque sur 1 ligne
 - CA en `text-2xl font-bold` (etait text-sm)
-- Score Quantis en badge colore avec fond (bg-green-500/10, bg-amber-500/10, etc.)
+- Score Vyzor en badge colore avec fond (bg-green-500/10, bg-amber-500/10, etc.)
 - Hover : ombre doree (`shadow-[0_4px_24px_rgba(245,158,11,0.08)]`) + elevation (`-translate-y-0.5`) + bordure amber (`border-amber-400/40`)
 - Bouton Deplacer avec icone FolderInput (visible, pas cache)
 - Bouton Supprimer en bas dans la barre d'actions (plus au-dessus du nom)
@@ -632,7 +632,7 @@ Quatre améliorations au pipeline Vision LLM, sans activer l'API Anthropic.
 
 ## Rapport PDF enrichi (2026-04-17)
 
-Refonte complète du rapport PDF Quantis : passage d'un rapport 1 page à un rapport professionnel de 6 pages A4 avec charte graphique dorée.
+Refonte complète du rapport PDF Vyzor : passage d'un rapport 1 page à un rapport professionnel de 6 pages A4 avec charte graphique dorée.
 
 ### Architecture
 
@@ -644,10 +644,10 @@ Le rapport est généré par 3 fichiers principaux :
 ### Structure 6 pages
 
 **Page 1 — Page de garde**
-- Logo Quantis (constante `LOGO_PATH = "/images/LogoV3.png"`)
+- Logo Vyzor (constante `LOGO_PATH = "/images/LogoV3.png"`)
 - Titre "Rapport d'analyse financière" + nom entreprise
 - Ligne dorée séparatrice
-- Quantis Score en jauge circulaire avec badge niveau (Excellent/Bon/Fragile/Critique)
+- Vyzor Score en jauge circulaire avec badge niveau (Excellent/Bon/Fragile/Critique)
 - 4 piliers en grille 2×2 : Rentabilité, Solvabilité, Liquidité, Efficacité avec barres de progression
 - Footer : période fiscale + date génération + "Confidentiel"
 
@@ -681,7 +681,7 @@ Le rapport est généré par 3 fichiers principaux :
 - Valeurs KPI : Helvetica-Bold 22px
 - N/D : Helvetica-Oblique gris
 - Header pages 2-6 : logo petit + nom entreprise + numéro de page
-- Footer : "Rapport confidentiel — Quantis" centré
+- Footer : "Rapport confidentiel — Vyzor" centré
 
 ### Formatage des valeurs
 - `fmtCurrency()` : "1 393 180 €" (Intl.NumberFormat fr-FR)

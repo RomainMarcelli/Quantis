@@ -1,4 +1,4 @@
-# PARSER_ROADMAP.md — Feuille de route parser Quantis
+# PARSER_ROADMAP.md — Feuille de route parser Vyzor
 
 > Dernière mise à jour : 2026-04-13
 
@@ -106,10 +106,10 @@ Chaque lot a un objectif clair, une liste de champs / KPIs ciblés, et un statut
 
 Il existe 3 types de structures de données dans le pipeline :
 1. `ParsedFinancialData` — structure "parser", organisée par section (incomeStatement / balanceSheet), champs typés avec noms anglais explicites
-2. `MappedFinancialData` — structure "Quantis métier", champs courts (ex: `ventes_march`, `ace`), alignée sur le fichier Excel
-3. `QuantisFinancialData` — structure "résumé" avec les 6 champs critiques pour l'UI de base
+2. `MappedFinancialData` — structure "Vyzor métier", champs courts (ex: `ventes_march`, `ace`), alignée sur le fichier Excel
+3. `VyzorFinancialData` — structure "résumé" avec les 6 champs critiques pour l'UI de base
 
-**Décision** : conserver les 3 niveaux. `ParsedFinancialData` est le contrat du parser, `MappedFinancialData` est le contrat métier Quantis, `QuantisFinancialData` est le contrat UI.
+**Décision** : conserver les 3 niveaux. `ParsedFinancialData` est le contrat du parser, `MappedFinancialData` est le contrat métier Vyzor, `VyzorFinancialData` est le contrat UI.
 
 ### Pas de mode "force filling"
 

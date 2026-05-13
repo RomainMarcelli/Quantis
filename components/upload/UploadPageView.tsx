@@ -13,8 +13,8 @@ import {
   X
 } from "lucide-react";
 import { useProductTour } from "@/hooks/useProductTour";
-import { QuantisSelect } from "@/components/ui/QuantisSelect";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
+import { VyzorSelect } from "@/components/ui/VyzorSelect";
+import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { UploadProcessingOverlay } from "@/components/upload/UploadProcessingOverlay";
 import {
   ONBOARDING_UPLOAD_CONTEXT_COMPLETED_EVENT,
@@ -26,7 +26,8 @@ import {
   SECTOR_OPTIONS
 } from "@/lib/onboarding/options";
 import type { CompanySizeValue } from "@/lib/onboarding/options";
-import { DEFAULT_FOLDER_NAME, ensureFolderName, setActiveFolderName } from "@/lib/folders/activeFolder";
+import { DEFAULT_FOLDER_NAME, registerKnownFolderName } from "@/lib/folders/folderRegistry";
+import { writeActiveAccountingSource } from "@/services/dataSourcesStore";
 import { validateUploadInput } from "@/lib/upload/uploadValidation";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { firebaseStorage } from "@/lib/firebase";
@@ -179,7 +180,8 @@ export function UploadPageView() {
     sectorValue: string,
     filesToSubmit: File[]
   ): Promise<AnalysisDraft> {
-    const folderName = ensureFolderName(DEFAULT_FOLDER_NAME) ?? DEFAULT_FOLDER_NAME;
+    const folderName = DEFAULT_FOLDER_NAME;
+    registerKnownFolderName(folderName);
 
     const uploadedFiles: { pdfUrl: string; fileName: string; fileSize: number }[] = [];
     const nonPdfFiles: File[] = [];
@@ -289,7 +291,21 @@ export function UploadPageView() {
         filesToSubmit
       );
       await saveAnalysisDraft(persistedDraft);
-      setActiveFolderName(persistedDraft.folderName);
+      registerKnownFolderName(persistedDraft.folderName);
+      // L'utilisateur a explicitement uploadé un fichier → on active la
+      // source FEC avec le folder courant. Sans ça, /synthese affiche
+      // "Aucune synthèse" parce que activeAccountingSource reste null.
+      // L'auto-activation par sync (Pennylane/MyUnisoft/Odoo) a la même
+      // sémantique : choix explicite de l'user = source active.
+      // Si l'écriture Firestore échoue (rules manquantes, quota), on log
+      // mais on n'empêche PAS la redirection — la liste des analyses est
+      // sauvée, l'utilisateur pourra activer manuellement plus tard.
+      try {
+        await writeActiveAccountingSource(user.uid, "fec", persistedDraft.folderName);
+      } catch (err) {
+        // eslint-disable-next-line no-console -- monitoring temporaire
+        console.warn("[upload] auto-activate FEC source failed", err);
+      }
       setLocalAnalysisHint(true);
       setIsAnalysisComplete(true);
       setSuccessMessage("Analyse créée avec succès. Redirection vers la synthèse...");
@@ -311,7 +327,7 @@ export function UploadPageView() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="rounded-xl border border-white/10 bg-transparent p-1.5">
-              <QuantisLogo withText={false} size={34} imageClassName="h-8 w-8 object-contain" />
+              <VyzorLogo withText={false} size={34} imageClassName="h-8 w-8 object-contain" />
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-quantis-gold">Analyse financière</p>
@@ -415,7 +431,7 @@ export function UploadPageView() {
           <div className="mt-5 grid gap-4 md:grid-cols-2" data-tour-id="upload-context">
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-white">Nombre d&apos;employés (optionnel)</span>
-              <QuantisSelect
+              <VyzorSelect
                 value={companySize}
                 onChange={(value) => setCompanySize(value as CompanySizeValue | "")}
                 placeholder="Sélectionner une tranche"
@@ -429,7 +445,7 @@ export function UploadPageView() {
 
             <label className="block">
               <span className="mb-1.5 block text-sm font-medium text-white">Secteur d&apos;activité (optionnel)</span>
-              <QuantisSelect
+              <VyzorSelect
                 value={sector}
                 onChange={(value) => {
                   setSector(value);

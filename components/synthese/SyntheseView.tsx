@@ -5,25 +5,25 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FileText,
   LayoutDashboard,
   Lock,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Receipt,
   Settings,
   Sparkles,
   UserCircle2,
   Bot
 } from "lucide-react";
-import { QuantisLogo } from "@/components/ui/QuantisLogo";
-import { GlobalSearchBar } from "@/components/search/GlobalSearchBar";
+import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { CreateDashboardModal } from "@/components/dashboard/widgets/CreateDashboardModal";
 import { useUserDashboards } from "@/hooks/useUserDashboards";
 import { useDelayedFlag } from "@/lib/ui/useDelayedFlag";
-import { useActiveFolderName } from "@/lib/folders/useActiveFolderName";
+import { useActiveDataSource } from "@/hooks/useActiveDataSource";
+import { resolveCurrentAnalysisForSource } from "@/lib/source/resolveSourceAnalyses";
 import { downloadFinancialReport } from "@/lib/reports/downloadFinancialReport";
 import { exportAnalysisDataAsJson } from "@/lib/export/exportAnalysisData";
 import {
@@ -45,14 +45,13 @@ import { getUserProfile } from "@/services/userProfileStore";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
+import { ExportSyntheseButton } from "@/components/synthese/ExportSyntheseButton";
 import { TemporalityBar } from "@/components/temporality/TemporalityBar";
+import { StaticYearBar } from "@/components/temporality/StaticYearBar";
 import { useTemporality } from "@/lib/temporality/temporalityContext";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
-import { useAiChat } from "@/components/ai/AiChatProvider";
-import { resolveActiveAnalysis } from "@/lib/source/activeSource";
-import { useActiveAnalysisId } from "@/lib/source/useActiveAnalysisId";
 import { ActiveSourceBadge } from "@/components/source/ActiveSourceBadge";
 import { SimulationToggleButton } from "@/components/simulation/SimulationWidget";
 import {
@@ -72,7 +71,7 @@ export function SyntheseView() {
 
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [greetingName, setGreetingName] = useState("Utilisateur");
-  const [companyName, setCompanyName] = useState("Quantis");
+  const [companyName, setCompanyName] = useState("Vyzor");
   const [sector, setSector] = useState<string | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
   const [selectedYearValue, setSelectedYearValue] = useState<string>("");
@@ -152,42 +151,26 @@ export function SyntheseView() {
     [currentCalendarYear, selectedYearValue, yearOptions]
   );
 
-  // Source active : si l'utilisateur a explicitement choisi une analyse via
-  // Documents → "Utiliser comme source active" (localStorage `quantis.activeAnalysis`),
-  // on la prend en priorité absolue. Sinon fallback : connexion dynamique > FEC > upload,
-  // la plus récente à priorité égale. Implémenté dans `resolveActiveAnalysis`.
-  const activeAnalysisId = useActiveAnalysisId();
-  // Dossier actif (sources statiques multi-exercices). Réactif → un changement
-  // dans Documents propage immédiatement la nouvelle source ici.
-  const activeFolderName = useActiveFolderName();
+  // Source active : lue depuis Firestore via le hook unifié.
+  // Si l'utilisateur n'a rien sélectionné (toggle binaire vert/rouge dans
+  // /documents), `activeAccountingSource` est null → on n'affiche pas de
+  // dashboard, on guide l'utilisateur à choisir.
+  const { activeAccountingSource, activeFecFolderName, activeBankingSource } = useActiveDataSource({
+    analyses: allAnalyses,
+  });
 
   const analysisPair = useMemo(() => {
-    if (!analysesBySelectedYear.length) {
+    if (!analysesBySelectedYear.length || !activeAccountingSource) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
 
-    // Priorité 1 : `activeAnalysisId` explicitement défini ET présent dans la
-    //              sélection courante → l'analyse spécifique gagne (override
-    //              utilisé pour connexion dynamique épinglée par exemple).
-    //              Si l'ID est null OU absent du filtre annuel, on saute.
-    // Priorité 2 : `activeFolderName` défini → la liasse de l'année courante
-    //              dans ce dossier gagne sur la priorité automatique. C'est
-    //              ce qui permet à un dossier statique d'écraser la connexion
-    //              Pennylane (qui sinon gagnerait par sa priorité métier).
-    // Priorité 3 : aucune source explicite → règle automatique
-    //              (dynamique > FEC > upload, plus récent en cas d'égalité).
-    let current: AnalysisRecord | null = null;
-    if (activeAnalysisId) {
-      current = analysesBySelectedYear.find((a) => a.id === activeAnalysisId) ?? null;
-    }
-    if (!current && activeFolderName) {
-      current = resolveCurrentAnalysis(analysesBySelectedYear, activeFolderName);
-    }
-    if (!current) {
-      // Pas de source explicite : on retombe sur le résolveur automatique
-      // (resolveActiveAnalysis avec id null applique la priorité métier).
-      current = resolveActiveAnalysis(analysesBySelectedYear, null);
-    }
+    // Filtre par source comptable active (helper pur, testé unitairement).
+    const current = resolveCurrentAnalysisForSource(
+      analysesBySelectedYear,
+      activeAccountingSource,
+      activeFecFolderName
+    );
+
     if (!current) {
       return { current: null as AnalysisRecord | null, previous: null as AnalysisRecord | null };
     }
@@ -199,16 +182,7 @@ export function SyntheseView() {
     });
 
     return { current, previous };
-  }, [allAnalyses, analysesBySelectedYear, activeAnalysisId, activeFolderName]);
-
-  // Pousse l'analyse courante au provider du chat IA — permet au backend
-  // d'enrichir les réponses Claude avec les données réelles (kpis, mappedData)
-  // sans que chaque tooltip ait à passer l'analysisId à la main.
-  const { setAnalysisContext } = useAiChat();
-  useEffect(() => {
-    setAnalysisContext(analysisPair.current?.id ?? null);
-    return () => setAnalysisContext(null);
-  }, [analysisPair.current?.id, setAnalysisContext]);
+  }, [allAnalyses, analysesBySelectedYear, activeAccountingSource, activeFecFolderName]);
 
   // Filtre temporel global. Si l'analyse a un dailyAccounting (source dynamique Pennylane),
   // les KPI flow (CA, VA, EBITDA…) sont recalculés sur la période sélectionnée. Les KPI bilan
@@ -255,24 +229,41 @@ export function SyntheseView() {
     }
   }, [yearOptions, selectedYearValue]);
 
-  // Sync ponctuel de l'année lors d'un CHANGEMENT d'analyse active.
+  // Sync ponctuel du year selector lors d'un CHANGEMENT de source active.
   //
-  // L'utilisateur a cliqué "Utiliser comme source" sur une liasse — on sync
-  // l'année à celle de la liasse cliquée pour qu'elle soit immédiatement
-  // visible. Mais on ne re-sync PAS perpétuellement : si l'utilisateur change
-  // ensuite l'année à la main pour explorer une autre liasse du même dossier,
-  // on respecte ce choix (sinon le sélecteur d'année serait inutile pour les
-  // sources statiques multi-exercices). On utilise un ref pour ne déclencher
-  // l'effet qu'à la TRANSITION de la valeur, pas à chaque render.
-  const previousActiveAnalysisIdRef = useRef<string | null>(null);
+  // Quand l'utilisateur bascule via le toggle binaire vert/rouge dans
+  // /documents (ex. Pennylane → FEC), on aligne le year selector sur le
+  // dernier exercice disponible dans la nouvelle source. Sinon le sélecteur
+  // resterait sur une année inexistante dans la nouvelle source.
+  // Ref pour ne déclencher qu'à la TRANSITION de la valeur, pas à chaque render.
+  const previousAccountingSourceRef = useRef<typeof activeAccountingSource>(null);
+  const previousFecFolderRef = useRef<string | null>(null);
   useEffect(() => {
-    if (activeAnalysisId === previousActiveAnalysisIdRef.current) return;
-    previousActiveAnalysisIdRef.current = activeAnalysisId;
-    if (!activeAnalysisId) return;
-    const target = allAnalyses.find((a) => a.id === activeAnalysisId);
-    if (!target) return;
-    setSelectedYearValue(String(resolveAnalysisYear(target)));
-  }, [activeAnalysisId, allAnalyses]);
+    const transitioned =
+      activeAccountingSource !== previousAccountingSourceRef.current ||
+      activeFecFolderName !== previousFecFolderRef.current;
+    previousAccountingSourceRef.current = activeAccountingSource;
+    previousFecFolderRef.current = activeFecFolderName;
+    if (!transitioned || !activeAccountingSource) return;
+    const matching = allAnalyses.filter((a) => {
+      const provider = a.sourceMetadata?.provider ?? null;
+      if (activeAccountingSource === "fec") {
+        if (provider !== "fec" && provider !== "upload") return false;
+        if (activeFecFolderName) {
+          return (
+            (a.folderName ?? "").trim().toLowerCase() ===
+            activeFecFolderName.toLowerCase()
+          );
+        }
+        return true;
+      }
+      return provider === activeAccountingSource;
+    });
+    if (!matching.length) return;
+    const latest = sortAnalysesByFiscalYear(matching, "desc")[0];
+    if (!latest) return;
+    setSelectedYearValue(String(resolveAnalysisYear(latest)));
+  }, [activeAccountingSource, activeFecFolderName, allAnalyses]);
 
   useEffect(() => {
     if (!pendingSearchTarget) {
@@ -310,7 +301,7 @@ export function SyntheseView() {
       ]);
 
       setGreetingName(resolveFirstName(currentUser, profile?.firstName));
-      setCompanyName(profile?.companyName?.trim() || "Quantis");
+      setCompanyName(profile?.companyName?.trim() || "Vyzor");
       setSector(profile?.sector ?? null);
       setAllAnalyses(history);
 
@@ -333,66 +324,95 @@ export function SyntheseView() {
     router.replace("/");
   }
 
+  // ─── Phase 3 brief Header unifié 09/05/2026 ───────────────────────
+  // State `isEditing` lifté au niveau de la vue pour pouvoir poser le
+  // bouton "Personnaliser" dans la ligne 2 du AppHeader (vs ancien
+  // bandeau meta interne au SyntheseDashboard, désormais supprimé).
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Brief 09/06/2026 : pour les sources statiques (PDF/Excel sans
+  // dailyAccounting), on affiche désormais un sélecteur "Exercice <année>"
+  // dans le slot temporalityBar du AppHeader — même quand un seul
+  // exercice est disponible (badge non-interactif). Permet de naviguer
+  // entre exercices quand le dossier en contient plusieurs.
+  const showTemporalityBar =
+    analysisPair.current && shouldShowTemporalityBar(analysisPair.current);
+  const headerTemporalityBar = showTemporalityBar ? (
+    <TemporalityBar
+      availableRange={computeAvailableRange(analysisPair.current!)}
+      daysInPeriod={null}
+      flat
+    />
+  ) : analysisPair.current && yearOptions.length > 0 ? (
+    <StaticYearBar
+      options={yearOptions}
+      value={selectedYearValue}
+      onChange={setSelectedYearValue}
+    />
+  ) : null;
+
+  // Boutons de la ligne 2 — toujours visibles dès qu'une analyse est
+  // active. "Simuler" rend le widget via Portal (cf. SimulationWidget).
+  // "Exporter la synthèse" expose un dropdown PDF / Word (le bouton est
+  // unique à la page Synthèse — sur les pages Tableau de bord, c'est
+  // "Exporter les tableaux" qui prend sa place).
+  const headerActions = analysisPair.current ? (
+    <>
+      {effective ? (
+        <SimulationToggleButton
+          mappedData={effective.mappedData}
+          portalContainerId="simulation-portal-container"
+        />
+      ) : null}
+      <ExportSyntheseButton
+        onExport={async (format) => {
+          if (!analysisPair.current) return;
+          const err = await downloadFinancialReport({
+            analysisId: analysisPair.current.id,
+            effectiveKpis: effective?.kpis ?? null,
+            format,
+          });
+          if (err) console.warn("[financial-report] download failed", err);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => setIsEditing((v) => !v)}
+        aria-pressed={isEditing}
+        className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition"
+        style={{
+          border: "1px solid var(--app-border-strong)",
+          color: isEditing ? "var(--app-brand-gold-deep)" : "var(--app-text-primary)",
+          backgroundColor: isEditing
+            ? "rgb(var(--app-brand-gold-deep-rgb) / 8%)"
+            : "transparent",
+        }}
+        onMouseEnter={(e) => {
+          if (!isEditing) {
+            e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isEditing) {
+            e.currentTarget.style.backgroundColor = "transparent";
+          }
+        }}
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        {isEditing ? "Terminer" : "Personnaliser"}
+      </button>
+    </>
+  ) : null;
+
   return (
     <section className="w-full space-y-4">
-      <header className="precision-card flex items-center justify-between gap-3 rounded-2xl px-5 py-3">
-        <div className="flex items-center gap-3">
-          <QuantisLogo withText={false} size={28} />
-          <div>
-            <p className="text-sm font-semibold text-white">{companyName}</p>
-            <p className="text-xs text-white/55">Plateforme financière</p>
-          </div>
-          <div className="ml-2 hidden lg:block">
-            <ActiveSourceBadge analysis={analysisPair.current} />
-          </div>
-        </div>
-
-        <div className="hidden min-w-[320px] flex-1 px-4 md:block">
-          <GlobalSearchBar placeholder="Rechercher un KPI, une alerte ou une section..." />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/settings")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Paramètres"
-            title="Paramètres"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/pricing")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Offres"
-            title="Offre Free (verrouillée)"
-          >
-            <Lock className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/account?from=analysis")}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Compte"
-            title="Compte"
-          >
-            <UserCircle2 className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => void onLogout()}
-            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/80 hover:bg-white/10"
-            aria-label="Se déconnecter"
-            title="Se déconnecter"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
-      </header>
-      <div className="md:hidden">
-        <GlobalSearchBar placeholder="Rechercher..." />
-      </div>
+      <AppHeader
+        variant="data"
+        companyName={companyName}
+        contextBadge={<ActiveSourceBadge analysis={analysisPair.current} />}
+        temporalityBar={headerTemporalityBar}
+        headerActions={headerActions}
+      />
 
       {/* Loader retardé : n'apparaît que si la requête dépasse 400 ms.
           Évite le flash sous le header pour les chargements rapides. */}
@@ -426,7 +446,11 @@ export function SyntheseView() {
               }))
             ],
             activeId: undefined,
-            onSelectItem: () => router.push("/analysis"),
+            // Brief 09/06/2026 : on transmet le tab choisi via ?tab=<id>
+            // pour que /analysis ouvre directement la bonne section
+            // (sinon l'utilisateur retombe systématiquement sur
+            // "Création de valeur").
+            onSelectItem: (id) => router.push(`/analysis?tab=${encodeURIComponent(id)}`),
             onCreate: user ? () => setCreateDashboardOpen(true) : undefined,
             onDelete: async (id) => {
               await userDashboards.deleteDashboard(id);
@@ -459,20 +483,26 @@ export function SyntheseView() {
               }}
               onReupload={() => router.push("/upload")}
               onManualEntry={() => router.push("/upload/manual")}
-              onDownloadFinancialReport={async () => {
+              onDownloadFinancialReport={async (format) => {
+                // Le format est choisi via le menu déroulant du bouton (PDF
+                // ou Word). On pousse les KPIs effectifs pour garantir la
+                // parité écran ↔ rapport.
                 if (!analysisPair.current) return;
-                const err = await downloadFinancialReport({ analysisId: analysisPair.current.id });
-                if (err) {
-                  // Erreur silencieuse — log debug, le bouton n'a pas de feedback UX dédié.
-                  console.warn("[financial-report] download failed", err);
-                }
+                const err = await downloadFinancialReport({
+                  analysisId: analysisPair.current.id,
+                  effectiveKpis: effective?.kpis ?? null,
+                  format,
+                });
+                if (err) console.warn("[financial-report] download failed", err);
               }}
               synthese={synthese}
               parserVersion={analysisPair.current.parserVersion}
               sourceMetadata={analysisPair.current.sourceMetadata ?? null}
+              currentKpis={effective?.kpis ?? null}
               previousKpis={previousKpis}
               analyses={allAnalyses}
               currentAnalysis={analysisPair.current}
+              activeBankingSource={activeBankingSource}
               periodLabel={
                 shouldShowTemporalityBar(analysisPair.current)
                   ? null
@@ -480,28 +510,13 @@ export function SyntheseView() {
                     ? `Exercice ${analysisPair.current.fiscalYear}`
                     : null
               }
-              simulationSlot={
-                effective ? <SimulationToggleButton mappedData={effective.mappedData} /> : null
-              }
               userId={user?.uid ?? null}
-              // Sélecteur dynamique (TemporalityBar complète) sous le titre
-              // pour les sources Pennylane/MyUnisoft/Odoo qui ont un
-              // dailyAccounting. Pour les sources statiques on passe à la
-              // place yearOptions/selectedYearValue/onYearChange — la
-              // SyntheseDashboard rend alors une mini-bar "Année" simple.
-              temporalitySlot={
-                shouldShowTemporalityBar(analysisPair.current) ? (
-                  <TemporalityBar
-                    availableRange={computeAvailableRange(analysisPair.current!)}
-                    daysInPeriod={effective?.isFiltered ? effective.filterSummary.daysInPeriod : null}
-                    rightLabel={
-                      effective?.isFiltered
-                        ? `${effective.filterSummary.daysInPeriod} jour(s) avec écritures sur la période`
-                        : undefined
-                    }
-                  />
-                ) : null
-              }
+              // Phase 3 (header unifié 09/05/2026) : la TemporalityBar est
+              // désormais portée par le AppHeader (ligne 2). On ne fournit
+              // plus de temporalitySlot ici. Idem pour simulationSlot
+              // (déplacé vers headerActions) et le bandeau meta supprimé.
+              isEditingControlled={isEditing}
+              onEditingChange={setIsEditing}
               yearOptions={yearOptions}
               selectedYearValue={selectedYearValue}
               onYearChange={setSelectedYearValue}
@@ -533,26 +548,8 @@ export function SyntheseView() {
           )}
         </div>
       </div>
+
     </section>
-  );
-}
-
-// Sélectionne l'analyse courante en priorisant le dossier actif.
-function resolveCurrentAnalysis(
-  analyses: AnalysisRecord[],
-  activeFolderName: string | null
-): AnalysisRecord | null {
-  const sorted = sortAnalysesByFiscalYear(analyses, "desc");
-  if (!sorted.length) {
-    return null;
-  }
-
-  const normalizedActiveFolder = normalizeAnalysisFolderName(activeFolderName);
-
-  return (
-    sorted.find(
-      (analysis) => normalizeAnalysisFolderName(analysis.folderName) === normalizedActiveFolder
-    ) ?? sorted[0]
   );
 }
 
