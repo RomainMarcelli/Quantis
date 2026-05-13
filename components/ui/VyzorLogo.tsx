@@ -28,6 +28,7 @@ export function VyzorLogo({
         width={size}
         height={size}
         className={imageClassName}
+        style={{ width: size, height: size }}
         priority
       />
       {withText ? <span className={textClassName}>Vyzor</span> : null}

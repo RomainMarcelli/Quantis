@@ -208,7 +208,7 @@ function BreakEvenChartCanvas({
         // ResizeObserver → setState → re-render → re-attach ref → setState → "Maximum
         // update depth exceeded". ResponsiveContainer est l'API stable et utilise un debounce
         // interne sur les changements de taille, ce qui supprime la boucle.
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={420}>
         <ComposedChart
           data={model.points}
           margin={CHART_MARGIN}
