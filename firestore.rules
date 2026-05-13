@@ -18,6 +18,32 @@ service cloud.firestore {
         allow read, create, update, delete:
           if request.auth != null && request.auth.uid == userId;
       }
+
+      // Audit Prodiges (mai 2026) — alignement avec rules prod : les 3 sous-
+      // collections suivantes étaient déjà déployées en prod mais absentes du
+      // code. Sans ces déclarations, un redeploy depuis le code régresserait
+      // les rules de prod en bloquant l'accès à settings/dataSources +
+      // kpiAlerts + kpiObjectives.
+
+      // Préférences utilisateur (sources de données actives, notifications,
+      // intégrations). Path : users/{uid}/settings/{settingId} — doc actuel
+      // settings/dataSources stocke activeAccountingSource /
+      // activeBankingSource / activeFecFolderName + timestamps.
+      match /settings/{settingId} {
+        allow read, create, update, delete:
+          if request.auth != null && request.auth.uid == userId;
+      }
+
+      // Cibles utilisateur sur les KPIs : alertes (seuils notif) et objectifs
+      // (barre de progression). Chaque doc = une cible, scope strict.
+      match /kpiAlerts/{alertId} {
+        allow read, create, update, delete:
+          if request.auth != null && request.auth.uid == userId;
+      }
+      match /kpiObjectives/{objectiveId} {
+        allow read, create, update, delete:
+          if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     match /analyses/{analysisId} {
