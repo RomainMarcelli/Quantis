@@ -197,6 +197,28 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
     }
 
+    // Sprint C multi-tenant (cf. docs/audit-sprint-C.md) — entité Firm
+    // (cabinet d'expertise comptable). Un cabinet regroupe N Companies
+    // (dossiers clients). Les `firm_members` peuvent lire toutes les
+    // Companies dont firmId pointe vers ce cabinet (étension Sprint C/D
+    // de la rule companies/).
+    //
+    // memberUserIds est un array dénormalisé qui inclut l'ownerUserId.
+    // Sprint C : seul l'owner peut update/delete (gestion membres = Sprint D).
+    match /firms/{firmId} {
+      allow read: if request.auth != null
+        && request.auth.uid in resource.data.memberUserIds;
+      allow create: if request.auth != null
+        && request.resource.data.ownerUserId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.auth.uid in request.resource.data.memberUserIds;
+      allow update: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid;
+    }
+
     // Sprint A multi-tenant (cf. docs/audit-sprint-A.md) — entité Company
     // qui regroupe les données comptables d'UNE entreprise. En Sprint A,
     // chaque user a exactement 1 Company (mode dirigeant TPE/PME).
