@@ -85,6 +85,13 @@ service cloud.firestore {
     // Connections aux logiciels comptables tiers (Pennylane, Chift, Bridge).
     // Update autorisé pour le refresh des tokens et la mise à jour des cursors de sync.
     // Les tokens sont chiffrés côté serveur (lib/server/tokenCrypto.ts) avant écriture.
+    //
+    // Sprint B multi-tenant (cf. docs/audit-sprint-B.md) : la contrainte
+    // d'unicité passe de (userId, provider) à (companyId, provider) côté
+    // application — un user peut désormais avoir N Connections actives
+    // ciblant des Companies différentes (cas Pennylane Firm cabinet).
+    // Les rules client gardent la même restriction (ownership par userId)
+    // car le client SDK ne sait pas piloter les contraintes d'unicité.
     match /connections/{connectionId} {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
 
