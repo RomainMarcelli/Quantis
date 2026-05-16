@@ -168,6 +168,39 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
+    // Sprint A multi-tenant (cf. docs/audit-sprint-A.md) — entité Company
+    // qui regroupe les données comptables d'UNE entreprise. En Sprint A,
+    // chaque user a exactement 1 Company (mode dirigeant TPE/PME).
+    // En Sprint C, on étendra avec `firmId` + firm_members pour le mode
+    // cabinet (1 user cabinet → N Companies dossiers clients).
+    //
+    // Sprint A : seul l'`ownerUserId` peut lire/écrire sa Company.
+    // Sprint C : la rule sera étendue avec un OR sur firmId in
+    // getUserFirms() (cf. roadmap).
+    match /companies/{companyId} {
+      allow read: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid;
+
+      // create : owner doit être l'utilisateur authentifié + champs
+      // structurels obligatoires pour éviter les Companies "corrompues"
+      // injectées côté client.
+      allow create: if request.auth != null
+        && request.resource.data.ownerUserId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.source is string
+        && request.resource.data.status is string;
+
+      // update : on interdit le changement d'ownerUserId (transferts
+      // d'ownership = à gérer Sprint C via une route admin dédiée).
+      allow update: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid
+        && request.resource.data.ownerUserId == request.auth.uid;
+
+      allow delete: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid;
+    }
+
     // Journal d'audit des appels API tierces (MyUnisoft, Pennylane, Bridge,
     // Odoo, FEC). Écriture EXCLUSIVEMENT côté serveur via Admin SDK
     // (cf. lib/server/integrationAudit.ts). Aucune écriture client autorisée.
