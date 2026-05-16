@@ -37,16 +37,21 @@ export async function GET(request: NextRequest) {
   const errorParam = url.searchParams.get("error");
 
   if (errorParam) {
-    return NextResponse.json(
-      { error: `OAuth Pennylane refusé : ${errorParam}` },
-      { status: 400 }
+    return NextResponse.redirect(
+      buildRedirectUrl(request, {
+        pennylane_oauth: "error",
+        error: "user_denied",
+        detail: errorParam.slice(0, 200),
+      })
     );
   }
 
   if (!code || !state) {
-    return NextResponse.json(
-      { error: "Paramètres OAuth manquants (code et state)." },
-      { status: 400 }
+    return NextResponse.redirect(
+      buildRedirectUrl(request, {
+        pennylane_oauth: "error",
+        error: "missing_params",
+      })
     );
   }
 
@@ -55,15 +60,30 @@ export async function GET(request: NextRequest) {
   const stateRef = db.collection(OAUTH_STATES_COLLECTION).doc(state);
   const stateDoc = await stateRef.get();
   if (!stateDoc.exists) {
-    return NextResponse.json({ error: "State OAuth invalide ou expiré." }, { status: 400 });
+    return NextResponse.redirect(
+      buildRedirectUrl(request, {
+        pennylane_oauth: "error",
+        error: "state_invalid",
+      })
+    );
   }
   const stateData = stateDoc.data() as StoredOAuthState;
   if (new Date(stateData.expiresAt).getTime() < Date.now()) {
     await stateRef.delete();
-    return NextResponse.json({ error: "State OAuth expiré." }, { status: 400 });
+    return NextResponse.redirect(
+      buildRedirectUrl(request, {
+        pennylane_oauth: "error",
+        error: "state_expired",
+      })
+    );
   }
   if (stateData.provider !== "pennylane") {
-    return NextResponse.json({ error: "Provider OAuth incohérent." }, { status: 400 });
+    return NextResponse.redirect(
+      buildRedirectUrl(request, {
+        pennylane_oauth: "error",
+        error: "provider_mismatch",
+      })
+    );
   }
 
   // Kind récupéré depuis le state (signé via stockage Firestore + TTL 10 min).
@@ -113,27 +133,41 @@ export async function GET(request: NextRequest) {
     // State consommé.
     await stateRef.delete();
 
-    // TODO : redirection vers une page front qui informera l'utilisateur —
-    // Romain branchera l'écran final. Pour l'instant on renvoie du JSON pour
-    // que l'API soit testable seule. On expose `companiesCount` pour que
-    // le front affiche le nombre de dossiers détectés post-connexion.
-    return NextResponse.json(
-      {
-        connectionId: connection.id,
-        mode: "oauth2",
-        kind,
-        status: "active",
-        companiesCount,
-      },
-      { status: 201 }
-    );
+    // Brief Tâche 3 (13/05/2026) : redirection vers /documents avec un
+    // marqueur de succès — c'est un flow déclenché côté navigateur, le
+    // callback ne peut pas répondre en JSON (l'utilisateur verrait une
+    // page brute). Le front /documents lit ces query params pour
+    // afficher un toast et rafraîchir la liste des connexions.
+    const successUrl = buildRedirectUrl(request, {
+      pennylane_oauth: "success",
+      kind,
+      connection_id: connection.id,
+      companies_count: String(companiesCount),
+    });
+    return NextResponse.redirect(successUrl);
   } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Échec de l'échange OAuth.",
-        detail: error instanceof Error ? error.message : "unknown",
-      },
-      { status: 500 }
-    );
+    const detail = error instanceof Error ? error.message : "unknown";
+    const errorUrl = buildRedirectUrl(request, {
+      pennylane_oauth: "error",
+      error: "exchange_failed",
+      detail: detail.slice(0, 200),
+    });
+    return NextResponse.redirect(errorUrl);
   }
+}
+
+/**
+ * Construit l'URL de redirection vers /documents en preservant l'origine
+ * de la requête (utile pour les déploiements multi-environnements : prod,
+ * preview Vercel, dev).
+ */
+function buildRedirectUrl(
+  request: NextRequest,
+  params: Record<string, string>
+): URL {
+  const target = new URL("/documents", request.nextUrl.origin);
+  for (const [key, value] of Object.entries(params)) {
+    target.searchParams.set(key, value);
+  }
+  return target;
 }

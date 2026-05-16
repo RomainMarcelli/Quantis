@@ -403,6 +403,38 @@ function PennylaneStep({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Brief 13/05/2026 : la Vue 3 propose maintenant 3 méthodes de connexion :
+  //   - "cabinet"    → OAuth Firm (PRIMAIRE — bouton doré)
+  //   - "entreprise" → OAuth Company (SECONDAIRE — visible si feature flag ON)
+  //   - "token"      → token manuel copier-coller (TERTIAIRE — fallback)
+  // L'utilisateur démarre sur le sélecteur ; "token" affiche le champ
+  // de saisie tel qu'avant.
+  type ConnectionMethod = "selector" | "token";
+  const [method, setMethod] = useState<ConnectionMethod>("selector");
+
+  // Feature flag Company API exposé par /api/integrations/pennylane/config.
+  // undefined = en cours de chargement.
+  const [companyOAuthEnabled, setCompanyOAuthEnabled] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/integrations/pennylane/config");
+        if (!res.ok) {
+          if (!cancelled) setCompanyOAuthEnabled(false);
+          return;
+        }
+        const data = (await res.json()) as { companyEnabled: boolean };
+        if (!cancelled) setCompanyOAuthEnabled(Boolean(data.companyEnabled));
+      } catch {
+        if (!cancelled) setCompanyOAuthEnabled(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Connection existante détectée au mount — null tant qu'on ne sait pas.
   type ExistingConnection = {
     id: string;
@@ -630,7 +662,92 @@ function PennylaneStep({
     );
   }
 
-  // ── Vue 3 : pas de connection (ou remplacement) → formulaire token ──
+  // ── Démarre un flow OAuth (firm | company) → redirige vers Pennylane ──
+  async function startOAuth(kind: "firm" | "company") {
+    setError(null);
+    setBusy(true);
+    try {
+      const idToken = await firebaseAuthGateway.getIdToken();
+      if (!idToken) throw new Error("Session expirée — reconnectez-vous.");
+      const res = await fetch("/api/integrations/pennylane/connect", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ mode: "oauth2", kind }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(extractError(data, "Initialisation OAuth échouée"));
+      const { authorizeUrl } = data as { authorizeUrl: string };
+      // Redirection navigateur vers Pennylane. Au retour, le callback
+      // (/api/integrations/pennylane/callback) crée la connexion puis
+      // redirige vers /documents?pennylane_oauth=success&kind=...
+      window.location.href = authorizeUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+      setBusy(false);
+    }
+  }
+
+  // ── Vue 3 : sélecteur de méthode de connexion (OAuth Cabinet / Entreprise / Token manuel) ──
+  if (method === "selector") {
+    return (
+      <div className="flex flex-col gap-4">
+        <Header
+          title="Connectez votre Pennylane"
+          subtitle="Choisissez la méthode adaptée à votre profil."
+        />
+
+        {/* Méthode PRIMAIRE — Cabinet (Firm OAuth) */}
+        <button
+          type="button"
+          onClick={() => void startOAuth("firm")}
+          disabled={busy}
+          className="flex flex-col items-start gap-1.5 rounded-xl border border-quantis-gold/30 bg-quantis-gold/[0.06] px-4 py-3 text-left transition hover:border-quantis-gold/60 hover:bg-quantis-gold/[0.1] disabled:opacity-50"
+        >
+          <span className="text-sm font-semibold text-quantis-gold">
+            Connecter mon cabinet Pennylane
+          </span>
+          <span className="text-xs text-white/70">
+            Recommandé si vous êtes expert-comptable et souhaitez connecter plusieurs dossiers clients.
+          </span>
+        </button>
+
+        {/* Méthode SECONDAIRE — Entreprise (Company OAuth, conditionnel feature flag) */}
+        {companyOAuthEnabled ? (
+          <button
+            type="button"
+            onClick={() => void startOAuth("company")}
+            disabled={busy}
+            className="flex flex-col items-start gap-1.5 rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-left transition hover:border-white/30 hover:bg-white/[0.06] disabled:opacity-50"
+          >
+            <span className="text-sm font-semibold text-white">
+              Connecter mon entreprise
+            </span>
+            <span className="text-xs text-white/65">
+              Recommandé si vous êtes dirigeant et souhaitez connecter votre propre dossier.
+            </span>
+          </button>
+        ) : null}
+
+        {/* Méthode TERTIAIRE — Token manuel (fallback compat bêta-testeurs) */}
+        <button
+          type="button"
+          onClick={() => setMethod("token")}
+          disabled={busy}
+          className="text-left text-xs text-white/55 underline-offset-2 hover:text-white/85 hover:underline disabled:opacity-50"
+        >
+          J&apos;ai déjà un token API (collez-le manuellement)
+        </button>
+
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        <PrivacyNote />
+      </div>
+    );
+  }
+
+  // ── Vue 4 : formulaire token manuel (méthode tertiaire) ──
   return (
     <div className="flex flex-col gap-4">
       <Header title="Connectez votre Pennylane" subtitle="Synchronisation en lecture seule depuis votre compte." />
@@ -646,10 +763,18 @@ function PennylaneStep({
         sensitive
         disabled={busy}
       />
-      <div>
+      <div className="flex flex-wrap gap-2">
         <PrimaryButton onClick={() => void handleConnect()} disabled={busy || !token.trim()} busy={busy}>
           {busy ? "Connexion en cours…" : "Connecter"}
         </PrimaryButton>
+        <button
+          type="button"
+          onClick={() => setMethod("selector")}
+          disabled={busy}
+          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10 disabled:opacity-40"
+        >
+          Retour
+        </button>
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
       <PrivacyNote />
