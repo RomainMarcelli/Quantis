@@ -79,6 +79,30 @@ Variables serveur requises pour le parser PDF Document AI:
 - `DOCUMENT_AI_DEBUG_STRUCTURE` (optionnel)
 - `PDF_PARSER_DEBUG` (optionnel, active `debugData` dans la reponse API)
 
+### Pennylane OAuth (Firm + Company)
+
+Brief 13/05/2026 — l'app Vyzor consomme la **Firm API** Pennylane (cabinets, multi-dossiers clients) en OAuth 2.0. La **Company API** (entreprises) est en attente de validation Pennylane, le code est en place derrière un feature flag desactive par defaut.
+
+**Recuperation des credentials :**
+
+1. Login `admin@vyzor.fr` sur le portail partenaire Pennylane.
+2. Section "OAuth applications" -> application "Vyzor" -> copier `client_id` + `client_secret`.
+3. Verifier que l'URL de redirection enregistree matche EXACTEMENT celle du `.env.local` (sinon Pennylane refuse).
+4. Coller dans `.env.local` (jamais commit). 11 scopes Firm sont prerenseignes dans `.env.example`.
+
+**Variables :**
+
+- `PENNYLANE_FIRM_CLIENT_ID` / `PENNYLANE_FIRM_CLIENT_SECRET` (REQUIS)
+- `PENNYLANE_FIRM_REDIRECT_URI` (par defaut : `https://app.vyzor.fr/api/integrations/pennylane/callback`)
+- `PENNYLANE_FIRM_SCOPES` (11 scopes readonly preremplis)
+- `PENNYLANE_COMPANY_*` (optionnel, derriere feature flag)
+- `PENNYLANE_COMPANY_ENABLED` (`false` par defaut)
+- `CONNECTOR_ENCRYPTION_KEY` (REQUIS — chiffre les tokens en Firestore, AES-256-GCM)
+
+**Test du flow OAuth bout-en-bout :**
+
+L'URL de redirection prod (`app.vyzor.fr`) n'est pas accessible en `localhost`. Pour tester le flow complet, deployer une preview Vercel et ouvrir la sandbox cabinet `admin+1@vyzor.fr` depuis l'URL preview. La doc detaillee : `docs/integrations/pennylane.md`.
+
 ## Lancer le projet
 
 ```bash
