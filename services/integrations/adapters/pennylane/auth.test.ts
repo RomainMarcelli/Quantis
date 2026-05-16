@@ -22,6 +22,7 @@ import {
   ensureFreshAuth,
   exchangeOAuthCode,
   isCompanyOAuthEnabled,
+  isFirmOAuthVisible,
   refreshOAuthToken,
 } from "@/services/integrations/adapters/pennylane/auth";
 
@@ -51,6 +52,7 @@ function unsetAllPennylaneEnv() {
   delete process.env.PENNYLANE_FIRM_CLIENT_SECRET;
   delete process.env.PENNYLANE_FIRM_REDIRECT_URI;
   delete process.env.PENNYLANE_FIRM_SCOPES;
+  delete process.env.PENNYLANE_FIRM_VISIBLE;
   delete process.env.PENNYLANE_COMPANY_CLIENT_ID;
   delete process.env.PENNYLANE_COMPANY_CLIENT_SECRET;
   delete process.env.PENNYLANE_COMPANY_REDIRECT_URI;
@@ -96,6 +98,34 @@ describe("isCompanyOAuthEnabled", () => {
   it("est insensible à la casse (TRUE/True)", () => {
     process.env.PENNYLANE_COMPANY_ENABLED = "TRUE";
     expect(isCompanyOAuthEnabled()).toBe(true);
+  });
+});
+
+describe("isFirmOAuthVisible (brief 14/05/2026)", () => {
+  it("retourne false par défaut — la tuile Firm est masquée en prod", () => {
+    expect(isFirmOAuthVisible()).toBe(false);
+  });
+
+  it("retourne false quand PENNYLANE_FIRM_VISIBLE=false", () => {
+    process.env.PENNYLANE_FIRM_VISIBLE = "false";
+    expect(isFirmOAuthVisible()).toBe(false);
+  });
+
+  it("retourne true quand PENNYLANE_FIRM_VISIBLE=true (preview Vercel)", () => {
+    process.env.PENNYLANE_FIRM_VISIBLE = "true";
+    expect(isFirmOAuthVisible()).toBe(true);
+  });
+
+  it("est insensible à la casse (TRUE/True)", () => {
+    process.env.PENNYLANE_FIRM_VISIBLE = "True";
+    expect(isFirmOAuthVisible()).toBe(true);
+  });
+
+  it("rejette les valeurs autres que 'true' (1, yes, on...) — strict", () => {
+    process.env.PENNYLANE_FIRM_VISIBLE = "1";
+    expect(isFirmOAuthVisible()).toBe(false);
+    process.env.PENNYLANE_FIRM_VISIBLE = "yes";
+    expect(isFirmOAuthVisible()).toBe(false);
   });
 });
 

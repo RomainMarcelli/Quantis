@@ -95,6 +95,7 @@ Brief 13/05/2026 — l'app Vyzor consomme la **Firm API** Pennylane (cabinets, m
 - `PENNYLANE_FIRM_CLIENT_ID` / `PENNYLANE_FIRM_CLIENT_SECRET` (REQUIS)
 - `PENNYLANE_FIRM_REDIRECT_URI` (par defaut : `https://app.vyzor.fr/api/integrations/pennylane/callback`)
 - `PENNYLANE_FIRM_SCOPES` (11 scopes readonly preremplis)
+- `PENNYLANE_FIRM_VISIBLE` (`false` par defaut — masque la tuile OAuth Firm dans le wizard ; passer a `true` sur preview Vercel pour les tests internes)
 - `PENNYLANE_COMPANY_*` (optionnel, derriere feature flag)
 - `PENNYLANE_COMPANY_ENABLED` (`false` par defaut)
 - `CONNECTOR_ENCRYPTION_KEY` (REQUIS — chiffre les tokens en Firestore, AES-256-GCM)

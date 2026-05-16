@@ -37,6 +37,22 @@ export function isCompanyOAuthEnabled(): boolean {
   return (process.env.PENNYLANE_COMPANY_ENABLED ?? "false").toLowerCase() === "true";
 }
 
+/**
+ * Indique si la tuile OAuth Firm doit être visible dans le wizard de
+ * connexion utilisateur. Désactivé par défaut : tant que la notion de
+ * "compte cabinet" n'existe pas dans le produit (refonte multi-tenant à
+ * venir), les bêta-testeurs sont des dirigeants TPE/PME qui doivent
+ * utiliser le token API manuel.
+ *
+ * Le BACK-END OAuth Firm reste pleinement fonctionnel — c'est uniquement
+ * l'exposition UI qui est gatée. Antoine peut activer ce flag sur une
+ * preview Vercel pour tester le flow OAuth bout-en-bout sans l'exposer
+ * aux bêta-testeurs.
+ */
+export function isFirmOAuthVisible(): boolean {
+  return (process.env.PENNYLANE_FIRM_VISIBLE ?? "false").toLowerCase() === "true";
+}
+
 // ─── Mode 1 : Company Token ─────────────────────────────────────────────────
 
 export async function buildCompanyTokenAuth(params: {

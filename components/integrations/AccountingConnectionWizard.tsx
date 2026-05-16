@@ -403,31 +403,58 @@ function PennylaneStep({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Brief 13/05/2026 : la Vue 3 propose maintenant 3 méthodes de connexion :
-  //   - "cabinet"    → OAuth Firm (PRIMAIRE — bouton doré)
-  //   - "entreprise" → OAuth Company (SECONDAIRE — visible si feature flag ON)
-  //   - "token"      → token manuel copier-coller (TERTIAIRE — fallback)
-  // L'utilisateur démarre sur le sélecteur ; "token" affiche le champ
-  // de saisie tel qu'avant.
+  // Brief 13/05/2026 + 14/05/2026 : la Vue 3 peut exposer jusqu'à 3 méthodes
+  // de connexion selon les feature flags :
+  //   - "cabinet"    → OAuth Firm     — visible UNIQUEMENT si PENNYLANE_FIRM_VISIBLE=true
+  //                                     (gaté : tant que la notion de compte
+  //                                     cabinet n'existe pas dans le produit,
+  //                                     les bêta-testeurs sont dirigeants TPE/PME)
+  //   - "entreprise" → OAuth Company  — visible UNIQUEMENT si PENNYLANE_COMPANY_ENABLED=true
+  //                                     (en attente de validation Pennylane)
+  //   - "token"      → token manuel   — toujours visible (comportement
+  //                                     historique pré-OAuth)
+  // Quand AUCUN OAuth n'est visible, on bypass le sélecteur et on rend
+  // directement le formulaire token (UX pré-OAuth conservée).
   type ConnectionMethod = "selector" | "token";
-  const [method, setMethod] = useState<ConnectionMethod>("selector");
+  // Init "token" par défaut. Si firmVisible OU companyEnabled passe à true
+  // après chargement de la config, on bascule en "selector".
+  const [method, setMethod] = useState<ConnectionMethod>("token");
 
-  // Feature flag Company API exposé par /api/integrations/pennylane/config.
-  // undefined = en cours de chargement.
+  // Feature flags exposés par /api/integrations/pennylane/config.
+  // undefined = en cours de chargement (on rend le token form par défaut).
   const [companyOAuthEnabled, setCompanyOAuthEnabled] = useState<boolean | undefined>(undefined);
+  const [firmOAuthVisible, setFirmOAuthVisible] = useState<boolean | undefined>(undefined);
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const res = await fetch("/api/integrations/pennylane/config");
         if (!res.ok) {
-          if (!cancelled) setCompanyOAuthEnabled(false);
+          if (!cancelled) {
+            setCompanyOAuthEnabled(false);
+            setFirmOAuthVisible(false);
+          }
           return;
         }
-        const data = (await res.json()) as { companyEnabled: boolean };
-        if (!cancelled) setCompanyOAuthEnabled(Boolean(data.companyEnabled));
+        const data = (await res.json()) as {
+          companyEnabled: boolean;
+          firmVisible: boolean;
+        };
+        if (cancelled) return;
+        const company = Boolean(data.companyEnabled);
+        const firm = Boolean(data.firmVisible);
+        setCompanyOAuthEnabled(company);
+        setFirmOAuthVisible(firm);
+        // Si au moins un OAuth est exposé, on présente le sélecteur ;
+        // sinon on reste sur le formulaire token (UX pré-OAuth).
+        if (company || firm) {
+          setMethod("selector");
+        }
       } catch {
-        if (!cancelled) setCompanyOAuthEnabled(false);
+        if (!cancelled) {
+          setCompanyOAuthEnabled(false);
+          setFirmOAuthVisible(false);
+        }
       }
     })();
     return () => {
@@ -699,20 +726,27 @@ function PennylaneStep({
           subtitle="Choisissez la méthode adaptée à votre profil."
         />
 
-        {/* Méthode PRIMAIRE — Cabinet (Firm OAuth) */}
-        <button
-          type="button"
-          onClick={() => void startOAuth("firm")}
-          disabled={busy}
-          className="flex flex-col items-start gap-1.5 rounded-xl border border-quantis-gold/30 bg-quantis-gold/[0.06] px-4 py-3 text-left transition hover:border-quantis-gold/60 hover:bg-quantis-gold/[0.1] disabled:opacity-50"
-        >
-          <span className="text-sm font-semibold text-quantis-gold">
-            Connecter mon cabinet Pennylane
-          </span>
-          <span className="text-xs text-white/70">
-            Recommandé si vous êtes expert-comptable et souhaitez connecter plusieurs dossiers clients.
-          </span>
-        </button>
+        {/* Méthode PRIMAIRE — Cabinet (Firm OAuth) — gatée par
+            PENNYLANE_FIRM_VISIBLE (brief 14/05/2026). Tant que la notion
+            de compte cabinet n'existe pas dans le produit, on masque la
+            tuile aux dirigeants TPE/PME. Le back-end OAuth Firm reste
+            fonctionnel — Antoine peut activer le flag sur preview pour
+            tester le flow bout-en-bout. */}
+        {firmOAuthVisible ? (
+          <button
+            type="button"
+            onClick={() => void startOAuth("firm")}
+            disabled={busy}
+            className="flex flex-col items-start gap-1.5 rounded-xl border border-quantis-gold/30 bg-quantis-gold/[0.06] px-4 py-3 text-left transition hover:border-quantis-gold/60 hover:bg-quantis-gold/[0.1] disabled:opacity-50"
+          >
+            <span className="text-sm font-semibold text-quantis-gold">
+              Connecter mon cabinet Pennylane
+            </span>
+            <span className="text-xs text-white/70">
+              Recommandé si vous êtes expert-comptable et souhaitez connecter plusieurs dossiers clients.
+            </span>
+          </button>
+        ) : null}
 
         {/* Méthode SECONDAIRE — Entreprise (Company OAuth, conditionnel feature flag) */}
         {companyOAuthEnabled ? (
@@ -767,14 +801,20 @@ function PennylaneStep({
         <PrimaryButton onClick={() => void handleConnect()} disabled={busy || !token.trim()} busy={busy}>
           {busy ? "Connexion en cours…" : "Connecter"}
         </PrimaryButton>
-        <button
-          type="button"
-          onClick={() => setMethod("selector")}
-          disabled={busy}
-          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10 disabled:opacity-40"
-        >
-          Retour
-        </button>
+        {/* "Retour" affiché uniquement si une méthode OAuth est exposée
+            (sélecteur disponible). En mode dirigeant pur (PENNYLANE_FIRM_VISIBLE
+            et PENNYLANE_COMPANY_ENABLED tous deux false), le formulaire
+            token est l'unique vue — pas de retour à proposer. */}
+        {firmOAuthVisible || companyOAuthEnabled ? (
+          <button
+            type="button"
+            onClick={() => setMethod("selector")}
+            disabled={busy}
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10 disabled:opacity-40"
+          >
+            Retour
+          </button>
+        ) : null}
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
       <PrivacyNote />
