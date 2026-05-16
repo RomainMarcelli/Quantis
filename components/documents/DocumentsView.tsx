@@ -36,6 +36,8 @@ import { SourceSwitchConfirmModal } from "@/components/documents/SourceSwitchCon
 import type { ProviderId } from "@/components/integrations/AccountingConnectionWizard";
 import type { AccountingSource } from "@/types/dataSources";
 import type { ConnectionDto } from "@/app/api/integrations/connections/route";
+import { useConnectorVisibility } from "@/lib/hooks/useConnectorVisibility";
+import type { ConnectorId } from "@/services/integrations/connectorVisibility";
 import {
   listUserFolders,
   createUserFolder,
@@ -84,6 +86,10 @@ export function DocumentsView() {
 
   // Bridge — status temps réel pour la tuile Banque + le détail.
   const bridgeStatus = useBridgeStatus();
+
+  // Visibilité MVP Phase 1 (brief 14/05/2026) — pilote l'affichage des
+  // tuiles de connecteurs (Pennylane, MyU, Odoo, Tiime, FEC, Bridge).
+  const { isVisible: isConnectorVisible } = useConnectorVisibility();
 
   // Modal "switch hors Documents" : seulement quand la source active est FEC
   // et que l'utilisateur clique sur Pennylane / MyUnisoft / Odoo.
@@ -298,7 +304,15 @@ export function DocumentsView() {
     return null;
   }
 
-  function handleAccountingTileClick(target: AccountingSource) {
+  function handleAccountingTileClick(target: AccountingSource | "tiime") {
+    // Cas spécial : Tiime (TIIME_VISIBLE=true). Pas une source comptable
+    // active — on ouvre simplement le step "Bientôt disponible" du wizard
+    // (cf. brief 14/05/2026 — la tuile sert juste à recueillir des
+    // emails d'attente).
+    if (target === "tiime") {
+      setConnectModalProvider("tiime");
+      return;
+    }
     const state = tileStateForAccounting(target);
     if (state === "active") {
       // Toggle off : désactive la source.
@@ -542,13 +556,16 @@ export function DocumentsView() {
           </SourceBlock>
 
           {/* ─── BLOC 2 — Source bancaire (phase 2 onboarding) ──────────
-              Visible UNIQUEMENT si une source comptable est active. Au
-              premier lancement, on n'affiche rien pour réduire le bruit
-              visuel. Le bloc apparaît avec une animation 200 ms quand
-              l'utilisateur active sa première source comptable, et
-              disparaît du DOM quand il la désactive (la connexion Bridge
-              persiste néanmoins en Firestore — toggle ≠ disconnect). */}
-          {activeAccountingSource !== null ? (
+              Visible UNIQUEMENT si :
+                - une source comptable est active (réduit le bruit visuel
+                  au premier lancement)
+                - Bridge est exposé (BRIDGE_VISIBLE=true) — brief 14/05/2026
+                  qui sort Bridge du périmètre MVP Phase 1.
+              Le bloc apparaît avec une animation 200 ms à l'activation
+              de la 1re source comptable, et disparaît du DOM quand
+              l'utilisateur la désactive (la connexion Bridge persiste
+              néanmoins en Firestore — toggle ≠ disconnect). */}
+          {activeAccountingSource !== null && isConnectorVisible("bridge") ? (
             <SourceBlock
               key="banking-block"
               revealOnMount
@@ -780,6 +797,14 @@ function SourceBlock({
  * via `tileStateFor` + `onTileClick`. Garde un seul endroit qui sait que
  * "Pennylane" est une tuile, "Tiime" est unavailable, etc.
  */
+/**
+ * Type union des sources rendues dans la grille. Tiime n'est pas une
+ * `AccountingSource` active (pas câblée côté Firestore / sync) — on la
+ * traite comme une option d'UI qui ouvre directement le step "Bientôt"
+ * du wizard quand sa visibilité est activée via TIIME_VISIBLE=true.
+ */
+type GridTileSource = AccountingSource | "tiime";
+
 function AccountingTilesGrid({
   excludeSource,
   tileStateFor,
@@ -788,8 +813,13 @@ function AccountingTilesGrid({
   /** Si fourni, cette source n'apparaît pas dans la grille (mode switcher). */
   excludeSource: AccountingSource | null;
   tileStateFor: (target: AccountingSource) => SourceTileState;
-  onTileClick: (target: AccountingSource) => void;
+  onTileClick: (target: GridTileSource) => void;
 }) {
+  // Brief 14/05/2026 — visibilité MVP Phase 1 : la grille n'affiche que
+  // les connecteurs marqués `visible: true` par
+  // /api/integrations/connectors/visibility. Pas de tuiles grisées
+  // "Bientôt disponible" — soit visible et cliquable, soit pas du tout.
+  const { isVisible } = useConnectorVisibility();
   const tiles: Array<{
     source: AccountingSource | "tiime";
     name: string;
@@ -821,9 +851,14 @@ function AccountingTilesGrid({
     {
       source: "tiime",
       name: "Tiime",
-      subtitle: "Bientôt disponible",
+      // Brief 14/05/2026 — tuile masquée par défaut en MVP. Si activée
+      // via TIIME_VISIBLE=true (test interne preview), on la rend
+      // cliquable comme une tuile normale (le step Tiime lui-même
+      // affiche "Bientôt disponible — laissez votre email"). Pas de
+      // mode grisé sur la grille.
+      subtitle: "Connexion automatique",
       logo: <TileLogo src="/images/integrations/tiime.svg" alt="Tiime" />,
-      available: false,
+      available: true,
     },
     {
       source: "fec",
@@ -834,9 +869,29 @@ function AccountingTilesGrid({
     },
   ];
 
-  // On garde Tiime visible aussi en mode switcher (l'utilisateur doit voir
-  // les options à venir), on exclut uniquement la source active courante.
-  const visible = tiles.filter((t) => t.source !== excludeSource);
+  // Map source → ConnectorId pour la résolution de visibilité.
+  // pennylane → pennylane_manual (le seul mode exposé en MVP — OAuth Firm/
+  // Company a son propre gating à l'intérieur du PennylaneStep du wizard).
+  // myunisoft → myu_manual (idem). fec → fec_upload. Bridge n'est PAS dans
+  // cette grille (rendu dans son propre bloc). Tiime / Odoo : gatés par
+  // leur flag dédié.
+  const connectorIdFor: Record<string, ConnectorId> = {
+    pennylane: "pennylane_manual",
+    myunisoft: "myu_manual",
+    odoo: "odoo",
+    tiime: "tiime",
+    fec: "fec_upload",
+  };
+
+  const visible = tiles.filter((t) => {
+    if (t.source === excludeSource) return false;
+    const connectorId = connectorIdFor[t.source as string];
+    return connectorId ? isVisible(connectorId) : false;
+  });
+
+  // Si aucune tuile n'est visible (cas extrême : tous les flags off et
+  // exclusion = active source), on évite un grid vide silencieux.
+  if (visible.length === 0) return null;
 
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
@@ -846,15 +901,15 @@ function AccountingTilesGrid({
           name={tile.name}
           subtitle={tile.subtitle}
           logo={tile.logo}
+          // Brief 14/05/2026 : pas de state "unavailable" — toute tuile
+          // visible est cliquable. Tiime (cas spécial, pas AccountingSource)
+          // ouvre directement son step wizard sans toucher au state Firestore.
           state={
-            tile.available && tile.source !== "tiime"
-              ? tileStateFor(tile.source as AccountingSource)
-              : "unavailable"
+            tile.source === "tiime"
+              ? "disconnected"
+              : tileStateFor(tile.source as AccountingSource)
           }
-          onClick={() => {
-            if (!tile.available || tile.source === "tiime") return;
-            onTileClick(tile.source as AccountingSource);
-          }}
+          onClick={() => onTileClick(tile.source)}
         />
       ))}
     </div>

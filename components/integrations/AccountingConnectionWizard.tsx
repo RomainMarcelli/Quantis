@@ -19,6 +19,8 @@ import {
   Upload,
 } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
+import { useConnectorVisibility } from "@/lib/hooks/useConnectorVisibility";
+import type { ConnectorId } from "@/services/integrations/connectorVisibility";
 
 export type ProviderId = "pennylane" | "myunisoft" | "odoo" | "tiime" | "other";
 
@@ -38,13 +40,17 @@ type ProviderCard = {
   available: boolean;
 };
 
-const PROVIDERS: ProviderCard[] = [
+// Brief 14/05/2026 — chaque ProviderCard est rattachée à un ConnectorId
+// dont la visibilité est résolue via `useConnectorVisibility()`. La grille
+// du wizard ne rend que les providers visibles. Pas de mode "Bientôt
+// disponible" : soit visible et cliquable, soit pas affiché.
+const PROVIDERS: Array<ProviderCard & { connectorId: ConnectorId }> = [
   // L'icône Pennylane (vert/teal) reste lisible sur fond clair ET sombre — pas de variante dédiée.
-  { id: "pennylane", name: "Pennylane",      subtitle: "Connexion automatique",      logo: { light: "/images/integrations/pennylane.png", dark: null },                                       available: true  },
-  { id: "myunisoft", name: "MyUnisoft",      subtitle: "Connexion automatique",      logo: { light: "/images/integrations/myunisoft.png", dark: "/images/integrations/myunisoft-dark.webp" }, available: true  },
-  { id: "odoo",      name: "Odoo",           subtitle: "Connexion automatique",      logo: { light: "/images/integrations/odoo.svg",      dark: "/images/integrations/odoo-dark.svg" },        available: true  },
-  { id: "tiime",     name: "Tiime",          subtitle: "Bientôt disponible",         logo: { light: "/images/integrations/tiime.svg",     dark: "/images/integrations/tiime-dark.svg" },       available: false },
-  { id: "other",     name: "Autre logiciel", subtitle: "Import manuel (FEC ou PDF)", logo: null,                                                                                                available: true  },
+  { id: "pennylane", connectorId: "pennylane_manual", name: "Pennylane",      subtitle: "Connexion automatique",      logo: { light: "/images/integrations/pennylane.png", dark: null },                                       available: true },
+  { id: "myunisoft", connectorId: "myu_manual",       name: "MyUnisoft",      subtitle: "Connexion automatique",      logo: { light: "/images/integrations/myunisoft.png", dark: "/images/integrations/myunisoft-dark.webp" }, available: true },
+  { id: "odoo",      connectorId: "odoo",             name: "Odoo",           subtitle: "Connexion automatique",      logo: { light: "/images/integrations/odoo.svg",      dark: "/images/integrations/odoo-dark.svg" },        available: true },
+  { id: "tiime",     connectorId: "tiime",            name: "Tiime",          subtitle: "Connexion automatique",      logo: { light: "/images/integrations/tiime.svg",     dark: "/images/integrations/tiime-dark.svg" },       available: true },
+  { id: "other",     connectorId: "fec_upload",       name: "Autre logiciel", subtitle: "Import manuel (FEC ou PDF)", logo: null,                                                                                                available: true },
 ];
 
 type ConnectedRecap = {
@@ -72,6 +78,10 @@ export function AccountingConnectionWizard({
 }: WizardProps) {
   const [chosen, setChosen] = useState<ProviderId | null>(initialProvider);
   const [recap, setRecap] = useState<ConnectedRecap | null>(null);
+
+  // Brief 14/05/2026 — visibilité MVP Phase 1. Pilote la grille de choix
+  // de provider en étape 1 du wizard.
+  const { isVisible: isWizardConnectorVisible } = useConnectorVisibility();
 
   function reset() {
     setChosen(null);
@@ -129,6 +139,10 @@ export function AccountingConnectionWizard({
 
   // ─── Étape 1 : choix du logiciel ───────────────────────────────────────────
   if (!chosen) {
+    // Brief 14/05/2026 — n'affiche que les providers visibles selon les
+    // flags d'env. Le badge "Bientôt" est retiré : soit visible et
+    // cliquable, soit pas affiché du tout.
+    const visibleProviders = PROVIDERS.filter((p) => isWizardConnectorVisible(p.connectorId));
     return (
       <WizardShell>
         <Header
@@ -136,7 +150,7 @@ export function AccountingConnectionWizard({
           subtitle="Choisissez votre logiciel pour synchroniser automatiquement vos données."
         />
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {PROVIDERS.map((p) => (
+          {visibleProviders.map((p) => (
             <button
               key={p.id}
               type="button"
@@ -148,11 +162,6 @@ export function AccountingConnectionWizard({
                 <p className="text-sm font-semibold text-white">{p.name}</p>
                 <p className="mt-0.5 text-xs text-white/55">{p.subtitle}</p>
               </div>
-              {!p.available && (
-                <span className="rounded-md border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-300">
-                  Bientôt
-                </span>
-              )}
             </button>
           ))}
         </div>
