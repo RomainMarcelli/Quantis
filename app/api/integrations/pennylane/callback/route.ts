@@ -9,6 +9,10 @@ import {
   exchangeOAuthCode,
   type PennylaneOAuthKind,
 } from "@/services/integrations/adapters/pennylane/auth";
+import {
+  deriveFirmIdFromCompanies,
+  fetchFirmCompaniesWithToken,
+} from "@/services/integrations/adapters/pennylane/firmOAuth";
 import { createConnection } from "@/services/integrations/storage/connectionStore";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
 import type { ConnectorProviderSub } from "@/types/connectors";
@@ -81,11 +85,29 @@ export async function GET(request: NextRequest) {
     const providerSub: ConnectorProviderSub =
       kind === "firm" ? "pennylane_firm" : "pennylane_company";
 
+    // Brief 13/05/2026 — Firm OAuth uniquement : on liste les dossiers
+    // accessibles via GET /companies (scope companies:readonly requis).
+    // Sélection multi-dossiers = v2 → on stocke un identifiant cabinet
+    // synthétique stable (deriveFirmIdFromCompanies) + le 1er dossier
+    // comme externalCompanyId représentatif. Le sync ultérieur itèrera
+    // sur l'ensemble des dossiers via le firm token.
+    let externalCompanyIdOverride: string | undefined;
+    let externalFirmIdOverride: string | null | undefined;
+    let companiesCount = 0;
+    if (kind === "firm") {
+      const companies = await fetchFirmCompaniesWithToken(auth.accessToken);
+      companiesCount = companies.length;
+      externalCompanyIdOverride = companies[0]?.id ?? "";
+      externalFirmIdOverride = deriveFirmIdFromCompanies(companies) || null;
+    }
+
     const connection = await createConnection({
       userId: stateData.userId,
       provider: "pennylane",
       providerSub,
       auth,
+      externalCompanyIdOverride,
+      externalFirmIdOverride,
     });
 
     // State consommé.
@@ -93,9 +115,16 @@ export async function GET(request: NextRequest) {
 
     // TODO : redirection vers une page front qui informera l'utilisateur —
     // Romain branchera l'écran final. Pour l'instant on renvoie du JSON pour
-    // que l'API soit testable seule.
+    // que l'API soit testable seule. On expose `companiesCount` pour que
+    // le front affiche le nombre de dossiers détectés post-connexion.
     return NextResponse.json(
-      { connectionId: connection.id, mode: "oauth2", kind, status: "active" },
+      {
+        connectionId: connection.id,
+        mode: "oauth2",
+        kind,
+        status: "active",
+        companiesCount,
+      },
       { status: 201 }
     );
   } catch (error) {
