@@ -175,6 +175,28 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
 
+    // Sprint B multi-tenant (cf. docs/audit-sprint-B.md) — table de
+    // jointure N:N entre Connections et Companies. Permet :
+    //   - 1 Connection Firm → N Companies (cas Pennylane cabinet)
+    //   - N Connections → 1 Company (Pennylane + Bridge sur même entreprise)
+    // Owner = userId du propriétaire de la Connection (pas firmId — un
+    // mapping appartient à l'user qui possède la Connection sous-jacente).
+    match /connection_companies/{mappingId} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.companyId is string
+        && request.resource.data.externalCompanyId is string
+        && request.resource.data.isActive is bool;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+
     // Sprint A multi-tenant (cf. docs/audit-sprint-A.md) — entité Company
     // qui regroupe les données comptables d'UNE entreprise. En Sprint A,
     // chaque user a exactement 1 Company (mode dirigeant TPE/PME).
