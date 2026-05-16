@@ -77,6 +77,20 @@ export type PennylaneRequestInit = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   query?: Record<string, string | number | undefined>;
   body?: unknown;
+  /**
+   * Sprint B (cf. audit-sprint-B Q4) — pour les Connections Firm OAuth qui
+   * donnent accès à N dossiers, on cible un dossier précis via la query
+   * `?company_id=X`. Pennylane Firm API accepte ce paramètre sur tous
+   * les endpoints data (/ledger_entries, /journals, /invoices, etc.).
+   *
+   * Fallback : si Pennylane retourne 403/404 avec ce pattern, on retente
+   * une fois avec le header custom `X-Company-Id: X` (à valider en
+   * sandbox dès accès aux credentials Firm).
+   *
+   * Sans valeur fournie : aucun ciblage (cas Company token / token manuel
+   * où le token est déjà scopé à une Company).
+   */
+  targetCompanyId?: string;
 };
 
 export async function pennylaneRequest<T>(
@@ -84,14 +98,15 @@ export async function pennylaneRequest<T>(
   endpoint: string,
   init: PennylaneRequestInit = {}
 ): Promise<T> {
-  return executeWithAuthRecovery<T>(connection, endpoint, init, false);
+  return executeWithAuthRecovery<T>(connection, endpoint, init, false, false);
 }
 
 async function executeWithAuthRecovery<T>(
   connection: Connection,
   endpoint: string,
   init: PennylaneRequestInit,
-  alreadyRefreshed: boolean
+  alreadyRefreshed: boolean,
+  alreadyTriedHeaderFallback: boolean
 ): Promise<T> {
   const url = new URL(`${getBaseUrl()}${endpoint}`);
   if (init.query) {
@@ -102,14 +117,41 @@ async function executeWithAuthRecovery<T>(
     }
   }
 
+  // Sprint B (Q4 audit) : injecter company_id en query par défaut. Si le
+  // serveur refuse (403/404), on retentera une fois avec le header.
+  const targetCompanyId = init.targetCompanyId?.trim();
+  if (targetCompanyId && !alreadyTriedHeaderFallback) {
+    url.searchParams.set("company_id", targetCompanyId);
+  }
+
+  const headers: Record<string, string> = { ...(buildHeaders(connection) as Record<string, string>) };
+  if (targetCompanyId && alreadyTriedHeaderFallback) {
+    headers["X-Company-Id"] = targetCompanyId;
+  }
+
   const requestInit: RequestInit = {
     method: init.method ?? "GET",
-    headers: buildHeaders(connection),
+    headers,
     body: init.body ? JSON.stringify(init.body) : undefined,
   };
 
   const response = await fetchWithRetry(url.toString(), requestInit, endpoint);
   const text = await response.text();
+
+  // Sprint B (Q4 audit) — fallback header X-Company-Id si le query-param
+  // est refusé. Une seule retry par requête, uniquement quand un
+  // targetCompanyId était demandé. Évite les boucles sur les vrais 4xx.
+  if (
+    targetCompanyId &&
+    !alreadyTriedHeaderFallback &&
+    (response.status === 403 || response.status === 404)
+  ) {
+    console.warn(
+      `[pennylane-client] company_id=${targetCompanyId} via query refused ` +
+        `(${response.status} on ${endpoint}) — retrying with X-Company-Id header`
+    );
+    return executeWithAuthRecovery<T>(connection, endpoint, init, alreadyRefreshed, true);
+  }
 
   // 401 mid-sync : si le mode est OAuth et qu'on n'a pas déjà tenté un refresh,
   // on rafraîchit le token in-place et on retente une fois.
@@ -130,7 +172,7 @@ async function executeWithAuthRecovery<T>(
       } catch {
         /* swallow — refresh utilisable en mémoire même si la persistance échoue */
       }
-      return executeWithAuthRecovery<T>(connection, endpoint, init, true);
+      return executeWithAuthRecovery<T>(connection, endpoint, init, true, alreadyTriedHeaderFallback);
     } catch {
       // Refresh impossible → on lève l'erreur 401 d'origine.
     }
@@ -175,11 +217,14 @@ export async function pennylaneFetchPage<T>(
   connection: Connection,
   endpoint: string,
   query: Record<string, string | number | undefined> = {},
-  cursor: string | null = null
+  cursor: string | null = null,
+  /** Sprint B — cible un dossier précis pour les Connections Firm OAuth. */
+  targetCompanyId?: string
 ): Promise<PennylanePage<T>> {
   const queryWithCursor = { ...query, cursor: cursor ?? undefined };
   const raw = await pennylaneRequest<RawPennylaneResponse<T>>(connection, endpoint, {
     query: queryWithCursor,
+    targetCompanyId,
   });
   return normalizePage<T>(raw);
 }
