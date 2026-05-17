@@ -54,9 +54,79 @@ existantes restent dans leurs collections top-level et portent un champ
 | Sprint | Livré | Statut |
 |---|---|---|
 | **A** | Modèle Company + companyStore + migration + middleware + 3 routes critiques en rétrocompat | ✅ Branche `feature/multi-tenant-A` |
-| **B** | Découplage Connection ↔ Company : contrainte d'unicité passée à `(companyId, provider)`, collection `connection_companies` (jointure N:N), `findOrCreateCompanyForConnection`, sync orchestrator multi-dossiers `runSyncForFirmConnection`, fetchers Pennylane acceptent `targetCompanyId` (query `?company_id=X` + fallback header `X-Company-Id`) | ✅ Branche `feature/multi-tenant-B` |
-| **C** | Mode cabinet UX : firmId + firm_members + UI cabinet (1 user cabinet → liste de Companies dossiers clients). Pennylane Firm OAuth (commit 88e3e4b) réactivé conditionnellement pour les users cabinet | ⏳ |
-| **D** | Polish + observabilité : migration de toutes les routes vers companyId explicite, suppression des logs `[resolveCompanyContext] fallback`, dépréciation des params `userId` | ⏳ |
+| **B** | Découplage Connection ↔ Company : contrainte d'unicité passée à `(companyId, provider)`, collection `connection_companies` (jointure N:N), `findOrCreateCompanyForConnection`, sync orchestrator multi-dossiers `runSyncForFirmConnection`, fetchers Pennylane acceptent `targetCompanyId` | ✅ Branche `feature/multi-tenant-B` |
+| **C** | Mode cabinet UX : modèle `Firm` + `accountType` sur User + OnboardingSelector + OAuth Firm callback minimal + picker de sélection + portefeuille + sélecteur de Company + page dossier | ✅ Branche `feature/multi-tenant-C` |
+| **D** | Polish + tests E2E + merge feature/multi-tenant + FAQ utilisateurs + seed-demo + rollback procedure | ⏳ |
+
+## Sprint C — mode cabinet UX
+
+### Collection `firms/{firmId}`
+
+```ts
+interface FirmRecord {
+  firmId: string;
+  name: string;
+  ownerUserId: string;          // fondateur/admin
+  memberUserIds: string[];      // dénormalisé, inclut owner (Firestore rule lit ce field)
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+```
+
+### `accountType` sur `users/{uid}`
+
+```ts
+type UserAccountType = "company_owner" | "firm_member";
+// + firmId?: string (présent si firm_member)
+```
+
+Absent sur les users pré-Sprint C → traité comme `company_owner` (fallback partout).
+
+### Routes ajoutées
+
+| Route | Méthode | Description |
+|---|---|---|
+| `/onboarding` | page | OnboardingSelector (2 parcours) |
+| `/cabinet/onboarding/connect` | page | FirmConnectPage (déclenche OAuth) |
+| `/cabinet/onboarding/picker` | page | FirmDossierPicker (sélection dossiers post-OAuth) |
+| `/cabinet/portefeuille` | page | FirmPortfolioView (grille de dossiers + KPIs synthétiques) |
+| `/cabinet/dossier/[companyId]` | page | Set `activeCompanyId` + redirect `/analysis` |
+| `/api/cabinet/firm/create` | POST | Crée Firm + update `accountType=firm_member` |
+| `/api/cabinet/oauth/start` | POST | Initie flow OAuth Firm (state CSRF) |
+| `/api/integrations/pennylane/firm/callback` | GET | Callback OAuth Firm minimal (Sprint C version) |
+| `/api/cabinet/connections/[id]/mappings` | GET, PATCH | Liste / active-désactive mappings du picker |
+| `/api/cabinet/portefeuille` | GET | Liste dossiers + KPIs synthétiques pour `firm_member` |
+
+### Pattern `activeCompanyStore`
+
+```ts
+const { activeCompanyId, setActiveCompanyId } = useActiveCompany();
+```
+
+React Context + localStorage. Fallback no-op hors `ActiveCompanyProvider` (les pages `company_owner` ne le mountent pas).
+
+### Sécurité
+
+- `firms/{firmId}` : read si `request.auth.uid in resource.data.memberUserIds`, write owner only.
+- `/api/cabinet/portefeuille` : refuse 403 si `accountType !== "firm_member"`, vérifie `firmId` + membership.
+- `/api/cabinet/connections/[id]/mappings` : double check `userId` defense-in-depth + ownership Connection.
+
+### Flow cabinet end-to-end
+
+```
+/signup → /onboarding → "Je gère un cabinet" → Saisie nom cabinet
+  → POST /api/cabinet/firm/create → firmId créé + accountType="firm_member"
+  → /cabinet/onboarding/connect → POST /api/cabinet/oauth/start → authorizeUrl
+  → Pennylane OAuth Firm → /api/integrations/pennylane/firm/callback
+    → exchange code → fetch /companies → createConnection (providerSub="pennylane_firm")
+    → createMappingsForFirmCallback (Sprint B helper, idempotent)
+  → /cabinet/onboarding/picker?connectionId=X&companies_imported=N
+    → sélection dossiers → PATCH /api/cabinet/connections/[id]/mappings
+  → /cabinet/portefeuille → grille KPIs synthétiques
+  → clic dossier → /cabinet/dossier/[companyId] → set activeCompanyId
+    → redirect /analysis (cockpit existant)
+  → switch via CompanySelector dans la sidebar → /cabinet/dossier/[autre]
+```
 
 ## Sprint B — découplage Connection ↔ Company
 
