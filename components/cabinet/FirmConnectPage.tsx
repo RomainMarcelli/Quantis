@@ -10,7 +10,6 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Building2, Loader2 } from "lucide-react";
-import { firebaseAuthGateway } from "@/services/auth";
 
 const ERROR_MESSAGES: Record<string, string> = {
   user_denied: "Vous avez refusé l'autorisation sur Pennylane.",
@@ -34,23 +33,13 @@ export function FirmConnectPage() {
     setError(null);
     setBusy(true);
     try {
-      const idToken = await firebaseAuthGateway.getIdToken();
-      if (!idToken) throw new Error("Session expirée — reconnectez-vous.");
-      const res = await fetch("/api/cabinet/oauth/start", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Initialisation OAuth échouée.");
-      }
-      const { authorizeUrl } = data as { authorizeUrl: string };
+      const res = await fetch("/api/integrations/pennylane/firm/authorize-url");
+      if (!res.ok) throw new Error("Failed to get OAuth URL");
+
+      const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
       window.location.href = authorizeUrl;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur inconnue.");
+    } catch {
+      setError("Pennylane Firm OAuth non configuré");
       setBusy(false);
     }
   }
