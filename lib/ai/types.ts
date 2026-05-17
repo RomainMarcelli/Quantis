@@ -43,6 +43,9 @@ export type ConversationSummary = {
   messageCount: number;
   /** Aperçu de la dernière réponse (tronqué) — pour la liste. */
   lastAnswerPreview: string | null;
+  /** Conversation épinglée — affichée en tête de liste. Rétro-compat : `false`
+   *  par défaut pour les conversations existantes en Firestore. */
+  pinned: boolean;
 };
 
 /**
@@ -121,7 +124,7 @@ export type AiComparison = {
   reference: { label: string; value: number };
 };
 
-export type AiActionType = "simulate" | "navigate" | "compare";
+export type AiActionType = "simulate" | "navigate" | "compare" | "chart";
 /** Icônes lucide-react autorisées pour les chips d'action (tree-shaking). */
 export type AiActionIcon =
   | "Sliders"
@@ -146,8 +149,11 @@ export type AiAction = {
  */
 export type AiStructuredResponse = {
   diagnostic: { status: AiDiagnosticStatus; message: string };
-  /** Explication 2-4 phrases — peut contenir des **gras** simples. */
-  explanation: string;
+  /** Explication 2-4 phrases — peut contenir des **gras** simples.
+   *  `null` ou chaîne vide : pas d'explication contextuelle disponible (KPI
+   *  inconnu du registre OU markdown insuffisant) — le bloc B n'est PAS rendu
+   *  côté UI (pas de fallback générique "Vue d'ensemble…"). */
+  explanation: string | null;
   /** Chiffres clés en micro-cards (2-3 max). */
   dataPoints?: AiDataPoint[];
   /** Comparaison binaire actuel vs référence (mini-graph horizontal). */

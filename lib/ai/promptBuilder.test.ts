@@ -245,16 +245,43 @@ describe("buildSystemPrompt — garde-fous et format", () => {
     expect(prompt).toMatch(/expert-comptable/i);
   });
 
-  it("contient toujours la section format_reponse (200 mots max, markdown)", () => {
+  it("contient toujours la section format_reponse (longueur adaptative, markdown)", () => {
     const prompt = buildSystemPrompt({
       analysis: buildAnalysis(),
       kpiId: null,
       userLevel: "intermediate",
     });
     expect(prompt).toContain("<format_reponse>");
-    expect(prompt).toContain("200 mots");
     expect(prompt).toContain("markdown");
     expect(prompt).toContain("action");
+    // Nouvelle consigne de non-troncature pour multi-points (le retour à
+    // la ligne dans la consigne est sans importance : on cherche la
+    // séquence sémantique avec un regex tolérant aux espaces/retours)
+    expect(prompt).toMatch(/COMPLÈTE TOUS LES POINTS\s+PROMIS/);
+    // 3 paliers de longueur explicites
+    expect(prompt).toMatch(/Question simple/);
+    expect(prompt).toMatch(/Question analytique/);
+    expect(prompt).toMatch(/multi-points/);
+    expect(prompt).toMatch(/100-200 mots/);
+    expect(prompt).toMatch(/300-500 mots/);
+  });
+
+  it("contient la section multi_questions avec consignes anti-ignorance", () => {
+    const prompt = buildSystemPrompt({
+      analysis: buildAnalysis(),
+      kpiId: null,
+      userLevel: "intermediate",
+    });
+    expect(prompt).toContain("<multi_questions>");
+    expect(prompt).toContain("TRAITE TOUTES LES QUESTIONS");
+    expect(prompt).toContain("N'ignore JAMAIS silencieusement");
+    // Order : garde_fous puis multi_questions puis format_reponse
+    const idxGuard = prompt.indexOf("<garde_fous>");
+    const idxMulti = prompt.indexOf("<multi_questions>");
+    const idxFormat = prompt.indexOf("<format_reponse>");
+    expect(idxGuard).toBeGreaterThan(-1);
+    expect(idxMulti).toBeGreaterThan(idxGuard);
+    expect(idxFormat).toBeGreaterThan(idxMulti);
   });
 
   it("ne laisse fuiter aucun chiffre quand il n'y a pas d'analyse", () => {

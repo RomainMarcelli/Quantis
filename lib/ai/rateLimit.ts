@@ -17,7 +17,49 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
 
-export const DAILY_AI_QUOTA = 20;
+// 50 questions/jour/user — équilibre usage pro / coût maîtrisé. Coût estimé :
+// 50 × ~1500 input tokens × $3/M (Sonnet 4.6) ≈ $0.22/jour/user. Reset à minuit
+// Europe/Paris.
+export const DAILY_AI_QUOTA = 50;
+
+/**
+ * Calcule l'ISO du prochain minuit en timezone Europe/Paris (utilisé par la
+ * route 429 pour informer l'UI). Approximation simple : on calcule l'offset
+ * actuel Paris (CET+1 / CEST+2) via Intl, on en déduit le minuit local puis on
+ * convertit en UTC. La précision DST est suffisante pour un affichage UI
+ * (utilisateur informé à 1h près au pire), pas critique.
+ */
+export function getNextResetISO(now: Date = new Date()): string {
+  // Récupère les composantes locales Paris via Intl (robuste DST).
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
+  const y = Number(get("year"));
+  const mo = Number(get("month"));
+  const d = Number(get("day"));
+  const h = Number(get("hour") === "24" ? "0" : get("hour"));
+  const mi = Number(get("minute"));
+  const s = Number(get("second"));
+
+  // Construit "now" en UTC ms, puis ajoute le delta jusqu'au prochain minuit
+  // local Paris (24h - h:m:s écoulé aujourd'hui à Paris).
+  const millisIntoDay = ((h * 60 + mi) * 60 + s) * 1000;
+  const millisUntilMidnight = 24 * 60 * 60 * 1000 - millisIntoDay;
+  const nextResetMs = now.getTime() + millisUntilMidnight;
+  // On marque la date à 00:00 Paris ; en UTC ça correspond à 22:00 ou 23:00
+  // selon DST. C'est correct car nextResetMs est calculé via le delta réel.
+  void y; void mo; void d; // composantes consommées pour le calcul ci-dessus
+  return new Date(nextResetMs).toISOString();
+}
 
 /**
  * Format YYYY-MM-DD en UTC. Volontairement pas de timezone : on évite les

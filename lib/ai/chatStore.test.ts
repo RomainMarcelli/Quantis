@@ -9,6 +9,7 @@ const {
   addMock,
   getMock,
   updateMock,
+  deleteMock,
   docMock,
   collectionConvMock,
   doc1Mock,
@@ -21,6 +22,7 @@ const {
   const addMock = vi.fn();
   const getMock = vi.fn();
   const updateMock = vi.fn();
+  const deleteMock = vi.fn();
   const docMock = vi.fn();
   const orderByMock = vi.fn();
   const limitMock = vi.fn();
@@ -43,6 +45,7 @@ const {
     addMock,
     getMock,
     updateMock,
+    deleteMock,
     docMock,
     collectionConvMock,
     doc1Mock,
@@ -84,8 +87,11 @@ vi.mock("@/lib/server/firebaseAdmin", () => ({
 import {
   addMessage,
   createConversation,
+  deleteConversation,
   getConversation,
   listConversations,
+  updateConversationPinned,
+  updateConversationTitle,
 } from "@/lib/ai/chatStore";
 import { Timestamp } from "firebase-admin/firestore";
 
@@ -101,7 +107,7 @@ describe("chatStore", () => {
     firestoreMock.collection.mockReturnValue(collectionChatsMock);
     collectionChatsMock.doc.mockReturnValue(doc1Mock);
     doc1Mock.collection.mockReturnValue(collectionConvMock);
-    docMock.mockReturnValue({ get: getMock, update: updateMock });
+    docMock.mockReturnValue({ get: getMock, update: updateMock, delete: deleteMock });
     orderByMock.mockReturnValue({ limit: limitMock });
     limitMock.mockReturnValue({ get: getListMock });
   });
@@ -143,6 +149,43 @@ describe("chatStore", () => {
       expect(conv.id).toBe("conv-1");
       expect(conv.messageCount).toBe(2);
       expect(conv.kpiId).toBe("ebitda");
+    });
+
+    it("stocke la QUESTION USER comme titre (pas la réponse IA) — cas court", async () => {
+      // Régression Bug 2 : le titre doit être la question, pas la réponse.
+      addMock.mockResolvedValueOnce({ id: "conv-bug2-a" });
+      const question = "Comment se porte mon chiffre d'affaires ?";
+      const answer =
+        "Vue d'ensemble de votre situation financière : votre CA progresse de 8% sur la période…";
+
+      await createConversation({
+        userId: "user-1",
+        kpiId: null,
+        question,
+        answer,
+      });
+
+      const written = addMock.mock.calls[0]![0]!;
+      expect(written.title).toBe(question);
+      expect(written.title).not.toContain("Vue d'ensemble");
+    });
+
+    it("tronque la question avec '…' au-delà de 80 chars", async () => {
+      addMock.mockResolvedValueOnce({ id: "conv-bug2-b" });
+      const question =
+        "Comment se porte mon chiffre d'affaires et quelle est ma marge brute par rapport à l'année dernière sur la même période ?";
+
+      await createConversation({
+        userId: "user-1",
+        kpiId: null,
+        question,
+        answer: "réponse",
+      });
+
+      const written = addMock.mock.calls[0]![0]!;
+      expect(written.title.length).toBeLessThanOrEqual(81);
+      expect(written.title.endsWith("…")).toBe(true);
+      expect(question.startsWith(written.title.replace(/…$/, "").trimEnd())).toBe(true);
     });
 
     it("accepte un kpiId null (chat libre sans focus)", async () => {
@@ -239,6 +282,136 @@ describe("chatStore", () => {
       expect(list[0]!.kpiId).toBe("ebitda");
       expect(list[0]!.messageCount).toBe(4);
       expect(list[0]!.lastAnswerPreview).toBe("Votre EBITDA…");
+    });
+  });
+
+  describe("updateConversationTitle", () => {
+    it("écrit le titre trimé/tronqué sur le doc existant", async () => {
+      getMock.mockResolvedValueOnce({ exists: true, data: () => ({}) });
+      updateMock.mockResolvedValueOnce(undefined);
+
+      await updateConversationTitle("user-1", "conv-1", "   Nouveau titre   ");
+
+      expect(docMock).toHaveBeenCalledWith("conv-1");
+      expect(updateMock).toHaveBeenCalledTimes(1);
+      const update = updateMock.mock.calls[0]![0]!;
+      expect(update.title).toBe("Nouveau titre");
+    });
+
+    it("rejette si la conversation n'existe pas", async () => {
+      getMock.mockResolvedValueOnce({ exists: false });
+      await expect(
+        updateConversationTitle("user-1", "nope", "x")
+      ).rejects.toThrow(/introuvable/i);
+    });
+  });
+
+  describe("updateConversationPinned", () => {
+    it("écrit pinned=true sur le doc existant", async () => {
+      getMock.mockResolvedValueOnce({ exists: true, data: () => ({}) });
+      updateMock.mockResolvedValueOnce(undefined);
+
+      await updateConversationPinned("user-1", "conv-1", true);
+
+      expect(updateMock).toHaveBeenCalledWith({ pinned: true });
+    });
+
+    it("rejette si la conversation n'existe pas", async () => {
+      getMock.mockResolvedValueOnce({ exists: false });
+      await expect(
+        updateConversationPinned("user-1", "nope", true)
+      ).rejects.toThrow(/introuvable/i);
+    });
+  });
+
+  describe("deleteConversation", () => {
+    it("supprime le doc existant", async () => {
+      getMock.mockResolvedValueOnce({ exists: true, data: () => ({}) });
+      deleteMock.mockResolvedValueOnce(undefined);
+
+      await deleteConversation("user-1", "conv-1");
+
+      expect(docMock).toHaveBeenCalledWith("conv-1");
+      expect(deleteMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejette si la conversation n'existe pas", async () => {
+      getMock.mockResolvedValueOnce({ exists: false });
+      await expect(
+        deleteConversation("user-1", "nope")
+      ).rejects.toThrow(/introuvable/i);
+    });
+  });
+
+  describe("listConversations pinned ordering", () => {
+    it("retourne les épinglées avant les non-épinglées, chaque groupe trié par lastMessageAt desc", async () => {
+      getListMock.mockResolvedValueOnce({
+        docs: [
+          {
+            id: "conv-recent-unpinned",
+            data: () => ({
+              kpiId: null,
+              createdAt: ts(1000),
+              lastMessageAt: ts(9000),
+              title: "Recent",
+              messages: [],
+              messageCount: 2,
+              lastAnswerPreview: "x",
+              pinned: false,
+            }),
+          },
+          {
+            id: "conv-old-pinned",
+            data: () => ({
+              kpiId: null,
+              createdAt: ts(1000),
+              lastMessageAt: ts(2000),
+              title: "Old pinned",
+              messages: [],
+              messageCount: 2,
+              lastAnswerPreview: "x",
+              pinned: true,
+            }),
+          },
+          {
+            id: "conv-mid-unpinned",
+            data: () => ({
+              kpiId: null,
+              createdAt: ts(1000),
+              lastMessageAt: ts(5000),
+              title: "Mid",
+              messages: [],
+              messageCount: 2,
+              lastAnswerPreview: "x",
+              // pinned undefined → rétro-compat, traité comme false
+            }),
+          },
+          {
+            id: "conv-recent-pinned",
+            data: () => ({
+              kpiId: null,
+              createdAt: ts(1000),
+              lastMessageAt: ts(8000),
+              title: "Recent pinned",
+              messages: [],
+              messageCount: 2,
+              lastAnswerPreview: "x",
+              pinned: true,
+            }),
+          },
+        ],
+      });
+
+      const list = await listConversations("user-1");
+      expect(list.map((c) => c.id)).toEqual([
+        "conv-recent-pinned",   // pinned, lastMessageAt=8000
+        "conv-old-pinned",      // pinned, lastMessageAt=2000
+        "conv-recent-unpinned", // unpinned, lastMessageAt=9000
+        "conv-mid-unpinned",    // unpinned, lastMessageAt=5000
+      ]);
+      // Rétro-compat : pinned undefined → false
+      const mid = list.find((c) => c.id === "conv-mid-unpinned");
+      expect(mid?.pinned).toBe(false);
     });
   });
 

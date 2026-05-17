@@ -98,6 +98,11 @@ function KpiEvolutionChartImpl({ kpiId, analyses, currentAnalysis }: KpiEvolutio
     <article
       className="precision-card fade-up flex h-full flex-col rounded-2xl p-5"
       data-search-id="dashboard-kpi-evolution-chart"
+      // Mission 2 — cible du scroll + halo via `?focusChart=<kpiId>` depuis
+      // le bouton "Voir le graphique" de l'agent IA. L'attribut est posé ici
+      // (conteneur racine du graphique) pour que `AnalysisDetailView` puisse
+      // le retrouver via `document.querySelector('[data-chart-id="..."]')`.
+      data-chart-id={kpiId}
     >
       <header className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-0.5">

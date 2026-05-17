@@ -84,6 +84,16 @@ function buildActions(kpiId: string | null, status: AiDiagnosticStatus): AiActio
       type: "navigate",
       target: kpiId,
     });
+    // Mission 2 — action parallèle "Voir le graphique" pour atterrir
+    // directement sur le KpiEvolutionChart (scroll + halo) via le param
+    // ?focusChart=<kpiId>. Le rendu côté UI ne montre le bouton que si un
+    // handler `onViewChart` est branché par le parent (cf. visibleActions).
+    actions.push({
+      label: "Voir le graphique",
+      icon: "BarChart3" as AiActionIcon,
+      type: "chart",
+      target: kpiId,
+    });
   }
   // Simuler : pertinent surtout en danger (où le besoin d'agir est explicite).
   if (status === "danger") {
@@ -128,8 +138,19 @@ function buildFollowUps(kpiId: string | null, status: AiDiagnosticStatus): strin
 }
 
 /**
+ * Constante rétro-compat — historiquement utilisée comme fallback générique
+ * pour `explanation` et `diagnostic.message` quand `kpiId` ne matchait aucun
+ * KPI du registre. NE SERT PLUS de default automatique (cf. `explanation: null`
+ * et message diagnostic vide retournés ci-dessous). Conservée exportée pour
+ * compatibilité avec d'éventuels imports externes / tests.
+ */
+export const fallbackExplanation =
+  "Vue d'ensemble de votre situation financière.";
+
+/**
  * Génère un message court de diagnostic basé sur le `goodSign`/`badSign` du
- * registre, préfixé d'un emoji visuel.
+ * registre. Si le KPI n'est pas dans le registre → chaîne vide (le bandeau
+ * de diagnostic A ne montrera pas de message générique répétitif).
  */
 function buildDiagnosticMessage(
   kpiId: string | null,
@@ -137,7 +158,7 @@ function buildDiagnosticMessage(
 ): string {
   const def = kpiId ? getKpiDefinition(kpiId) : null;
   if (!def) {
-    return "Vue d'ensemble de votre situation financière.";
+    return "";
   }
   if (status === "danger") return def.tooltip.badSign;
   if (status === "good") return def.tooltip.goodSign;
@@ -235,9 +256,23 @@ export function buildStructuredFromContext(ctx: Ctx): AiStructuredResponse {
   const diag = getKpiDiagnostic(ctx.value, def?.thresholds);
   const status = toStatus(diag);
   const message = buildDiagnosticMessage(ctx.kpiId, status);
-  const explanation = ctx.markdown
-    ? extractExplanation(ctx.markdown)
-    : message;
+
+  // explanation : on retombe sur `null` plutôt que sur le fallback générique
+  // "Vue d'ensemble de votre situation financière". Règles :
+  //  1) markdown fourni → on essaie d'en extraire les premières phrases.
+  //     Si l'extraction est vide on retourne null (pas de bloc B vide).
+  //  2) pas de markdown ET KPI connu du registre → on réutilise `message`
+  //     (texte issu du registre, contextuel — pas générique).
+  //  3) pas de markdown ET KPI inconnu → null (le bloc B est masqué).
+  let explanation: string | null;
+  if (ctx.markdown) {
+    const extracted = extractExplanation(ctx.markdown);
+    explanation = extracted.length > 0 ? extracted : null;
+  } else if (def) {
+    explanation = message;
+  } else {
+    explanation = null;
+  }
 
   return {
     diagnostic: { status, message },
