@@ -231,12 +231,20 @@ export async function getUserConnectionById(
 
 export async function listUserConnections(
   userId: string,
-  provider?: ConnectorProvider
+  provider?: ConnectorProvider,
+  companyId?: string | null
 ): Promise<Connection[]> {
   const db = getFirebaseAdminFirestore();
   let query = db.collection(COLLECTION).where("userId", "==", userId);
   if (provider) {
     query = query.where("provider", "==", provider);
+  }
+  // Scope multi-tenant — quand un companyId actif est fourni (firm_member
+  // ayant sélectionné un dossier), on ne retourne que les Connections
+  // rattachées à ce dossier. Les Connections legacy sans companyId sont
+  // exclues — voulu : elles n'appartiennent à aucun dossier précis.
+  if (typeof companyId === "string" && companyId.length > 0) {
+    query = query.where("companyId", "==", companyId);
   }
   const snap = await query.get();
   return snap.docs.map((doc) =>

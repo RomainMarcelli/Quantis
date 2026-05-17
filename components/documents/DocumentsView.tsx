@@ -169,7 +169,10 @@ export function DocumentsView() {
       // de l'état "connectée vs déconnectée" de chaque tuile. Bridge est
       // tracké séparément par useBridgeStatus.
       if (idToken) {
-        const res = await fetch("/api/integrations/connections", {
+        const connectionsUrl = activeCompanyId
+          ? `/api/integrations/connections?companyId=${encodeURIComponent(activeCompanyId)}`
+          : "/api/integrations/connections";
+        const res = await fetch(connectionsUrl, {
           headers: { Authorization: `Bearer ${idToken}` },
           cache: "no-store",
         });

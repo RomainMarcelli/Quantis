@@ -38,8 +38,15 @@ export async function GET(request: NextRequest) {
     throw error;
   }
 
+  // Scope optionnel par companyId — quand un firm_member consulte un
+  // dossier précis, on veut le statut "connectée vs déconnectée" pour CETTE
+  // entreprise uniquement, pas le mélange des connections d'autres dossiers.
+  const companyIdParam = request.nextUrl.searchParams.get("companyId");
+  const companyIdFilter =
+    typeof companyIdParam === "string" && companyIdParam.length > 0 ? companyIdParam : null;
+
   try {
-    const connections = await listUserConnections(userId);
+    const connections = await listUserConnections(userId, undefined, companyIdFilter);
 
     // Filtre les Connections marquées `mock: true` (mocks dev / sandbox) pour
     // qu'elles n'apparaissent pas dans la page Documents en environnement
