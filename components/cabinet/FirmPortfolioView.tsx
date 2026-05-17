@@ -28,7 +28,8 @@ type Dossier = {
   name: string;
   externalCompanyId: string | null;
   externalCompanyName: string | null;
-  connectionId: string;
+  connectionId: string | null;
+  source: string | null;
   lastSyncedAt: string | null;
   lastSyncStatus: "success" | "failed" | "in_progress" | "partial" | "never" | "unknown";
   kpis: {
@@ -130,7 +131,15 @@ export function FirmPortfolioView() {
 
   const connectionIds = useMemo(() => {
     if (!data) return [];
-    return Array.from(new Set(data.dossiers.map((d) => d.connectionId)));
+    // Filtre les Companies sans Connection (ajouts manuels FEC/Excel) —
+    // elles n'ont pas de sync à déclencher.
+    return Array.from(
+      new Set(
+        data.dossiers
+          .map((d) => d.connectionId)
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+      )
+    );
   }, [data]);
 
   async function syncAll() {
