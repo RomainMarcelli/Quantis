@@ -125,7 +125,7 @@ export function DocumentsView() {
     activeBankingSource,
     setActiveAccountingSource,
     setActiveBankingSource,
-  } = useActiveDataSource();
+  } = useActiveDataSource({ companyId: activeCompanyId });
 
   // Auto-collapse du switcher dès que la source active change
   // (l'utilisateur a basculé sur une nouvelle source → on cache la grille

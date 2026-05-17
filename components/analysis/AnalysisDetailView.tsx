@@ -313,6 +313,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // `activeAccountingSource` (et `activeFecFolderName` si FEC).
   const { activeAccountingSource, activeFecFolderName, activeBankingSource } = useActiveDataSource({
     analyses: allAnalyses,
+    companyId: activeCompanyId,
   });
 
   // Onglet Trésorerie : visible UNIQUEMENT si l'utilisateur a activé Bridge

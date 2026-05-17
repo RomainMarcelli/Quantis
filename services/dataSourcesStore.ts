@@ -35,8 +35,21 @@ import {
   type BankingSource,
 } from "@/types/dataSources";
 
-const SETTINGS_DOC_PATH = (uid: string): readonly [string, string, string, string] =>
-  ["users", uid, "settings", "dataSources"] as const;
+// Doc path scopé par companyId pour le mode cabinet (firm_member ayant
+// plusieurs dossiers — chaque dossier doit avoir SA source active sans
+// fuite croisée). Pour company_owner / firm_member sans dossier actif
+// (companyId nullish), on retombe sur le doc historique "dataSources".
+const SETTINGS_DOC_PATH = (
+  uid: string,
+  companyId?: string | null
+): readonly [string, string, string, string] => [
+  "users",
+  uid,
+  "settings",
+  typeof companyId === "string" && companyId.length > 0
+    ? `dataSources_${companyId}`
+    : "dataSources",
+];
 
 /**
  * Décode un snapshot Firestore en `ActiveDataSourceState` validé. Toute
@@ -78,9 +91,10 @@ function decodeSnapshot(snapshot: DocumentSnapshot): ActiveDataSourceState {
 export function subscribeActiveDataSource(
   userId: string,
   onChange: (state: ActiveDataSourceState) => void,
-  onError?: (err: Error) => void
+  onError?: (err: Error) => void,
+  companyId?: string | null
 ): Unsubscribe {
-  const ref = doc(firestoreDb, ...SETTINGS_DOC_PATH(userId));
+  const ref = doc(firestoreDb, ...SETTINGS_DOC_PATH(userId, companyId));
   return onSnapshot(
     ref,
     (snapshot) => onChange(decodeSnapshot(snapshot)),
@@ -101,9 +115,10 @@ export function subscribeActiveDataSource(
 export async function writeActiveAccountingSource(
   userId: string,
   source: AccountingSource | null,
-  fecFolderName: string | null = null
+  fecFolderName: string | null = null,
+  companyId?: string | null
 ): Promise<void> {
-  const ref = doc(firestoreDb, ...SETTINGS_DOC_PATH(userId));
+  const ref = doc(firestoreDb, ...SETTINGS_DOC_PATH(userId, companyId));
   const folderName = source === "fec" ? fecFolderName?.trim() || null : null;
   await setDoc(
     ref,
@@ -120,9 +135,10 @@ export async function writeActiveAccountingSource(
 /** Active ou désactive Bridge. Indépendant de la source comptable. */
 export async function writeActiveBankingSource(
   userId: string,
-  source: BankingSource | null
+  source: BankingSource | null,
+  companyId?: string | null
 ): Promise<void> {
-  const ref = doc(firestoreDb, ...SETTINGS_DOC_PATH(userId));
+  const ref = doc(firestoreDb, ...SETTINGS_DOC_PATH(userId, companyId));
   await setDoc(
     ref,
     {

@@ -63,6 +63,7 @@ export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) 
 
   const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
     analyses,
+    companyId: activeCompanyId,
   });
 
   useEffect(() => {

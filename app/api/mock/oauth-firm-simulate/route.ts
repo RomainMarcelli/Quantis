@@ -163,6 +163,24 @@ export async function GET(req: NextRequest) {
         mock: true,
       });
 
+      // Active la source "pennylane" pour ce dossier — au prochain
+      // affichage de /cabinet/dossier/{companyId} → /synthese, la tuile
+      // Pennylane est marquée connectée et alimente les KPIs.
+      await db
+        .collection("users")
+        .doc(uid)
+        .collection("settings")
+        .doc(`dataSources_${companyId}`)
+        .set(
+          {
+            activeAccountingSource: "pennylane",
+            activeFecFolderName: null,
+            createdAt: now,
+            updatedAt: now,
+          },
+          { merge: true }
+        );
+
       mappings.push({ companyId, externalCompanyName: mc.name });
     }
 

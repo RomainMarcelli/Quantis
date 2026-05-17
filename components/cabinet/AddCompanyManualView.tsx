@@ -24,6 +24,7 @@ import { ACCOUNT_TYPES } from "@/lib/config/account-types";
 import { getDataSourceByProvider } from "@/lib/config/data-sources";
 import { saveAnalysisDraft } from "@/services/analysisStore";
 import { createUserFolder } from "@/services/folderStore";
+import { writeActiveAccountingSource } from "@/services/dataSourcesStore";
 import type { AnalysisDraft } from "@/types/analysis";
 
 export function AddCompanyManualView() {
@@ -126,6 +127,17 @@ export function AddCompanyManualView() {
               companyId: createPayload.companyId,
             };
             await saveAnalysisDraft(draftWithCompany);
+
+            // Active la source "fec" pour ce dossier — l'upload Excel/PDF
+            // passe par le même pipeline parser/folder que FEC, donc on
+            // utilise cette source pour activer la tuile et alimenter les
+            // KPIs scopés au dossier dans /synthese, /analysis, etc.
+            await writeActiveAccountingSource(
+              user.uid,
+              "fec",
+              trimmedName,
+              createPayload.companyId
+            );
           } catch (uploadErr) {
             throw new Error(
               `Entreprise créée, mais l'import du fichier a échoué : ${

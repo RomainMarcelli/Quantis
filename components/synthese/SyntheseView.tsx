@@ -162,6 +162,7 @@ export function SyntheseView() {
   // dashboard, on guide l'utilisateur à choisir.
   const { activeAccountingSource, activeFecFolderName, activeBankingSource } = useActiveDataSource({
     analyses: allAnalyses,
+    companyId: activeCompanyId,
   });
 
   const analysisPair = useMemo(() => {
