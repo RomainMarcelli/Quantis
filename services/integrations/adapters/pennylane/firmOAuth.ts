@@ -39,6 +39,8 @@ type RawCompany = {
 type RawCompaniesResponse = {
   items?: RawCompany[];
   data?: RawCompany[];
+  companies?: RawCompany[];
+  results?: RawCompany[];
 };
 
 function getBaseUrl(): string {
@@ -91,14 +93,41 @@ export async function fetchFirmCompaniesWithToken(
     return [];
   }
 
-  let payload: RawCompaniesResponse;
+  let payload: unknown;
   try {
-    payload = (await response.json()) as RawCompaniesResponse;
+    payload = await response.json();
   } catch {
     return [];
   }
 
-  const rawList = payload.items ?? payload.data ?? [];
+  // Pennylane Firm API peut renvoyer la liste sous plusieurs formes selon
+  // la version : { items: [...] } | { data: [...] } | { companies: [...] }
+  // | { results: [...] } | [...] (top-level array). On essaie chacune.
+  let rawList: RawCompany[] = [];
+  if (Array.isArray(payload)) {
+    rawList = payload as RawCompany[];
+  } else if (payload && typeof payload === "object") {
+    const p = payload as RawCompaniesResponse;
+    rawList = p.items ?? p.data ?? p.companies ?? p.results ?? [];
+  }
+
+  // Log diagnostic si on reçoit 200 OK mais 0 dossier — c'est ce cas
+  // précis qu'on a vu en sandbox 17/05/2026 (Pennylane a 1 dossier mais
+  // notre parsing renvoie []). On loggue les top-level keys du payload
+  // pour identifier le bon shape sans exposer de PII.
+  if (rawList.length === 0) {
+    const topKeys =
+      payload && typeof payload === "object" && !Array.isArray(payload)
+        ? Object.keys(payload as Record<string, unknown>).slice(0, 10)
+        : Array.isArray(payload)
+          ? ["__top_level_array__"]
+          : [typeof payload];
+    console.warn("[pennylane-firm] /companies returned 0 items", {
+      status: response.status,
+      topLevelKeys: topKeys,
+    });
+  }
+
   return rawList
     .map((raw) => normalizeRawCompany(raw))
     .filter((c): c is PennylaneFirmCompany => c !== null);

@@ -125,6 +125,14 @@ export async function GET(request: NextRequest) {
     })
   );
 
+  // Firm OAuth — liste les dossiers accessibles via le firm token.
+  // Endpoint racine, pas scopé company. Pour diagnostiquer pourquoi
+  // /cabinet/onboarding/picker affiche "0 dossier disponible" alors que
+  // le cabinet a des dossiers en sandbox.
+  const companiesRawSample = await safeCall(() =>
+    pennylaneRequest<unknown>(connection, "/companies", { query: { per_page: 100 } })
+  );
+
   return NextResponse.json({
     environment: {
       baseUrl,
@@ -154,6 +162,7 @@ export async function GET(request: NextRequest) {
       customer_invoices: customerInvoicesSample,
       supplier_invoices: supplierInvoicesSample,
       trial_balance: trialBalanceSample,
+      companies_firm: companiesRawSample,
     },
   });
 }
