@@ -159,7 +159,10 @@ async function executeWithAuthRecovery<T>(
     try {
       // Import dynamique pour éviter une dépendance circulaire avec auth.ts.
       const { refreshOAuthToken } = await import("@/services/integrations/adapters/pennylane/auth");
-      const refreshed = await refreshOAuthToken(connection.auth);
+      // kind dérivé du providerSub : firm pour les cabinets (sandbox 13/05/2026),
+      // company sinon (compat connexions Phase 1.5 pre-Firm).
+      const kind = connection.providerSub === "pennylane_firm" ? "firm" : "company";
+      const refreshed = await refreshOAuthToken(connection.auth, kind);
       // Mutation in-place : les requêtes suivantes du même sync utiliseront le nouveau token.
       Object.assign(connection.auth, refreshed);
       // Persistance asynchrone "best effort" — si elle échoue, on continue avec la session

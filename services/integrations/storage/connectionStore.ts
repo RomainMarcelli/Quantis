@@ -61,6 +61,17 @@ export type CreateConnectionInput = {
   provider: ConnectorProvider;
   providerSub: ConnectorProviderSub;
   auth: ConnectorAuth;
+  /**
+   * Override optionnel de externalCompanyId / externalFirmId, utile pour
+   * les flows où ces identifiants sont récupérés APRÈS l'échange du
+   * token (ex: Pennylane Firm OAuth qui appelle GET /companies en post-
+   * callback pour lister les dossiers accessibles).
+   *
+   * Si non fourni, on dérive les identifiants depuis `auth` comme avant
+   * (compat ascendante).
+   */
+  externalCompanyIdOverride?: string;
+  externalFirmIdOverride?: string | null;
 };
 
 /**
@@ -159,14 +170,21 @@ export async function createConnection(input: CreateConnectionInput): Promise<Co
     tokenExpiresAt: input.auth.mode === "oauth2" ? input.auth.tokenExpiresAt : null,
     scopes: input.auth.mode === "oauth2" ? input.auth.scopes : [],
     externalCompanyId:
-      input.auth.mode === "firm_token"
-        ? ""
-        : input.auth.mode === "partner_jwt"
-          ? input.auth.externalCompanyId
-          : input.auth.mode === "odoo_session"
+      input.externalCompanyIdOverride !== undefined
+        ? input.externalCompanyIdOverride
+        : input.auth.mode === "firm_token"
+          ? ""
+          : input.auth.mode === "partner_jwt"
             ? input.auth.externalCompanyId
-            : input.auth.externalCompanyId,
-    externalFirmId: input.auth.mode === "firm_token" ? input.auth.externalFirmId : null,
+            : input.auth.mode === "odoo_session"
+              ? input.auth.externalCompanyId
+              : input.auth.externalCompanyId,
+    externalFirmId:
+      input.externalFirmIdOverride !== undefined
+        ? input.externalFirmIdOverride
+        : input.auth.mode === "firm_token"
+          ? input.auth.externalFirmId
+          : null,
     odooInstanceUrl: input.auth.mode === "odoo_session" ? input.auth.instanceUrl : null,
     odooDatabase: input.auth.mode === "odoo_session" ? input.auth.database : null,
     odooLogin: input.auth.mode === "odoo_session" ? input.auth.login : null,
