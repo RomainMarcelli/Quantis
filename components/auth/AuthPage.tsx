@@ -240,6 +240,11 @@ export function AuthPage({
         usageObjectives,
       });
       if (userLevel) setUserLevel(userLevel);
+      // Hook feature/cabinet-ux : consomme le choix du picker pré-auth.
+      // Si l'user a choisi "Je gère un cabinet" sur /onboarding puis saisi
+      // un nom sur /cabinet/setup, on crée la Firm via l'API existante.
+      // Le user est déjà authentifié à ce stade (Firebase Auth session active).
+      await applyPreAuthAccountTypeChoice();
       switchMode("forgot-sent");
     } catch (err) {
       const mapped = mapFirebaseError(err);
@@ -254,6 +259,41 @@ export function AuthPage({
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // ─── Pré-auth account-type bridge ─────────────────────────────────────
+  // Lit `vyzor_account_type` + (optionnellement) `vyzor_firm_name` posés par
+  // /onboarding et /cabinet/setup. Si firm_member, POST /api/cabinet/firm/create
+  // pour créer la Firm et basculer users/{uid}.accountType. En cas d'échec on
+  // log silencieux : le user peut toujours configurer son cabinet plus tard
+  // depuis /cabinet/setup (no-op vs flow company_owner classique).
+  async function applyPreAuthAccountTypeChoice() {
+    if (typeof window === "undefined") return;
+    const accountType = window.localStorage.getItem("vyzor_account_type");
+    if (accountType !== "firm_member") {
+      window.localStorage.removeItem("vyzor_account_type");
+      return;
+    }
+    const firmName =
+      window.localStorage.getItem("vyzor_firm_name") || companyName.trim() || "Mon cabinet";
+    try {
+      const idToken = await firebaseAuthGateway.getIdToken();
+      if (!idToken) return;
+      await fetch("/api/cabinet/firm/create", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: firmName }),
+      });
+    } catch {
+      /* swallow — non bloquant */
+    } finally {
+      window.localStorage.removeItem("vyzor_account_type");
+      window.localStorage.removeItem("vyzor_firm_name");
+      window.localStorage.removeItem("vyzor_firm_expected_dossiers");
     }
   }
 
