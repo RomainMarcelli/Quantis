@@ -42,6 +42,7 @@ import {
 import { firebaseAuthGateway } from "@/services/auth";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
+import { useActiveCompany } from "@/lib/stores/activeCompanyStore";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 import { SyntheseDashboard } from "@/components/synthese/SyntheseDashboard";
@@ -68,6 +69,7 @@ import {
 
 export function SyntheseView() {
   const router = useRouter();
+  const { activeCompanyId } = useActiveCompany();
 
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [greetingName, setGreetingName] = useState("Utilisateur");
@@ -133,7 +135,10 @@ export function SyntheseView() {
     }
 
     void loadSyntheseData(user);
-  }, [user]);
+    // Recharge quand le dossier actif change (mode cabinet — switch dossier
+    // dans le dropdown ou depuis le portefeuille).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeCompanyId]);
 
   const yearOptions = useMemo(
     () => buildSyntheseYearOptions(allAnalyses, currentCalendarYear),
@@ -296,7 +301,7 @@ export function SyntheseView() {
       }
 
       const [history, profile] = await Promise.all([
-        listUserAnalyses(currentUser.uid),
+        listUserAnalyses(currentUser.uid, undefined, activeCompanyId),
         getUserProfile(currentUser.uid)
       ]);
 

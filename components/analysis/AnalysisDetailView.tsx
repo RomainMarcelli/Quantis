@@ -179,6 +179,10 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
 
+  // Scope multi-tenant — déclaré tôt pour pouvoir être utilisé dans les
+  // useEffect plus bas (loadDashboardData filtre par activeCompanyId).
+  const { activeCompanyId } = useActiveCompany();
+
   // L'onglet Trésorerie n'apparaît que si LES TROIS conditions sont vraies :
   //   1. l'utilisateur a activé Bridge via le toggle de /documents
   //      (`activeBankingSource === "bridge"`, lu plus bas via useActiveDataSource).
@@ -338,7 +342,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     // Priorité 2 : on laisse loadDashboardData résoudre via la source active
     // (filtrage par provider + folder dans le matcher).
     void loadDashboardData(user, analysisId ?? undefined);
-  }, [user, analysisId, activeAccountingSource, activeFecFolderName]);
+    // Recharge quand le dossier cabinet actif change (mode firm_member).
+  }, [user, analysisId, activeAccountingSource, activeFecFolderName, activeCompanyId]);
 
   useEffect(() => {
     if (currentFolder.trim()) {
@@ -417,23 +422,18 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const temporality = useTemporality();
 
   // Sprint C — quand l'user firm_member switche de dossier via CompanySelector,
-  // on bascule `analysis` sur la dernière analyse rattachée au companyId actif.
-  // Si l'activeCompanyId est null (company_owner / mode non cabinet), on laisse
-  // le flow standard sélectionner la dernière analyse globale.
-  const { activeCompanyId } = useActiveCompany();
+  // loadDashboardData se rejoue déjà via la dépendance `activeCompanyId` du
+  // useEffect principal. Ce useEffect post-load gère l'edge case "le dossier
+  // actif n'a aucune analyse" en affichant un message clair plutôt qu'un
+  // cockpit vide ambigu.
   useEffect(() => {
-    if (!activeCompanyId || allAnalyses.length === 0) return;
-    const matching = allAnalyses.filter((a) => a.companyId === activeCompanyId);
-    if (matching.length === 0) {
-      // Aucune analyse pour ce dossier — on garde l'analyse courante mais
-      // on informe l'utilisateur que le dossier n'a pas encore d'analyse.
+    if (!activeCompanyId) return;
+    if (allAnalyses.length === 0 && !loadingAnalysis) {
       setAnalysis(null);
       setInfoMessage("Ce dossier n'a pas encore d'analyse financière.");
-      return;
+    } else {
+      setInfoMessage(null);
     }
-    // Le plus récent (allAnalyses est déjà trié desc par createdAt côté store).
-    setAnalysis(matching[0]!);
-    setInfoMessage(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCompanyId, allAnalyses]);
 
@@ -619,7 +619,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       }
 
       const [history, profile, persistedFolders] = await Promise.all([
-        listUserAnalyses(currentUser.uid),
+        listUserAnalyses(currentUser.uid, undefined, activeCompanyId),
         getUserProfile(currentUser.uid),
         listUserFolders(currentUser.uid)
       ]);
