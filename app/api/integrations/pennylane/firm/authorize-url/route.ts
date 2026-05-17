@@ -20,8 +20,22 @@ const OAUTH_STATES_COLLECTION = "oauth_states";
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
 const DEFAULT_AUTHORIZE_URL = "https://app.pennylane.com/oauth/authorize";
-const DEFAULT_SCOPES =
-  "accounting:readonly invoices:readonly customers:readonly suppliers:readonly transactions:readonly categories:readonly products:readonly bank_accounts:readonly employees:readonly firms:readonly companies:readonly";
+// Les 11 scopes Firm API documentés par Pennylane (brief 13/05/2026).
+// Toute autre valeur (accounting/invoices/products/bank_accounts/employees/firms)
+// fait répondre Pennylane "scope invalide ou mal formé".
+const DEFAULT_SCOPES = [
+  "categories:readonly",
+  "customers:readonly",
+  "fiscal_years:readonly",
+  "journals:readonly",
+  "ledger_accounts:readonly",
+  "ledger_entries:readonly",
+  "suppliers:readonly",
+  "transactions:readonly",
+  "trial_balance:readonly",
+  "companies:readonly",
+  "dms_files:readonly",
+].join(" ");
 
 export async function GET(request: NextRequest) {
   let userId: string;
