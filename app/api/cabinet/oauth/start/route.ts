@@ -76,7 +76,8 @@ export async function POST(request: NextRequest) {
       expiresAt,
     });
 
-  const scopes = process.env.PENNYLANE_FIRM_SCOPES?.trim() || DEFAULT_SCOPES;
+  // Scopes hard-codés : voir commentaire identique dans authorize-url/route.ts.
+  const scopes = DEFAULT_SCOPES;
   const authorizeBase = process.env.PENNYLANE_OAUTH_AUTHORIZE_URL || DEFAULT_AUTHORIZE_URL;
   const authorizeUrl = new URL(authorizeBase);
   authorizeUrl.searchParams.set("response_type", "code");

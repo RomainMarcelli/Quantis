@@ -82,7 +82,11 @@ export async function GET(request: NextRequest) {
 
   const authorizeBase =
     process.env.PENNYLANE_OAUTH_AUTHORIZE_URL || DEFAULT_AUTHORIZE_URL;
-  const scope = process.env.PENNYLANE_FIRM_SCOPES?.trim() || DEFAULT_SCOPES;
+  // Scopes hard-codés : la liste documentée Pennylane Firm est figée à 11
+  // valeurs ; rendre ça paramétrable via env a déjà fait casser la prod
+  // (variable mise à des scopes inventés). Modifier ici si Pennylane publie
+  // une nouvelle liste.
+  const scope = DEFAULT_SCOPES;
 
   const authorizeUrl = new URL(authorizeBase);
   authorizeUrl.searchParams.set("client_id", clientId);
