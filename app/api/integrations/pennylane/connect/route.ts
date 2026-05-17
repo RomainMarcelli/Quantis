@@ -8,6 +8,8 @@ import {
   buildCompanyTokenAuth,
   buildFirmTokenAuth,
   buildOAuthAuthorizeUrl,
+  isCompanyOAuthEnabled,
+  type PennylaneOAuthKind,
 } from "@/services/integrations/adapters/pennylane/auth";
 import {
   ConnectionAlreadyExistsError,
@@ -33,6 +35,9 @@ type ConnectRequestBody =
     }
   | {
       mode: "oauth2";
+      /** Brief 13/05/2026 : "firm" pour cabinets, "company" pour entreprises.
+       *  Défaut "firm" (cas principal — la Firm API est validée par Pennylane). */
+      kind?: PennylaneOAuthKind;
     };
 
 export async function POST(request: NextRequest) {
@@ -95,31 +100,51 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.mode === "oauth2") {
+      const kind: PennylaneOAuthKind = body.kind ?? "firm";
+
+      // Feature flag : Company API en attente de validation Pennylane.
+      // Côté route on refuse explicitement pour donner une erreur 503 claire
+      // au front (au lieu de laisser exploser plus bas avec un 501 obscur).
+      if (kind === "company" && !isCompanyOAuthEnabled()) {
+        return NextResponse.json(
+          {
+            error: "Pennylane Company OAuth indisponible.",
+            detail:
+              "L'OAuth Company est en attente de validation Pennylane. " +
+              "Utilisez le mode 'firm' (cabinet) ou un token manuel.",
+          },
+          { status: 503 }
+        );
+      }
+
       const state = randomBytes(24).toString("base64url");
       const expiresAt = new Date(Date.now() + OAUTH_STATE_TTL_MS).toISOString();
+      // Brief 13/05/2026 : on persiste le `kind` dans le state pour le
+      // récupérer côté callback (le state est notre canal signé Firm↔Company).
       await getFirebaseAdminFirestore()
         .collection(OAUTH_STATES_COLLECTION)
         .doc(state)
         .set({
           userId,
           provider: "pennylane",
+          kind,
           createdAt: new Date().toISOString(),
           expiresAt,
         });
 
       let authorizeUrl: string;
       try {
-        authorizeUrl = buildOAuthAuthorizeUrl(state);
+        authorizeUrl = buildOAuthAuthorizeUrl(state, kind);
       } catch (error) {
         return NextResponse.json(
           {
-            error: "OAuth Pennylane non configuré côté serveur.",
+            error: `OAuth Pennylane ${kind} non configuré côté serveur.`,
             detail: error instanceof Error ? error.message : "unknown",
           },
           { status: 501 }
         );
       }
-      return NextResponse.json({ authorizeUrl, state }, { status: 200 });
+      return NextResponse.json({ authorizeUrl, state, kind }, { status: 200 });
     }
 
     return NextResponse.json({ error: "Mode d'auth inconnu." }, { status: 400 });

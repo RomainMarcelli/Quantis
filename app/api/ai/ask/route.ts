@@ -19,6 +19,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
 import { AuthenticationError, requireAuthenticatedUser } from "@/lib/server/requireAuth";
 import { enforceRouteRateLimit } from "@/lib/server/rateLimit";
+import { resolveCompanyContext } from "@/services/auth/resolveCompanyContext";
+import { CompanyAccessError } from "@/services/auth/requireCompanyAccess";
 import { getAiService } from "@/lib/ai/aiService";
 import {
   addMessage,
@@ -41,6 +43,10 @@ type AskBody = {
   analysisId?: unknown;
   conversationId?: unknown;
   userLevel?: unknown;
+  /** Sprint A multi-tenant — optionnel. Si fourni, on valide l'accès
+   *  via requireCompanyAccess. Sinon, fallback rétrocompat sur la 1re
+   *  Company du user. Le mode est loggé pour mesurer la migration. */
+  companyId?: unknown;
 };
 
 function isUserLevel(v: unknown): v is UserLevel {
@@ -73,6 +79,21 @@ export async function POST(request: NextRequest) {
     body = (await request.json()) as AskBody;
   } catch {
     return NextResponse.json({ error: "Body JSON invalide." }, { status: 400 });
+  }
+
+  // Sprint A multi-tenant — résolution du contexte Company. Pour /ai/ask
+  // qui ne touche pas directement les données comptables, on se contente
+  // de valider l'accès si companyId fourni. Pas bloquant si rien fourni
+  // (fallback rétrocompat sur la 1re Company du user).
+  const companyIdHint =
+    typeof body.companyId === "string" ? body.companyId.trim() : null;
+  try {
+    await resolveCompanyContext(userId, companyIdHint);
+  } catch (err) {
+    if (err instanceof CompanyAccessError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    throw err;
   }
 
   const question = typeof body.question === "string" ? body.question.trim() : "";

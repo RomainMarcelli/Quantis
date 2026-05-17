@@ -19,6 +19,8 @@ import {
   Upload,
 } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
+import { useConnectorVisibility } from "@/lib/hooks/useConnectorVisibility";
+import type { ConnectorId } from "@/services/integrations/connectorVisibility";
 
 export type ProviderId = "pennylane" | "myunisoft" | "odoo" | "tiime" | "other";
 
@@ -38,13 +40,17 @@ type ProviderCard = {
   available: boolean;
 };
 
-const PROVIDERS: ProviderCard[] = [
+// Brief 14/05/2026 — chaque ProviderCard est rattachée à un ConnectorId
+// dont la visibilité est résolue via `useConnectorVisibility()`. La grille
+// du wizard ne rend que les providers visibles. Pas de mode "Bientôt
+// disponible" : soit visible et cliquable, soit pas affiché.
+const PROVIDERS: Array<ProviderCard & { connectorId: ConnectorId }> = [
   // L'icône Pennylane (vert/teal) reste lisible sur fond clair ET sombre — pas de variante dédiée.
-  { id: "pennylane", name: "Pennylane",      subtitle: "Connexion automatique",      logo: { light: "/images/integrations/pennylane.png", dark: null },                                       available: true  },
-  { id: "myunisoft", name: "MyUnisoft",      subtitle: "Connexion automatique",      logo: { light: "/images/integrations/myunisoft.png", dark: "/images/integrations/myunisoft-dark.webp" }, available: true  },
-  { id: "odoo",      name: "Odoo",           subtitle: "Connexion automatique",      logo: { light: "/images/integrations/odoo.svg",      dark: "/images/integrations/odoo-dark.svg" },        available: true  },
-  { id: "tiime",     name: "Tiime",          subtitle: "Bientôt disponible",         logo: { light: "/images/integrations/tiime.svg",     dark: "/images/integrations/tiime-dark.svg" },       available: false },
-  { id: "other",     name: "Autre logiciel", subtitle: "Import manuel (FEC ou PDF)", logo: null,                                                                                                available: true  },
+  { id: "pennylane", connectorId: "pennylane_manual", name: "Pennylane",      subtitle: "Connexion automatique",      logo: { light: "/images/integrations/pennylane.png", dark: null },                                       available: true },
+  { id: "myunisoft", connectorId: "myu_manual",       name: "MyUnisoft",      subtitle: "Connexion automatique",      logo: { light: "/images/integrations/myunisoft.png", dark: "/images/integrations/myunisoft-dark.webp" }, available: true },
+  { id: "odoo",      connectorId: "odoo",             name: "Odoo",           subtitle: "Connexion automatique",      logo: { light: "/images/integrations/odoo.svg",      dark: "/images/integrations/odoo-dark.svg" },        available: true },
+  { id: "tiime",     connectorId: "tiime",            name: "Tiime",          subtitle: "Connexion automatique",      logo: { light: "/images/integrations/tiime.svg",     dark: "/images/integrations/tiime-dark.svg" },       available: true },
+  { id: "other",     connectorId: "fec_upload",       name: "Autre logiciel", subtitle: "Import manuel (FEC ou PDF)", logo: null,                                                                                                available: true },
 ];
 
 type ConnectedRecap = {
@@ -72,6 +78,10 @@ export function AccountingConnectionWizard({
 }: WizardProps) {
   const [chosen, setChosen] = useState<ProviderId | null>(initialProvider);
   const [recap, setRecap] = useState<ConnectedRecap | null>(null);
+
+  // Brief 14/05/2026 — visibilité MVP Phase 1. Pilote la grille de choix
+  // de provider en étape 1 du wizard.
+  const { isVisible: isWizardConnectorVisible } = useConnectorVisibility();
 
   function reset() {
     setChosen(null);
@@ -129,6 +139,10 @@ export function AccountingConnectionWizard({
 
   // ─── Étape 1 : choix du logiciel ───────────────────────────────────────────
   if (!chosen) {
+    // Brief 14/05/2026 — n'affiche que les providers visibles selon les
+    // flags d'env. Le badge "Bientôt" est retiré : soit visible et
+    // cliquable, soit pas affiché du tout.
+    const visibleProviders = PROVIDERS.filter((p) => isWizardConnectorVisible(p.connectorId));
     return (
       <WizardShell>
         <Header
@@ -136,7 +150,7 @@ export function AccountingConnectionWizard({
           subtitle="Choisissez votre logiciel pour synchroniser automatiquement vos données."
         />
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {PROVIDERS.map((p) => (
+          {visibleProviders.map((p) => (
             <button
               key={p.id}
               type="button"
@@ -148,11 +162,6 @@ export function AccountingConnectionWizard({
                 <p className="text-sm font-semibold text-white">{p.name}</p>
                 <p className="mt-0.5 text-xs text-white/55">{p.subtitle}</p>
               </div>
-              {!p.available && (
-                <span className="rounded-md border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-amber-300">
-                  Bientôt
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -403,6 +412,65 @@ function PennylaneStep({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Brief 13/05/2026 + 14/05/2026 : la Vue 3 peut exposer jusqu'à 3 méthodes
+  // de connexion selon les feature flags :
+  //   - "cabinet"    → OAuth Firm     — visible UNIQUEMENT si PENNYLANE_FIRM_VISIBLE=true
+  //                                     (gaté : tant que la notion de compte
+  //                                     cabinet n'existe pas dans le produit,
+  //                                     les bêta-testeurs sont dirigeants TPE/PME)
+  //   - "entreprise" → OAuth Company  — visible UNIQUEMENT si PENNYLANE_COMPANY_ENABLED=true
+  //                                     (en attente de validation Pennylane)
+  //   - "token"      → token manuel   — toujours visible (comportement
+  //                                     historique pré-OAuth)
+  // Quand AUCUN OAuth n'est visible, on bypass le sélecteur et on rend
+  // directement le formulaire token (UX pré-OAuth conservée).
+  type ConnectionMethod = "selector" | "token";
+  // Init "token" par défaut. Si firmVisible OU companyEnabled passe à true
+  // après chargement de la config, on bascule en "selector".
+  const [method, setMethod] = useState<ConnectionMethod>("token");
+
+  // Feature flags exposés par /api/integrations/pennylane/config.
+  // undefined = en cours de chargement (on rend le token form par défaut).
+  const [companyOAuthEnabled, setCompanyOAuthEnabled] = useState<boolean | undefined>(undefined);
+  const [firmOAuthVisible, setFirmOAuthVisible] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/integrations/pennylane/config");
+        if (!res.ok) {
+          if (!cancelled) {
+            setCompanyOAuthEnabled(false);
+            setFirmOAuthVisible(false);
+          }
+          return;
+        }
+        const data = (await res.json()) as {
+          companyEnabled: boolean;
+          firmVisible: boolean;
+        };
+        if (cancelled) return;
+        const company = Boolean(data.companyEnabled);
+        const firm = Boolean(data.firmVisible);
+        setCompanyOAuthEnabled(company);
+        setFirmOAuthVisible(firm);
+        // Si au moins un OAuth est exposé, on présente le sélecteur ;
+        // sinon on reste sur le formulaire token (UX pré-OAuth).
+        if (company || firm) {
+          setMethod("selector");
+        }
+      } catch {
+        if (!cancelled) {
+          setCompanyOAuthEnabled(false);
+          setFirmOAuthVisible(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Connection existante détectée au mount — null tant qu'on ne sait pas.
   type ExistingConnection = {
     id: string;
@@ -630,7 +698,99 @@ function PennylaneStep({
     );
   }
 
-  // ── Vue 3 : pas de connection (ou remplacement) → formulaire token ──
+  // ── Démarre un flow OAuth (firm | company) → redirige vers Pennylane ──
+  async function startOAuth(kind: "firm" | "company") {
+    setError(null);
+    setBusy(true);
+    try {
+      const idToken = await firebaseAuthGateway.getIdToken();
+      if (!idToken) throw new Error("Session expirée — reconnectez-vous.");
+      const res = await fetch("/api/integrations/pennylane/connect", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ mode: "oauth2", kind }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(extractError(data, "Initialisation OAuth échouée"));
+      const { authorizeUrl } = data as { authorizeUrl: string };
+      // Redirection navigateur vers Pennylane. Au retour, le callback
+      // (/api/integrations/pennylane/callback) crée la connexion puis
+      // redirige vers /documents?pennylane_oauth=success&kind=...
+      window.location.href = authorizeUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue");
+      setBusy(false);
+    }
+  }
+
+  // ── Vue 3 : sélecteur de méthode de connexion (OAuth Cabinet / Entreprise / Token manuel) ──
+  if (method === "selector") {
+    return (
+      <div className="flex flex-col gap-4">
+        <Header
+          title="Connectez votre Pennylane"
+          subtitle="Choisissez la méthode adaptée à votre profil."
+        />
+
+        {/* Méthode PRIMAIRE — Cabinet (Firm OAuth) — gatée par
+            PENNYLANE_FIRM_VISIBLE (brief 14/05/2026). Tant que la notion
+            de compte cabinet n'existe pas dans le produit, on masque la
+            tuile aux dirigeants TPE/PME. Le back-end OAuth Firm reste
+            fonctionnel — Antoine peut activer le flag sur preview pour
+            tester le flow bout-en-bout. */}
+        {firmOAuthVisible ? (
+          <button
+            type="button"
+            onClick={() => void startOAuth("firm")}
+            disabled={busy}
+            className="flex flex-col items-start gap-1.5 rounded-xl border border-quantis-gold/30 bg-quantis-gold/[0.06] px-4 py-3 text-left transition hover:border-quantis-gold/60 hover:bg-quantis-gold/[0.1] disabled:opacity-50"
+          >
+            <span className="text-sm font-semibold text-quantis-gold">
+              Connecter mon cabinet Pennylane
+            </span>
+            <span className="text-xs text-white/70">
+              Recommandé si vous êtes expert-comptable et souhaitez connecter plusieurs dossiers clients.
+            </span>
+          </button>
+        ) : null}
+
+        {/* Méthode SECONDAIRE — Entreprise (Company OAuth, conditionnel feature flag) */}
+        {companyOAuthEnabled ? (
+          <button
+            type="button"
+            onClick={() => void startOAuth("company")}
+            disabled={busy}
+            className="flex flex-col items-start gap-1.5 rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-left transition hover:border-white/30 hover:bg-white/[0.06] disabled:opacity-50"
+          >
+            <span className="text-sm font-semibold text-white">
+              Connecter mon entreprise
+            </span>
+            <span className="text-xs text-white/65">
+              Recommandé si vous êtes dirigeant et souhaitez connecter votre propre dossier.
+            </span>
+          </button>
+        ) : null}
+
+        {/* Méthode TERTIAIRE — Token manuel (fallback compat bêta-testeurs) */}
+        <button
+          type="button"
+          onClick={() => setMethod("token")}
+          disabled={busy}
+          className="text-left text-xs text-white/55 underline-offset-2 hover:text-white/85 hover:underline disabled:opacity-50"
+        >
+          J&apos;ai déjà un token API (collez-le manuellement)
+        </button>
+
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        <PrivacyNote />
+      </div>
+    );
+  }
+
+  // ── Vue 4 : formulaire token manuel (méthode tertiaire) ──
   return (
     <div className="flex flex-col gap-4">
       <Header title="Connectez votre Pennylane" subtitle="Synchronisation en lecture seule depuis votre compte." />
@@ -646,10 +806,24 @@ function PennylaneStep({
         sensitive
         disabled={busy}
       />
-      <div>
+      <div className="flex flex-wrap gap-2">
         <PrimaryButton onClick={() => void handleConnect()} disabled={busy || !token.trim()} busy={busy}>
           {busy ? "Connexion en cours…" : "Connecter"}
         </PrimaryButton>
+        {/* "Retour" affiché uniquement si une méthode OAuth est exposée
+            (sélecteur disponible). En mode dirigeant pur (PENNYLANE_FIRM_VISIBLE
+            et PENNYLANE_COMPANY_ENABLED tous deux false), le formulaire
+            token est l'unique vue — pas de retour à proposer. */}
+        {firmOAuthVisible || companyOAuthEnabled ? (
+          <button
+            type="button"
+            onClick={() => setMethod("selector")}
+            disabled={busy}
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70 hover:bg-white/10 disabled:opacity-40"
+          >
+            Retour
+          </button>
+        ) : null}
       </div>
       {error && <p className="text-xs text-red-400">{error}</p>}
       <PrivacyNote />

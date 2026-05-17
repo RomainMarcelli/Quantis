@@ -109,7 +109,8 @@ export async function fetchJournals(
     ctx.connection,
     "/journals",
     { limit: PAGE_SIZE },
-    cursor
+    cursor,
+    ctx.targetCompanyId
   );
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
   return toAdapterPage(page, (raw) => mapJournal(raw as PennylaneJournal, mapperCtx));
@@ -125,7 +126,8 @@ export async function fetchLedgerAccounts(
     ctx.connection,
     "/ledger_accounts",
     { limit: PAGE_SIZE },
-    cursor
+    cursor,
+    ctx.targetCompanyId
   );
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
   return toAdapterPage(page, (raw) => mapLedgerAccount(raw as PennylaneLedgerAccount, mapperCtx));
@@ -143,7 +145,8 @@ export async function fetchCustomers(
     ctx.connection,
     "/customers",
     { limit: PAGE_SIZE, ...buildFilters(ctx, "entity") },
-    cursor
+    cursor,
+    ctx.targetCompanyId
   );
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
   return toAdapterPage(page, (raw) => mapContact(raw as PennylaneCustomer, "customer", mapperCtx));
@@ -157,7 +160,8 @@ export async function fetchSuppliers(
     ctx.connection,
     "/suppliers",
     { limit: PAGE_SIZE, ...buildFilters(ctx, "entity") },
-    cursor
+    cursor,
+    ctx.targetCompanyId
   );
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
   return toAdapterPage(page, (raw) => mapContact(raw as PennylaneSupplier, "supplier", mapperCtx));
@@ -197,7 +201,8 @@ export async function fetchCustomerInvoices(
     ctx.connection,
     "/customer_invoices",
     { limit: PAGE_SIZE, ...buildFilters(ctx, "transactional") },
-    cursor
+    cursor,
+    ctx.targetCompanyId
   );
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
   return toAdapterPage(page, (raw) =>
@@ -213,7 +218,8 @@ export async function fetchSupplierInvoices(
     ctx.connection,
     "/supplier_invoices",
     { limit: PAGE_SIZE, ...buildFilters(ctx, "transactional") },
-    cursor
+    cursor,
+    ctx.targetCompanyId
   );
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
   return toAdapterPage(page, (raw) =>
@@ -255,7 +261,8 @@ export async function fetchAccountingEntries(
     ctx.connection,
     "/ledger_entries",
     { limit: PAGE_SIZE, ...buildFilters(ctx, "transactional") },
-    cursor
+    cursor,
+    ctx.targetCompanyId
   );
   const mapperCtx = { userId: ctx.connection.userId, connectionId: ctx.connection.id };
 
@@ -298,7 +305,9 @@ type PennylaneTrialBalanceItem = {
 export async function fetchTrialBalance(
   connection: Connection,
   periodStart: Date,
-  periodEnd: Date
+  periodEnd: Date,
+  /** Sprint B — cible un dossier précis pour les Connections Firm. */
+  targetCompanyId?: string
 ): Promise<NormalizedTrialBalanceEntry[]> {
   const start = periodStart.toISOString().slice(0, 10);
   const end = periodEnd.toISOString().slice(0, 10);
@@ -310,7 +319,8 @@ export async function fetchTrialBalance(
       connection,
       "/trial_balance",
       { period_start: start, period_end: end, limit: 200 },
-      cursor
+      cursor,
+      targetCompanyId
     );
     for (const item of page.items) {
       all.push({

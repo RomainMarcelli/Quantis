@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import { Lock, LogOut, Settings, UserCircle2 } from "lucide-react";
 import { VyzorLogo } from "@/components/ui/VyzorLogo";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
+import { CompanySelector } from "@/components/cabinet/CompanySelector";
 import { firebaseAuthGateway } from "@/services/auth";
 import type { ReactNode } from "react";
 
@@ -172,6 +173,7 @@ export function AppHeader({
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-2">
+          <CompanySelector />
           {actionSlot}
           <NotificationsBell />
           <UtilityButton

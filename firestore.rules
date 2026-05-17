@@ -85,6 +85,13 @@ service cloud.firestore {
     // Connections aux logiciels comptables tiers (Pennylane, Chift, Bridge).
     // Update autorisé pour le refresh des tokens et la mise à jour des cursors de sync.
     // Les tokens sont chiffrés côté serveur (lib/server/tokenCrypto.ts) avant écriture.
+    //
+    // Sprint B multi-tenant (cf. docs/audit-sprint-B.md) : la contrainte
+    // d'unicité passe de (userId, provider) à (companyId, provider) côté
+    // application — un user peut désormais avoir N Connections actives
+    // ciblant des Companies différentes (cas Pennylane Firm cabinet).
+    // Les rules client gardent la même restriction (ownership par userId)
+    // car le client SDK ne sait pas piloter les contraintes d'unicité.
     match /connections/{connectionId} {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
 
@@ -166,6 +173,83 @@ service cloud.firestore {
         && request.resource.data.connectionId is string
         && request.resource.data.externalId is string;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Sprint B multi-tenant (cf. docs/audit-sprint-B.md) — table de
+    // jointure N:N entre Connections et Companies. Permet :
+    //   - 1 Connection Firm → N Companies (cas Pennylane cabinet)
+    //   - N Connections → 1 Company (Pennylane + Bridge sur même entreprise)
+    // Owner = userId du propriétaire de la Connection (pas firmId — un
+    // mapping appartient à l'user qui possède la Connection sous-jacente).
+    match /connection_companies/{mappingId} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.companyId is string
+        && request.resource.data.externalCompanyId is string
+        && request.resource.data.isActive is bool;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // Sprint C multi-tenant (cf. docs/audit-sprint-C.md) — entité Firm
+    // (cabinet d'expertise comptable). Un cabinet regroupe N Companies
+    // (dossiers clients). Les `firm_members` peuvent lire toutes les
+    // Companies dont firmId pointe vers ce cabinet (étension Sprint C/D
+    // de la rule companies/).
+    //
+    // memberUserIds est un array dénormalisé qui inclut l'ownerUserId.
+    // Sprint C : seul l'owner peut update/delete (gestion membres = Sprint D).
+    match /firms/{firmId} {
+      allow read: if request.auth != null
+        && request.auth.uid in resource.data.memberUserIds;
+      allow create: if request.auth != null
+        && request.resource.data.ownerUserId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.auth.uid in request.resource.data.memberUserIds;
+      allow update: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid;
+    }
+
+    // Sprint A multi-tenant (cf. docs/audit-sprint-A.md) — entité Company
+    // qui regroupe les données comptables d'UNE entreprise. En Sprint A,
+    // chaque user a exactement 1 Company (mode dirigeant TPE/PME).
+    // En Sprint C, on étendra avec `firmId` + firm_members pour le mode
+    // cabinet (1 user cabinet → N Companies dossiers clients).
+    //
+    // Sprint A : seul l'`ownerUserId` peut lire/écrire sa Company.
+    // Sprint C : la rule sera étendue avec un OR sur firmId in
+    // getUserFirms() (cf. roadmap).
+    match /companies/{companyId} {
+      allow read: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid;
+
+      // create : owner doit être l'utilisateur authentifié + champs
+      // structurels obligatoires pour éviter les Companies "corrompues"
+      // injectées côté client.
+      allow create: if request.auth != null
+        && request.resource.data.ownerUserId == request.auth.uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.source is string
+        && request.resource.data.status is string;
+
+      // update : on interdit le changement d'ownerUserId (transferts
+      // d'ownership = à gérer Sprint C via une route admin dédiée).
+      allow update: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid
+        && request.resource.data.ownerUserId == request.auth.uid;
+
+      allow delete: if request.auth != null
+        && resource.data.ownerUserId == request.auth.uid;
     }
 
     // Journal d'audit des appels API tierces (MyUnisoft, Pennylane, Bridge,

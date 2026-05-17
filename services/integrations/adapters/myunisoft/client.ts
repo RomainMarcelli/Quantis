@@ -4,7 +4,8 @@
 //  - X-Third-Party-Secret = clé partenaire fixe (env MYUNISOFT_THIRD_PARTY_SECRET)
 //  - Authorization: Bearer <JWT>  = token par cabinet/société (depuis la connection)
 //
-// Doc : https://partners.api.myunisoft.fr/
+// Doc partenaire : https://partners.api.myu.fr/ (rebrand MyUnisoft → MyU, semaine du 18/05/2026)
+// Doc API runtime : https://docs.api.myunisoft.fr/ (inchangée)
 
 import type { Connection } from "@/types/connectors";
 import {
