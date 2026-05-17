@@ -9,10 +9,10 @@ export const runtime = "nodejs";
 
 const DEFAULT_AUTHORIZE_URL = "https://app.pennylane.com/oauth/authorize";
 const DEFAULT_SCOPES =
-  "accounting:read invoices:read customers:read suppliers:read transactions:read categories:read products:read bank_accounts:read employees:read firms:read companies:read";
+  "accounting:readonly invoices:readonly customers:readonly suppliers:readonly transactions:readonly categories:readonly products:readonly bank_accounts:readonly employees:readonly firms:readonly companies:readonly";
 
 export async function GET() {
-  const clientId = process.env.PENNYLANE_FIRM_CLIENT_ID;
+  const clientId = process.env.PENNYLANE_OAUTH_CLIENT_ID;
 
   if (!clientId) {
     return NextResponse.json(
@@ -21,20 +21,9 @@ export async function GET() {
     );
   }
 
-  const fallbackRedirect = process.env.NEXT_PUBLIC_APP_URL
-    ? `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/pennylane/firm/callback`
-    : undefined;
   const redirectUri =
-    process.env.PENNYLANE_REDIRECT_URI ??
-    process.env.PENNYLANE_FIRM_REDIRECT_URI ??
-    fallbackRedirect;
-
-  if (!redirectUri) {
-    return NextResponse.json(
-      { error: "Pennylane redirect URI not configured" },
-      { status: 500 }
-    );
-  }
+    process.env.PENNYLANE_REDIRECT_URI ||
+    `${process.env.APP_BASE_URL}/api/integrations/pennylane/firm/callback`;
 
   const authorizeBase =
     process.env.PENNYLANE_OAUTH_AUTHORIZE_URL || DEFAULT_AUTHORIZE_URL;

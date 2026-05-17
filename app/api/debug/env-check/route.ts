@@ -18,17 +18,21 @@ export async function GET() {
   }
 
   const checks = {
-    PENNYLANE_FIRM_CLIENT_ID: {
-      present: !!process.env.PENNYLANE_FIRM_CLIENT_ID,
-      length: process.env.PENNYLANE_FIRM_CLIENT_ID?.length || 0,
+    PENNYLANE_OAUTH_CLIENT_ID: {
+      present: !!process.env.PENNYLANE_OAUTH_CLIENT_ID,
+      length: process.env.PENNYLANE_OAUTH_CLIENT_ID?.length || 0,
     },
-    PENNYLANE_FIRM_CLIENT_SECRET: {
-      present: !!process.env.PENNYLANE_FIRM_CLIENT_SECRET,
-      length: process.env.PENNYLANE_FIRM_CLIENT_SECRET?.length || 0,
+    PENNYLANE_OAUTH_CLIENT_SECRET: {
+      present: !!process.env.PENNYLANE_OAUTH_CLIENT_SECRET,
+      length: process.env.PENNYLANE_OAUTH_CLIENT_SECRET?.length || 0,
     },
     PENNYLANE_REDIRECT_URI: {
       present: !!process.env.PENNYLANE_REDIRECT_URI,
       value: process.env.PENNYLANE_REDIRECT_URI || "N/A",
+    },
+    APP_BASE_URL: {
+      present: !!process.env.APP_BASE_URL,
+      value: process.env.APP_BASE_URL || "N/A",
     },
   };
 
