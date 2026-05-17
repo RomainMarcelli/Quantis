@@ -1,8 +1,29 @@
 // GET /api/integrations/pennylane/callback?code=...&state=...
-// Callback OAuth Pennylane. Échange le code contre un access_token, crée la connection.
+// Callback OAuth Pennylane unifié — gère LES DEUX flows : Firm et Company.
 //
-// Le state est validé contre la collection oauth_states (TTL 10 min) pour vérifier
-// l'origine ET pour récupérer le `kind` (firm | company) choisi côté /connect.
+// Cette URL est celle whitelistée chez Pennylane :
+//   https://app.vyzor.fr/api/integrations/pennylane/callback
+//
+// Détection du flow :
+//   1. Le state OAuth est préfixé "firm:" ou "company:" par le starter.
+//   2. Fallback : si le state n'a pas de préfixe (anciens flows), on lit
+//      le champ `kind` stocké dans le doc oauth_states/{state}.
+//   3. Défaut "company" si toujours indéterminé (rétrocompat Phase 1.5).
+//
+// Validation :
+//   - Le state est lu en Firestore (collection oauth_states) pour CSRF +
+//     pour récupérer le userId. TTL 10 min.
+//
+// Post-traitement Firm :
+//   - GET /companies → liste des dossiers accessibles via le firm token.
+//   - findOrCreateCompanyForConnection pour la Company représentative.
+//   - createConnection avec providerSub="pennylane_firm".
+//   - createMappingsForFirmCallback pour TOUS les dossiers (idempotent).
+//   - Redirect vers /cabinet/onboarding/picker?connectionId=...
+//
+// Post-traitement Company :
+//   - createConnection avec providerSub="pennylane_company".
+//   - Redirect vers /documents?pennylane_oauth=success&...
 
 import { NextResponse, type NextRequest } from "next/server";
 import {
@@ -14,6 +35,8 @@ import {
   fetchFirmCompaniesWithToken,
 } from "@/services/integrations/adapters/pennylane/firmOAuth";
 import { createConnection } from "@/services/integrations/storage/connectionStore";
+import { createMappingsForFirmCallback } from "@/services/companies/firmCallbackMapping";
+import { findOrCreateCompanyForConnection } from "@/services/companies/companyMatching";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
 import type { ConnectorProviderSub } from "@/types/connectors";
 
@@ -24,11 +47,41 @@ const OAUTH_STATES_COLLECTION = "oauth_states";
 type StoredOAuthState = {
   userId: string;
   provider: string;
-  /** Brief 13/05/2026 : champ ajouté pour router Firm vs Company.
-   *  Absent sur les states créés AVANT le câblage Firm (compat ascendante). */
   kind?: PennylaneOAuthKind;
+  firmId?: string;
   expiresAt: string;
 };
+
+function deriveKindFromState(
+  state: string,
+  storedKind: PennylaneOAuthKind | undefined
+): PennylaneOAuthKind {
+  if (state.startsWith("firm:")) return "firm";
+  if (state.startsWith("company:")) return "company";
+  return storedKind ?? "company";
+}
+
+function buildDocumentsRedirect(
+  request: NextRequest,
+  params: Record<string, string>
+): URL {
+  const target = new URL("/documents", request.nextUrl.origin);
+  for (const [key, value] of Object.entries(params)) {
+    target.searchParams.set(key, value);
+  }
+  return target;
+}
+
+function buildConnectRedirect(
+  request: NextRequest,
+  params: Record<string, string>
+): URL {
+  const target = new URL("/cabinet/onboarding/connect", request.nextUrl.origin);
+  for (const [key, value] of Object.entries(params)) {
+    target.searchParams.set(key, value);
+  }
+  return target;
+}
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -38,7 +91,7 @@ export async function GET(request: NextRequest) {
 
   if (errorParam) {
     return NextResponse.redirect(
-      buildRedirectUrl(request, {
+      buildDocumentsRedirect(request, {
         pennylane_oauth: "error",
         error: "user_denied",
         detail: errorParam.slice(0, 200),
@@ -48,20 +101,20 @@ export async function GET(request: NextRequest) {
 
   if (!code || !state) {
     return NextResponse.redirect(
-      buildRedirectUrl(request, {
+      buildDocumentsRedirect(request, {
         pennylane_oauth: "error",
         error: "missing_params",
       })
     );
   }
 
-  // Vérifier le state.
+  // Lecture du state.
   const db = getFirebaseAdminFirestore();
   const stateRef = db.collection(OAUTH_STATES_COLLECTION).doc(state);
   const stateDoc = await stateRef.get();
   if (!stateDoc.exists) {
     return NextResponse.redirect(
-      buildRedirectUrl(request, {
+      buildDocumentsRedirect(request, {
         pennylane_oauth: "error",
         error: "state_invalid",
       })
@@ -71,7 +124,7 @@ export async function GET(request: NextRequest) {
   if (new Date(stateData.expiresAt).getTime() < Date.now()) {
     await stateRef.delete();
     return NextResponse.redirect(
-      buildRedirectUrl(request, {
+      buildDocumentsRedirect(request, {
         pennylane_oauth: "error",
         error: "state_expired",
       })
@@ -79,95 +132,139 @@ export async function GET(request: NextRequest) {
   }
   if (stateData.provider !== "pennylane") {
     return NextResponse.redirect(
-      buildRedirectUrl(request, {
+      buildDocumentsRedirect(request, {
         pennylane_oauth: "error",
         error: "provider_mismatch",
       })
     );
   }
 
-  // Kind récupéré depuis le state (signé via stockage Firestore + TTL 10 min).
-  // Défaut "company" pour les states pré-Firm (Phase 1.5) — c'était le comportement implicite.
-  const kind: PennylaneOAuthKind = stateData.kind ?? "company";
+  // Détection du kind : préfixe state > champ stocké > défaut "company".
+  const kind = deriveKindFromState(state, stateData.kind);
+  const userId = stateData.userId;
+  const firmId = stateData.firmId;
 
-  // externalCompanyId : Pennylane peut le renvoyer en query ou non selon l'API.
-  // Pour la Firm API, l'identité est récupérée via GET /companies post-token
-  // (cf. commit suivant qui câble ce fetch). Pour l'instant on persiste vide
-  // si non fourni — le sync ultérieur résoudra l'identité.
-  const externalCompanyId = url.searchParams.get("company_id") ?? "";
+  // externalCompanyId : Pennylane peut le renvoyer en query selon l'API.
+  // Pour la Firm API, on récupère via GET /companies après token (cf. ci-dessous).
+  const externalCompanyIdFromQuery = url.searchParams.get("company_id") ?? "";
 
   try {
-    const auth = await exchangeOAuthCode({ code, externalCompanyId, kind });
+    const auth = await exchangeOAuthCode({
+      code,
+      externalCompanyId: externalCompanyIdFromQuery,
+      kind,
+    });
 
-    // providerSub dérivé du kind. Le ConnectionRecord persiste cette info
-    // pour que les futures requêtes (sync, refresh) sachent à quelle API
-    // Pennylane elles parlent (Firm vs Company).
     const providerSub: ConnectorProviderSub =
       kind === "firm" ? "pennylane_firm" : "pennylane_company";
 
-    // Brief 13/05/2026 — Firm OAuth uniquement : on liste les dossiers
-    // accessibles via GET /companies (scope companies:readonly requis).
-    // Sélection multi-dossiers = v2 → on stocke un identifiant cabinet
-    // synthétique stable (deriveFirmIdFromCompanies) + le 1er dossier
-    // comme externalCompanyId représentatif. Le sync ultérieur itèrera
-    // sur l'ensemble des dossiers via le firm token.
-    let externalCompanyIdOverride: string | undefined;
-    let externalFirmIdOverride: string | null | undefined;
-    let companiesCount = 0;
     if (kind === "firm") {
+      // 1. Liste les dossiers accessibles via le firm token.
       const companies = await fetchFirmCompaniesWithToken(auth.accessToken);
-      companiesCount = companies.length;
-      externalCompanyIdOverride = companies[0]?.id ?? "";
-      externalFirmIdOverride = deriveFirmIdFromCompanies(companies) || null;
+      const representativeId = companies[0]?.id || "";
+      const externalFirmId = deriveFirmIdFromCompanies(companies) || null;
+
+      // 2. Company représentative (1er dossier) pour rattacher la Connection.
+      //    Si pas de dossier accessible, on crée un placeholder pour ne pas
+      //    perdre la Connection — le sync ultérieur pourra retenter.
+      const repId =
+        representativeId || `firm-${auth.accessToken.slice(0, 6)}`;
+      const { company: representativeCompany } = await findOrCreateCompanyForConnection({
+        userId,
+        connectionId: "__pending__",
+        source: "pennylane_oauth",
+        externalCompanyId: repId,
+        companyMetadata: {
+          name: companies[0]?.name,
+          siren: companies[0]?.siren ?? undefined,
+        },
+      });
+
+      // 3. Crée la Connection Firm.
+      const connection = await createConnection({
+        userId,
+        companyId: representativeCompany.id,
+        provider: "pennylane",
+        providerSub,
+        auth,
+        externalCompanyIdOverride: repId,
+        externalFirmIdOverride: externalFirmId,
+      });
+
+      // 4. Mappings pour TOUS les dossiers retournés (idempotent).
+      if (companies.length > 0) {
+        try {
+          await createMappingsForFirmCallback(
+            userId,
+            connection.id,
+            "pennylane_oauth",
+            companies.map((c) => ({
+              externalCompanyId: c.id,
+              name: c.name,
+              siren: c.siren ?? undefined,
+            }))
+          );
+        } catch (err) {
+          console.warn("[pennylane-callback] createMappings failed (non-blocking)", err);
+        }
+      }
+
+      // 5. State consommé.
+      await stateRef.delete();
+
+      console.info(
+        `[pennylane-callback] firm connectionId=${connection.id} firmId=${firmId ?? "—"} ` +
+          `companies=${companies.length} userId=${userId}`
+      );
+
+      // 6. Redirect vers le picker.
+      const pickerUrl = new URL(
+        "/cabinet/onboarding/picker",
+        request.nextUrl.origin
+      );
+      pickerUrl.searchParams.set("connectionId", connection.id);
+      pickerUrl.searchParams.set("companies_imported", String(companies.length));
+      return NextResponse.redirect(pickerUrl);
     }
 
+    // ─── Flow Company ────────────────────────────────────────────────────
     const connection = await createConnection({
-      userId: stateData.userId,
+      userId,
       provider: "pennylane",
       providerSub,
       auth,
-      externalCompanyIdOverride,
-      externalFirmIdOverride,
     });
 
-    // State consommé.
     await stateRef.delete();
 
-    // Brief Tâche 3 (13/05/2026) : redirection vers /documents avec un
-    // marqueur de succès — c'est un flow déclenché côté navigateur, le
-    // callback ne peut pas répondre en JSON (l'utilisateur verrait une
-    // page brute). Le front /documents lit ces query params pour
-    // afficher un toast et rafraîchir la liste des connexions.
-    const successUrl = buildRedirectUrl(request, {
+    console.info(
+      `[pennylane-callback] company connectionId=${connection.id} userId=${userId}`
+    );
+
+    const successUrl = buildDocumentsRedirect(request, {
       pennylane_oauth: "success",
       kind,
       connection_id: connection.id,
-      companies_count: String(companiesCount),
     });
     return NextResponse.redirect(successUrl);
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown";
-    const errorUrl = buildRedirectUrl(request, {
-      pennylane_oauth: "error",
-      error: "exchange_failed",
-      detail: detail.slice(0, 200),
-    });
-    return NextResponse.redirect(errorUrl);
+    // Pour le flow Firm, on redirige vers /cabinet/onboarding/connect (origine
+    // du flow) avec error param. Pour Company, vers /documents.
+    if (kind === "firm") {
+      return NextResponse.redirect(
+        buildConnectRedirect(request, {
+          error: "oauth_failed",
+          detail: detail.slice(0, 200),
+        })
+      );
+    }
+    return NextResponse.redirect(
+      buildDocumentsRedirect(request, {
+        pennylane_oauth: "error",
+        error: "exchange_failed",
+        detail: detail.slice(0, 200),
+      })
+    );
   }
-}
-
-/**
- * Construit l'URL de redirection vers /documents en preservant l'origine
- * de la requête (utile pour les déploiements multi-environnements : prod,
- * preview Vercel, dev).
- */
-function buildRedirectUrl(
-  request: NextRequest,
-  params: Record<string, string>
-): URL {
-  const target = new URL("/documents", request.nextUrl.origin);
-  for (const [key, value] of Object.entries(params)) {
-    target.searchParams.set(key, value);
-  }
-  return target;
 }

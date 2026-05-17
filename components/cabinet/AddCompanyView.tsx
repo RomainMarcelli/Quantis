@@ -53,7 +53,11 @@ export function AddCompanyView() {
       if (source.provider !== "pennylane_firm") {
         throw new Error(`OAuth ${source.name} non encore câblé. Contactez le support.`);
       }
-      const res = await fetch(ROUTES.API_OAUTH_AUTHORIZE);
+      const idToken = await firebaseAuthGateway.getIdToken();
+      if (!idToken) throw new Error("Session expirée — reconnectez-vous.");
+      const res = await fetch(ROUTES.API_OAUTH_AUTHORIZE, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
       if (!res.ok) throw new Error("Échec de l'init OAuth.");
       const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
       window.location.href = authorizeUrl;

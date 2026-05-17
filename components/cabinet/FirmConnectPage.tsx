@@ -34,7 +34,11 @@ export function FirmConnectPage() {
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch("/api/integrations/pennylane/firm/authorize-url");
+      const idToken = await firebaseAuthGateway.getIdToken();
+      if (!idToken) throw new Error("Session expirée — reconnectez-vous.");
+      const res = await fetch("/api/integrations/pennylane/firm/authorize-url", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
       if (!res.ok) throw new Error("Failed to get OAuth URL");
 
       const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };

@@ -39,7 +39,7 @@ export const ROUTES = {
   // ─── API ───────────────────────────────────────────────────────────────
   API_MOCK_OAUTH: "/api/mock/oauth-firm-simulate",
   API_OAUTH_AUTHORIZE: "/api/integrations/pennylane/firm/authorize-url",
-  API_OAUTH_CALLBACK: "/api/integrations/pennylane/firm/callback",
+  API_OAUTH_CALLBACK: "/api/integrations/pennylane/callback",
   API_CABINET_FIRM_CREATE: "/api/cabinet/firm/create",
   API_CABINET_PORTEFEUILLE: "/api/cabinet/portefeuille",
   API_CABINET_INVITE: "/api/cabinet/invite",
