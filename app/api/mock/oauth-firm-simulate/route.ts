@@ -23,9 +23,9 @@ import { encryptToken } from "@/lib/server/tokenCrypto";
 export const runtime = "nodejs";
 
 const MOCK_COMPANIES = [
-  { name: "Boulangerie Martin SARL",      ext: "pl-mock-boulangerie",  ca: 180_000, tn:  42_000, ebitda:  28_000, score: 72 },
-  { name: "SARL Dupuis Plomberie",        ext: "pl-mock-plomberie",    ca: 320_000, tn:  -8_000, ebitda: -12_000, score: 41 },
-  { name: "Cabinet Médical Leroy",        ext: "pl-mock-cabinet-med",  ca: 610_000, tn: 125_000, ebitda:  98_000, score: 88 },
+  { name: "Boulangerie Martin SARL",      ext: "pl-mock-boulangerie",  ca: 180_000, tn:  42_000, ebitda:  28_000, resultatNet:  18_000, score: 72 },
+  { name: "SARL Dupuis Plomberie",        ext: "pl-mock-plomberie",    ca: 320_000, tn:  -8_000, ebitda: -12_000, resultatNet: -22_000, score: 41 },
+  { name: "Cabinet Médical Leroy",        ext: "pl-mock-cabinet-med",  ca: 610_000, tn: 125_000, ebitda:  98_000, resultatNet:  72_000, score: 88 },
 ];
 
 export async function GET(req: NextRequest) {
@@ -158,7 +158,7 @@ export async function GET(req: NextRequest) {
         folderName: mc.name,
         fiscalYear: 2025,
         createdAt: nowIso,
-        kpis: { ca: mc.ca, tn: mc.tn, ebitda: mc.ebitda },
+        kpis: { ca: mc.ca, tn: mc.tn, ebitda: mc.ebitda, resultat_net: mc.resultatNet },
         quantisScore: { vyzor_score: mc.score },
         mock: true,
       });

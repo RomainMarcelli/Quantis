@@ -36,6 +36,7 @@ type DossierDto = {
     tresorerieNette: number | null;
     vyzorScore: number | null;
     ebitda: number | null;
+    resultatNet: number | null;
   };
 };
 
@@ -142,6 +143,7 @@ export async function GET(request: NextRequest) {
     let tresorerieNette: number | null = null;
     let vyzorScore: number | null = null;
     let ebitda: number | null = null;
+    let resultatNet: number | null = null;
     try {
       const analysesSnap = await db
         .collection("analyses")
@@ -163,9 +165,17 @@ export async function GET(request: NextRequest) {
           if (typeof kpis.ca === "number") ca = kpis.ca;
           if (typeof kpis.tn === "number") tresorerieNette = kpis.tn;
           if (typeof kpis.ebitda === "number") ebitda = kpis.ebitda;
+          if (typeof kpis.resultat_net === "number") resultatNet = kpis.resultat_net;
+          if (resultatNet === null && typeof kpis.resultatNet === "number") {
+            resultatNet = kpis.resultatNet;
+          }
         }
         if (ca === null && mapped && typeof mapped.total_prod_expl === "number") {
           ca = mapped.total_prod_expl;
+        }
+        // Fallback résultat net via mappedData.resultat_exercice si pas de kpi.
+        if (resultatNet === null && mapped && typeof mapped.resultat_exercice === "number") {
+          resultatNet = mapped.resultat_exercice;
         }
         const score = latest.quantisScore as { vyzor_score?: number } | undefined;
         if (score && typeof score.vyzor_score === "number") {
@@ -185,7 +195,7 @@ export async function GET(request: NextRequest) {
       lastSyncedAt,
       lastSyncStatus,
       source,
-      kpis: { ca, tresorerieNette, vyzorScore, ebitda },
+      kpis: { ca, tresorerieNette, vyzorScore, ebitda, resultatNet },
     });
   }
 
