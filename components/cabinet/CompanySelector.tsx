@@ -9,7 +9,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Building2, ChevronDown, Loader2, ArrowLeftCircle } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
 import { firebaseAuthGateway } from "@/services/auth";
+import { firebaseAuth, firestoreDb } from "@/lib/firebase";
 import { useActiveCompany } from "@/lib/stores/activeCompanyStore";
 
 type Dossier = {
@@ -32,10 +34,24 @@ export function CompanySelector() {
   useEffect(() => setMounted(true), []);
 
   // Détecte le type de compte. Si pas firm_member, on ne rend rien.
+  // Garde Firestore directe en amont pour éviter d'appeler /portefeuille
+  // côté users non-cabinet (qui répond 403 mais reste un round-trip).
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
+        const user = firebaseAuth.currentUser;
+        if (!user) return;
+
+        const userSnap = await getDoc(doc(firestoreDb, "users", user.uid));
+        const resolvedAccountType =
+          (userSnap.data()?.accountType as string | undefined) ?? "company_owner";
+        if (cancelled) return;
+        if (resolvedAccountType !== "firm_member") {
+          setAccountType(resolvedAccountType);
+          return;
+        }
+
         const idToken = await firebaseAuthGateway.getIdToken();
         if (!idToken) return;
         const res = await fetch("/api/cabinet/portefeuille", {

@@ -39,13 +39,16 @@ export async function POST(request: NextRequest) {
     throw error;
   }
 
-  const clientId = process.env.PENNYLANE_FIRM_CLIENT_ID;
-  const redirectUri = process.env.PENNYLANE_FIRM_REDIRECT_URI;
+  const clientId = process.env.PENNYLANE_OAUTH_CLIENT_ID;
+  const redirectUri =
+    process.env.PENNYLANE_REDIRECT_URI ||
+    `${process.env.APP_BASE_URL}/api/integrations/pennylane/firm/callback`;
   if (!clientId || !redirectUri) {
     return NextResponse.json(
       {
         error: "Pennylane Firm OAuth non configuré.",
-        detail: "PENNYLANE_FIRM_CLIENT_ID / _REDIRECT_URI manquants côté serveur.",
+        detail:
+          "PENNYLANE_OAUTH_CLIENT_ID / PENNYLANE_REDIRECT_URI (ou APP_BASE_URL) manquants côté serveur.",
       },
       { status: 503 }
     );

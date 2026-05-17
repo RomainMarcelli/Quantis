@@ -14,7 +14,7 @@
 //   7. Redirige vers /cabinet/onboarding/picker?connectionId=XXX.
 //
 // Notes :
-//   - Si PENNYLANE_FIRM_CLIENT_ID absent (sandbox / dev sans creds réels),
+//   - Si PENNYLANE_OAUTH_CLIENT_ID absent (sandbox / dev sans creds réels),
 //     la route renvoie 503 avec un message clair.
 //   - Le helper fetchFirmCompaniesWithToken est défini inline (Sprint C
 //     minimal — la version complète sur feature/maj-connecteurs sera
@@ -63,9 +63,11 @@ function getOAuthConfig(): {
   tokenUrl: string;
   apiBase: string;
 } | null {
-  const clientId = process.env.PENNYLANE_FIRM_CLIENT_ID;
-  const clientSecret = process.env.PENNYLANE_FIRM_CLIENT_SECRET;
-  const redirectUri = process.env.PENNYLANE_FIRM_REDIRECT_URI;
+  const clientId = process.env.PENNYLANE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.PENNYLANE_OAUTH_CLIENT_SECRET;
+  const redirectUri =
+    process.env.PENNYLANE_REDIRECT_URI ||
+    `${process.env.APP_BASE_URL}/api/integrations/pennylane/firm/callback`;
   if (!clientId || !clientSecret || !redirectUri) return null;
   return {
     clientId,
@@ -93,7 +95,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Pennylane Firm OAuth non configuré.",
-        detail: "PENNYLANE_FIRM_CLIENT_ID / _CLIENT_SECRET / _REDIRECT_URI manquants côté serveur.",
+        detail: "PENNYLANE_OAUTH_CLIENT_ID / _CLIENT_SECRET / PENNYLANE_REDIRECT_URI (ou APP_BASE_URL) manquants côté serveur.",
       },
       { status: 503 }
     );
