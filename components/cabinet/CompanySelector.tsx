@@ -6,6 +6,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Building2, ChevronDown, Loader2, ArrowLeftCircle } from "lucide-react";
 import { firebaseAuthGateway } from "@/services/auth";
@@ -24,6 +25,11 @@ export function CompanySelector() {
   const [open, setOpen] = useState(false);
   const [accountType, setAccountType] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // Détecte le type de compte. Si pas firm_member, on ne rend rien.
   useEffect(() => {
@@ -64,16 +70,34 @@ export function CompanySelector() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Click-outside pour fermer.
+  // Click-outside pour fermer (gère aussi le menu porté dans body).
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      const inTrigger = containerRef.current?.contains(target);
+      const inMenu = menuRef.current?.contains(target);
+      if (!inTrigger && !inMenu) setOpen(false);
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  // Position du menu (fixed) calculée depuis le trigger — recalcul au scroll/resize.
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      setMenuPos({ top: r.bottom + 8, right: window.innerWidth - r.right });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
   }, [open]);
 
   // Rétrocompat : non-firm_member → composant invisible.
@@ -96,6 +120,7 @@ export function CompanySelector() {
   return (
     <div ref={containerRef} className="relative inline-block">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
@@ -118,16 +143,22 @@ export function CompanySelector() {
         />
       </button>
 
-      {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 z-50 mt-2 w-72 overflow-hidden rounded-xl shadow-xl"
-          style={{
-            backgroundColor: "rgb(var(--app-card-bg-rgb, 15 15 18) / 95%)",
-            border: "1px solid var(--app-border-strong)",
-            backdropFilter: "blur(24px)",
-          }}
-        >
+      {open && mounted && menuPos
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              className="w-72 overflow-hidden rounded-xl shadow-xl"
+              style={{
+                position: "fixed",
+                top: menuPos.top,
+                right: menuPos.right,
+                zIndex: 9999,
+                backgroundColor: "rgb(var(--app-card-bg-rgb, 15 15 18) / 95%)",
+                border: "1px solid var(--app-border-strong)",
+                backdropFilter: "blur(24px)",
+              }}
+            >
           <p
             className="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.06em]"
             style={{ color: "var(--app-text-tertiary)" }}
@@ -188,8 +219,10 @@ export function CompanySelector() {
               Retour au portefeuille
             </button>
           </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
