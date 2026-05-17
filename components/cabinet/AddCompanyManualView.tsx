@@ -22,6 +22,8 @@ import { useAccountType } from "@/hooks/useAccountType";
 import { ROUTES } from "@/lib/config/routes";
 import { ACCOUNT_TYPES } from "@/lib/config/account-types";
 import { getDataSourceByProvider } from "@/lib/config/data-sources";
+import { saveAnalysisDraft } from "@/services/analysisStore";
+import type { AnalysisDraft } from "@/types/analysis";
 
 export function AddCompanyManualView() {
   const router = useRouter();
@@ -85,9 +87,11 @@ export function AddCompanyManualView() {
         throw new Error(createPayload.error || "Création de l'entreprise échouée.");
       }
 
-      // Upload optionnel — pipeline existant /api/analyses. Si l'user n'a
-      // pas joint de fichier, l'entreprise reste en `pending_upload` côté
-      // server (la Company existe, l'analyse viendra plus tard).
+      // Upload optionnel — pipeline existant /api/analyses parse le fichier
+      // et renvoie un AnalysisDraft. On l'enrichit avec le companyId de la
+      // nouvelle entreprise puis on persiste via saveAnalysisDraft (client
+      // Firestore) — sans cette étape, le draft était jeté et l'entreprise
+      // restait vide côté portefeuille/cockpit.
       if (file) {
         const user = firebaseAuthGateway.getCurrentUser();
         if (user) {
@@ -95,11 +99,33 @@ export function AddCompanyManualView() {
           formData.append("userId", user.uid);
           formData.append("folderName", trimmedName);
           formData.append("source", "upload");
-          formData.append("companyId", createPayload.companyId);
           formData.append("files", file);
-          await fetch("/api/analyses", { method: "POST", body: formData });
-          // On ne block pas sur l'échec de l'upload — l'utilisateur pourra
-          // ré-uploader depuis le cockpit Dossier.
+          try {
+            const res = await fetch("/api/analyses", { method: "POST", body: formData });
+            const payload = (await res.json().catch(() => ({}))) as {
+              analysisDraft?: AnalysisDraft;
+              error?: string;
+              detail?: string;
+            };
+            if (!res.ok || !payload.analysisDraft) {
+              throw new Error(payload.detail || payload.error || "Le pipeline d'upload a échoué.");
+            }
+            // Injecte le companyId AVANT la persistance pour que le portefeuille
+            // + le cockpit retrouvent l'analyse via la query par companyId.
+            const draftWithCompany: AnalysisDraft = {
+              ...payload.analysisDraft,
+              companyId: createPayload.companyId,
+            };
+            await saveAnalysisDraft(draftWithCompany);
+          } catch (uploadErr) {
+            // L'entreprise existe, l'upload a échoué — on remonte l'erreur
+            // au lieu d'avancer silencieusement vers le portefeuille.
+            throw new Error(
+              `Entreprise créée, mais l'import du fichier a échoué : ${
+                uploadErr instanceof Error ? uploadErr.message : "erreur inconnue"
+              }`
+            );
+          }
         }
       }
 

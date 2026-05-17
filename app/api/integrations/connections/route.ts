@@ -5,6 +5,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { listUserConnections } from "@/services/integrations/storage/connectionStore";
 import { AuthenticationError, requireAuthenticatedUser } from "@/lib/server/requireAuth";
+import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const connections = await listUserConnections(userId);
-    const dtos: ConnectionDto[] = connections.map((c) => ({
+
+    // Filtre les Connections marquées `mock: true` (mocks dev / sandbox) pour
+    // qu'elles n'apparaissent pas dans la page Documents en environnement
+    // réel. Le marqueur `mock` n'est pas exposé dans le type Connection donc
+    // on relit le doc brut depuis Firestore en best-effort.
+    const db = getFirebaseAdminFirestore();
+    const mockFlags = await Promise.all(
+      connections.map(async (c) => {
+        try {
+          const snap = await db.collection("connections").doc(c.id).get();
+          return Boolean(snap.data()?.mock);
+        } catch {
+          return false;
+        }
+      })
+    );
+    const realConnections = connections.filter((_, idx) => !mockFlags[idx]);
+
+    const dtos: ConnectionDto[] = realConnections.map((c) => ({
       id: c.id,
       provider: c.provider,
       providerSub: c.providerSub,
