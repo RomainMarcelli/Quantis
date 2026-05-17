@@ -23,6 +23,7 @@ import { ROUTES } from "@/lib/config/routes";
 import { ACCOUNT_TYPES } from "@/lib/config/account-types";
 import { getDataSourceByProvider } from "@/lib/config/data-sources";
 import { saveAnalysisDraft } from "@/services/analysisStore";
+import { createUserFolder } from "@/services/folderStore";
 import type { AnalysisDraft } from "@/types/analysis";
 
 export function AddCompanyManualView() {
@@ -95,12 +96,19 @@ export function AddCompanyManualView() {
       if (file) {
         const user = firebaseAuthGateway.getCurrentUser();
         if (user) {
-          const formData = new FormData();
-          formData.append("userId", user.uid);
-          formData.append("folderName", trimmedName);
-          formData.append("source", "upload");
-          formData.append("files", file);
           try {
+            // 1) Crée le dossier user/folders pour que l'analyse apparaisse
+            //    dans /documents (la vue groupe les analyses par folderName
+            //    et n'affiche que les dossiers présents dans la collection
+            //    `folders`).
+            await createUserFolder(user.uid, trimmedName);
+
+            // 2) Pipeline /api/analyses → AnalysisDraft.
+            const formData = new FormData();
+            formData.append("userId", user.uid);
+            formData.append("folderName", trimmedName);
+            formData.append("source", "upload");
+            formData.append("files", file);
             const res = await fetch("/api/analyses", { method: "POST", body: formData });
             const payload = (await res.json().catch(() => ({}))) as {
               analysisDraft?: AnalysisDraft;
@@ -110,16 +118,15 @@ export function AddCompanyManualView() {
             if (!res.ok || !payload.analysisDraft) {
               throw new Error(payload.detail || payload.error || "Le pipeline d'upload a échoué.");
             }
-            // Injecte le companyId AVANT la persistance pour que le portefeuille
-            // + le cockpit retrouvent l'analyse via la query par companyId.
+            // 3) Injecte le companyId AVANT la persistance pour que le
+            //    portefeuille + le cockpit retrouvent l'analyse via la query
+            //    par companyId.
             const draftWithCompany: AnalysisDraft = {
               ...payload.analysisDraft,
               companyId: createPayload.companyId,
             };
             await saveAnalysisDraft(draftWithCompany);
           } catch (uploadErr) {
-            // L'entreprise existe, l'upload a échoué — on remonte l'erreur
-            // au lieu d'avancer silencieusement vers le portefeuille.
             throw new Error(
               `Entreprise créée, mais l'import du fichier a échoué : ${
                 uploadErr instanceof Error ? uploadErr.message : "erreur inconnue"
