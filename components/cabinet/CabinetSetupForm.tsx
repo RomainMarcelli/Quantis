@@ -9,12 +9,8 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Users } from "lucide-react";
-
-const LS_KEYS = {
-  firmName: "vyzor_firm_name",
-  firmExpected: "vyzor_firm_expected_dossiers",
-  accountType: "vyzor_account_type",
-} as const;
+import { ROUTES } from "@/lib/config/routes";
+import { ACCOUNT_TYPES, PRE_AUTH_STORAGE_KEYS } from "@/lib/config/account-types";
 
 export function CabinetSetupForm() {
   const router = useRouter();
@@ -34,21 +30,21 @@ export function CabinetSetupForm() {
       return;
     }
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(LS_KEYS.accountType, "firm_member");
-      window.localStorage.setItem(LS_KEYS.firmName, trimmed);
+      window.localStorage.setItem(PRE_AUTH_STORAGE_KEYS.accountType, ACCOUNT_TYPES.FIRM_MEMBER);
+      window.localStorage.setItem(PRE_AUTH_STORAGE_KEYS.firmName, trimmed);
       window.localStorage.setItem(
-        LS_KEYS.firmExpected,
+        PRE_AUTH_STORAGE_KEYS.firmExpected,
         String(Math.max(1, Math.min(10_000, Math.round(expectedDossiers || 10))))
       );
     }
-    router.push("/register?next=/cabinet/onboarding/connect");
+    router.push(`${ROUTES.SIGNUP}?next=${encodeURIComponent(ROUTES.CABINET_CONNECT)}`);
   }
 
   return (
     <div className="mx-auto w-full max-w-xl">
       <button
         type="button"
-        onClick={() => router.push("/onboarding")}
+        onClick={() => router.push(ROUTES.ONBOARDING)}
         className="mb-4 inline-flex items-center gap-1.5 text-xs"
         style={{ color: "var(--app-text-tertiary)" }}
       >

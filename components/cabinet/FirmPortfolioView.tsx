@@ -16,11 +16,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, Building2, ExternalLink, Loader2, Plus, RefreshCcw } from "lucide-react";
+import { Briefcase, Building2, ExternalLink, Loader2, Mail, Plus, RefreshCcw, X } from "lucide-react";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { firebaseAuthGateway } from "@/services/auth";
 import { useActiveCompany } from "@/lib/stores/activeCompanyStore";
+import { ROUTES } from "@/lib/config/routes";
 
 type Dossier = {
   companyId: string;
@@ -80,19 +81,20 @@ export function FirmPortfolioView() {
   const [error, setError] = useState<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [firstName, setFirstName] = useState<string | undefined>(undefined);
+  const [inviteTarget, setInviteTarget] = useState<{ companyId: string; companyName: string } | null>(null);
 
   async function reload() {
     setError(null);
     try {
       const idToken = await firebaseAuthGateway.getIdToken();
       if (!idToken) throw new Error("Session expirée.");
-      const res = await fetch("/api/cabinet/portefeuille", {
+      const res = await fetch(ROUTES.API_CABINET_PORTEFEUILLE, {
         headers: { Authorization: `Bearer ${idToken}` },
       });
       const payload = await res.json();
       if (!res.ok) {
         if (res.status === 403 && payload.error?.includes("firm_member")) {
-          router.replace("/synthese");
+          router.replace(ROUTES.SYNTHESE);
           return;
         }
         throw new Error(payload.error || "Chargement portefeuille échoué.");
@@ -159,7 +161,7 @@ export function FirmPortfolioView() {
 
   function openDossier(companyId: string) {
     setActiveCompanyId(companyId);
-    router.push(`/cabinet/dossier/${encodeURIComponent(companyId)}`);
+    router.push(ROUTES.CABINET_DOSSIER(encodeURIComponent(companyId)));
   }
 
   return (
@@ -172,7 +174,7 @@ export function FirmPortfolioView() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => router.push("/cabinet/onboarding/connect")}
+              onClick={() => router.push(ROUTES.CABINET_ADD_COMPANY)}
               className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition"
               style={{
                 border: "1px solid var(--app-border)",
@@ -181,7 +183,7 @@ export function FirmPortfolioView() {
               }}
             >
               <Plus className="h-3.5 w-3.5" />
-              Ajouter un dossier
+              Ajouter une entreprise
             </button>
             <button
               type="button"
@@ -249,7 +251,7 @@ export function FirmPortfolioView() {
               </p>
               <button
                 type="button"
-                onClick={() => router.push("/cabinet/onboarding/connect")}
+                onClick={() => router.push(ROUTES.CABINET_ADD_COMPANY)}
                 className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition"
                 style={{
                   border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 40%)",
@@ -269,7 +271,7 @@ export function FirmPortfolioView() {
               }}
             >
               <div
-                className="grid grid-cols-[1.6fr_1fr_1fr_0.7fr_0.9fr_0.3fr] gap-3 px-5 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                className="grid grid-cols-[1.6fr_1fr_1fr_0.7fr_0.9fr_0.5fr] gap-3 px-5 py-3 text-[10px] font-semibold uppercase tracking-wider"
                 style={{
                   color: "var(--app-text-tertiary)",
                   borderBottom: "1px solid var(--app-border)",
@@ -288,11 +290,11 @@ export function FirmPortfolioView() {
                 {sortedDossiers.map((d) => {
                   const badge = syncBadge(d.lastSyncStatus);
                   return (
-                    <li key={d.companyId}>
+                    <li key={d.companyId} className="relative">
                       <button
                         type="button"
                         onClick={() => openDossier(d.companyId)}
-                        className="grid w-full grid-cols-[1.6fr_1fr_1fr_0.7fr_0.9fr_0.3fr] items-center gap-3 px-5 py-3 text-left transition"
+                        className="grid w-full grid-cols-[1.6fr_1fr_1fr_0.7fr_0.9fr_0.5fr] items-center gap-3 px-5 py-3 text-left transition"
                         style={{ borderBottom: "1px solid var(--app-border)" }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
@@ -349,10 +351,38 @@ export function FirmPortfolioView() {
                           </span>
                           <span className="truncate">{formatSyncDate(d.lastSyncedAt)}</span>
                         </div>
-                        <ExternalLink
-                          className="h-3.5 w-3.5 justify-self-end"
-                          style={{ color: "var(--app-text-tertiary)" }}
-                        />
+                        <div className="flex items-center justify-end gap-1">
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInviteTarget({
+                                companyId: d.companyId,
+                                companyName: d.externalCompanyName || d.name,
+                              });
+                            }}
+                            role="button"
+                            title="Inviter le dirigeant"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md transition"
+                            style={{
+                              color: "var(--app-text-tertiary)",
+                              border: "1px solid var(--app-border)",
+                            }}
+                            onMouseEnter={(e) => {
+                              (e.currentTarget as HTMLSpanElement).style.color =
+                                "var(--app-brand-gold-deep)";
+                            }}
+                            onMouseLeave={(e) => {
+                              (e.currentTarget as HTMLSpanElement).style.color =
+                                "var(--app-text-tertiary)";
+                            }}
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </span>
+                          <ExternalLink
+                            className="h-3.5 w-3.5"
+                            style={{ color: "var(--app-text-tertiary)" }}
+                          />
+                        </div>
                       </button>
                     </li>
                   );
@@ -361,6 +391,178 @@ export function FirmPortfolioView() {
             </div>
           ) : null}
         </section>
+      </div>
+
+      {inviteTarget ? (
+        <InviteDirigeantModal
+          companyId={inviteTarget.companyId}
+          companyName={inviteTarget.companyName}
+          onClose={() => setInviteTarget(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function InviteDirigeantModal({
+  companyId,
+  companyName,
+  onClose,
+}: {
+  companyId: string;
+  companyName: string;
+  onClose: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function send() {
+    if (!email || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const idToken = await firebaseAuthGateway.getIdToken();
+      if (!idToken) throw new Error("Session expirée.");
+      const res = await fetch(ROUTES.API_CABINET_INVITE, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, email }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { inviteUrl?: string; error?: string };
+      if (!res.ok || !payload.inviteUrl) {
+        throw new Error(payload.error || "Création de l'invitation échouée.");
+      }
+      setInviteUrl(payload.inviteUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur inconnue.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgb(0 0 0 / 60%)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl p-6"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          backgroundColor: "rgb(var(--app-card-bg-rgb, 15 15 18) / 95%)",
+          border: "1px solid var(--app-border-strong)",
+          backdropFilter: "blur(24px)",
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold" style={{ color: "var(--app-text-primary)" }}>
+              Inviter le dirigeant
+            </h3>
+            <p className="mt-0.5 text-xs" style={{ color: "var(--app-text-secondary)" }}>
+              {companyName}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="-mr-1 -mt-1 rounded p-1 transition"
+            style={{ color: "var(--app-text-tertiary)" }}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {inviteUrl ? (
+          <div className="mt-4 space-y-3">
+            <p className="text-xs font-medium" style={{ color: "var(--app-text-secondary)" }}>
+              Lien d'invitation créé — copiez-le pour l'envoyer au dirigeant :
+            </p>
+            <div
+              className="rounded-lg p-3"
+              style={{
+                backgroundColor: "var(--app-surface-soft)",
+                border: "1px solid var(--app-border)",
+              }}
+            >
+              <p className="break-all font-mono text-[11px]" style={{ color: "var(--app-text-primary)" }}>
+                {inviteUrl}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                await navigator.clipboard.writeText(inviteUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              className="inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-xs font-medium transition"
+              style={{
+                border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 40%)",
+                color: "var(--app-brand-gold-deep)",
+                backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 12%)",
+              }}
+            >
+              {copied ? "Lien copié ✓" : "Copier le lien"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full rounded-lg px-3 py-2 text-xs transition"
+              style={{ color: "var(--app-text-tertiary)" }}
+            >
+              Fermer
+            </button>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="dirigeant@entreprise.fr"
+              autoFocus
+              disabled={busy}
+              className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+              style={{
+                border: "1px solid var(--app-border-strong)",
+                backgroundColor: "var(--app-surface-soft)",
+                color: "var(--app-text-primary)",
+              }}
+            />
+            {error ? (
+              <p className="text-[11px]" style={{ color: "var(--app-danger, #EF4444)" }}>
+                {error}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void send()}
+              disabled={busy || !email}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition disabled:opacity-50"
+              style={{
+                border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 40%)",
+                color: "var(--app-brand-gold-deep)",
+                backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 12%)",
+              }}
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {busy ? "Génération du lien…" : "Créer le lien d'invitation"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full rounded-lg px-3 py-2 text-xs transition"
+              style={{ color: "var(--app-text-tertiary)" }}
+            >
+              Annuler
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

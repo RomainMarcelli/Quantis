@@ -270,30 +270,56 @@ export function AuthPage({
   // depuis /cabinet/setup (no-op vs flow company_owner classique).
   async function applyPreAuthAccountTypeChoice() {
     if (typeof window === "undefined") return;
-    const accountType = window.localStorage.getItem("vyzor_account_type");
-    if (accountType !== "firm_member") {
-      window.localStorage.removeItem("vyzor_account_type");
+    const { PRE_AUTH_STORAGE_KEYS, ACCOUNT_TYPES } = await import("@/lib/config/account-types");
+    const { ROUTES } = await import("@/lib/config/routes");
+    const ls = window.localStorage;
+
+    // Cas 1 : invitation dirigeant (token présent) — l'user devient
+    // company_owner rattaché à la Company invitée.
+    const inviteToken = ls.getItem(PRE_AUTH_STORAGE_KEYS.inviteToken);
+    if (inviteToken) {
+      try {
+        const idToken = await firebaseAuthGateway.getIdToken();
+        if (idToken) {
+          await fetch(ROUTES.API_INVITE_ACCEPT, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ token: inviteToken }),
+          });
+        }
+      } catch {
+        /* swallow — l'user pourra retenter depuis /invite/[token] */
+      } finally {
+        ls.removeItem(PRE_AUTH_STORAGE_KEYS.inviteToken);
+        ls.removeItem(PRE_AUTH_STORAGE_KEYS.inviteCompanyId);
+        ls.removeItem(PRE_AUTH_STORAGE_KEYS.inviteEmail);
+        ls.removeItem(PRE_AUTH_STORAGE_KEYS.accountType);
+      }
+      return;
+    }
+
+    // Cas 2 : choix pré-auth /onboarding → firm_member ⇒ création de la Firm.
+    const accountType = ls.getItem(PRE_AUTH_STORAGE_KEYS.accountType);
+    if (accountType !== ACCOUNT_TYPES.FIRM_MEMBER) {
+      ls.removeItem(PRE_AUTH_STORAGE_KEYS.accountType);
       return;
     }
     const firmName =
-      window.localStorage.getItem("vyzor_firm_name") || companyName.trim() || "Mon cabinet";
+      ls.getItem(PRE_AUTH_STORAGE_KEYS.firmName) || companyName.trim() || "Mon cabinet";
     try {
       const idToken = await firebaseAuthGateway.getIdToken();
       if (!idToken) return;
-      await fetch("/api/cabinet/firm/create", {
+      await fetch(ROUTES.API_CABINET_FIRM_CREATE, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
         body: JSON.stringify({ name: firmName }),
       });
     } catch {
       /* swallow — non bloquant */
     } finally {
-      window.localStorage.removeItem("vyzor_account_type");
-      window.localStorage.removeItem("vyzor_firm_name");
-      window.localStorage.removeItem("vyzor_firm_expected_dossiers");
+      ls.removeItem(PRE_AUTH_STORAGE_KEYS.accountType);
+      ls.removeItem(PRE_AUTH_STORAGE_KEYS.firmName);
+      ls.removeItem(PRE_AUTH_STORAGE_KEYS.firmExpected);
     }
   }
 

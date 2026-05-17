@@ -13,8 +13,9 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { firebaseAuth, firestoreDb } from "@/lib/firebase";
+import { ACCOUNT_TYPES, type AccountType } from "@/lib/config/account-types";
 
-export type AccountTypeValue = "firm_member" | "company_owner";
+export type AccountTypeValue = AccountType;
 
 interface AccountTypeState {
   accountType: AccountTypeValue | null;
@@ -42,12 +43,14 @@ export function useAccountType(): AccountTypeState {
         if (cancelled) return;
         const data = snap.data() ?? {};
         const at =
-          data.accountType === "firm_member" ? "firm_member" : "company_owner";
+          data.accountType === ACCOUNT_TYPES.FIRM_MEMBER
+            ? ACCOUNT_TYPES.FIRM_MEMBER
+            : ACCOUNT_TYPES.COMPANY_OWNER;
         const fid = typeof data.firmId === "string" ? data.firmId : null;
         setState({ accountType: at, firmId: fid, loading: false });
       } catch {
         if (!cancelled) {
-          setState({ accountType: "company_owner", firmId: null, loading: false });
+          setState({ accountType: ACCOUNT_TYPES.COMPANY_OWNER, firmId: null, loading: false });
         }
       }
     });

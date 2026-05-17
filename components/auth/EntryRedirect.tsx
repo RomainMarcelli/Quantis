@@ -13,6 +13,8 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { firebaseAuth, firestoreDb } from "@/lib/firebase";
+import { ROUTES } from "@/lib/config/routes";
+import { ACCOUNT_TYPES } from "@/lib/config/account-types";
 
 type EntryRedirectProps = {
   nextRedirect: string | null;
@@ -27,24 +29,23 @@ export function EntryRedirect({ nextRedirect }: EntryRedirectProps) {
     const unsubscribe = firebaseAuth.onAuthStateChanged(async (user) => {
       if (cancelled) return;
       if (!user) {
-        router.replace("/onboarding");
+        router.replace(ROUTES.ONBOARDING);
         return;
       }
       try {
         const snap = await getDoc(doc(firestoreDb, "users", user.uid));
         if (cancelled) return;
         const accountType =
-          (snap.data()?.accountType as string | undefined) ?? "company_owner";
-        if (accountType === "firm_member") {
-          router.replace("/cabinet/portefeuille");
+          (snap.data()?.accountType as string | undefined) ?? ACCOUNT_TYPES.COMPANY_OWNER;
+        if (accountType === ACCOUNT_TYPES.FIRM_MEMBER) {
+          router.replace(ROUTES.CABINET_PORTFOLIO);
         } else if (nextRedirect) {
           router.replace(nextRedirect);
         } else {
-          router.replace("/synthese");
+          router.replace(ROUTES.SYNTHESE);
         }
       } catch {
-        // Si Firestore plante, fallback safe vers /synthese (n'enferme pas l'user).
-        router.replace(nextRedirect ?? "/synthese");
+        router.replace(nextRedirect ?? ROUTES.SYNTHESE);
       } finally {
         if (!cancelled) setResolving(false);
       }
