@@ -63,6 +63,9 @@ function unsetAllPennylaneEnv() {
   delete process.env.PENNYLANE_OAUTH_REDIRECT_URI;
   delete process.env.PENNYLANE_OAUTH_AUTHORIZE_URL;
   delete process.env.PENNYLANE_OAUTH_TOKEN_URL;
+  // Nouvelles vars résolues par getOAuthConfig (nommage Vercel canonique).
+  delete process.env.PENNYLANE_REDIRECT_URI;
+  delete process.env.APP_BASE_URL;
 }
 
 beforeEach(() => {

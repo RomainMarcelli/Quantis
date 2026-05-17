@@ -130,8 +130,21 @@ function getOAuthConfig(kind: PennylaneOAuthKind = "firm"): OAuthConfig {
     process.env[`${prefix}_CLIENT_ID`] ?? process.env.PENNYLANE_OAUTH_CLIENT_ID;
   const clientSecret =
     process.env[`${prefix}_CLIENT_SECRET`] ?? process.env.PENNYLANE_OAUTH_CLIENT_SECRET;
+  // Le redirect_uri DOIT matcher exactement celui utilisé dans /authorize-url
+  // (spec OAuth2 — sinon Pennylane renvoie invalid_grant à l'échange).
+  // Résolution alignée sur app/api/integrations/pennylane/firm/authorize-url
+  // et app/api/cabinet/oauth/start :
+  //   1. PENNYLANE_REDIRECT_URI (nom Vercel canonique)
+  //   2. PENNYLANE_FIRM_REDIRECT_URI / PENNYLANE_COMPANY_REDIRECT_URI (par kind)
+  //   3. PENNYLANE_OAUTH_REDIRECT_URI (legacy)
+  //   4. Construction depuis APP_BASE_URL
   const redirectUri =
-    process.env[`${prefix}_REDIRECT_URI`] ?? process.env.PENNYLANE_OAUTH_REDIRECT_URI;
+    process.env.PENNYLANE_REDIRECT_URI ??
+    process.env[`${prefix}_REDIRECT_URI`] ??
+    process.env.PENNYLANE_OAUTH_REDIRECT_URI ??
+    (process.env.APP_BASE_URL
+      ? `${process.env.APP_BASE_URL}/api/integrations/pennylane/callback`
+      : undefined);
 
   if (!clientId || !clientSecret || !redirectUri) {
     throw new Error(
