@@ -18,7 +18,7 @@ import {
   type ReactNode,
 } from "react";
 
-const STORAGE_KEY = "vyzor:activeCompanyId";
+export const ACTIVE_COMPANY_STORAGE_KEY = "vyzor:activeCompanyId";
 
 interface ActiveCompanyContextValue {
   activeCompanyId: string | null;
@@ -27,20 +27,21 @@ interface ActiveCompanyContextValue {
 
 const ActiveCompanyContext = createContext<ActiveCompanyContextValue | null>(null);
 
-function readPersisted(): string | null {
+// Exporté pour tests purs (pas besoin de @testing-library/react).
+export function readActiveCompanyFromStorage(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return window.localStorage.getItem(STORAGE_KEY);
+    return window.localStorage.getItem(ACTIVE_COMPANY_STORAGE_KEY);
   } catch {
     return null;
   }
 }
 
-function writePersisted(value: string | null): void {
+export function writeActiveCompanyToStorage(value: string | null): void {
   if (typeof window === "undefined") return;
   try {
-    if (value === null) window.localStorage.removeItem(STORAGE_KEY);
-    else window.localStorage.setItem(STORAGE_KEY, value);
+    if (value === null) window.localStorage.removeItem(ACTIVE_COMPANY_STORAGE_KEY);
+    else window.localStorage.setItem(ACTIVE_COMPANY_STORAGE_KEY, value);
   } catch {
     /* swallow — localStorage indispo ne casse pas l'app */
   }
@@ -51,13 +52,13 @@ export function ActiveCompanyProvider({ children }: { children: ReactNode }) {
 
   // Hydratation depuis localStorage au mount (évite mismatch SSR/CSR).
   useEffect(() => {
-    const persisted = readPersisted();
+    const persisted = readActiveCompanyFromStorage();
     if (persisted) setActiveCompanyIdState(persisted);
   }, []);
 
   function setActiveCompanyId(id: string | null): void {
     setActiveCompanyIdState(id);
-    writePersisted(id);
+    writeActiveCompanyToStorage(id);
   }
 
   const value = useMemo(
