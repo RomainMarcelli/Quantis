@@ -79,6 +79,53 @@ Variables serveur requises pour le parser PDF Document AI:
 - `DOCUMENT_AI_DEBUG_STRUCTURE` (optionnel)
 - `PDF_PARSER_DEBUG` (optionnel, active `debugData` dans la reponse API)
 
+### Pennylane OAuth (Firm + Company)
+
+Brief 13/05/2026 — l'app Vyzor consomme la **Firm API** Pennylane (cabinets, multi-dossiers clients) en OAuth 2.0. La **Company API** (entreprises) est en attente de validation Pennylane, le code est en place derrière un feature flag desactive par defaut.
+
+**Recuperation des credentials :**
+
+1. Login `admin@vyzor.fr` sur le portail partenaire Pennylane.
+2. Section "OAuth applications" -> application "Vyzor" -> copier `client_id` + `client_secret`.
+3. Verifier que l'URL de redirection enregistree matche EXACTEMENT celle du `.env.local` (sinon Pennylane refuse).
+4. Coller dans `.env.local` (jamais commit). 11 scopes Firm sont prerenseignes dans `.env.example`.
+
+**Variables :**
+
+- `PENNYLANE_FIRM_CLIENT_ID` / `PENNYLANE_FIRM_CLIENT_SECRET` (REQUIS)
+- `PENNYLANE_FIRM_REDIRECT_URI` (par defaut : `https://app.vyzor.fr/api/integrations/pennylane/callback`)
+- `PENNYLANE_FIRM_SCOPES` (11 scopes readonly preremplis)
+- `PENNYLANE_FIRM_VISIBLE` (`false` par defaut — masque la tuile OAuth Firm dans le wizard ; passer a `true` sur preview Vercel pour les tests internes)
+- `PENNYLANE_COMPANY_*` (optionnel, derriere feature flag)
+- `PENNYLANE_COMPANY_ENABLED` (`false` par defaut)
+- `CONNECTOR_ENCRYPTION_KEY` (REQUIS — chiffre les tokens en Firestore, AES-256-GCM)
+
+### Visibilite MVP Phase 1 des connecteurs
+
+Brief 14/05/2026 — le wizard `/documents` n'expose que ce qui marche bout-en-bout pour un dirigeant TPE/PME :
+
+| Connecteur | Visible par defaut | Flag |
+|---|---|---|
+| Pennylane (token manuel) | Oui | (toujours) |
+| MyU (token manuel) | Oui | (toujours) |
+| FEC (upload) | Oui | (toujours) |
+| Pennylane OAuth Firm | Non | `PENNYLANE_FIRM_VISIBLE=true` |
+| Pennylane OAuth Company | Non | `PENNYLANE_COMPANY_ENABLED=true` |
+| Bridge (Open Banking) | Non | `BRIDGE_VISIBLE=true` |
+| Odoo | Non | `ODOO_VISIBLE=true` |
+| Tiime | Non | `TIIME_VISIBLE=true` |
+
+Pour reactiver un connecteur sur une preview Vercel (test interne, hors prod) :
+1. Ajouter le flag dans les env vars Vercel pour la preview ciblee (jamais en Production).
+2. Rebuild la preview, ouvrir `/documents`, la tuile correspondante reapparait.
+3. Le code des connecteurs masques reste dans le repo, ils sont uniquement absents de l'UI.
+
+Le module central est `services/integrations/connectorVisibility.ts`, expose au front via `GET /api/integrations/connectors/visibility` et consomme via le hook `useConnectorVisibility()`.
+
+**Test du flow OAuth bout-en-bout :**
+
+L'URL de redirection prod (`app.vyzor.fr`) n'est pas accessible en `localhost`. Pour tester le flow complet, deployer une preview Vercel et ouvrir la sandbox cabinet `admin+1@vyzor.fr` depuis l'URL preview. La doc detaillee : `docs/integrations/pennylane.md`.
+
 ## Lancer le projet
 
 ```bash

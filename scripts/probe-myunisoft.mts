@@ -107,7 +107,9 @@ async function call(endpoint: string, query: Record<string, string> = {}): Promi
 
   const results: ProbeResult[] = [];
 
-  // ─── Endpoints MAD officiels (cf. partners.api.myunisoft.fr/MAD) ────
+  // ─── Endpoints MAD officiels (cf. partners.api.myu.fr/MAD) ─────────
+  // Note : doc partenaire renommée MyUnisoft → MyU (rebrand 18/05/2026).
+  // L'URL d'API runtime reste docs.api.myunisoft.fr (inchangée).
   // 1. Exercices
   results.push(await call("/mad/exercices"));
 

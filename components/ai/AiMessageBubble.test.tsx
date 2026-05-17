@@ -12,7 +12,7 @@ describe("AiMessageBubble", () => {
     const html = renderToStaticMarkup(
       <AiMessageBubble
         message={{ role: "user", content: "Pourquoi mon CA baisse ?", timestamp: ts }}
-        onFollowUp={() => {}}
+        onAskFollowUp={() => {}}
       />
     );
     expect(html).toContain("Pourquoi mon CA baisse ?");
@@ -29,7 +29,7 @@ describe("AiMessageBubble", () => {
     const html = renderToStaticMarkup(
       <AiMessageBubble
         message={{ role: "user", content: "Test", timestamp: ts }}
-        onFollowUp={() => {}}
+        onAskFollowUp={() => {}}
       />
     );
     expect(html).toContain("rgba(255, 255, 255, 0.3)");
@@ -51,7 +51,7 @@ describe("AiMessageBubble", () => {
             followUpQuestions: [],
           },
         }}
-        onFollowUp={() => {}}
+        onAskFollowUp={() => {}}
       />
     );
     expect(html).toContain("Tout va bien.");

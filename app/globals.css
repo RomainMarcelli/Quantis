@@ -2008,6 +2008,21 @@ body[data-simulation-open="true"] [data-meta-block] {
   100% { opacity: 0; }
 }
 
+/* Curseur streaming SSE — barre verticale clignotante en fin de réponse en
+   cours. Le glyphe « ▍ » (BLOCK SEXTANT-345678) donne un rendu plus net que
+   « │ » sur la plupart des polices, sans dépendre d'une web font. */
+@keyframes vyzor-cursor-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+
+.vyzor-stream-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--app-brand-gold-deep);
+  animation: vyzor-cursor-blink 1s steps(1, end) infinite;
+}
+
 .vyzor-chat-panel {
   animation: vyzor-chat-slide-in 400ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -2132,5 +2147,27 @@ body[data-simulation-open="true"] [data-meta-block] {
   .widget-wiggle,
   .widget-wiggle::after {
     animation: none;
+  }
+}
+
+/* ─── Halo "Voir le détail" depuis l'assistant IA ─────────────────────────
+ * Appliqué dynamiquement par AnalysisDetailView via la classe
+ * `kpi-highlight-pulse` sur la card portant `data-kpi-id=<focusKpi>`.
+ * Durée : 2 cycles de 1 s = 2 s. La classe est retirée par le useEffect
+ * après 2 000 ms, et le query param ?focusKpi= est nettoyé en parallèle.
+ * Couleur : `--quantis-gold` (palette Vyzor) — fallback rgb(212,175,55)
+ * en cas de var indisponible. */
+@keyframes kpi-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.6); }
+  50%      { box-shadow: 0 0 0 8px rgba(212, 175, 55, 0); }
+}
+.kpi-highlight-pulse {
+  animation: kpi-pulse 1s ease-in-out 2;
+  border-color: rgb(212, 175, 55) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpi-highlight-pulse {
+    animation: none;
+    box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.6);
   }
 }

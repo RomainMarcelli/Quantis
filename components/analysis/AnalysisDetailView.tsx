@@ -124,6 +124,56 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // ici le param et on l'applique sur le state local au montage.
   const initialTabFromQuery = searchParams.get("tab");
 
+  // ── Focus KPI depuis l'assistant IA ────────────────────────────────────
+  // Quand on arrive avec `?focusKpi=<kpiId>` (clic sur "Voir le détail" dans
+  // la carte de réponse de l'IA), on scroll vers la card KPI correspondante
+  // (data-kpi-id) et on applique un halo doré pulsé ~2 s. Le query param est
+  // nettoyé après animation pour ne pas re-trigger au reload.
+  // Edge cases :
+  //   - kpiId absent du DOM (KPI hors page actuelle / lazy mount) → no-op
+  //     silencieux, l'utilisateur voit juste /analysis sans surprise.
+  //   - reload avec le param toujours présent → re-trigger une fois puis
+  //     nettoyage.
+  useEffect(() => {
+    // Mission 2 — priorité à `focusChart` (plus spécifique) sur `focusKpi`.
+    // Si focusChart est présent → on cible `[data-chart-id="<id>"]`
+    // (KpiEvolutionChart racine). Sinon fallback sur `[data-kpi-id="<id>"]`
+    // (card KPI). Même animation `kpi-highlight-pulse`, même nettoyage URL
+    // après 2 s.
+    const focusChart = searchParams.get("focusChart");
+    const focusKpi = searchParams.get("focusKpi");
+    const targetId = focusChart ?? focusKpi;
+    const targetSelector = focusChart
+      ? `[data-chart-id="${CSS.escape(focusChart)}"]`
+      : focusKpi
+        ? `[data-kpi-id="${CSS.escape(focusKpi)}"]`
+        : null;
+    const cleanupParam = focusChart ? "focusChart" : "focusKpi";
+    if (!targetId || !targetSelector) return;
+    // Petit délai pour laisser le temps aux cards KPI / charts de monter
+    // (fade-up, computations KPI sur l'analyse chargée).
+    const mountTimer = setTimeout(() => {
+      const element = document.querySelector(targetSelector);
+      if (!element) return;
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      element.classList.add("kpi-highlight-pulse");
+      const cleanupTimer = setTimeout(() => {
+        element.classList.remove("kpi-highlight-pulse");
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete(cleanupParam);
+          window.history.replaceState({}, "", url.toString());
+        } catch {
+          // best-effort — pas critique si replaceState échoue.
+        }
+      }, 2000);
+      // Stocker le cleanup secondaire sur l'élément pour qu'un unmount le
+      // capture aussi (rare mais propre).
+      (element as HTMLElement).dataset.kpiPulseCleanup = String(cleanupTimer);
+    }, 300);
+    return () => clearTimeout(mountTimer);
+  }, [searchParams]);
+
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);

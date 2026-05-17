@@ -29,6 +29,7 @@ vi.mock("@/lib/ai/chatStore", () => ({
 
 vi.mock("@/lib/ai/rateLimit", () => ({
   consumeDailyQuota: vi.fn(),
+  getNextResetISO: vi.fn(() => "2026-05-14T22:00:00.000Z"),
 }));
 
 vi.mock("@/lib/server/firebaseAdmin", () => ({
@@ -58,6 +59,47 @@ function makeRequest(body: unknown, headers: Record<string, string> = {}): NextR
   });
 }
 
+/** Parse un flux SSE en {events: [{event, data}], text: concat chunks}. */
+async function readSseResponse(res: Response): Promise<{
+  events: Array<{ event: string; data: unknown }>;
+  fullText: string;
+  meta?: { conversationId: string | null; remainingQuota: number };
+  done?: { conversationId: string; structured: unknown };
+  error?: { error: string };
+}> {
+  const reader = res.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const events: Array<{ event: string; data: unknown }> = [];
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+  }
+  buffer += decoder.decode();
+  for (const block of buffer.split(/\n\n/)) {
+    if (!block.trim()) continue;
+    let evt = "";
+    let dat = "";
+    for (const line of block.split(/\n/)) {
+      if (line.startsWith("event: ")) evt = line.slice(7);
+      else if (line.startsWith("data: ")) dat += line.slice(6);
+    }
+    if (evt) events.push({ event: evt, data: dat ? JSON.parse(dat) : null });
+  }
+  let fullText = "";
+  let meta: { conversationId: string | null; remainingQuota: number } | undefined;
+  let done: { conversationId: string; structured: unknown } | undefined;
+  let error: { error: string } | undefined;
+  for (const e of events) {
+    if (e.event === "chunk") fullText += (e.data as { text: string }).text;
+    if (e.event === "meta") meta = e.data as typeof meta;
+    if (e.event === "done") done = e.data as typeof done;
+    if (e.event === "error") error = e.data as typeof error;
+  }
+  return { events, fullText, meta, done, error };
+}
+
 describe("POST /api/ai/ask", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,6 +111,10 @@ describe("POST /api/ai/ask", () => {
     });
     (getAiService as ReturnType<typeof vi.fn>).mockReturnValue({
       ask: vi.fn().mockResolvedValue({ answer: "Réponse mock", mode: "mock" }),
+      askStream: vi.fn(async function* () {
+        yield "Réponse ";
+        yield "mock";
+      }),
     });
     (createConversation as ReturnType<typeof vi.fn>).mockResolvedValue({
       id: "conv-new",
@@ -109,24 +155,31 @@ describe("POST /api/ai/ask", () => {
     (consumeDailyQuota as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       allowed: false,
       remaining: 0,
-      used: 21,
+      used: 51,
     });
     const res = await POST(makeRequest({ question: "test" }));
     expect(res.status).toBe(429);
     const json = await res.json();
+    expect(json.error).toBe("QUOTA_EXCEEDED");
+    expect(typeof json.message).toBe("string");
+    expect(json.message.length).toBeGreaterThan(0);
     expect(json.remainingQuota).toBe(0);
+    // resetAt valide ISO
+    expect(typeof json.resetAt).toBe("string");
+    const parsed = new Date(json.resetAt);
+    expect(Number.isNaN(parsed.getTime())).toBe(false);
   });
 
-  it("crée une nouvelle conversation quand aucun conversationId n'est fourni", async () => {
+  it("crée une nouvelle conversation quand aucun conversationId n'est fourni (stream SSE)", async () => {
     const res = await POST(
       makeRequest({ question: "Pourquoi mon EBITDA ?", kpiId: "ebitda" })
     );
     expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.answer).toBe("Réponse mock");
-    expect(json.conversationId).toBe("conv-new");
-    expect(json.remainingQuota).toBe(19);
-    expect(json.mode).toBe("mock");
+    expect(res.headers.get("Content-Type")).toMatch(/text\/event-stream/);
+    const parsed = await readSseResponse(res);
+    expect(parsed.fullText).toBe("Réponse mock");
+    expect(parsed.meta?.remainingQuota).toBe(19);
+    expect(parsed.done?.conversationId).toBe("conv-new");
     expect(createConversation).toHaveBeenCalledWith({
       userId: "user-1",
       kpiId: "ebitda",
@@ -155,8 +208,8 @@ describe("POST /api/ai/ask", () => {
       })
     );
     expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.conversationId).toBe("conv-1");
+    const parsed = await readSseResponse(res);
+    expect(parsed.done?.conversationId).toBe("conv-1");
     expect(addMessage).toHaveBeenCalledWith({
       userId: "user-1",
       conversationId: "conv-1",
@@ -194,13 +247,17 @@ describe("POST /api/ai/ask", () => {
   });
 
   it("ignore un userLevel inconnu et retombe sur 'intermediate'", async () => {
-    const askMock = vi.fn().mockResolvedValue({ answer: "ok", mode: "mock" });
-    (getAiService as ReturnType<typeof vi.fn>).mockReturnValue({ ask: askMock });
+    const askStreamMock = vi.fn(async function* () {
+      yield "ok";
+    });
+    (getAiService as ReturnType<typeof vi.fn>).mockReturnValue({
+      ask: vi.fn(),
+      askStream: askStreamMock,
+    });
 
-    await POST(
-      makeRequest({ question: "x", userLevel: "weird" })
-    );
-    expect(askMock).toHaveBeenCalledWith(
+    const res = await POST(makeRequest({ question: "x", userLevel: "weird" }));
+    await readSseResponse(res); // drain le stream pour que askStream soit appelé
+    expect(askStreamMock).toHaveBeenCalledWith(
       expect.objectContaining({ userLevel: "intermediate" })
     );
   });

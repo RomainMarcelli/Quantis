@@ -23,7 +23,19 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, MessageSquarePlus, Send, Sparkles } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Lightbulb,
+  MessageSquarePlus,
+  RefreshCw,
+  Send,
+  Sparkles,
+  Target,
+  Timer,
+  TrendingDown,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { getKpiDefinition } from "@/lib/kpi/kpiRegistry";
 import { getUserLevel, setUserLevel } from "@/lib/ai/userLevel";
 import { UserLevelPicker } from "@/components/ai/UserLevelPicker";
@@ -66,11 +78,25 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
   const [loading, setLoading] = useState(false);
   const [remainingQuota, setRemainingQuota] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Bloc visuel dédié quand l'API renvoie 429 (quota épuisé) — distinct du
+  // bandeau d'erreur générique pour mettre en avant le reset à minuit.
+  const [quotaExceeded, setQuotaExceeded] = useState<{ message: string } | null>(null);
   const [userLevel, setUserLevelState] = useState<UserLevel | null>(null);
   const [autoSendQuestion, setAutoSendQuestion] = useState<string | null>(null);
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // AbortController du stream en cours. Permet d'interrompre proprement le
+  // SSE quand l'utilisateur (1) pose une nouvelle question avant la fin,
+  // (2) clique Régénérer, (3) quitte la page (cleanup unmount).
+  const streamAbortRef = useRef<AbortController | null>(null);
+
+  // Cleanup à l'unmount — abort tout stream en cours.
+  useEffect(() => {
+    return () => {
+      streamAbortRef.current?.abort();
+    };
+  }, []);
 
   // Init au mount + quand le contexte change (navigation entre KPIs).
   useEffect(() => {
@@ -111,11 +137,48 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
       setLoading(true);
       setErrorMessage(null);
 
+      // Abort tout stream précédent encore en vol (sécurité, normalement
+      // loading=true bloque déjà un second envoi).
+      streamAbortRef.current?.abort();
+      const abort = new AbortController();
+      streamAbortRef.current = abort;
+
+      // Identifiant placeholder pour le message assistant streamé — permet
+      // de retrouver et muter LE bon message au fil des chunks.
+      const placeholderId = `stream-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
       setMessages((prev) => [
         ...prev,
         { role: "user", content: trimmed, timestamp: Date.now() },
+        {
+          role: "assistant",
+          content: "",
+          timestamp: Date.now(),
+          isStreaming: true,
+          id: placeholderId,
+        },
       ]);
       setInput("");
+
+      const appendChunkTo = (text: string) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === placeholderId ? { ...m, content: m.content + text } : m
+          )
+        );
+      };
+
+      const finalizeMessage = (extra: Partial<UiMessage>) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === placeholderId ? { ...m, ...extra, isStreaming: false } : m
+          )
+        );
+      };
+
+      const removePlaceholder = () => {
+        setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+      };
 
       try {
         const { firebaseAuthGateway } = await import("@/services/auth");
@@ -137,36 +200,156 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
             conversationId,
             userLevel: level,
           }),
+          signal: abort.signal,
         });
-        const json = (await res.json()) as {
-          answer?: string;
-          structured?: AiStructuredResponse | null;
-          conversationId?: string;
-          remainingQuota?: number;
-          error?: string;
-        };
+
+        // Erreurs précoces (401, 400, 403, 404, 429) → JSON classique côté serveur.
         if (!res.ok) {
+          const json = (await res
+            .json()
+            .catch(() => ({}))) as {
+            error?: string;
+            message?: string;
+            remainingQuota?: number;
+          };
+          if (res.status === 429 || json.error === "QUOTA_EXCEEDED") {
+            removePlaceholder();
+            setQuotaExceeded({
+              message:
+                json.message ??
+                "Quota quotidien atteint (50 questions par jour). Réinitialisation à minuit (Europe/Paris).",
+            });
+            if (typeof json.remainingQuota === "number") setRemainingQuota(json.remainingQuota);
+            return;
+          }
           throw new Error(json.error ?? "Erreur serveur.");
         }
-        const answer = json.answer ?? "";
-        const structured =
-          json.structured ??
-          buildStructuredFromMarkdown(answer, props.kpiId, props.kpiValue ?? null);
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: answer, timestamp: Date.now(), structured },
-        ]);
-        if (json.conversationId) setConversationId(json.conversationId);
-        if (typeof json.remainingQuota === "number") {
-          setRemainingQuota(json.remainingQuota);
+
+        if (!res.body) {
+          throw new Error("Réponse sans corps de stream.");
+        }
+
+        // ── Consommation du flux SSE ─────────────────────────────────
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let fullAnswer = "";
+        let doneConversationId: string | null = null;
+        let streamError: string | null = null;
+
+        // Parse incremental : on découpe sur "\n\n" (séparateur d'event SSE).
+        const consumeBuffer = () => {
+          let idx: number;
+          while ((idx = buffer.indexOf("\n\n")) !== -1) {
+            const block = buffer.slice(0, idx);
+            buffer = buffer.slice(idx + 2);
+            let evt = "";
+            let dat = "";
+            for (const line of block.split("\n")) {
+              if (line.startsWith("event: ")) evt = line.slice(7);
+              else if (line.startsWith("data: ")) dat += line.slice(6);
+            }
+            if (!evt) continue;
+            let parsed: unknown = null;
+            try {
+              parsed = dat ? JSON.parse(dat) : null;
+            } catch {
+              continue;
+            }
+            if (evt === "meta") {
+              const m = parsed as { remainingQuota?: number };
+              if (typeof m?.remainingQuota === "number") setRemainingQuota(m.remainingQuota);
+            } else if (evt === "chunk") {
+              const c = parsed as { text?: string };
+              if (typeof c?.text === "string") {
+                fullAnswer += c.text;
+                appendChunkTo(c.text);
+              }
+            } else if (evt === "done") {
+              const d = parsed as { conversationId?: string };
+              if (d?.conversationId) doneConversationId = d.conversationId;
+            } else if (evt === "error") {
+              const e = parsed as { error?: string };
+              streamError = e?.error ?? "Erreur pendant le streaming.";
+            }
+          }
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          consumeBuffer();
+        }
+        buffer += decoder.decode();
+        consumeBuffer();
+
+        if (streamError) {
+          throw new Error(streamError);
+        }
+
+        // Finalisation : on construit le structuré côté front (Claude ne le
+        // produit pas) pour rendre les blocs A-F au lieu du markdown brut.
+        const structured = buildStructuredFromMarkdown(
+          fullAnswer,
+          props.kpiId,
+          props.kpiValue ?? null
+        );
+        finalizeMessage({ content: fullAnswer, structured });
+
+        if (doneConversationId) {
+          const previousId = conversationId;
+          setConversationId(doneConversationId);
+          if (!previousId) {
+            // Première création : on stabilise l'URL sur /assistant-ia/chat/[id]
+            // pour qu'un refresh recharge l'historique.
+            router.replace(`/assistant-ia/chat/${doneConversationId}`);
+          }
         }
       } catch (err) {
+        // Un AbortError signifie qu'on a coupé le stream volontairement
+        // (nouvelle question, régénération, unmount) — pas une vraie erreur.
+        if ((err as { name?: string })?.name === "AbortError") {
+          removePlaceholder();
+          return;
+        }
+        removePlaceholder();
         setErrorMessage(err instanceof Error ? err.message : "Erreur inconnue.");
       } finally {
         setLoading(false);
+        if (streamAbortRef.current === abort) {
+          streamAbortRef.current = null;
+        }
       }
     },
-    [conversationId, loading, props.analysisId, props.kpiId, props.kpiValue]
+    [conversationId, loading, props.analysisId, props.kpiId, props.kpiValue, router]
+  );
+
+  /**
+   * Régénère un message assistant en relançant la question user qui le
+   * précède. Pas de confirmation (comportement ChatGPT). La nouvelle réponse
+   * consomme un nouveau ticket de quota côté serveur — c'est volontaire.
+   */
+  const regenerateMessage = useCallback(
+    (assistantId: string) => {
+      // On retrouve la dernière question user qui précède le message ciblé.
+      const idx = messages.findIndex((m) => m.id === assistantId);
+      if (idx < 0) return;
+      let userQuestion: string | null = null;
+      for (let i = idx - 1; i >= 0; i -= 1) {
+        if (messages[i]!.role === "user") {
+          userQuestion = messages[i]!.content;
+          break;
+        }
+      }
+      if (!userQuestion) return;
+      // Retire le message assistant à régénérer pour éviter doublon visuel.
+      setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+      // Annule un éventuel stream en cours puis relance.
+      streamAbortRef.current?.abort();
+      void sendQuestion(userQuestion);
+    },
+    [messages, sendQuestion]
   );
 
   // Envoi automatique d'une question pré-remplie quand le niveau est dispo.
@@ -288,13 +471,56 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
 
           {messages.map((m, idx) => (
             <AiMessageBubble
-              key={idx}
+              key={m.id ?? idx}
               message={m}
-              onFollowUp={(q) => void sendQuestion(q)}
+              onAskFollowUp={(q) => void sendQuestion(q)}
+              onCopy={
+                m.role === "assistant"
+                  ? (text) => {
+                      // Clipboard indisponible en HTTP non-localhost / iframe →
+                      // erreur silencieuse, le feedback visuel reste géré côté
+                      // bouton (Copié ! affiché même en cas d'échec clipboard).
+                      try {
+                        void navigator.clipboard?.writeText(text);
+                      } catch {
+                        /* noop */
+                      }
+                    }
+                  : undefined
+              }
+              onRegenerate={
+                m.role === "assistant" && m.id
+                  ? () => regenerateMessage(m.id!)
+                  : undefined
+              }
+              onViewDetail={(kpiId) => {
+                // Navigation vers la page d'analyse avec le KPI ciblé via
+                // `focusKpi` (évite conflit avec `kpiId` déjà utilisé pour
+                // d'autres usages). La page d'analyse scroll vers la card
+                // et applique un halo doré pulsé pendant ~2s, puis nettoie
+                // le query param pour éviter de re-trigger au reload.
+                if (!kpiId) return;
+                router.push(`/analysis?focusKpi=${encodeURIComponent(kpiId)}`);
+              }}
+              onViewChart={(kpiId) => {
+                // Mission 2 — Navigation vers le graphique d'évolution du
+                // KPI sur la page d'analyse. Param distinct `focusChart`
+                // pour cibler le conteneur `[data-chart-id="<kpiId>"]` au
+                // lieu de la card KPI. Si le graphique n'existe pas sur la
+                // page (ex. KPI sans evolutionChart configuré dans le
+                // dashboard), l'effet retombe silencieusement en no-op.
+                if (!kpiId) return;
+                router.push(`/analysis?focusChart=${encodeURIComponent(kpiId)}`);
+              }}
             />
           ))}
 
-          {loading ? <AiSpinner /> : null}
+          {/* Spinner uniquement tant qu'aucun chunk n'est arrivé. Dès que le
+              premier delta arrive, le placeholder de streaming devient visible
+              (avec curseur clignotant) et le spinner peut disparaître. */}
+          {loading && !messages.some((m) => m.isStreaming && m.content.length > 0) ? (
+            <AiSpinner />
+          ) : null}
 
           {errorMessage ? (
             <div
@@ -306,6 +532,27 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
               }}
             >
               {errorMessage}
+            </div>
+          ) : null}
+
+          {quotaExceeded ? (
+            <div
+              className="rounded-lg px-4 py-3 text-[13px]"
+              style={{
+                backgroundColor: "rgba(239, 68, 68, 0.10)",
+                border: "1px solid rgba(239, 68, 68, 0.4)",
+                color: "var(--app-danger)",
+              }}
+            >
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden />
+                <div>
+                  <p className="font-semibold">{quotaExceeded.message}</p>
+                  <p className="mt-1 text-[12px] opacity-80">
+                    Revenez demain pour continuer à poser vos questions.
+                  </p>
+                </div>
+              </div>
             </div>
           ) : null}
         </div>
@@ -375,11 +622,7 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px]" style={{ color: "var(--app-text-tertiary)" }}>
             <span>Entrée pour envoyer · Maj+Entrée pour saut de ligne</span>
-            {remainingQuota !== null ? (
-              <span className="font-mono uppercase tracking-wider">
-                {remainingQuota}/20 questions aujourd&apos;hui
-              </span>
-            ) : null}
+            {remainingQuota !== null ? <ChatQuotaPill remaining={remainingQuota} /> : null}
           </div>
         </form>
       </div>
@@ -390,13 +633,15 @@ export function AiChatFullPage(props: AiChatFullPageProps) {
 // ─── Sous-composants ────────────────────────────────────────────────────
 
 /** Questions modèles affichées à l'état vide — alignées sur la liste de
- *  AssistantConversationsView pour cohérence. Si un KPI focus est fourni,
- *  on remplace les 3 premières par les `suggestedQuestions` du KPI. */
-const FALLBACK_SAMPLE_QUESTIONS: Array<{ icon: string; question: string }> = [
-  { icon: "📈", question: "Pourquoi mon EBITDA est-il négatif ce trimestre ?" },
-  { icon: "🔁", question: "Quels leviers prioriser pour faire baisser mon BFR ?" },
-  { icon: "⏱️", question: "Mon DSO est anormalement long — par où commencer ?" },
-  { icon: "🎯", question: "Combien rapporterait une hausse de prix de 5 % ?" },
+ *  AssistantConversationsView pour cohérence. Icônes lucide-react (Mission 1
+ *  — remplacement des emojis pour cohérence visuelle avec AppHeader/AppSidebar).
+ *  Si un KPI focus est fourni, on remplace les 3 premières par les
+ *  `suggestedQuestions` du KPI. */
+const FALLBACK_SAMPLE_QUESTIONS: Array<{ Icon: LucideIcon; question: string }> = [
+  { Icon: TrendingDown, question: "Pourquoi mon EBITDA est-il négatif ce trimestre ?" },
+  { Icon: RefreshCw, question: "Quels leviers prioriser pour faire baisser mon BFR ?" },
+  { Icon: Timer, question: "Mon DSO est anormalement long — par où commencer ?" },
+  { Icon: Target, question: "Combien rapporterait une hausse de prix de 5 % ?" },
 ];
 
 function EmptyConversation({
@@ -408,10 +653,10 @@ function EmptyConversation({
 }) {
   // Si on est focus sur un KPI, propose 2 questions tirées du registre +
   // 2 questions génériques pour rester variées. Sinon prend le top 4 par défaut.
-  const questions: Array<{ icon: string; question: string }> = definition
+  const questions: Array<{ Icon: LucideIcon; question: string }> = definition
     ? [
-        { icon: "✨", question: definition.suggestedQuestions.whenBad },
-        { icon: "💡", question: definition.suggestedQuestions.whenGood },
+        { Icon: Sparkles, question: definition.suggestedQuestions.whenBad },
+        { Icon: Lightbulb, question: definition.suggestedQuestions.whenGood },
         ...FALLBACK_SAMPLE_QUESTIONS.slice(0, 2),
       ]
     : FALLBACK_SAMPLE_QUESTIONS;
@@ -467,8 +712,15 @@ function EmptyConversation({
               e.currentTarget.style.boxShadow = "none";
             }}
           >
-            <span className="text-lg flex-shrink-0" aria-hidden>
-              {q.icon}
+            <span
+              aria-hidden
+              className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
+              style={{ backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 10%)" }}
+            >
+              <q.Icon
+                className="h-5 w-5 text-quantis-gold"
+                style={{ color: "var(--app-brand-gold-deep)" }}
+              />
             </span>
             <span
               className="flex-1 text-[13px] leading-snug"
@@ -480,6 +732,44 @@ function EmptyConversation({
         ))}
       </div>
     </div>
+  );
+}
+
+// ─── Pill quota dans la barre de saisie — 4 paliers ─────────────────────
+//
+// Aligne le footer de la page chat sur l'indicateur de la page d'accueil
+// (cf. AssistantConversationsView/QuotaIndicator). Total fixé à 50 — affichage
+// uniquement, la source de vérité reste DAILY_AI_QUOTA côté serveur.
+function ChatQuotaPill({ remaining }: { remaining: number }) {
+  if (remaining > 10) {
+    return (
+      <span className="font-mono uppercase tracking-wider">
+        {remaining}/50 questions aujourd&apos;hui
+      </span>
+    );
+  }
+  if (remaining > 3) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 font-mono uppercase tracking-wider"
+        style={{ color: "var(--app-brand-gold-deep)" }}
+      >
+        <AlertCircle className="h-3 w-3" aria-hidden />
+        Plus que {remaining} aujourd&apos;hui
+      </span>
+    );
+  }
+  if (remaining > 0) {
+    return (
+      <span className="font-mono uppercase tracking-wider text-rose-400">
+        Plus que {remaining} — reset à minuit
+      </span>
+    );
+  }
+  return (
+    <span className="font-mono uppercase tracking-wider text-rose-400">
+      Quota épuisé — reset à minuit
+    </span>
   );
 }
 

@@ -63,3 +63,6 @@ services/pdf-analysis/fixtures/maquette-docai-2.json
 services/pdf-analysis/fixtures/fusalp-docai.json
 
 AUDIT_AUTH_PAGE.md
+claude-code-reports/
+# Python bytecode (services/reports)
+**/__pycache__/
