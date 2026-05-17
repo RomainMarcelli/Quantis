@@ -177,6 +177,12 @@ export type CalculatedKpis = {
 export type AnalysisRecord = {
   id: string;
   userId: string;
+  /**
+   * Sprint A multi-tenant — rattache une analyse à une Company. Optionnel pour
+   * rétrocompat avec les analyses pré-migration. Lu par le CompanySelector du
+   * mode cabinet pour filtrer le cockpit au dossier actif (feature/cabinet-ux).
+   */
+  companyId?: string;
   folderName: string;
   createdAt: string;
   fiscalYear: number | null;

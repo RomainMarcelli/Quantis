@@ -306,6 +306,7 @@ function toAnalysisRecord(id: string, data: Record<string, unknown>): AnalysisRe
   return {
     id,
     userId: String(data.userId ?? ""),
+    companyId: typeof data.companyId === "string" && data.companyId.trim() ? data.companyId : undefined,
     folderName: String(data.folderName ?? "Dossier principal"),
     createdAt,
     fiscalYear: typeof data.fiscalYear === "number" ? data.fiscalYear : null,

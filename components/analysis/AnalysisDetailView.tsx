@@ -65,6 +65,7 @@ import { firebaseAuthGateway } from "@/services/auth";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
 import { useTemporality } from "@/lib/temporality/temporalityContext";
+import { useActiveCompany } from "@/lib/stores/activeCompanyStore";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
@@ -414,6 +415,28 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // ceux du snapshot car ils sont à un instant T.
   // Source statique (PDF) : recomputeKpisForPeriod renvoie l'annuel inchangé.
   const temporality = useTemporality();
+
+  // Sprint C — quand l'user firm_member switche de dossier via CompanySelector,
+  // on bascule `analysis` sur la dernière analyse rattachée au companyId actif.
+  // Si l'activeCompanyId est null (company_owner / mode non cabinet), on laisse
+  // le flow standard sélectionner la dernière analyse globale.
+  const { activeCompanyId } = useActiveCompany();
+  useEffect(() => {
+    if (!activeCompanyId || allAnalyses.length === 0) return;
+    const matching = allAnalyses.filter((a) => a.companyId === activeCompanyId);
+    if (matching.length === 0) {
+      // Aucune analyse pour ce dossier — on garde l'analyse courante mais
+      // on informe l'utilisateur que le dossier n'a pas encore d'analyse.
+      setAnalysis(null);
+      setInfoMessage("Ce dossier n'a pas encore d'analyse financière.");
+      return;
+    }
+    // Le plus récent (allAnalyses est déjà trié desc par createdAt côté store).
+    setAnalysis(matching[0]!);
+    setInfoMessage(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCompanyId, allAnalyses]);
+
   const effectiveAnalysis = useMemo(() => {
     if (!analysis) return null;
     return recomputeKpisForPeriod(analysis, temporality.periodStart, temporality.periodEnd);

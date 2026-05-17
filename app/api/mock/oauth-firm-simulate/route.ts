@@ -3,21 +3,22 @@
 //
 // Crée en Firestore :
 //   - 1 Firm (firmId généré, ownerUserId = uid du caller)
-//   - 1 Connection mock (provider=pennylane_firm)
+//   - 1 Connection mock conforme au schéma ConnectionRecord (encryptedAccessToken,
+//     authMode oauth2, etc.) — sinon getUserConnectionById lève sur decryptToken
 //   - 3 Companies fictives (Boulangerie / Plomberie / Cabinet médical)
-//   - 3 mappings connection_companies (isActive=true → visibles dans le portefeuille)
-//   - 3 analyses mock par Company (kpis + quantisScore → portefeuille affiche les KPIs)
+//   - 3 mappings connection_companies (isActive=true)
+//   - 3 analyses mock avec champ `companyId` (lu par AnalysisDetailView pour
+//     scoper le cockpit au dossier actif)
 //
-// Puis bascule users/{uid}.accountType = "firm_member" + firmId.
+// Bascule users/{uid}.accountType = "firm_member" + firmId.
 //
-// Gate : MOCK_OAUTH_FIRM_ENABLED === "true". Refuse sinon (403).
-//
-// Tous les docs créés portent `mock: true` pour permettre un nettoyage simple
-// (cf. scripts/mock-firm-dossiers.mts --revert pour la logique de revert).
+// Gate : MOCK_OAUTH_FIRM_ENABLED === "true".
+// Tous les docs créés portent `mock: true` pour permettre un nettoyage simple.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { Timestamp } from "firebase-admin/firestore";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
+import { encryptToken } from "@/lib/server/tokenCrypto";
 
 export const runtime = "nodejs";
 
@@ -41,9 +42,11 @@ export async function GET(req: NextRequest) {
   try {
     const db = getFirebaseAdminFirestore();
     const now = Timestamp.now();
+    const nowIso = new Date().toISOString();
     const ts = Date.now();
     const firmId = `firm_mock_${ts}`;
     const connectionId = `conn_firm_mock_${ts}`;
+    const mockTokenCipher = encryptToken(`mock_access_${ts}`);
 
     // 1) Firm
     await db.collection("firms").doc(firmId).set({
@@ -61,23 +64,35 @@ export async function GET(req: NextRequest) {
       {
         accountType: "firm_member",
         firmId,
-        updatedAt: new Date().toISOString(),
+        updatedAt: nowIso,
       },
       { merge: true }
     );
 
-    // 3) Connection mock
+    // 3) Connection mock — schéma ConnectionRecord complet pour passer
+    //    getUserConnectionById → toConnection → decryptAuth sans erreur.
     await db.collection("connections").doc(connectionId).set({
-      id: connectionId,
       userId: uid,
       firmId,
       provider: "pennylane",
-      kind: "firm_oauth",
-      status: "connected",
-      lastSyncAt: new Date().toISOString(),
+      providerSub: "pennylane_firm",
+      status: "active",
+      authMode: "oauth2",
+      encryptedAccessToken: mockTokenCipher,
+      encryptedRefreshToken: null,
+      tokenPreview: "mock_…",
+      tokenExpiresAt: null,
+      scopes: ["read_only:companies", "read_only:journal_entries"],
+      externalCompanyId: "",
+      externalFirmId: `firm_ext_mock_${ts}`,
+      odooInstanceUrl: null,
+      odooDatabase: null,
+      odooLogin: null,
+      syncCursors: {},
+      lastSyncAt: nowIso,
       lastSyncStatus: "success",
-      createdAt: now,
-      updatedAt: now,
+      lastSyncError: null,
+      createdAt: nowIso,
       mock: true,
     });
 
@@ -111,13 +126,14 @@ export async function GET(req: NextRequest) {
         mock: true,
       });
 
-      // Analyse mock — alimente les KPIs synthétiques du portefeuille.
       const analysisId = `an_mock_${companyId}`;
       await db.collection("analyses").doc(analysisId).set({
         id: analysisId,
         userId: uid,
         companyId,
-        createdAt: new Date().toISOString(),
+        folderName: mc.name,
+        fiscalYear: 2025,
+        createdAt: nowIso,
         kpis: { ca: mc.ca, tn: mc.tn },
         quantisScore: { vyzor_score: mc.score },
         mock: true,
