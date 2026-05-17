@@ -85,6 +85,13 @@ service cloud.firestore {
     // Connections aux logiciels comptables tiers (Pennylane, Chift, Bridge).
     // Update autorisé pour le refresh des tokens et la mise à jour des cursors de sync.
     // Les tokens sont chiffrés côté serveur (lib/server/tokenCrypto.ts) avant écriture.
+    //
+    // Sprint B multi-tenant (cf. docs/audit-sprint-B.md) : la contrainte
+    // d'unicité passe de (userId, provider) à (companyId, provider) côté
+    // application — un user peut désormais avoir N Connections actives
+    // ciblant des Companies différentes (cas Pennylane Firm cabinet).
+    // Les rules client gardent la même restriction (ownership par userId)
+    // car le client SDK ne sait pas piloter les contraintes d'unicité.
     match /connections/{connectionId} {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
 
@@ -166,6 +173,28 @@ service cloud.firestore {
         && request.resource.data.connectionId is string
         && request.resource.data.externalId is string;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Sprint B multi-tenant (cf. docs/audit-sprint-B.md) — table de
+    // jointure N:N entre Connections et Companies. Permet :
+    //   - 1 Connection Firm → N Companies (cas Pennylane cabinet)
+    //   - N Connections → 1 Company (Pennylane + Bridge sur même entreprise)
+    // Owner = userId du propriétaire de la Connection (pas firmId — un
+    // mapping appartient à l'user qui possède la Connection sous-jacente).
+    match /connection_companies/{mappingId} {
+      allow read: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.connectionId is string
+        && request.resource.data.companyId is string
+        && request.resource.data.externalCompanyId is string
+        && request.resource.data.isActive is bool;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
     }
 
     // Sprint A multi-tenant (cf. docs/audit-sprint-A.md) — entité Company
