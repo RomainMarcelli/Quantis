@@ -59,6 +59,15 @@ export type SyncOptions = {
   // Timeout global du sync. Les passes terminées sont conservées (cursors persistés),
   // les passes en cours abandonnées génèrent un statut "partial".
   timeoutMs?: number;
+  /**
+   * Sprint B (cf. audit-sprint-B Q4) — cible un dossier précis pour les
+   * Connections Firm OAuth multi-dossiers. Propagé au ctx adapter qui
+   * le transmet aux fetchers Pennylane via `?company_id=X`.
+   *
+   * Pour les Connections Company / token manuel, laisser undefined (le
+   * token est déjà scopé à un dossier unique).
+   */
+  targetCompanyId?: string;
 };
 
 export type EntitySyncReport = {
@@ -120,6 +129,9 @@ export async function runSync(params: {
     mode,
     periodStart,
     periodEnd,
+    // Sprint B : si l'option est fournie, on cible un dossier précis.
+    // Propagé jusqu'aux fetchers Pennylane qui injectent ?company_id=X.
+    targetCompanyId: params.options?.targetCompanyId,
   };
 
   const entities: EntitySyncReport[] = [];
@@ -245,6 +257,131 @@ export async function runSync(params: {
     error: firstError,
     status,
     timedOut,
+  };
+}
+
+// ─── Sprint B : sync multi-dossiers pour les Connections Firm ──────────────
+
+/**
+ * Rapport d'un sync Firm sur N Companies. Une Connection Firm sait
+ * accéder à plusieurs dossiers ; on lance un `runSync` par dossier en
+ * parallèle bornée (Promise.allSettled), et on agrège.
+ *
+ * Si une Company échoue, on continue avec les autres — l'utilisateur
+ * voit un rapport global `partial` plutôt qu'un sync entièrement KO.
+ */
+export type FirmSyncReport = {
+  connectionId: string;
+  totalCompanies: number;
+  succeeded: number;
+  failed: number;
+  perCompany: Array<{
+    companyId: string;
+    externalCompanyId: string;
+    status: "success" | "partial" | "failed";
+    error: string | null;
+  }>;
+};
+
+/**
+ * Lance un sync sur TOUTES les Companies actives mappées à une
+ * Connection Firm. Itère via `connection_companies` (mappings actifs),
+ * appelle `runSync` avec un `targetCompanyId` injecté pour chaque,
+ * et agrège les résultats.
+ *
+ * Pour les Connections non-Firm (Company token / OAuth Company), il
+ * est INUTILE d'appeler ce helper — utilisez `runSync` directement.
+ */
+export async function runSyncForFirmConnection(params: {
+  userId: string;
+  connectionId: string;
+  options?: SyncOptions;
+}): Promise<FirmSyncReport> {
+  // Import dynamique pour éviter le cycle services/companies →
+  // services/integrations/sync (Sprint B câblage progressif).
+  const { listMappingsForConnection } = await import(
+    "@/services/companies/connectionCompanyStore"
+  );
+  const mappings = await listMappingsForConnection(params.connectionId);
+
+  if (mappings.length === 0) {
+    console.warn(
+      `[runSyncForFirmConnection] connection=${params.connectionId} ` +
+        "n'a aucun mapping actif vers une Company. Aucun sync lancé."
+    );
+    return {
+      connectionId: params.connectionId,
+      totalCompanies: 0,
+      succeeded: 0,
+      failed: 0,
+      perCompany: [],
+    };
+  }
+
+  console.info(
+    `[runSyncForFirmConnection] connection=${params.connectionId} → ${mappings.length} ` +
+      "Companies à syncer en parallèle"
+  );
+
+  // Promise.allSettled : un échec sur une Company n'interrompt pas les
+  // autres. Acceptable car chaque sync écrit sa propre Company isolée.
+  const results = await Promise.allSettled(
+    mappings.map((mapping) =>
+      runSync({
+        userId: params.userId,
+        connectionId: params.connectionId,
+        options: {
+          ...params.options,
+          targetCompanyId: mapping.externalCompanyId,
+        },
+      }).then((report) => ({ mapping, report }))
+    )
+  );
+
+  const perCompany: FirmSyncReport["perCompany"] = [];
+  let succeeded = 0;
+  let failed = 0;
+  for (let i = 0; i < results.length; i++) {
+    const mapping = mappings[i]!;
+    const r = results[i]!;
+    if (r.status === "fulfilled") {
+      const { report } = r.value;
+      const isOk = report.status === "success" || report.status === "partial";
+      if (isOk) succeeded += 1;
+      else failed += 1;
+      perCompany.push({
+        companyId: mapping.companyId,
+        externalCompanyId: mapping.externalCompanyId,
+        status: report.status,
+        error: report.error,
+      });
+      console.info(
+        `[runSyncForFirmConnection] company=${mapping.companyId} (ext=${mapping.externalCompanyId}) ` +
+          `status=${report.status}` +
+          (report.error ? ` error="${report.error.slice(0, 120)}"` : "")
+      );
+    } else {
+      failed += 1;
+      const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      perCompany.push({
+        companyId: mapping.companyId,
+        externalCompanyId: mapping.externalCompanyId,
+        status: "failed",
+        error: msg,
+      });
+      console.error(
+        `[runSyncForFirmConnection] company=${mapping.companyId} (ext=${mapping.externalCompanyId}) ` +
+          `FAILED: ${msg}`
+      );
+    }
+  }
+
+  return {
+    connectionId: params.connectionId,
+    totalCompanies: mappings.length,
+    succeeded,
+    failed,
+    perCompany,
   };
 }
 

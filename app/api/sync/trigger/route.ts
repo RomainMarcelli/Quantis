@@ -27,6 +27,8 @@ import { buildAndPersistAnalysisFromSync } from "@/services/integrations/sync/bu
 import { AuthenticationError, requireAuthenticatedUser } from "@/lib/server/requireAuth";
 import { checkFixedWindowRateLimit } from "@/lib/server/rateLimit";
 import { getUserConnectionById } from "@/services/integrations/storage/connectionStore";
+import { resolveCompanyContext } from "@/services/auth/resolveCompanyContext";
+import { CompanyAccessError } from "@/services/auth/requireCompanyAccess";
 
 export const runtime = "nodejs";
 
@@ -35,6 +37,10 @@ const RATE_LIMIT_MAX = 1;
 
 type TriggerRequestBody = {
   connectionId?: unknown;
+  /** Sprint A multi-tenant — optionnel. Si fourni, on valide l'accès
+   *  via requireCompanyAccess. Sinon, fallback rétrocompat sur la
+   *  première Company du user (mode dirigeant 1-user = 1-company). */
+  companyId?: unknown;
 };
 
 type TriggerResponse =
@@ -82,6 +88,23 @@ export async function POST(request: NextRequest) {
     // 403 plutôt que 404 — on ne révèle pas l'existence d'une connexion
     // d'un autre utilisateur (information disclosure).
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  }
+
+  // ─── Sprint A multi-tenant — résolution du contexte Company ─────────
+  // Si companyId fourni : validation stricte via requireCompanyAccess.
+  // Sinon : fallback rétrocompat sur la 1re Company du user. Le log
+  // émis par resolveCompanyContext permet de mesurer la migration au
+  // fil des sprints (combien de calls ont encore le fallback ?).
+  const companyIdHint =
+    typeof body.companyId === "string" ? body.companyId.trim() : null;
+  try {
+    await resolveCompanyContext(userId, companyIdHint);
+  } catch (error) {
+    if (error instanceof CompanyAccessError) {
+      // 404 = pas de Company (migration incomplète), 403 = autre user.
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
   }
 
   // ─── Rate limit : 1 sync / 5 min par (userId × connectionId) ───────

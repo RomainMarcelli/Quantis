@@ -46,39 +46,94 @@ function buildTokenPreview(token: string): string {
 
 export type CreateConnectionInput = {
   userId: string;
+  /**
+   * Sprint B multi-tenant — companyId obligatoire pour rattacher la
+   * Connection à un dossier précis. La contrainte d'unicité passe de
+   * `(userId, provider)` à `(companyId, provider)` : un user peut
+   * désormais avoir N Connections actives à condition qu'elles ciblent
+   * des Companies différentes (cas Pennylane Firm cabinet).
+   *
+   * Optionnel sur le type pour rétrocompat des callers Sprint A qui ne
+   * passent pas encore companyId — fallback automatique sur la 1re
+   * Company du user (équivalent au mode 1-user = 1-company).
+   */
+  companyId?: string;
   provider: ConnectorProvider;
   providerSub: ConnectorProviderSub;
   auth: ConnectorAuth;
 };
 
 /**
- * Erreur typée levée par `createConnection` quand l'utilisateur a déjà une
- * connexion ACTIVE pour le même provider. Permet aux routes connect de
- * répondre 409 avec un message clair + l'id de la connexion existante (utile
- * pour que le front propose une "Resync" ou "Disconnect" plutôt que de
- * créer un doublon).
+ * Erreur typée levée par `createConnection` quand une Connection ACTIVE
+ * existe déjà pour la même clé d'unicité. Permet aux routes connect de
+ * répondre 409 avec un message clair + l'id de la connexion existante.
+ *
+ * Sprint B : la clé d'unicité passe de (userId, provider) à
+ * (companyId, provider). Le champ `userId` reste exposé pour compat
+ * des callers, mais le filtre métier porte sur companyId.
  */
 export class ConnectionAlreadyExistsError extends Error {
   constructor(
     public readonly userId: string,
     public readonly provider: ConnectorProvider,
-    public readonly existingConnectionId: string
+    public readonly existingConnectionId: string,
+    public readonly companyId?: string
   ) {
     super(
-      `Une connexion ${provider} active existe déjà pour cet utilisateur (id=${existingConnectionId}).`
+      companyId
+        ? `Une connexion ${provider} active existe déjà pour cette company (companyId=${companyId}, id=${existingConnectionId}).`
+        : `Une connexion ${provider} active existe déjà pour cet utilisateur (id=${existingConnectionId}).`
     );
     this.name = "ConnectionAlreadyExistsError";
   }
 }
 
 export async function createConnection(input: CreateConnectionInput): Promise<Connection> {
-  // Garde-fou : une seule connexion ACTIVE par (userId, provider).
-  // Les connexions revoked/expired/error ne bloquent pas (l'utilisateur peut
-  // re-connecter après un disconnect ou un échec de rotation de token).
-  const existing = await listUserConnections(input.userId, input.provider);
-  const stillActive = existing.find((c) => c.status === "active");
-  if (stillActive) {
-    throw new ConnectionAlreadyExistsError(input.userId, input.provider, stillActive.id);
+  // Sprint B : la contrainte d'unicité porte sur (companyId, provider).
+  // Si le caller ne fournit pas de companyId (rétrocompat Sprint A), on
+  // résout la 1re Company du user via listCompaniesForUser. Si aucune
+  // Company trouvée, on laisse la création passer sans contrainte —
+  // c'est un signal qu'un onboarding incomplet est en cours (un sprint
+  // ultérieur peut renforcer si besoin).
+  let companyId = input.companyId ?? undefined;
+  if (!companyId) {
+    // Import dynamique pour éviter un cycle services/integrations →
+    // services/companies (qui pourrait importer connectionStore en retour).
+    const { listCompaniesForUser } = await import("@/services/companies/companyStore");
+    const companies = await listCompaniesForUser(input.userId);
+    if (companies.length > 0) {
+      companyId = companies[0]!.id;
+      console.info(
+        `[connectionStore] createConnection fallback companyId=${companyId} pour user=${input.userId} (rétrocompat Sprint A)`
+      );
+    }
+  }
+
+  // Garde-fou Sprint B : une seule Connection ACTIVE par (companyId, provider).
+  // Les connexions revoked/expired/error ne bloquent pas.
+  if (companyId) {
+    const existing = await listUserConnections(input.userId, input.provider);
+    const stillActiveOnSameCompany = existing.find(
+      (c) => c.status === "active" && c.companyId === companyId
+    );
+    if (stillActiveOnSameCompany) {
+      throw new ConnectionAlreadyExistsError(
+        input.userId,
+        input.provider,
+        stillActiveOnSameCompany.id,
+        companyId
+      );
+    }
+  } else {
+    // Pas de companyId (cas extrême : user sans Company). On retombe sur
+    // l'ancien comportement (userId, provider) pour ne pas casser les
+    // anciens tests/flows. La migration Sprint A garantit que ce cas
+    // ne devrait plus se produire en prod.
+    const existing = await listUserConnections(input.userId, input.provider);
+    const stillActive = existing.find((c) => c.status === "active");
+    if (stillActive) {
+      throw new ConnectionAlreadyExistsError(input.userId, input.provider, stillActive.id);
+    }
   }
 
   const db = getFirebaseAdminFirestore();
@@ -87,6 +142,10 @@ export async function createConnection(input: CreateConnectionInput): Promise<Co
 
   const record: Omit<ConnectionRecord, "id"> = {
     userId: input.userId,
+    // Sprint B : persistance du companyId au top-level du record. Si absent
+    // (fallback Sprint A introuvable), on laisse undefined — le champ sera
+    // omis du payload Firestore (cf. cleanup ci-dessous).
+    companyId,
     provider: input.provider,
     providerSub: input.providerSub,
     status: "active",
@@ -118,7 +177,15 @@ export async function createConnection(input: CreateConnectionInput): Promise<Co
     createdAt,
   };
 
-  await docRef.set(record);
+  // Firestore refuse les champs undefined → on les omet du payload écrit.
+  // Le record retourné conserve la forme du type (avec undefined possible)
+  // pour ne pas casser les consommateurs TS.
+  const payload: Record<string, unknown> = { ...record };
+  for (const key of Object.keys(payload)) {
+    if (payload[key] === undefined) delete payload[key];
+  }
+
+  await docRef.set(payload);
   return toConnection({ ...record, id: docRef.id });
 }
 

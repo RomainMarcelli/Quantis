@@ -113,6 +113,18 @@ export type ConnectionSyncCursors = {
 export type ConnectionRecord = {
   id: string;
   userId: string;
+  /**
+   * Sprint A multi-tenant — rattache une Connection à une Company.
+   * Ajouté par la migration users-to-companies (16/05/2026). Optionnel
+   * sur le TYPE pour rétrocompat ascendante avec les connections
+   * historiques sans companyId (ne devrait plus exister en prod après
+   * la migration, mais on garde le `?` pour la robustesse).
+   *
+   * Sprint B : la contrainte d'unicité passe de (userId, provider) à
+   * (companyId, provider) — un user peut désormais avoir N Connections
+   * actives à condition que chaque ciblage Company soit distinct.
+   */
+  companyId?: string;
   provider: ConnectorProvider;
   providerSub: ConnectorProviderSub;
   status: ConnectionStatus;
@@ -572,6 +584,16 @@ export type AdapterSyncContext = {
   mode: SyncMode;
   periodStart: Date;
   periodEnd: Date;
+  /**
+   * Sprint B (cf. audit-sprint-B Q4) — cible un dossier précis dans une
+   * Connection Firm OAuth multi-dossiers. Propagé aux fetchers Pennylane
+   * via `pennylaneFetchPage(..., targetCompanyId)` qui injecte
+   * `?company_id=X` en query (fallback header `X-Company-Id` si 403/404).
+   *
+   * undefined = pas de ciblage (cas Company token / token manuel où le
+   * token est déjà scopé à un dossier unique côté provider).
+   */
+  targetCompanyId?: string;
 };
 
 // Le résultat d'une page de sync — l'adaptateur peut être appelé plusieurs fois

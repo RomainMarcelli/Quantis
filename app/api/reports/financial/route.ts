@@ -16,6 +16,8 @@ import { AuthenticationError, requireAuthenticatedUser } from "@/lib/server/requ
 import { enforceRouteRateLimit } from "@/lib/server/rateLimit";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
 import { findPreviousAnalysisByFiscalYear } from "@/services/analysisHistory";
+import { resolveCompanyContext } from "@/services/auth/resolveCompanyContext";
+import { CompanyAccessError } from "@/services/auth/requireCompanyAccess";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { DashboardLayout, WidgetInstance } from "@/types/dashboard";
 
@@ -29,6 +31,10 @@ type ReportRequestBody = {
   effectiveKpis?: Record<string, number | null> | null;
   /** Format de sortie : "pdf" (défaut) ou "docx". */
   format?: ReportFormat;
+  /** Sprint A multi-tenant — optionnel. Si fourni, on valide l'accès
+   *  via requireCompanyAccess. Sinon, fallback rétrocompat sur la
+   *  première Company du user. */
+  companyId?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -64,6 +70,19 @@ export async function POST(request: NextRequest) {
   }
   const clientEffectiveKpis = body.effectiveKpis ?? null;
   const requestedFormat: ReportFormat = body.format === "docx" ? "docx" : "pdf";
+
+  // Sprint A multi-tenant — résolution du contexte Company. Si le front
+  // fournit companyId, on valide. Sinon fallback sur la 1re Company du
+  // user (mode rétrocompat). Le log indique le mode utilisé.
+  const companyIdHint = typeof body.companyId === "string" ? body.companyId.trim() : null;
+  try {
+    await resolveCompanyContext(userId, companyIdHint);
+  } catch (error) {
+    if (error instanceof CompanyAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    throw error;
+  }
 
   // Lecture de l'analyse via Admin SDK (pas le client SDK : on a besoin de
   // bypasser les règles Firestore côté serveur).
