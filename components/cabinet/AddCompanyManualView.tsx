@@ -42,8 +42,13 @@ export function AddCompanyManualView() {
     return null;
   }
 
+  // Le champ accept liste tous les formats supportés par le pipeline,
+  // quel que soit le provider choisi en amont. Le `source` côté Firestore
+  // garde la classification (fec / static_file / manual), mais le user
+  // peut joindre n'importe quel fichier de la liste — utile quand il
+  // s'est trompé de carte dans /cabinet/entreprises/ajouter.
+  const fileAccept = ".txt,.csv,.tsv,.xlsx,.xls,.pdf";
   const isFec = sourceProvider === "fec";
-  const fileAccept = isFec ? ".txt,.csv,.tsv" : ".xlsx,.xls,.pdf";
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -180,8 +185,12 @@ export function AddCompanyManualView() {
 
           <Field
             id="file"
-            label={isFec ? "Fichier FEC (.txt ou .csv)" : "Bilan / Compte de résultat (.xlsx, .pdf)"}
-            hint="Optionnel — l'entreprise peut être créée vide, l'analyse peut venir plus tard."
+            label={
+              isFec
+                ? "Fichier comptable (FEC .txt/.csv ou Excel/PDF)"
+                : "Fichier comptable (Excel .xlsx, PDF ou FEC .txt/.csv)"
+            }
+            hint="Optionnel — l'entreprise peut être créée vide, l'analyse peut venir plus tard. Tous les formats supportés sont acceptés ici."
           >
             <label
               className="flex h-28 cursor-pointer items-center justify-center rounded-lg text-center"

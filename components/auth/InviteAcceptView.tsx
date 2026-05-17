@@ -1,26 +1,29 @@
 // File: components/auth/InviteAcceptView.tsx
-// Role: vue d'acceptation d'invitation. Lit l'invitation depuis Firestore
-// (client) via le token de l'URL. Si valide, affiche le nom de l'entreprise
-// + bouton "Créer mon compte" qui pose le token en localStorage et
-// redirige vers /register?email=… — AuthPage POST /api/invite/accept après
-// signup réussi.
+// Role: vue d'acceptation d'invitation. Fetch l'invitation via la route
+// publique GET /api/invite/[token] (server-side, contourne les Firestore
+// rules qui interdisent les reads non-authentifiés). Si valide, affiche
+// le nom de l'entreprise + bouton "Créer mon compte" qui pose le token en
+// localStorage et redirige vers /register. AuthPage POST /api/invite/accept
+// après signup réussi.
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
 import { Building2, Loader2 } from "lucide-react";
-import { firestoreDb } from "@/lib/firebase";
 import { ROUTES } from "@/lib/config/routes";
 import { PRE_AUTH_STORAGE_KEYS, ACCOUNT_TYPES } from "@/lib/config/account-types";
 
 type InviteState =
   | { status: "loading" }
   | { status: "valid"; companyName: string; email: string }
-  | { status: "expired" }
-  | { status: "used" }
+  | { status: "expired"; companyName?: string }
+  | { status: "used"; companyName?: string }
   | { status: "not_found" }
   | { status: "error"; message: string };
+
+type ApiResponse =
+  | { status: "valid"; companyName: string; email: string }
+  | { status: "expired" | "used" | "not_found"; companyName?: string };
 
 export function InviteAcceptView({ token }: { token: string }) {
   const router = useRouter();
@@ -30,27 +33,18 @@ export function InviteAcceptView({ token }: { token: string }) {
     let cancelled = false;
     void (async () => {
       try {
-        const snap = await getDoc(doc(firestoreDb, "invitations", token));
+        const res = await fetch(`/api/invite/${encodeURIComponent(token)}`);
+        const payload = (await res.json().catch(() => ({}))) as ApiResponse & { error?: string };
         if (cancelled) return;
-        if (!snap.exists()) {
-          setState({ status: "not_found" });
+        if (payload.status === "valid") {
+          setState({ status: "valid", companyName: payload.companyName, email: payload.email });
           return;
         }
-        const data = snap.data();
-        if (data.status === "accepted") {
-          setState({ status: "used" });
+        if (payload.status === "expired" || payload.status === "used" || payload.status === "not_found") {
+          setState({ status: payload.status, companyName: payload.companyName });
           return;
         }
-        const expiresAt = data.expiresAt?.toDate?.() as Date | undefined;
-        if (expiresAt && expiresAt < new Date()) {
-          setState({ status: "expired" });
-          return;
-        }
-        setState({
-          status: "valid",
-          companyName: String(data.companyName ?? "Votre entreprise"),
-          email: String(data.email ?? ""),
-        });
+        setState({ status: "error", message: payload.error || "Réponse inattendue." });
       } catch (err) {
         if (!cancelled) {
           setState({
