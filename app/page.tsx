@@ -1,8 +1,14 @@
 // File: app/page.tsx
-// Role: page d'accueil de l'app — affiche directement la nouvelle AuthPage
-// (layout 2 colonnes, branding gauche + form droit) en mode login. C'est le
-// premier écran que voit un visiteur non authentifié à la racine `/`.
-import { AuthPage } from "@/components/auth/AuthPage";
+// Role: point d'entrée — redirige selon l'état auth + accountType.
+//
+// feature/cabinet-ux : le visiteur non authentifié arrive sur /onboarding
+// (picker pré-auth company_owner vs firm_member). L'user authentifié est
+// envoyé directement vers son dashboard selon son accountType.
+//
+// Composant client minimal (pas de SSR) — toute la logique de routage est
+// gardée dans EntryRedirect pour éviter les flashs et permettre la
+// résolution accountType depuis Firestore.
+import { EntryRedirect } from "@/components/auth/EntryRedirect";
 
 type HomePageProps = {
   searchParams?: Promise<{
@@ -13,7 +19,7 @@ type HomePageProps = {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const params = (await searchParams) ?? {};
   const rawNext = Array.isArray(params.next) ? params.next[0] ?? "" : params.next ?? "";
-  const postLoginRedirect = rawNext.startsWith("/") ? rawNext : "/synthese";
+  const nextRedirect = rawNext.startsWith("/") ? rawNext : null;
 
-  return <AuthPage initialMode="login" postLoginRedirect={postLoginRedirect} />;
+  return <EntryRedirect nextRedirect={nextRedirect} />;
 }

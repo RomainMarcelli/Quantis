@@ -30,6 +30,7 @@ import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod
 import { buildSyntheseYearOptions, filterAnalysesByYear } from "@/lib/synthese/synthesePeriod";
 import { ExportSyntheseButton } from "@/components/synthese/ExportSyntheseButton";
 import { downloadStatementReport } from "@/lib/reports/downloadStatementReport";
+import { useActiveCompany } from "@/lib/stores/activeCompanyStore";
 import type { AnalysisRecord } from "@/types/analysis";
 import type { AuthenticatedUser } from "@/types/auth";
 
@@ -50,6 +51,7 @@ type FinancialStatementsViewProps = {
 
 export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) {
   const router = useRouter();
+  const { activeCompanyId } = useActiveCompany();
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analyses, setAnalyses] = useState<AnalysisRecord[]>([]);
   const [fetchState, setFetchState] = useState<FetchState>("idle");
@@ -61,6 +63,7 @@ export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) 
 
   const { activeAccountingSource, activeFecFolderName } = useActiveDataSource({
     analyses,
+    companyId: activeCompanyId,
   });
 
   useEffect(() => {
@@ -86,14 +89,15 @@ export function FinancialStatementsView({ mode }: FinancialStatementsViewProps) 
   useEffect(() => {
     if (!user) return;
     void loadAnalyses(user);
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Recharge quand le dossier actif change (mode cabinet).
+  }, [user, activeCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadAnalyses(currentUser: AuthenticatedUser) {
     setFetchState("loading");
     setErrorMessage(null);
     try {
       const [history, profile] = await Promise.all([
-        listUserAnalyses(currentUser.uid),
+        listUserAnalyses(currentUser.uid, undefined, activeCompanyId),
         getUserProfile(currentUser.uid),
       ]);
       setAnalyses(history);

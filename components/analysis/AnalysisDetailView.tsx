@@ -65,6 +65,7 @@ import { firebaseAuthGateway } from "@/services/auth";
 import { persistPendingAnalysisForUser } from "@/services/pendingAnalysisSync";
 import { getUserProfile } from "@/services/userProfileStore";
 import { useTemporality } from "@/lib/temporality/temporalityContext";
+import { useActiveCompany } from "@/lib/stores/activeCompanyStore";
 import { recomputeKpisForPeriod } from "@/lib/temporality/recomputeKpisForPeriod";
 import { computePreviousPeriod } from "@/lib/temporality/computePreviousPeriod";
 import { computeAvailableRange, shouldShowTemporalityBar } from "@/lib/temporality/availableRange";
@@ -177,6 +178,10 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisRecord | null>(null);
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRecord[]>([]);
+
+  // Scope multi-tenant — déclaré tôt pour pouvoir être utilisé dans les
+  // useEffect plus bas (loadDashboardData filtre par activeCompanyId).
+  const { activeCompanyId } = useActiveCompany();
 
   // L'onglet Trésorerie n'apparaît que si LES TROIS conditions sont vraies :
   //   1. l'utilisateur a activé Bridge via le toggle de /documents
@@ -308,6 +313,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // `activeAccountingSource` (et `activeFecFolderName` si FEC).
   const { activeAccountingSource, activeFecFolderName, activeBankingSource } = useActiveDataSource({
     analyses: allAnalyses,
+    companyId: activeCompanyId,
   });
 
   // Onglet Trésorerie : visible UNIQUEMENT si l'utilisateur a activé Bridge
@@ -337,7 +343,8 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
     // Priorité 2 : on laisse loadDashboardData résoudre via la source active
     // (filtrage par provider + folder dans le matcher).
     void loadDashboardData(user, analysisId ?? undefined);
-  }, [user, analysisId, activeAccountingSource, activeFecFolderName]);
+    // Recharge quand le dossier cabinet actif change (mode firm_member).
+  }, [user, analysisId, activeAccountingSource, activeFecFolderName, activeCompanyId]);
 
   useEffect(() => {
     if (currentFolder.trim()) {
@@ -414,6 +421,23 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
   // ceux du snapshot car ils sont à un instant T.
   // Source statique (PDF) : recomputeKpisForPeriod renvoie l'annuel inchangé.
   const temporality = useTemporality();
+
+  // Sprint C — quand l'user firm_member switche de dossier via CompanySelector,
+  // loadDashboardData se rejoue déjà via la dépendance `activeCompanyId` du
+  // useEffect principal. Ce useEffect post-load gère l'edge case "le dossier
+  // actif n'a aucune analyse" en affichant un message clair plutôt qu'un
+  // cockpit vide ambigu.
+  useEffect(() => {
+    if (!activeCompanyId) return;
+    if (allAnalyses.length === 0 && !loadingAnalysis) {
+      setAnalysis(null);
+      setInfoMessage("Ce dossier n'a pas encore d'analyse financière.");
+    } else {
+      setInfoMessage(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCompanyId, allAnalyses]);
+
   const effectiveAnalysis = useMemo(() => {
     if (!analysis) return null;
     return recomputeKpisForPeriod(analysis, temporality.periodStart, temporality.periodEnd);
@@ -596,7 +620,7 @@ export function AnalysisDetailView({ analysisId, viewMode = "analysis" }: Analys
       }
 
       const [history, profile, persistedFolders] = await Promise.all([
-        listUserAnalyses(currentUser.uid),
+        listUserAnalyses(currentUser.uid, undefined, activeCompanyId),
         getUserProfile(currentUser.uid),
         listUserFolders(currentUser.uid)
       ]);

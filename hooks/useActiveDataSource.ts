@@ -42,6 +42,13 @@ type UseActiveDataSourceOptions = {
    * `availableYears` reste vide.
    */
   analyses?: AnalysisRecord[];
+  /**
+   * Scope par dossier cabinet — quand un firm_member ouvre une entreprise
+   * précise, on lit/écrit `users/{uid}/settings/dataSources_{companyId}`
+   * pour ne pas mélanger les sources actives de N dossiers.
+   * Pour company_owner / non scopé, retombe sur le doc historique.
+   */
+  companyId?: string | null;
 };
 
 export type UseActiveDataSourceResult = {
@@ -72,7 +79,7 @@ export type UseActiveDataSourceResult = {
 export function useActiveDataSource(
   options: UseActiveDataSourceOptions = {}
 ): UseActiveDataSourceResult {
-  const { analyses } = options;
+  const { analyses, companyId } = options;
   const [userId, setUserId] = useState<string | null>(null);
   const [state, setState] = useState<ActiveDataSourceState>(EMPTY_ACTIVE_DATA_SOURCE);
   const [isLoading, setIsLoading] = useState(true);
@@ -96,6 +103,10 @@ export function useActiveDataSource(
   useEffect(() => {
     if (!userId) return;
     setIsLoading(true);
+    // Reset state quand le scope change (companyId switche) pour éviter
+    // d'afficher la source de l'ancien dossier le temps que Firestore
+    // résolve la nouvelle.
+    setState(EMPTY_ACTIVE_DATA_SOURCE);
     const unsubscribe = subscribeActiveDataSource(
       userId,
       (next) => {
@@ -105,7 +116,9 @@ export function useActiveDataSource(
         // Migration douce — on tente une seule fois après la première
         // résolution Firestore. Si Firestore est vide ET on a un legacy
         // localStorage, on déduit la source et on persiste.
-        if (!migrationDoneRef.current) {
+        // Skip si on est scopé à un companyId (jamais de legacy localStorage
+        // pour les sous-dossiers — la migration n'a de sens qu'au niveau user).
+        if (!migrationDoneRef.current && !companyId) {
           migrationDoneRef.current = true;
           void runLegacyMigration(userId, next, analyses);
         }
@@ -113,27 +126,28 @@ export function useActiveDataSource(
       (err) => {
         setError(err);
         setIsLoading(false);
-      }
+      },
+      companyId
     );
     return () => {
       unsubscribe();
     };
-  }, [userId, analyses]);
+  }, [userId, analyses, companyId]);
 
   const setActiveAccountingSource = useCallback(
     async (source: AccountingSource | null, fecFolderName: string | null = null) => {
       if (!userId) return;
-      await writeActiveAccountingSource(userId, source, fecFolderName);
+      await writeActiveAccountingSource(userId, source, fecFolderName, companyId);
     },
-    [userId]
+    [userId, companyId]
   );
 
   const setActiveBankingSource = useCallback(
     async (source: BankingSource | null) => {
       if (!userId) return;
-      await writeActiveBankingSource(userId, source);
+      await writeActiveBankingSource(userId, source, companyId);
     },
-    [userId]
+    [userId, companyId]
   );
 
   // Années disponibles dans la source active. Pour Pennylane / MyUnisoft /

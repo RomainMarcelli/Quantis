@@ -33,6 +33,7 @@ import { AccountingDetailsPanel } from "@/components/documents/AccountingDetails
 import { BankingDetailsPanel } from "@/components/documents/BankingDetailsPanel";
 import { ConnectSourceModal } from "@/components/documents/ConnectSourceModal";
 import { SourceSwitchConfirmModal } from "@/components/documents/SourceSwitchConfirmModal";
+import { useActiveCompany } from "@/lib/stores/activeCompanyStore";
 import type { ProviderId } from "@/components/integrations/AccountingConnectionWizard";
 import type { AccountingSource } from "@/types/dataSources";
 import type { ConnectionDto } from "@/app/api/integrations/connections/route";
@@ -69,6 +70,7 @@ type DeleteFolderConfirm = {
 
 export function DocumentsView() {
   const router = useRouter();
+  const { activeCompanyId } = useActiveCompany();
   const [user, setUser] = useState<AuthenticatedUser | null>(() => firebaseAuthGateway.getCurrentUser());
   const [loading, setLoading] = useState(true);
   // Loader visible uniquement si le chargement dépasse 400 ms — évite le flash.
@@ -123,7 +125,7 @@ export function DocumentsView() {
     activeBankingSource,
     setActiveAccountingSource,
     setActiveBankingSource,
-  } = useActiveDataSource();
+  } = useActiveDataSource({ companyId: activeCompanyId });
 
   // Auto-collapse du switcher dès que la source active change
   // (l'utilisateur a basculé sur une nouvelle source → on cache la grille
@@ -153,7 +155,7 @@ export function DocumentsView() {
     setLoading(true);
     try {
       const [allAnalyses, folders, idToken] = await Promise.all([
-        listUserAnalyses(user.uid),
+        listUserAnalyses(user.uid, undefined, activeCompanyId),
         listUserFolders(user.uid),
         firebaseAuthGateway.getIdToken(),
       ]);
@@ -167,7 +169,10 @@ export function DocumentsView() {
       // de l'état "connectée vs déconnectée" de chaque tuile. Bridge est
       // tracké séparément par useBridgeStatus.
       if (idToken) {
-        const res = await fetch("/api/integrations/connections", {
+        const connectionsUrl = activeCompanyId
+          ? `/api/integrations/connections?companyId=${encodeURIComponent(activeCompanyId)}`
+          : "/api/integrations/connections";
+        const res = await fetch(connectionsUrl, {
           headers: { Authorization: `Bearer ${idToken}` },
           cache: "no-store",
         });
@@ -185,7 +190,8 @@ export function DocumentsView() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+    // Recharge quand le dossier actif change (mode cabinet).
+  }, [user, activeCompanyId]);
 
   useEffect(() => {
     void loadData();

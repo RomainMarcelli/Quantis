@@ -9,7 +9,8 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Building2, Loader2 } from "lucide-react";
+import { Building2, Loader2, Sparkles } from "lucide-react";
+import { firebaseAuthGateway } from "@/services/auth";
 
 const ERROR_MESSAGES: Record<string, string> = {
   user_denied: "Vous avez refusé l'autorisation sur Pennylane.",
@@ -33,7 +34,11 @@ export function FirmConnectPage() {
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch("/api/integrations/pennylane/firm/authorize-url");
+      const idToken = await firebaseAuthGateway.getIdToken();
+      if (!idToken) throw new Error("Session expirée — reconnectez-vous.");
+      const res = await fetch("/api/integrations/pennylane/firm/authorize-url", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
       if (!res.ok) throw new Error("Failed to get OAuth URL");
 
       const { authorizeUrl } = (await res.json()) as { authorizeUrl: string };
@@ -43,6 +48,33 @@ export function FirmConnectPage() {
       setBusy(false);
     }
   }
+
+  // Mock dev — simule le retour OAuth Firm et seed Firestore avec 3 dossiers fictifs.
+  // Visible uniquement si NEXT_PUBLIC_MOCK_OAUTH_ENABLED === "true".
+  async function startMockOAuth() {
+    setError(null);
+    setBusy(true);
+    try {
+      const user = firebaseAuthGateway.getCurrentUser();
+      if (!user) throw new Error("Utilisateur non authentifié.");
+      const firmName =
+        (typeof window !== "undefined" && window.localStorage.getItem("vyzor_firm_name")) ||
+        "Cabinet Test";
+      const url = `/api/mock/oauth-firm-simulate?uid=${encodeURIComponent(user.uid)}&firmName=${encodeURIComponent(firmName)}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        const payload = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "Mock OAuth a échoué.");
+      }
+      const data = (await res.json()) as { connectionId: string };
+      router.push(`/cabinet/onboarding/picker?connectionId=${encodeURIComponent(data.connectionId)}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Mock OAuth a échoué.");
+      setBusy(false);
+    }
+  }
+
+  const mockEnabled = process.env.NEXT_PUBLIC_MOCK_OAUTH_ENABLED === "true";
 
   return (
     <div className="mx-auto w-full max-w-2xl py-8">
@@ -103,6 +135,41 @@ export function FirmConnectPage() {
           <p className="mt-3 text-xs" style={{ color: "var(--app-danger, #EF4444)" }}>
             {error}
           </p>
+        ) : null}
+
+        {mockEnabled ? (
+          <div
+            className="mt-5 rounded-xl p-4"
+            style={{
+              backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 8%)",
+              border: "1px dashed rgb(var(--app-brand-gold-deep-rgb) / 40%)",
+            }}
+          >
+            <p
+              className="mb-2 text-[11px] font-semibold uppercase tracking-wider"
+              style={{ color: "var(--app-brand-gold-deep)" }}
+            >
+              ⚠️ Mode mock — données fictives
+            </p>
+            <p className="mb-3 text-xs" style={{ color: "var(--app-text-secondary)" }}>
+              Saute l'OAuth réel et seed 3 dossiers Pennylane fictifs (Boulangerie / Plomberie /
+              Cabinet Médical) pour itérer sur l'UX cabinet sans creds Pennylane.
+            </p>
+            <button
+              type="button"
+              onClick={() => void startMockOAuth()}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition disabled:opacity-50"
+              style={{
+                border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 60%)",
+                color: "var(--app-brand-gold-deep)",
+                backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 18%)",
+              }}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              {busy ? "Simulation…" : "Simuler connexion (mock)"}
+            </button>
+          </div>
         ) : null}
 
         <div className="mt-6 flex items-center gap-3">

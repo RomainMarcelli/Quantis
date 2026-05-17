@@ -1,7 +1,8 @@
 // POST /api/cabinet/oauth/start
 // Initie le flow OAuth Pennylane Firm (Sprint C). Crée un state CSRF
-// stocké en Firestore (TTL 10 min), retourne l'URL d'autorisation.
-// Le callback est /api/integrations/pennylane/firm/callback.
+// préfixé "firm:" stocké en Firestore (TTL 10 min), retourne l'URL
+// d'autorisation. Le callback unifié /api/integrations/pennylane/callback
+// route Firm vs Company via le préfixe du state.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { randomBytes } from "node:crypto";
@@ -42,7 +43,7 @@ export async function POST(request: NextRequest) {
   const clientId = process.env.PENNYLANE_OAUTH_CLIENT_ID;
   const redirectUri =
     process.env.PENNYLANE_REDIRECT_URI ||
-    `${process.env.APP_BASE_URL}/api/integrations/pennylane/firm/callback`;
+    `${process.env.APP_BASE_URL}/api/integrations/pennylane/callback`;
   if (!clientId || !redirectUri) {
     return NextResponse.json(
       {
@@ -59,8 +60,9 @@ export async function POST(request: NextRequest) {
   const userDoc = await db.collection("users").doc(userId).get();
   const firmId = userDoc.exists ? (userDoc.data()?.firmId as string | undefined) : undefined;
 
-  // Génère + persiste le state CSRF.
-  const state = randomBytes(24).toString("base64url");
+  // Génère + persiste le state CSRF. Préfixé "firm:" pour disambiguation
+  // côté callback unifié (firm vs company).
+  const state = `firm:${randomBytes(24).toString("base64url")}`;
   const expiresAt = new Date(Date.now() + OAUTH_STATE_TTL_MS).toISOString();
   await db
     .collection(OAUTH_STATES_COLLECTION)

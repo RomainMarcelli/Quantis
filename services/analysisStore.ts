@@ -170,12 +170,24 @@ export async function saveAnalysisDraft(analysisDraft: AnalysisDraft): Promise<A
   };
 }
 
-export async function listUserAnalyses(userId: string, fiscalYear?: number): Promise<AnalysisRecord[]> {
+export async function listUserAnalyses(
+  userId: string,
+  fiscalYear?: number,
+  companyId?: string | null
+): Promise<AnalysisRecord[]> {
   const collectionRef = collection(firestoreDb, COLLECTION);
 
   const constraints: QueryConstraint[] = [where("userId", "==", userId)];
   if (typeof fiscalYear === "number") {
     constraints.push(where("fiscalYear", "==", fiscalYear));
+  }
+  // Scope multi-tenant — quand un companyId actif est fourni (firm_member
+  // ayant sélectionné un dossier), on filtre côté Firestore pour ne
+  // retourner que les analyses rattachées à cette Company. Les analyses
+  // legacy sans champ companyId sont exclues — c'est le comportement
+  // voulu : elles n'appartiennent à aucun dossier précis.
+  if (typeof companyId === "string" && companyId.length > 0) {
+    constraints.push(where("companyId", "==", companyId));
   }
 
   const snapshot = await getDocs(query(collectionRef, ...constraints));
@@ -306,6 +318,7 @@ function toAnalysisRecord(id: string, data: Record<string, unknown>): AnalysisRe
   return {
     id,
     userId: String(data.userId ?? ""),
+    companyId: typeof data.companyId === "string" && data.companyId.trim() ? data.companyId : undefined,
     folderName: String(data.folderName ?? "Dossier principal"),
     createdAt,
     fiscalYear: typeof data.fiscalYear === "number" ? data.fiscalYear : null,

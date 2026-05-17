@@ -2,14 +2,23 @@
 // Liste les dossiers (Companies) du cabinet de l'user authentifié avec
 // leurs KPIs synthétiques pour affichage dans la vue Portefeuille.
 //
-// Sprint C Tâche 5. Réservé aux users avec accountType === "firm_member".
+// Réservé aux users avec accountType === "firm_member".
+//
+// Approche firm-driven (refacto cabinet-ux) : on liste toutes les Companies
+// dont `firmId === user.firmId`, peu importe leur source. Pour chacune, on
+// cherche optionnellement un mapping connection_companies pour enrichir
+// avec lastSyncAt / lastSyncStatus / externalCompanyId. Les Companies
+// ajoutées manuellement (FEC / Excel / PDF) sans Connection apparaissent
+// désormais avec un statut "never" et pas d'externalCompanyId.
+//
+// L'ancien comportement (mapping-driven) ratait les Companies sans
+// mapping — c'est ce bug qui faisait disparaître les ajouts manuels du
+// portefeuille.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { AuthenticationError, requireAuthenticatedUser } from "@/lib/server/requireAuth";
 import { getFirebaseAdminFirestore } from "@/lib/server/firebaseAdmin";
-import { listFirmsForUser, getFirm } from "@/services/companies/firmStore";
-import { listActiveMappingsForUser } from "@/services/companies/connectionCompanyStore";
-import { getCompany } from "@/services/companies/companyStore";
+import { getFirm } from "@/services/companies/firmStore";
 
 export const runtime = "nodejs";
 
@@ -18,13 +27,16 @@ type DossierDto = {
   name: string;
   externalCompanyId: string | null;
   externalCompanyName: string | null;
-  connectionId: string;
+  connectionId: string | null;
   lastSyncedAt: string | null;
   lastSyncStatus: "success" | "failed" | "in_progress" | "partial" | "never" | "unknown";
+  source: string | null;
   kpis: {
     ca: number | null;
     tresorerieNette: number | null;
     vyzorScore: number | null;
+    ebitda: number | null;
+    resultatNet: number | null;
   };
 };
 
@@ -41,7 +53,7 @@ export async function GET(request: NextRequest) {
 
   const db = getFirebaseAdminFirestore();
 
-  // 1. Vérifie que le user est firm_member et récupère son firmId.
+  // 1. Vérifie firm_member + récupère firmId.
   const userDoc = await db.collection("users").doc(userId).get();
   const userData = userDoc.exists ? userDoc.data() ?? {} : {};
   const accountType = (userData.accountType as string | undefined) ?? "company_owner";
@@ -51,7 +63,6 @@ export async function GET(request: NextRequest) {
       { status: 403 }
     );
   }
-
   const firmId = userData.firmId as string | undefined;
   if (!firmId) {
     return NextResponse.json(
@@ -59,8 +70,6 @@ export async function GET(request: NextRequest) {
       { status: 404 }
     );
   }
-
-  // Vérifie l'appartenance à la Firm (sécurité défensive).
   const firm = await getFirm(firmId);
   if (!firm) {
     return NextResponse.json({ error: "Cabinet introuvable." }, { status: 404 });
@@ -72,61 +81,101 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 2. Liste les mappings actifs du user (Sprint C : 1 firm → N mappings via Connections owned by firm_members).
-  const mappings = await listActiveMappingsForUser(userId);
+  // 2. Liste toutes les Companies actives du cabinet (firm-driven).
+  const companiesSnap = await db
+    .collection("companies")
+    .where("firmId", "==", firmId)
+    .where("status", "==", "active")
+    .get();
+  const companies: Array<Record<string, unknown> & { id: string }> = companiesSnap.docs.map(
+    (d) => ({ ...(d.data() as Record<string, unknown>), id: d.id })
+  );
 
-  // 3. Pour chaque mapping, charge la Company + dernière analyse pour les KPIs synthétiques.
+  // 3. Pour chaque Company, on enrichit avec mapping (sync) + analyse (KPIs).
   const dossiers: DossierDto[] = [];
-  for (const mapping of mappings) {
-    const company = await getCompany(mapping.companyId);
-    if (!company || company.status !== "active") continue;
+  for (const company of companies) {
+    const companyId = company.id;
+    const name = String(company.name ?? "Sans nom");
+    const source = typeof company.source === "string" ? company.source : null;
 
-    // Charge la connection pour récupérer lastSyncAt / lastSyncStatus.
+    // Mapping optionnel (les ajouts manuels n'en ont pas).
+    let connectionId: string | null = null;
+    let externalCompanyId: string | null = null;
+    let externalCompanyName: string | null = null;
     let lastSyncedAt: string | null = null;
-    let lastSyncStatus: DossierDto["lastSyncStatus"] = "unknown";
+    let lastSyncStatus: DossierDto["lastSyncStatus"] = "never";
     try {
-      const connSnap = await db.collection("connections").doc(mapping.connectionId).get();
-      if (connSnap.exists) {
-        const cd = connSnap.data() ?? {};
-        lastSyncedAt = (cd.lastSyncAt as string | null) ?? null;
-        const status = cd.lastSyncStatus as string | undefined;
-        if (status === "success" || status === "failed" || status === "in_progress" || status === "partial" || status === "never") {
-          lastSyncStatus = status;
+      const mappingSnap = await db
+        .collection("connection_companies")
+        .where("companyId", "==", companyId)
+        .where("isActive", "==", true)
+        .limit(1)
+        .get();
+      if (!mappingSnap.empty) {
+        const mapping = mappingSnap.docs[0]!.data();
+        connectionId = (mapping.connectionId as string | null) ?? null;
+        externalCompanyId = (mapping.externalCompanyId as string | null) ?? null;
+        externalCompanyName = (mapping.externalCompanyName as string | null) ?? null;
+        if (connectionId) {
+          const connSnap = await db.collection("connections").doc(connectionId).get();
+          if (connSnap.exists) {
+            const cd = connSnap.data() ?? {};
+            lastSyncedAt = (cd.lastSyncAt as string | null) ?? null;
+            const status = cd.lastSyncStatus as string | undefined;
+            if (
+              status === "success" ||
+              status === "failed" ||
+              status === "in_progress" ||
+              status === "partial" ||
+              status === "never"
+            ) {
+              lastSyncStatus = status;
+            }
+          }
         }
       }
     } catch {
-      /* swallow — lecture best effort */
+      /* swallow — read best effort */
     }
 
-    // Charge l'analyse la plus récente de cette Company (KPIs synthétiques).
+    // Dernière analyse pour les KPIs synthétiques (CA, tn, ebitda, score).
     let ca: number | null = null;
     let tresorerieNette: number | null = null;
     let vyzorScore: number | null = null;
+    let ebitda: number | null = null;
+    let resultatNet: number | null = null;
     try {
       const analysesSnap = await db
         .collection("analyses")
-        .where("companyId", "==", company.id)
+        .where("companyId", "==", companyId)
         .where("userId", "==", userId)
         .get();
-      // Tri local par createdAt desc — on évite un index composite pour Sprint C.
       const analyses = analysesSnap.docs
-        .map((d) => ({ id: d.id, ...(d.data() as Record<string, unknown>) } as Record<string, unknown>))
+        .map((d) => ({ ...(d.data() as Record<string, unknown>), id: d.id }))
         .sort((a, b) => {
-          const av = String(a.createdAt ?? "");
-          const bv = String(b.createdAt ?? "");
+          const av = String((a as Record<string, unknown>).createdAt ?? "");
+          const bv = String((b as Record<string, unknown>).createdAt ?? "");
           return bv.localeCompare(av);
         });
       if (analyses.length > 0) {
-        const latest = analyses[0]!;
+        const latest = analyses[0]! as Record<string, unknown>;
         const kpis = latest.kpis as Record<string, number | null> | undefined;
         const mapped = latest.mappedData as Record<string, number | null> | undefined;
         if (kpis) {
           if (typeof kpis.ca === "number") ca = kpis.ca;
           if (typeof kpis.tn === "number") tresorerieNette = kpis.tn;
+          if (typeof kpis.ebitda === "number") ebitda = kpis.ebitda;
+          if (typeof kpis.resultat_net === "number") resultatNet = kpis.resultat_net;
+          if (resultatNet === null && typeof kpis.resultatNet === "number") {
+            resultatNet = kpis.resultatNet;
+          }
         }
-        // Fallback CA via mappedData.total_prod_expl si pas de kpi.ca.
         if (ca === null && mapped && typeof mapped.total_prod_expl === "number") {
           ca = mapped.total_prod_expl;
+        }
+        // Fallback résultat net via mappedData.resultat_exercice si pas de kpi.
+        if (resultatNet === null && mapped && typeof mapped.resultat_exercice === "number") {
+          resultatNet = mapped.resultat_exercice;
         }
         const score = latest.quantisScore as { vyzor_score?: number } | undefined;
         if (score && typeof score.vyzor_score === "number") {
@@ -134,18 +183,19 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch {
-      /* swallow — lecture best effort */
+      /* swallow */
     }
 
     dossiers.push({
-      companyId: company.id,
-      name: company.name,
-      externalCompanyId: mapping.externalCompanyId || null,
-      externalCompanyName: mapping.externalCompanyName ?? null,
-      connectionId: mapping.connectionId,
+      companyId,
+      name,
+      externalCompanyId,
+      externalCompanyName,
+      connectionId,
       lastSyncedAt,
       lastSyncStatus,
-      kpis: { ca, tresorerieNette, vyzorScore },
+      source,
+      kpis: { ca, tresorerieNette, vyzorScore, ebitda, resultatNet },
     });
   }
 

@@ -240,6 +240,11 @@ export function AuthPage({
         usageObjectives,
       });
       if (userLevel) setUserLevel(userLevel);
+      // Hook feature/cabinet-ux : consomme le choix du picker pré-auth.
+      // Si l'user a choisi "Je gère un cabinet" sur /onboarding puis saisi
+      // un nom sur /cabinet/setup, on crée la Firm via l'API existante.
+      // Le user est déjà authentifié à ce stade (Firebase Auth session active).
+      await applyPreAuthAccountTypeChoice();
       switchMode("forgot-sent");
     } catch (err) {
       const mapped = mapFirebaseError(err);
@@ -254,6 +259,67 @@ export function AuthPage({
       }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // ─── Pré-auth account-type bridge ─────────────────────────────────────
+  // Lit `vyzor_account_type` + (optionnellement) `vyzor_firm_name` posés par
+  // /onboarding et /cabinet/setup. Si firm_member, POST /api/cabinet/firm/create
+  // pour créer la Firm et basculer users/{uid}.accountType. En cas d'échec on
+  // log silencieux : le user peut toujours configurer son cabinet plus tard
+  // depuis /cabinet/setup (no-op vs flow company_owner classique).
+  async function applyPreAuthAccountTypeChoice() {
+    if (typeof window === "undefined") return;
+    const { PRE_AUTH_STORAGE_KEYS, ACCOUNT_TYPES } = await import("@/lib/config/account-types");
+    const { ROUTES } = await import("@/lib/config/routes");
+    const ls = window.localStorage;
+
+    // Cas 1 : invitation dirigeant (token présent) — l'user devient
+    // company_owner rattaché à la Company invitée.
+    const inviteToken = ls.getItem(PRE_AUTH_STORAGE_KEYS.inviteToken);
+    if (inviteToken) {
+      try {
+        const idToken = await firebaseAuthGateway.getIdToken();
+        if (idToken) {
+          await fetch(ROUTES.API_INVITE_ACCEPT, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ token: inviteToken }),
+          });
+        }
+      } catch {
+        /* swallow — l'user pourra retenter depuis /invite/[token] */
+      } finally {
+        ls.removeItem(PRE_AUTH_STORAGE_KEYS.inviteToken);
+        ls.removeItem(PRE_AUTH_STORAGE_KEYS.inviteCompanyId);
+        ls.removeItem(PRE_AUTH_STORAGE_KEYS.inviteEmail);
+        ls.removeItem(PRE_AUTH_STORAGE_KEYS.accountType);
+      }
+      return;
+    }
+
+    // Cas 2 : choix pré-auth /onboarding → firm_member ⇒ création de la Firm.
+    const accountType = ls.getItem(PRE_AUTH_STORAGE_KEYS.accountType);
+    if (accountType !== ACCOUNT_TYPES.FIRM_MEMBER) {
+      ls.removeItem(PRE_AUTH_STORAGE_KEYS.accountType);
+      return;
+    }
+    const firmName =
+      ls.getItem(PRE_AUTH_STORAGE_KEYS.firmName) || companyName.trim() || "Mon cabinet";
+    try {
+      const idToken = await firebaseAuthGateway.getIdToken();
+      if (!idToken) return;
+      await fetch(ROUTES.API_CABINET_FIRM_CREATE, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: firmName }),
+      });
+    } catch {
+      /* swallow — non bloquant */
+    } finally {
+      ls.removeItem(PRE_AUTH_STORAGE_KEYS.accountType);
+      ls.removeItem(PRE_AUTH_STORAGE_KEYS.firmName);
+      ls.removeItem(PRE_AUTH_STORAGE_KEYS.firmExpected);
     }
   }
 
