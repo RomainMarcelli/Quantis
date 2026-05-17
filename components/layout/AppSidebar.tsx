@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Bot,
+  Briefcase,
   ChevronDown,
   FileText,
   LayoutDashboard,
@@ -36,22 +37,27 @@ import {
   writeSidebarCollapsedPreference,
 } from "@/lib/ui/sidebarPreference";
 import { LegalFooter } from "@/components/layout/LegalFooter";
+import { useAccountType } from "@/hooks/useAccountType";
 
 export type SidebarRoute =
   | "synthese"
   | "analysis"
   | "etats-financiers"
   | "documents"
-  | "assistant-ia";
+  | "assistant-ia"
+  | "cabinet-portefeuille";
 
 type NavItem = {
   id: SidebarRoute;
   label: string;
   icon: LucideIcon;
   href: string;
+  /** Visible uniquement pour ce type de compte. Undefined = visible pour tous. */
+  onlyFor?: "firm_member" | "company_owner";
 };
 
 const PRIMARY_NAV: NavItem[] = [
+  { id: "cabinet-portefeuille", label: "Portefeuille", icon: Briefcase, href: "/cabinet/portefeuille", onlyFor: "firm_member" },
   { id: "synthese", label: "Synthèse", icon: Sparkles, href: "/synthese" },
   { id: "analysis", label: "Tableau de bord", icon: LayoutDashboard, href: "/analysis" },
   { id: "assistant-ia", label: "Assistant IA", icon: Bot, href: "/assistant-ia" },
@@ -128,6 +134,8 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { accountType } = useAccountType();
+  const visibleNav = PRIMARY_NAV.filter((item) => !item.onlyFor || item.onlyFor === accountType);
   const [collapsed, setCollapsed] = useState(false);
   const [ready, setReady] = useState(false);
   // L'AppSidebar est rendue À L'INTÉRIEUR de chaque page (pas dans un
@@ -220,7 +228,7 @@ export function AppSidebar({
 
       {/* Nav primaire. */}
       <nav className="space-y-1 text-sm" data-tour-id="app-sidebar-nav">
-        {PRIMARY_NAV.map((item) => {
+        {visibleNav.map((item) => {
           const Icon = item.icon;
           const active = item.id === activeRoute;
           // Brief 09/06/2026 : sous-menus toujours visibles peu importe la

@@ -1,15 +1,26 @@
 // File: components/cabinet/FirmPortfolioView.tsx
-// Role: vue Portefeuille du cabinet (Sprint C Tâche 5).
+// Role: Console de gestion du cabinet (Sprint C Tâche 5, refactor feature/cabinet-ux).
 //
-// Affiche une grille de cartes = dossiers actifs du cabinet, avec KPIs
-// synthétiques. Bouton "Ajouter un dossier" → retour vers connect.
-// Bouton "Synchroniser tous" → POST batch sync (à câbler en C6/D).
+// Vue d'ensemble des dossiers clients du cabinet. Visible uniquement pour
+// les firm_member (gardée côté API + côté sidebar nav). Reprend les codes
+// visuels de l'app (AppHeader + AppSidebar layout, precision-card,
+// CSS variables --app-*).
+//
+// Layout :
+//   - Header (AppHeader variant="simple", subtitle "Console cabinet")
+//   - Ligne 1 : 3 KPIs synthétiques (nb dossiers, CA moyen, EBITDA moyen)
+//   - Ligne 2 : liste alphabétique des dossiers, chaque ligne clickable
+//     → /cabinet/dossier/[companyId]
+//   - Boutons "Ajouter un dossier" + "Synchroniser tous" en haut à droite
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, ExternalLink, Loader2, Plus, RefreshCcw } from "lucide-react";
+import { Briefcase, Building2, ExternalLink, Loader2, Plus, RefreshCcw } from "lucide-react";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import { firebaseAuthGateway } from "@/services/auth";
+import { useActiveCompany } from "@/lib/stores/activeCompanyStore";
 
 type Dossier = {
   companyId: string;
@@ -23,6 +34,7 @@ type Dossier = {
     ca: number | null;
     tresorerieNette: number | null;
     vyzorScore: number | null;
+    ebitda: number | null;
   };
 };
 
@@ -45,36 +57,29 @@ function formatSyncDate(iso: string | null): string {
   return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function syncBadgeStyle(status: Dossier["lastSyncStatus"]): {
-  label: string;
-  color: string;
-  bg: string;
-} {
+function syncBadge(status: Dossier["lastSyncStatus"]): { label: string; color: string; bg: string } {
   switch (status) {
-    case "success":
-      return { label: "Sync OK", color: "#22C55E", bg: "rgb(34 197 94 / 12%)" };
-    case "partial":
-      return { label: "Partiel", color: "#F59E0B", bg: "rgb(245 158 11 / 12%)" };
-    case "failed":
-      return { label: "Erreur", color: "#EF4444", bg: "rgb(239 68 68 / 12%)" };
-    case "in_progress":
-      return { label: "En cours", color: "#3B82F6", bg: "rgb(59 130 246 / 12%)" };
-    case "never":
-    case "unknown":
-    default:
-      return {
-        label: "Jamais syncé",
-        color: "var(--app-text-tertiary)",
-        bg: "var(--app-surface-soft)",
-      };
+    case "success":     return { label: "Sync OK", color: "#22C55E", bg: "rgb(34 197 94 / 12%)" };
+    case "partial":     return { label: "Partiel",  color: "#F59E0B", bg: "rgb(245 158 11 / 12%)" };
+    case "failed":      return { label: "Erreur",   color: "#EF4444", bg: "rgb(239 68 68 / 12%)" };
+    case "in_progress": return { label: "En cours", color: "#3B82F6", bg: "rgb(59 130 246 / 12%)" };
+    default:            return { label: "Jamais",   color: "var(--app-text-tertiary)", bg: "var(--app-surface-soft)" };
   }
+}
+
+function mean(values: Array<number | null>): number | null {
+  const nums = values.filter((v): v is number => typeof v === "number");
+  if (nums.length === 0) return null;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
 }
 
 export function FirmPortfolioView() {
   const router = useRouter();
+  const { setActiveCompanyId } = useActiveCompany();
   const [data, setData] = useState<PortfolioData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
+  const [firstName, setFirstName] = useState<string | undefined>(undefined);
 
   async function reload() {
     setError(null);
@@ -87,8 +92,7 @@ export function FirmPortfolioView() {
       const payload = await res.json();
       if (!res.ok) {
         if (res.status === 403 && payload.error?.includes("firm_member")) {
-          // Non-firm_member → on les redirige vers le dashboard standard.
-          router.replace("/analysis");
+          router.replace("/synthese");
           return;
         }
         throw new Error(payload.error || "Chargement portefeuille échoué.");
@@ -101,13 +105,30 @@ export function FirmPortfolioView() {
 
   useEffect(() => {
     void reload();
+    const user = firebaseAuthGateway.getCurrentUser();
+    if (user?.displayName) setFirstName(user.displayName.split(" ")[0]);
   }, []);
 
-  // Liste unique des Connections (pour le bouton "Sync tous").
+  // Tri alphabétique + KPIs agrégés.
+  const sortedDossiers = useMemo(() => {
+    if (!data) return [];
+    return [...data.dossiers].sort((a, b) =>
+      (a.externalCompanyName || a.name).localeCompare(b.externalCompanyName || b.name, "fr", { sensitivity: "base" })
+    );
+  }, [data]);
+
+  const aggregateKpis = useMemo(() => {
+    if (!data) return { count: 0, caMean: null as number | null, ebitdaMean: null as number | null };
+    return {
+      count: data.dossiers.length,
+      caMean: mean(data.dossiers.map((d) => d.kpis.ca)),
+      ebitdaMean: mean(data.dossiers.map((d) => d.kpis.ebitda)),
+    };
+  }, [data]);
+
   const connectionIds = useMemo(() => {
     if (!data) return [];
-    const set = new Set(data.dossiers.map((d) => d.connectionId));
-    return Array.from(set);
+    return Array.from(new Set(data.dossiers.map((d) => d.connectionId)));
   }, [data]);
 
   async function syncAll() {
@@ -117,26 +138,17 @@ export function FirmPortfolioView() {
     try {
       const idToken = await firebaseAuthGateway.getIdToken();
       if (!idToken) throw new Error("Session expirée.");
-      // Pour chaque Connection, on déclenche /api/sync/trigger.
-      // Sprint C minimal : pas de runSyncForFirmConnection batch HTTP — on
-      // appelle séquentiellement les triggers existants. Une route dédiée
-      // /api/cabinet/sync/all sera ajoutée en Sprint D si nécessaire.
       const results = await Promise.allSettled(
         connectionIds.map((connectionId) =>
           fetch("/api/sync/trigger", {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${idToken}`,
-              "Content-Type": "application/json",
-            },
+            headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
             body: JSON.stringify({ connectionId }),
           })
         )
       );
       const failed = results.filter((r) => r.status === "rejected").length;
-      if (failed > 0) {
-        setError(`${failed} sync échoué(s) sur ${results.length}.`);
-      }
+      if (failed > 0) setError(`${failed} sync échoué(s) sur ${results.length}.`);
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue.");
@@ -145,199 +157,245 @@ export function FirmPortfolioView() {
     }
   }
 
-  if (!data && !error) {
-    return (
-      <div className="mx-auto flex w-full max-w-5xl items-center gap-2 py-12">
-        <Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--app-brand-gold-deep)" }} />
-        <p className="text-sm" style={{ color: "var(--app-text-secondary)" }}>
-          Chargement du portefeuille…
-        </p>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="mx-auto w-full max-w-5xl py-12">
-        <p className="text-sm" style={{ color: "var(--app-danger, #EF4444)" }}>
-          {error}
-        </p>
-      </div>
-    );
+  function openDossier(companyId: string) {
+    setActiveCompanyId(companyId);
+    router.push(`/cabinet/dossier/${encodeURIComponent(companyId)}`);
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl py-8">
-      <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p
-            className="text-xs uppercase tracking-[0.15em]"
-            style={{ color: "var(--app-text-tertiary)" }}
-          >
-            Portefeuille
-          </p>
-          <h1
-            className="mt-1 text-2xl font-semibold md:text-3xl"
-            style={{ color: "var(--app-text-primary)" }}
-          >
-            {data.firm.name}
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--app-text-secondary)" }}>
-            {data.total} dossier{data.total > 1 ? "s" : ""} actif{data.total > 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => router.push("/cabinet/onboarding/connect")}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs transition"
-            style={{ border: "1px solid var(--app-border)", color: "var(--app-text-secondary)" }}
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Ajouter un dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => void syncAll()}
-            disabled={syncBusy || connectionIds.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition disabled:opacity-50"
-            style={{
-              border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 40%)",
-              color: "var(--app-brand-gold-deep)",
-              backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 12%)",
-            }}
-          >
-            {syncBusy ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Synchronisation…
-              </>
-            ) : (
-              <>
-                <RefreshCcw className="h-3.5 w-3.5" />
-                Synchroniser tous
-              </>
-            )}
-          </button>
-        </div>
-      </header>
+    <div className="space-y-4">
+      <AppHeader
+        variant="simple"
+        companyName={data?.firm.name ?? "Cabinet"}
+        subtitle="Console cabinet"
+        actionSlot={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/cabinet/onboarding/connect")}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition"
+              style={{
+                border: "1px solid var(--app-border)",
+                color: "var(--app-text-secondary)",
+                backgroundColor: "var(--app-surface-soft)",
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter un dossier
+            </button>
+            <button
+              type="button"
+              onClick={() => void syncAll()}
+              disabled={syncBusy || connectionIds.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-50"
+              style={{
+                border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 40%)",
+                color: "var(--app-brand-gold-deep)",
+                backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 12%)",
+              }}
+            >
+              {syncBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCcw className="h-3.5 w-3.5" />}
+              {syncBusy ? "Sync…" : "Synchroniser tous"}
+            </button>
+          </div>
+        }
+      />
 
-      {error ? (
-        <p className="mb-4 text-xs" style={{ color: "var(--app-danger, #EF4444)" }}>
-          {error}
-        </p>
-      ) : null}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+        <AppSidebar activeRoute="cabinet-portefeuille" accountFirstName={firstName} />
 
-      {data.dossiers.length === 0 ? (
-        <div
-          className="rounded-2xl p-10 text-center"
-          style={{
-            backgroundColor: "rgb(var(--app-card-bg-rgb, 15 15 18) / 85%)",
-            border: "1px solid var(--app-border)",
-            backdropFilter: "blur(24px)",
-          }}
-        >
-          <Building2
-            className="mx-auto mb-3 h-10 w-10"
-            style={{ color: "var(--app-text-tertiary)" }}
-          />
-          <p className="text-sm font-medium" style={{ color: "var(--app-text-primary)" }}>
-            Aucun dossier actif
-          </p>
-          <p className="mt-1 text-xs" style={{ color: "var(--app-text-secondary)" }}>
-            Connectez votre cabinet Pennylane pour commencer.
-          </p>
-          <button
-            type="button"
-            onClick={() => router.push("/cabinet/onboarding/connect")}
-            className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition"
-            style={{
-              border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 40%)",
-              color: "var(--app-brand-gold-deep)",
-              backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 12%)",
-            }}
-          >
-            Connecter Pennylane →
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {data.dossiers.map((d) => {
-            const badge = syncBadgeStyle(d.lastSyncStatus);
-            return (
+        <section className="space-y-4">
+          {/* KPI row */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <KpiCard
+              label="Dossiers actifs"
+              value={aggregateKpis.count.toString()}
+              icon={<Briefcase className="h-4 w-4" />}
+            />
+            <KpiCard
+              label="CA moyen"
+              value={formatEUR(aggregateKpis.caMean)}
+            />
+            <KpiCard
+              label="EBITDA moyen"
+              value={formatEUR(aggregateKpis.ebitdaMean)}
+            />
+          </div>
+
+          {error ? (
+            <p className="text-xs" style={{ color: "var(--app-danger, #EF4444)" }}>
+              {error}
+            </p>
+          ) : null}
+
+          {!data && !error ? (
+            <div className="flex items-center gap-2 py-12">
+              <Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--app-brand-gold-deep)" }} />
+              <p className="text-sm" style={{ color: "var(--app-text-secondary)" }}>
+                Chargement du portefeuille…
+              </p>
+            </div>
+          ) : data && data.dossiers.length === 0 ? (
+            <div
+              className="precision-card rounded-2xl p-10 text-center"
+              style={{ backgroundColor: "rgb(var(--app-card-bg-rgb, 15 15 18) / 85%)", border: "1px solid var(--app-border)" }}
+            >
+              <Building2 className="mx-auto mb-3 h-10 w-10" style={{ color: "var(--app-text-tertiary)" }} />
+              <p className="text-sm font-medium" style={{ color: "var(--app-text-primary)" }}>
+                Aucun dossier actif
+              </p>
+              <p className="mt-1 text-xs" style={{ color: "var(--app-text-secondary)" }}>
+                Connectez votre cabinet Pennylane pour commencer.
+              </p>
               <button
-                key={d.companyId}
                 type="button"
-                onClick={() => router.push(`/cabinet/dossier/${encodeURIComponent(d.companyId)}`)}
-                className="flex flex-col gap-4 rounded-2xl p-5 text-left transition hover:scale-[1.005]"
+                onClick={() => router.push("/cabinet/onboarding/connect")}
+                className="mt-5 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition"
                 style={{
-                  backgroundColor: "rgb(var(--app-card-bg-rgb, 15 15 18) / 85%)",
-                  border: "1px solid var(--app-border)",
-                  backdropFilter: "blur(24px)",
+                  border: "1px solid rgb(var(--app-brand-gold-deep-rgb) / 40%)",
+                  color: "var(--app-brand-gold-deep)",
+                  backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 12%)",
                 }}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3
-                      className="truncate text-base font-semibold"
-                      style={{ color: "var(--app-text-primary)" }}
-                    >
-                      {d.externalCompanyName || d.name}
-                    </h3>
-                    {d.externalCompanyId ? (
-                      <p
-                        className="mt-0.5 truncate font-mono text-[11px]"
-                        style={{ color: "var(--app-text-tertiary)" }}
-                      >
-                        ID {d.externalCompanyId}
-                      </p>
-                    ) : null}
-                  </div>
-                  <span
-                    className="flex-shrink-0 rounded-md px-2 py-1 text-[10px] font-medium uppercase tracking-wider"
-                    style={{ color: badge.color, backgroundColor: badge.bg }}
-                  >
-                    {badge.label}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3">
-                  <KpiCell label="CA" value={formatEUR(d.kpis.ca)} />
-                  <KpiCell label="Trésorerie nette" value={formatEUR(d.kpis.tresorerieNette)} />
-                  <KpiCell
-                    label="Score Vyzor"
-                    value={d.kpis.vyzorScore !== null ? `${Math.round(d.kpis.vyzorScore)}/100` : "—"}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between text-[11px]">
-                  <span style={{ color: "var(--app-text-tertiary)" }}>
-                    Dernier sync : {formatSyncDate(d.lastSyncedAt)}
-                  </span>
-                  <span className="inline-flex items-center gap-1" style={{ color: "var(--app-text-secondary)" }}>
-                    Ouvrir <ExternalLink className="h-3 w-3" />
-                  </span>
-                </div>
+                Connecter Pennylane →
               </button>
-            );
-          })}
-        </div>
-      )}
+            </div>
+          ) : data ? (
+            <div
+              className="precision-card overflow-hidden rounded-2xl"
+              style={{
+                backgroundColor: "rgb(var(--app-card-bg-rgb, 15 15 18) / 85%)",
+                border: "1px solid var(--app-border)",
+              }}
+            >
+              <div
+                className="grid grid-cols-[1.6fr_1fr_1fr_0.7fr_0.9fr_0.3fr] gap-3 px-5 py-3 text-[10px] font-semibold uppercase tracking-wider"
+                style={{
+                  color: "var(--app-text-tertiary)",
+                  borderBottom: "1px solid var(--app-border)",
+                  backgroundColor: "var(--app-surface-soft)",
+                }}
+              >
+                <span>Dossier</span>
+                <span className="text-right">CA</span>
+                <span className="text-right">EBITDA</span>
+                <span className="text-right">Score</span>
+                <span>Dernier sync</span>
+                <span />
+              </div>
+
+              <ul>
+                {sortedDossiers.map((d) => {
+                  const badge = syncBadge(d.lastSyncStatus);
+                  return (
+                    <li key={d.companyId}>
+                      <button
+                        type="button"
+                        onClick={() => openDossier(d.companyId)}
+                        className="grid w-full grid-cols-[1.6fr_1fr_1fr_0.7fr_0.9fr_0.3fr] items-center gap-3 px-5 py-3 text-left transition"
+                        style={{ borderBottom: "1px solid var(--app-border)" }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <div className="min-w-0">
+                          <p
+                            className="truncate text-sm font-medium"
+                            style={{ color: "var(--app-text-primary)" }}
+                          >
+                            {d.externalCompanyName || d.name}
+                          </p>
+                          {d.externalCompanyId ? (
+                            <p
+                              className="truncate font-mono text-[10px]"
+                              style={{ color: "var(--app-text-tertiary)" }}
+                            >
+                              {d.externalCompanyId}
+                            </p>
+                          ) : null}
+                        </div>
+                        <p
+                          className="text-right font-mono text-sm"
+                          style={{ color: "var(--app-text-primary)" }}
+                        >
+                          {formatEUR(d.kpis.ca)}
+                        </p>
+                        <p
+                          className="text-right font-mono text-sm"
+                          style={{
+                            color:
+                              d.kpis.ebitda !== null && d.kpis.ebitda < 0
+                                ? "#EF4444"
+                                : "var(--app-text-primary)",
+                          }}
+                        >
+                          {formatEUR(d.kpis.ebitda)}
+                        </p>
+                        <p
+                          className="text-right font-mono text-sm"
+                          style={{ color: "var(--app-text-primary)" }}
+                        >
+                          {d.kpis.vyzorScore !== null ? `${Math.round(d.kpis.vyzorScore)}` : "—"}
+                        </p>
+                        <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--app-text-tertiary)" }}>
+                          <span
+                            className="inline-block rounded-md px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider"
+                            style={{ color: badge.color, backgroundColor: badge.bg }}
+                          >
+                            {badge.label}
+                          </span>
+                          <span className="truncate">{formatSyncDate(d.lastSyncedAt)}</span>
+                        </div>
+                        <ExternalLink
+                          className="h-3.5 w-3.5 justify-self-end"
+                          style={{ color: "var(--app-text-tertiary)" }}
+                        />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      </div>
     </div>
   );
 }
 
-function KpiCell({ label, value }: { label: string; value: string }) {
+function KpiCard({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
-    <div>
+    <div
+      className="precision-card rounded-2xl px-5 py-4"
+      style={{
+        backgroundColor: "rgb(var(--app-card-bg-rgb, 15 15 18) / 85%)",
+        border: "1px solid var(--app-border)",
+      }}
+    >
+      <div className="flex items-center gap-2">
+        {icon ? (
+          <span
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
+            style={{
+              backgroundColor: "rgb(var(--app-brand-gold-deep-rgb) / 14%)",
+              color: "var(--app-brand-gold-deep)",
+            }}
+          >
+            {icon}
+          </span>
+        ) : null}
+        <p
+          className="text-[10px] font-semibold uppercase tracking-[0.12em]"
+          style={{ color: "var(--app-text-tertiary)" }}
+        >
+          {label}
+        </p>
+      </div>
       <p
-        className="text-[10px] uppercase tracking-wider"
-        style={{ color: "var(--app-text-tertiary)" }}
-      >
-        {label}
-      </p>
-      <p
-        className="mt-0.5 font-mono text-sm font-semibold"
+        className="mt-2 font-mono text-xl font-semibold"
         style={{ color: "var(--app-text-primary)" }}
       >
         {value}

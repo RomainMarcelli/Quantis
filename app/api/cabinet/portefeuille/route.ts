@@ -25,6 +25,7 @@ type DossierDto = {
     ca: number | null;
     tresorerieNette: number | null;
     vyzorScore: number | null;
+    ebitda: number | null;
   };
 };
 
@@ -102,6 +103,7 @@ export async function GET(request: NextRequest) {
     let ca: number | null = null;
     let tresorerieNette: number | null = null;
     let vyzorScore: number | null = null;
+    let ebitda: number | null = null;
     try {
       const analysesSnap = await db
         .collection("analyses")
@@ -123,6 +125,7 @@ export async function GET(request: NextRequest) {
         if (kpis) {
           if (typeof kpis.ca === "number") ca = kpis.ca;
           if (typeof kpis.tn === "number") tresorerieNette = kpis.tn;
+          if (typeof kpis.ebitda === "number") ebitda = kpis.ebitda;
         }
         // Fallback CA via mappedData.total_prod_expl si pas de kpi.ca.
         if (ca === null && mapped && typeof mapped.total_prod_expl === "number") {
@@ -145,7 +148,7 @@ export async function GET(request: NextRequest) {
       connectionId: mapping.connectionId,
       lastSyncedAt,
       lastSyncStatus,
-      kpis: { ca, tresorerieNette, vyzorScore },
+      kpis: { ca, tresorerieNette, vyzorScore, ebitda },
     });
   }
 
