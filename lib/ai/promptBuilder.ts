@@ -24,6 +24,13 @@ export type BuildSystemPromptParams = {
   analysis: AnalysisRecord | null;
   /** KPI sur lequel on focalise la conversation, ou null si question libre. */
   kpiId: string | null;
+  /**
+   * Valeur courante du KPI focus, envoyée par le front quand la question est
+   * posée depuis une carte KPI cliquée hors page d'analyse (URL contient
+   * `?kpiId=...&kpiValue=...` sans `analysisId`). Permet d'injecter la valeur
+   * dans le system prompt même en l'absence d'analyse complète chargée.
+   */
+  kpiValue?: number | null;
   /** Niveau utilisateur — détermine le ton et la profondeur des explications. */
   userLevel: UserLevel;
 };
@@ -45,19 +52,24 @@ const ROLE_BY_LEVEL: Record<UserLevel, string> = {
  */
 export function buildSystemPrompt(params: BuildSystemPromptParams): string {
   const { analysis, kpiId, userLevel } = params;
+  const kpiValue =
+    typeof params.kpiValue === "number" && Number.isFinite(params.kpiValue)
+      ? params.kpiValue
+      : null;
 
   const sections = [
     section("role", ROLE_BY_LEVEL[userLevel]),
-    section("entreprise", buildCompanySection(analysis)),
-    section("donnees_kpi", buildKpiSection(analysis)),
+    section("entreprise", buildCompanySection(analysis, kpiId, kpiValue)),
+    section("donnees_kpi", buildKpiSection(analysis, kpiId, kpiValue)),
   ];
 
-  const focusSection = buildFocusSection(analysis, kpiId);
+  const focusSection = buildFocusSection(analysis, kpiId, kpiValue);
   if (focusSection) {
     sections.push(section("contexte_focus", focusSection));
   }
 
   sections.push(section("garde_fous", buildGuardrailsSection()));
+  sections.push(section("multi_questions", buildMultiQuestionsSection()));
   sections.push(section("format_reponse", buildOutputFormatSection(userLevel)));
 
   return sections.join("\n\n");
@@ -69,8 +81,18 @@ function section(tag: string, body: string): string {
   return `<${tag}>\n${body.trim()}\n</${tag}>`;
 }
 
-function buildCompanySection(analysis: AnalysisRecord | null): string {
+function buildCompanySection(
+  analysis: AnalysisRecord | null,
+  kpiId: string | null,
+  kpiValue: number | null,
+): string {
   if (!analysis) {
+    // Si on a au moins le KPI focus + sa valeur (envoyé depuis une carte KPI
+    // cliquée), on indique à Claude qu'il a un contexte partiel — éviter
+    // qu'il refuse de répondre en disant "je n'ai aucune donnée".
+    if (kpiId && kpiValue !== null) {
+      return "L'utilisateur consulte un KPI isolé depuis une carte cliquée. L'analyse complète n'est pas chargée dans cette conversation, mais le KPI focus et sa valeur courante sont fournis ci-dessous.";
+    }
     return "Aucune analyse disponible. L'utilisateur n'a pas encore importé de fichier.";
   }
   const sector = analysis.uploadContext?.sector ?? "non renseigné";
@@ -89,8 +111,27 @@ function buildCompanySection(analysis: AnalysisRecord | null): string {
   ].join("\n");
 }
 
-function buildKpiSection(analysis: AnalysisRecord | null): string {
+function buildKpiSection(
+  analysis: AnalysisRecord | null,
+  kpiId: string | null,
+  kpiValue: number | null,
+): string {
   if (!analysis) {
+    // Pas d'analyse, mais le front a fourni kpiId + kpiValue (carte KPI
+    // cliquée hors page d'analyse) → on les expose pour que Claude puisse
+    // citer la vraie valeur au lieu de répondre "aucune donnée".
+    if (kpiId && kpiValue !== null) {
+      const def = getKpiDefinition(kpiId);
+      if (def) {
+        const valueStr = formatKpiValue(def.unit, kpiValue);
+        const diagnostic = getKpiDiagnostic(kpiValue, def.thresholds);
+        const tag = diagnostic !== "neutral" ? ` [${diagnostic}]` : "";
+        return [
+          "KPI fourni par le contexte UI (analyse complète non chargée) :",
+          `- ${kpiId} (${def.label}) : ${valueStr}${tag}`,
+        ].join("\n");
+      }
+    }
     return "Aucune donnée chiffrée disponible.";
   }
 
@@ -148,23 +189,28 @@ function buildMappedDataExtract(analysis: AnalysisRecord): string {
 
 function buildFocusSection(
   analysis: AnalysisRecord | null,
-  kpiId: string | null
+  kpiId: string | null,
+  kpiValue: number | null,
 ): string | null {
   if (!kpiId) return null;
   const def = getKpiDefinition(kpiId);
   if (!def) return null;
 
-  const value = analysis
+  // Priorité 1 : la valeur depuis l'analyse en BDD (canonique).
+  // Priorité 2 : la valeur envoyée par le front via `kpiValue` (carte KPI
+  // cliquée hors page d'analyse) — sans elle, le focus était inutilisable.
+  const valueFromAnalysis = analysis
     ? (analysis.kpis as Record<string, number | null | undefined>)[kpiId]
     : null;
+  const resolvedValue: number | null =
+    typeof valueFromAnalysis === "number" && Number.isFinite(valueFromAnalysis)
+      ? valueFromAnalysis
+      : kpiValue;
   const valueStr =
-    typeof value === "number" && Number.isFinite(value)
-      ? formatKpiValue(def.unit, value)
+    resolvedValue !== null
+      ? formatKpiValue(def.unit, resolvedValue)
       : "non disponible";
-  const diagnostic = getKpiDiagnostic(
-    typeof value === "number" ? value : null,
-    def.thresholds
-  );
+  const diagnostic = getKpiDiagnostic(resolvedValue, def.thresholds);
 
   return [
     `L'utilisateur a cliqué depuis le KPI "${kpiId}" (${def.label}).`,
@@ -185,13 +231,52 @@ function buildGuardrailsSection(): string {
   ].join("\n");
 }
 
+function buildMultiQuestionsSection(): string {
+  return [
+    "Si l'utilisateur pose PLUSIEURS questions dans un même message (détectables",
+    "par : présence de plusieurs \"?\", listes \"1) 2) 3)\", ou plusieurs sujets",
+    "distincts) :",
+    "",
+    "- TRAITE TOUTES LES QUESTIONS — n'en ignore AUCUNE",
+    "- Structure ta réponse avec un sous-titre par question (## Question 1,",
+    "  ## Question 2, etc., ou ## EBITDA, ## BFR, ## Endettement... selon le",
+    "  sujet)",
+    "- Sois plus concis sur chaque question pour tenir dans la longueur (80-120",
+    "  mots par question)",
+    "- Termine par UNE seule action prioritaire commune (pas une par question)",
+    "",
+    "Si tu n'arrives vraiment pas à traiter toutes les questions correctement,",
+    "réponds TRANSPARENT à l'utilisateur en début de message :",
+    "\"Vous m'avez posé X questions à la fois. Pour vous donner une réponse de",
+    "qualité, je vais traiter [LISTE DES QUESTIONS QUE TU TRAITES]. Pour",
+    "approfondir [QUESTION RESTANTE], posez-la dans un message dédié.\"",
+    "",
+    "Puis traite les questions énumérées. N'ignore JAMAIS silencieusement une",
+    "question.",
+  ].join("\n");
+}
+
 function buildOutputFormatSection(userLevel: UserLevel): string {
   return [
-    "- Réponse en markdown : titres avec **gras**, listes courtes si utile.",
-    "- 200 mots maximum. Privilégie 4 à 8 phrases denses plutôt qu'une liste à puces interminable.",
-    `- Adapte la profondeur au niveau "${userLevel}" décrit dans <role>.`,
-    "- Cite TOUJOURS les valeurs chiffrées en €/% précises depuis <donnees_kpi>.",
-    "- Termine par 1 action concrète et actionnable sous 90 jours, formulée à l'impératif (\"Renégociez…\", \"Identifiez…\").",
+    "Format : markdown structuré",
+    "Longueur : adapte-toi à la complexité de la question",
+    "",
+    "- Question simple (1 KPI, demande de chiffre) : 100-200 mots maximum",
+    "- Question analytique (causes, comparaison, synthèse) : 300-500 mots maximum",
+    "- Question multi-points (3 actions, 2 leviers...) : COMPLÈTE TOUS LES POINTS",
+    "  PROMIS, ne laisse JAMAIS une liste incomplète",
+    "",
+    "Structure pour les questions multi-points : utilise des sous-titres clairs",
+    "(## 1. Titre / ## 2. Titre / ## 3. Titre) et chiffre chaque point.",
+    "",
+    "Cite toujours les chiffres réels avec leur unité (€, %, jours...).",
+    "Termine TOUJOURS par 1 action concrète à l'impératif réalisable en moins de",
+    "90 jours.",
+    "",
+    "Si tu manques de place, RACCOURCIS les détails de chaque point — ne supprime",
+    "AUCUN point promis.",
+    "",
+    `Adapte la profondeur et le ton au niveau "${userLevel}" décrit dans <role>.`,
   ].join("\n");
 }
 

@@ -21,9 +21,12 @@ import {
   ArrowRight,
   BarChart3,
   Calendar,
+  Check,
   CheckCircle,
+  Copy,
   Eye,
   Lightbulb,
+  RotateCcw,
   Sliders,
   TrendingUp,
 } from "lucide-react";
@@ -80,50 +83,132 @@ const STATUS_TO_STYLE: Record<
   },
 };
 
+/**
+ * Question pré-formulée envoyée quand l'utilisateur clique sur l'action
+ * "Comparer avec N-1". Volontairement explicite et naturelle en français —
+ * c'est cette question qui apparaitra dans la conversation côté user.
+ */
+export const COMPARE_PREVIOUS_PERIOD_PROMPT =
+  "Comparez avec l'année dernière (N-1).";
+
 type AiResponseCardProps = {
   response: AiStructuredResponse;
-  /** Callback quand l'utilisateur clique sur un follow-up — envoyé comme nouveau message. */
-  onFollowUp: (question: string) => void;
+  /**
+   * Callback quand l'utilisateur clique sur un follow-up OU sur l'action
+   * "Comparer avec N-1" — la chaîne est envoyée comme nouvelle question dans
+   * la conversation. Optionnel : si non fourni, les boutons sont rendus mais
+   * non interactifs (utile en SSR / preview).
+   */
+  onAskFollowUp?: (question: string) => void;
+  /**
+   * Callback pour l'action "Voir le détail". Reçoit le `kpiId` cible. Si
+   * non fourni OU si le kpiId de la réponse est absent → le bouton est masqué
+   * (pas de no-op visuel qui ne fait rien au clic).
+   */
+  onViewDetail?: (kpiId: string) => void;
+  /**
+   * Callback pour l'action "Voir le graphique" (Mission 2). Reçoit le `kpiId`
+   * cible. Si non fourni → le bouton est masqué. Distinct de `onViewDetail` :
+   * route vers `/analysis?focusChart=<id>` (scroll vers le graphique
+   * d'évolution) plutôt que vers la card KPI.
+   */
+  onViewChart?: (kpiId: string) => void;
+  /**
+   * Callback "Copier" — déclenché au clic sur le bouton Copier. Reçoit le
+   * texte brut du message courant via le wrapper côté AiMessageBubble. Si
+   * absent, le bouton n'est pas rendu.
+   */
+  onCopy?: () => void;
+  /**
+   * Callback "Régénérer" — déclenché au clic sur le bouton Régénérer (sans
+   * confirmation). Le parent (AiChatFullPage) retrouve la question user
+   * précédente, retire le message courant, et rejoue la question.
+   */
+  onRegenerate?: () => void;
 };
 
-export function AiResponseCard({ response, onFollowUp }: AiResponseCardProps) {
+export function AiResponseCard({
+  response,
+  onAskFollowUp,
+  onViewDetail,
+  onViewChart,
+  onCopy,
+  onRegenerate,
+}: AiResponseCardProps) {
   function handleAction(action: AiAction) {
-    if (typeof window === "undefined") return;
     if (action.type === "navigate") {
-      // Navigation vers l'onglet/section du KPI. Le routing exact dépend de
-      // l'app — on dispatche un événement custom que les pages peuvent écouter.
-      window.dispatchEvent(
-        new CustomEvent("vyzor:kpi:navigate", { detail: { kpiId: action.target } })
-      );
+      // "Voir le détail" — navigation vers la page d'analyse du KPI ciblé.
+      if (onViewDetail && action.target) {
+        onViewDetail(action.target);
+      }
       return;
     }
-    if (action.type === "simulate") {
-      window.dispatchEvent(
-        new CustomEvent("vyzor:simulation:open", {
-          detail: { scenario: action.target },
-        })
-      );
+    if (action.type === "chart") {
+      // "Voir le graphique" — navigation vers le graphique d'évolution du
+      // KPI (scroll + halo) sur la page d'analyse.
+      if (onViewChart && action.target) {
+        onViewChart(action.target);
+      }
       return;
     }
     if (action.type === "compare") {
-      window.dispatchEvent(
-        new CustomEvent("vyzor:temporality:set", { detail: { period: action.target } })
-      );
+      // "Comparer avec N-1" — on injecte une question pré-formulée dans le
+      // flow de conversation. Le serveur répondra normalement avec une analyse
+      // comparative N vs N-1.
+      if (onAskFollowUp) {
+        onAskFollowUp(COMPARE_PREVIOUS_PERIOD_PROMPT);
+      }
+      return;
+    }
+    if (action.type === "simulate") {
+      // Hors périmètre Phase 1 — pas de handler câblé ici. Le bouton reste
+      // visuel ; à raccorder quand la feature simulation sera connectée à
+      // l'agent IA.
       return;
     }
   }
 
+  /**
+   * Filtre les actions pour masquer celles qui ne peuvent rien faire.
+   * Règle : "Voir le détail" (navigate) est masqué UNIQUEMENT quand
+   * `onViewDetail` n'est pas fourni. Si le handler existe mais que la
+   * réponse n'a pas de `target` (kpiId), le bouton est rendu : le handler
+   * gérera le no-op (il vérifie `!kpiId`) — laisse l'utilisateur cliquer
+   * sans surprise visuelle de bouton manquant.
+   */
+  const visibleActions = response.actions.filter((action) => {
+    if (action.type === "navigate") {
+      return Boolean(onViewDetail);
+    }
+    if (action.type === "chart") {
+      return Boolean(onViewChart);
+    }
+    if (action.type === "compare") {
+      return Boolean(onAskFollowUp);
+    }
+    // simulate : non câblé pour l'instant — masqué pour ne pas montrer un
+    // bouton inerte. Réactiver quand le handler sera dispo.
+    return false;
+  });
+
   return (
     <div className="space-y-3">
-      {/* Bloc A — Diagnostic (toujours présent) */}
-      <DiagnosticBlock
-        status={response.diagnostic.status}
-        message={response.diagnostic.message}
-        delay={BLOCK_DELAYS.diagnostic}
-      />
+      {/* Bloc A — Diagnostic (masqué si message vide pour éviter un bandeau
+          inerte quand le KPI n'est pas dans le registre) */}
+      {response.diagnostic.message ? (
+        <DiagnosticBlock
+          status={response.diagnostic.status}
+          message={response.diagnostic.message}
+          delay={BLOCK_DELAYS.diagnostic}
+        />
+      ) : null}
 
-      {/* Bloc B — Explication (toujours présent) */}
-      <ExplanationBlock text={response.explanation} delay={BLOCK_DELAYS.explanation} />
+      {/* Bloc B — Explication (masqué si `null` ou string vide — supprime le
+          fallback générique "Vue d'ensemble de votre situation financière"
+          qui apparaissait avant en tête de chaque réponse) */}
+      {response.explanation ? (
+        <ExplanationBlock text={response.explanation} delay={BLOCK_DELAYS.explanation} />
+      ) : null}
 
       {/* Bloc C — Data points (optionnel) */}
       {response.dataPoints && response.dataPoints.length > 0 ? (
@@ -136,21 +221,133 @@ export function AiResponseCard({ response, onFollowUp }: AiResponseCardProps) {
       ) : null}
 
       {/* Bloc E — Actions (toujours présent) */}
-      {response.actions.length > 0 ? (
+      {visibleActions.length > 0 ? (
         <ActionsBlock
-          actions={response.actions}
+          actions={visibleActions}
           delay={BLOCK_DELAYS.actions}
           onAction={handleAction}
         />
       ) : null}
 
       {/* Bloc F — Questions de suivi (toujours présent) */}
-      {response.followUpQuestions.length > 0 ? (
+      {response.followUpQuestions.length > 0 && onAskFollowUp ? (
         <FollowUpBlock
           questions={response.followUpQuestions}
           delay={BLOCK_DELAYS.followUp}
-          onPick={onFollowUp}
+          onPick={onAskFollowUp}
         />
+      ) : null}
+
+      {/* Bloc G — Actions sur le message (Copier / Régénérer). Cohérent avec
+          ChatGPT / Claude : présent sous chaque réponse assistant finalisée,
+          à droite, plus discret que les chips d'action métier. Masqué pendant
+          le streaming par AiMessageBubble (qui ne rend pas AiResponseCard). */}
+      {(onCopy || onRegenerate) ? (
+        <MessageActionsBlock onCopy={onCopy} onRegenerate={onRegenerate} />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Boutons Copier + Régénérer rendus sous la réponse assistant. Comportement :
+ *   - Copier : navigator.clipboard.writeText, feedback Check 1.5 s.
+ *   - Régénérer : appelle `onRegenerate` directement (pas de confirmation).
+ *
+ * Erreur clipboard silencieuse (peut être indisponible en HTTP non-localhost).
+ */
+function MessageActionsBlock({
+  onCopy,
+  onRegenerate,
+}: {
+  onCopy?: () => void;
+  onRegenerate?: () => void;
+}) {
+  /**
+   * Feedback visuel "Copié !" géré via mutation DOM directe (data-attribute
+   * `data-copied` + swap des nodes Check/Copy par CSS sibling). On évite
+   * `useState` côté React pour que le composant reste stateless — le test
+   * walker (qui appelle les fonctions de composants pour traverser leur
+   * output) ne supporte pas les hooks. La logique reste simple et locale.
+   */
+  const handleCopy = (e: React.MouseEvent<HTMLButtonElement>) => {
+    onCopy?.();
+    const btn = e.currentTarget;
+    btn.setAttribute("data-copied", "true");
+    btn.setAttribute("aria-label", "Copié !");
+    const label = btn.querySelector("[data-copy-label]");
+    if (label) label.textContent = "Copié !";
+    const iconCopy = btn.querySelector("[data-copy-icon='default']") as HTMLElement | null;
+    const iconCheck = btn.querySelector("[data-copy-icon='done']") as HTMLElement | null;
+    if (iconCopy) iconCopy.style.display = "none";
+    if (iconCheck) iconCheck.style.display = "inline-block";
+    btn.style.color = "var(--app-success)";
+    setTimeout(() => {
+      btn.removeAttribute("data-copied");
+      btn.setAttribute("aria-label", "Copier");
+      if (label) label.textContent = "Copier";
+      if (iconCopy) iconCopy.style.display = "inline-block";
+      if (iconCheck) iconCheck.style.display = "none";
+      btn.style.color = "var(--app-text-tertiary)";
+    }, 1500);
+  };
+
+  return (
+    <div className="flex justify-end gap-1.5 pt-1">
+      {onCopy ? (
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label="Copier"
+          data-ai-action="copy"
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition"
+          style={{ color: "var(--app-text-tertiary)", backgroundColor: "transparent" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+            if (!e.currentTarget.hasAttribute("data-copied")) {
+              e.currentTarget.style.color = "var(--app-text-secondary)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            if (!e.currentTarget.hasAttribute("data-copied")) {
+              e.currentTarget.style.color = "var(--app-text-tertiary)";
+            }
+          }}
+        >
+          <Copy
+            data-copy-icon="default"
+            className="h-3.5 w-3.5"
+            style={{ display: "inline-block" }}
+          />
+          <Check
+            data-copy-icon="done"
+            className="h-3.5 w-3.5"
+            style={{ display: "none" }}
+          />
+          <span data-copy-label>Copier</span>
+        </button>
+      ) : null}
+      {onRegenerate ? (
+        <button
+          type="button"
+          onClick={onRegenerate}
+          aria-label="Régénérer"
+          data-ai-action="regenerate"
+          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] transition"
+          style={{ color: "var(--app-text-tertiary)", backgroundColor: "transparent" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--app-surface-soft)";
+            e.currentTarget.style.color = "var(--app-text-secondary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.color = "var(--app-text-tertiary)";
+          }}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          <span>Régénérer</span>
+        </button>
       ) : null}
     </div>
   );

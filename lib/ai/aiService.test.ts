@@ -106,7 +106,9 @@ describe("MockAiService", () => {
       analysis: fakeAnalysis({ solvabilite: 0.4 }),
       userLevel: "intermediate",
     });
-    expect(r.answer).toContain("Solvabilité"); // label du KPI
+    // Label du KPI — comparaison case-insensitive car le label peut s'écrire
+    // "Ratio de solvabilité" (s minuscule) selon la version du builder.
+    expect(r.answer.toLowerCase()).toContain("solvabilité");
     expect(r.answer).toMatch(/0,4(?!\d)/); // formaté en français (formatNumber → "0,4")
   });
 
@@ -120,6 +122,26 @@ describe("MockAiService", () => {
     });
     expect(r.mode).toBe("mock");
     expect(r.answer.length).toBeGreaterThan(20);
+  });
+
+  it("askStream() yield la même réponse que ask() en fragments", async () => {
+    const svc = new MockAiService(0);
+    const params = {
+      question: "Pourquoi mon EBITDA ?",
+      kpiId: "ebitda" as const,
+      analysis: fakeAnalysis({ ebitda: -50_000 }),
+      userLevel: "intermediate" as const,
+    };
+    const full = await svc.ask(params);
+    let streamed = "";
+    let chunkCount = 0;
+    for await (const chunk of svc.askStream(params)) {
+      streamed += chunk;
+      chunkCount += 1;
+    }
+    expect(streamed).toBe(full.answer);
+    // Le mock split par espaces — au moins quelques chunks pour un mock typique.
+    expect(chunkCount).toBeGreaterThan(5);
   });
 
   it("respecte la latence configurée", async () => {
@@ -155,7 +177,12 @@ describe("getAiService factory", () => {
   });
 
   it("respecte l'override pour les tests", () => {
-    const fake: AiService = { ask: vi.fn().mockResolvedValue({ answer: "x", mode: "mock" }) };
+    const fake: AiService = {
+      ask: vi.fn().mockResolvedValue({ answer: "x", mode: "mock" }),
+      askStream: async function* () {
+        yield "x";
+      },
+    };
     setAiServiceOverride(fake);
     expect(getAiService()).toBe(fake);
   });

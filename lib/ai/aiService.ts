@@ -34,16 +34,26 @@ import type { AiAskParams, AiResponse } from "@/lib/ai/types";
  */
 export const CLAUDE_MODEL_ID = "claude-sonnet-4-6";
 
-/** Plafond de tokens en sortie — cohérent avec AI_ARCHITECTURE.md §"Niveau 2". */
-const CLAUDE_MAX_TOKENS = 600;
+// 1500 tokens ≈ 900-1000 mots français. Permet des réponses analytiques
+// multi-points (3 actions, 2 leviers, causes multiples) sans troncature.
+// À surveiller via response.usage pour ajuster en Phase 2.
+const CLAUDE_MAX_TOKENS = 1500;
 
 export interface AiService {
   /**
-   * Pose une question à l'assistant. Retourne la réponse complète (pas de
-   * streaming pour la première version — on l'ajoutera quand le niveau 3
-   * multi-tour sera priorisé).
+   * Pose une question à l'assistant. Retourne la réponse complète (mode
+   * bloquant — conservé pour la rétro-compat avec les chemins existants
+   * qui n'utilisent pas le streaming).
    */
   ask(params: AiAskParams): Promise<AiResponse>;
+
+  /**
+   * Variante streaming : yield les fragments de texte au fur et à mesure
+   * qu'ils arrivent du modèle. Utilisé par `POST /api/ai/ask` pour servir
+   * une réponse SSE au front. La persistance Firestore est faite côté route
+   * (à la fin du stream), pas ici.
+   */
+  askStream(params: AiAskParams): AsyncGenerator<string, void, void>;
 }
 
 // ─── MockAiService ──────────────────────────────────────────────────────
@@ -63,20 +73,53 @@ export class MockAiService implements AiService {
     if (this.latencyMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, this.latencyMs));
     }
-    const value = getKpiValue(params);
-    const answer = getMockResponse({
-      kpiId: params.kpiId,
-      question: params.question,
-      value,
-      userLevel: params.userLevel,
-    });
-    const structured = buildStructuredFromContext({
-      kpiId: params.kpiId,
-      value,
-      markdown: answer,
-    });
+    const { answer, structured } = generateMockAnswer(params);
     return { answer, mode: "mock", structured };
   }
+
+  /**
+   * Stream simulé — yield mot par mot avec un petit délai (~30 ms) pour
+   * reproduire visuellement l'effet streaming sans dépendre d'une clé API
+   * Anthropic. Le contenu est identique à `ask()` (factorisé via
+   * `generateMockAnswer`).
+   */
+  async *askStream(params: AiAskParams): AsyncGenerator<string, void, void> {
+    const { answer } = generateMockAnswer(params);
+    const tokens = answer.split(/(\s+)/); // garde les espaces comme tokens
+    // Délai par token proportionnel à la latence globale : à `MOCK_LATENCY_MS`
+    // par défaut (1500), on tape ~30 ms/token ; en test (latency=0) on est
+    // instantané. Plafonné à 50 ms pour ne pas faire patiner sur les longues
+    // réponses (50 ms × 200 tokens = 10 s max).
+    const perToken = Math.min(50, Math.max(0, this.latencyMs / 50));
+    for (const tok of tokens) {
+      if (!tok) continue;
+      if (perToken > 0) {
+        await new Promise((resolve) => setTimeout(resolve, perToken));
+      }
+      yield tok;
+    }
+  }
+}
+
+/** Génère le couple `(answer, structured)` pour un appel mock — partagé
+ *  entre `ask` (bloquant) et `askStream` (streaming simulé). */
+function generateMockAnswer(params: AiAskParams): {
+  answer: string;
+  structured: ReturnType<typeof buildStructuredFromContext>;
+} {
+  const value = getKpiValue(params);
+  const answer = getMockResponse({
+    kpiId: params.kpiId,
+    question: params.question,
+    value,
+    userLevel: params.userLevel,
+  });
+  const structured = buildStructuredFromContext({
+    kpiId: params.kpiId,
+    value,
+    markdown: answer,
+  });
+  return { answer, structured };
 }
 
 // ─── ClaudeAiService ────────────────────────────────────────────────────
@@ -103,6 +146,7 @@ export class ClaudeAiService implements AiService {
       const systemPrompt = buildSystemPrompt({
         analysis: params.analysis,
         kpiId: params.kpiId,
+        kpiValue: params.kpiValue ?? null,
         userLevel: params.userLevel,
       });
 
@@ -133,6 +177,58 @@ export class ClaudeAiService implements AiService {
       // 500 serait pire UX qu'une réponse mock dégradée mais informative.
       console.error("AI: Claude API call failed, falling back to mock", error);
       return this.fallback.ask(params);
+    }
+  }
+
+  /**
+   * Streaming SSE-compatible : utilise `client.messages.stream(...)` qui
+   * expose un AsyncIterable d'évènements bas niveau. On filtre les
+   * `content_block_delta` de type `text_delta` et on yield uniquement le
+   * texte — le wrapper SSE côté route serialize les chunks.
+   *
+   * Si la première étape (création du stream) échoue (clé invalide, modèle
+   * inaccessible), on retombe sur le mock du fallback pour ne pas casser
+   * l'UX. Une erreur en cours de stream propage normalement — la route
+   * convertit ça en event `error` SSE.
+   */
+  async *askStream(params: AiAskParams): AsyncGenerator<string, void, void> {
+    let stream: Awaited<ReturnType<Anthropic["messages"]["stream"]>>;
+    try {
+      const client = new Anthropic({ apiKey: this.apiKey });
+      const systemPrompt = buildSystemPrompt({
+        analysis: params.analysis,
+        kpiId: params.kpiId,
+        kpiValue: params.kpiValue ?? null,
+        userLevel: params.userLevel,
+      });
+
+      const messages = [
+        ...(params.history ?? []).map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+        { role: "user" as const, content: params.question },
+      ];
+
+      stream = client.messages.stream({
+        model: CLAUDE_MODEL_ID,
+        max_tokens: CLAUDE_MAX_TOKENS,
+        system: systemPrompt,
+        messages,
+      });
+    } catch (error) {
+      console.error("AI: Claude streaming setup failed, falling back to mock", error);
+      yield* this.fallback.askStream(params);
+      return;
+    }
+
+    for await (const event of stream) {
+      if (
+        event.type === "content_block_delta" &&
+        event.delta.type === "text_delta"
+      ) {
+        yield event.delta.text;
+      }
     }
   }
 }

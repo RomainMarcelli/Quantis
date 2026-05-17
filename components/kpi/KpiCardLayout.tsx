@@ -196,6 +196,7 @@ export function KpiCardLayout({
     <article
       className={`precision-card group fade-up flex h-full flex-col rounded-2xl p-6 transition ${selectionClass} ${className ?? ""}`}
       data-search-id={searchId}
+      data-kpi-id={kpiId}
       {...interactiveProps}
     >
       {/* Ligne 1 — Kicker (nom officiel mono UPPERCASE 10 px gris) + tooltip ✨.

@@ -49,6 +49,12 @@ type PersistedConversation = {
   messages: PersistedMessage[];
   messageCount: number;
   lastAnswerPreview: string | null;
+  /**
+   * Conversation épinglée dans la liste. Rétro-compat : pour les conversations
+   * existantes le champ est `undefined` côté Firestore — `toSummary` le
+   * normalise en `false`. Aucun script de migration nécessaire.
+   */
+  pinned?: boolean;
 };
 
 function conversationsCollection(userId: string) {
@@ -90,6 +96,7 @@ function toSummary(id: string, data: PersistedConversation): ConversationSummary
     lastMessageAt: data.lastMessageAt.toMillis(),
     messageCount: data.messageCount,
     lastAnswerPreview: data.lastAnswerPreview,
+    pinned: data.pinned === true,
   };
 }
 
@@ -124,6 +131,7 @@ export async function createConversation(params: {
     messages: [userMessage, assistantMessage],
     messageCount: 2,
     lastAnswerPreview: truncate(params.answer, PREVIEW_MAX_LENGTH),
+    pinned: false,
   };
 
   const ref = await conversationsCollection(params.userId).add(data);
@@ -136,6 +144,7 @@ export async function createConversation(params: {
     lastMessageAt: data.lastMessageAt.toMillis(),
     messageCount: data.messageCount,
     lastAnswerPreview: data.lastAnswerPreview,
+    pinned: false,
     messages: data.messages.map(toChatMessage),
   };
 }
@@ -192,7 +201,16 @@ export async function listConversations(
     .orderBy("lastMessageAt", "desc")
     .limit(limit)
     .get();
-  return snapshot.docs.map((d) => toSummary(d.id, d.data() as PersistedConversation));
+  const summaries = snapshot.docs.map((d) =>
+    toSummary(d.id, d.data() as PersistedConversation)
+  );
+  // Tri stable : épinglées d'abord (puis lastMessageAt desc), non-épinglées
+  // ensuite (déjà triées desc par Firestore). On utilise un tri en mémoire
+  // pour éviter un index composite Firestore — coût négligeable (≤ 50 items).
+  return summaries.sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return b.lastMessageAt - a.lastMessageAt;
+  });
 }
 
 /**
@@ -210,4 +228,56 @@ export async function getConversation(
     ...toSummary(snap.id, data),
     messages: data.messages.map(toChatMessage),
   };
+}
+
+/**
+ * Met à jour le titre d'une conversation. Le titre est trimmé puis tronqué à
+ * TITLE_MAX_LENGTH. Lève si la conversation n'existe pas (le caller doit
+ * mapper sur un 404 HTTP).
+ */
+export async function updateConversationTitle(
+  userId: string,
+  conversationId: string,
+  title: string
+): Promise<void> {
+  const ref = conversationsCollection(userId).doc(conversationId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new Error(`Conversation ${conversationId} introuvable`);
+  }
+  await ref.update({
+    title: truncate(title, TITLE_MAX_LENGTH),
+  });
+}
+
+/**
+ * Bascule l'état épinglé d'une conversation. Lève si introuvable.
+ */
+export async function updateConversationPinned(
+  userId: string,
+  conversationId: string,
+  pinned: boolean
+): Promise<void> {
+  const ref = conversationsCollection(userId).doc(conversationId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new Error(`Conversation ${conversationId} introuvable`);
+  }
+  await ref.update({ pinned });
+}
+
+/**
+ * Supprime définitivement une conversation et tous ses messages embedded.
+ * Lève si introuvable. Ownership implicite via le chemin Firestore.
+ */
+export async function deleteConversation(
+  userId: string,
+  conversationId: string
+): Promise<void> {
+  const ref = conversationsCollection(userId).doc(conversationId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new Error(`Conversation ${conversationId} introuvable`);
+  }
+  await ref.delete();
 }

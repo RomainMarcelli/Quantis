@@ -9,15 +9,40 @@ import { AiResponseCard } from "@/components/ai/AiResponseCard";
 import { buildStructuredFromMarkdown } from "@/lib/ai/structuredResponse";
 import type { AiStructuredResponse, ChatMessage } from "@/lib/ai/types";
 
-export type UiMessage = ChatMessage & { structured?: AiStructuredResponse };
+export type UiMessage = ChatMessage & {
+  structured?: AiStructuredResponse;
+  /** Streaming en cours : on rend uniquement le content brut + curseur, pas les
+   *  blocs A-F ni les actions (qui n'apparaissent qu'à la finalisation). */
+  isStreaming?: boolean;
+  /** Identifiant stable côté client — utile pour cibler le bon message lors
+   *  du streaming (placeholder) et de la régénération. Non persisté. */
+  id?: string;
+};
 
 type AiMessageBubbleProps = {
   message: UiMessage;
-  /** Callback quand l'utilisateur clique sur une question de suivi. */
-  onFollowUp: (question: string) => void;
+  /** Callback quand l'utilisateur clique sur une question de suivi ou sur
+   *  l'action "Comparer avec N-1" — relayé vers `AiResponseCard`. */
+  onAskFollowUp?: (question: string) => void;
+  /** Callback pour l'action "Voir le détail" — relayé vers `AiResponseCard`. */
+  onViewDetail?: (kpiId: string) => void;
+  /** Callback pour l'action "Voir le graphique" (Mission 2) — relayé vers
+   *  `AiResponseCard`. */
+  onViewChart?: (kpiId: string) => void;
+  /** Callback "Copier" — texte du message copié dans le presse-papiers. */
+  onCopy?: (text: string) => void;
+  /** Callback "Régénérer" — rejoue la question user qui précède ce message. */
+  onRegenerate?: () => void;
 };
 
-export function AiMessageBubble({ message, onFollowUp }: AiMessageBubbleProps) {
+export function AiMessageBubble({
+  message,
+  onAskFollowUp,
+  onViewDetail,
+  onViewChart,
+  onCopy,
+  onRegenerate,
+}: AiMessageBubbleProps) {
   if (message.role === "user") {
     return (
       <div className="vyzor-msg-enter flex flex-col items-end" data-ai-msg="user">
@@ -43,11 +68,43 @@ export function AiMessageBubble({ message, onFollowUp }: AiMessageBubbleProps) {
     );
   }
 
+  // ── Mode streaming ──────────────────────────────────────────────────
+  // Tant que le stream n'est pas terminé, on affiche le content brut + un
+  // curseur clignotant. Pas de blocs A-F ni d'actions (Copier/Régénérer/
+  // Voir détail) : ces affordances n'ont du sens que sur une réponse
+  // finalisée.
+  if (message.isStreaming) {
+    // Tant qu'aucun chunk n'est arrivé (content vide), on ne rend rien — le
+    // parent affiche un AiSpinner classique. Évite un curseur clignotant
+    // seul dans le vide.
+    if (!message.content) return null;
+    return (
+      <div className="vyzor-msg-enter" data-ai-msg="assistant" data-ai-streaming="true">
+        <p
+          className="whitespace-pre-wrap text-[13px] leading-relaxed"
+          style={{ color: "var(--app-text-primary)" }}
+        >
+          {message.content}
+          <span className="vyzor-stream-cursor" aria-hidden>
+            ▍
+          </span>
+        </p>
+      </div>
+    );
+  }
+
   const structured =
     message.structured ?? buildStructuredFromMarkdown(message.content, null, null);
   return (
     <div className="vyzor-msg-enter" data-ai-msg="assistant">
-      <AiResponseCard response={structured} onFollowUp={onFollowUp} />
+      <AiResponseCard
+        response={structured}
+        onAskFollowUp={onAskFollowUp}
+        onViewDetail={onViewDetail}
+        onViewChart={onViewChart}
+        onCopy={onCopy ? () => onCopy(message.content) : undefined}
+        onRegenerate={onRegenerate}
+      />
     </div>
   );
 }

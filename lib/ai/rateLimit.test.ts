@@ -25,7 +25,7 @@ vi.mock("@/lib/server/firebaseAdmin", () => ({
   getFirebaseAdminFirestore: () => firestoreMock,
 }));
 
-import { consumeDailyQuota, readRemainingQuota, DAILY_AI_QUOTA, __TESTING__ } from "@/lib/ai/rateLimit";
+import { consumeDailyQuota, readRemainingQuota, DAILY_AI_QUOTA, getNextResetISO, __TESTING__ } from "@/lib/ai/rateLimit";
 
 describe("rateLimit IA quotidien", () => {
   beforeEach(() => {
@@ -76,17 +76,17 @@ describe("rateLimit IA quotidien", () => {
 
     it("rejette quand le quota est dépassé", async () => {
       setMock.mockResolvedValueOnce(undefined);
-      getMock.mockResolvedValueOnce({ data: () => ({ count: 21 }) });
+      getMock.mockResolvedValueOnce({ data: () => ({ count: 51 }) });
 
       const result = await consumeDailyQuota("user-1");
       expect(result.allowed).toBe(false);
       expect(result.remaining).toBe(0);
-      expect(result.used).toBe(21);
+      expect(result.used).toBe(51);
     });
 
-    it("autorise au pile à 20 (limite stricte > et non >=)", async () => {
+    it("autorise au pile à 50 (limite stricte > et non >=)", async () => {
       setMock.mockResolvedValueOnce(undefined);
-      getMock.mockResolvedValueOnce({ data: () => ({ count: 20 }) });
+      getMock.mockResolvedValueOnce({ data: () => ({ count: 50 }) });
 
       const result = await consumeDailyQuota("user-1");
       expect(result.allowed).toBe(true);
@@ -104,19 +104,40 @@ describe("rateLimit IA quotidien", () => {
   });
 
   describe("readRemainingQuota", () => {
-    it("retourne 20 quand aucun doc n'existe (pas encore d'usage aujourd'hui)", async () => {
+    it("retourne 50 quand aucun doc n'existe (pas encore d'usage aujourd'hui)", async () => {
       getMock.mockResolvedValueOnce({ exists: false, data: () => undefined });
       const r = await readRemainingQuota("user-1");
       expect(r.used).toBe(0);
-      expect(r.remaining).toBe(20);
-      expect(r.quota).toBe(20);
+      expect(r.remaining).toBe(50);
+      expect(r.quota).toBe(50);
     });
 
     it("retourne le restant correct quand des appels ont déjà été consommés", async () => {
       getMock.mockResolvedValueOnce({ exists: true, data: () => ({ count: 7 }) });
       const r = await readRemainingQuota("user-1");
       expect(r.used).toBe(7);
-      expect(r.remaining).toBe(13);
+      expect(r.remaining).toBe(43);
+    });
+  });
+
+  describe("DAILY_AI_QUOTA constant", () => {
+    it("vaut 50 — équilibre usage pro / coût maîtrisé", () => {
+      expect(DAILY_AI_QUOTA).toBe(50);
+    });
+  });
+
+  describe("getNextResetISO", () => {
+    it("retourne une ISO datetime strictement > now", () => {
+      const now = new Date();
+      const iso = getNextResetISO(now);
+      expect(typeof iso).toBe("string");
+      // Format ISO valide
+      const parsed = new Date(iso);
+      expect(Number.isNaN(parsed.getTime())).toBe(false);
+      // > now
+      expect(parsed.getTime()).toBeGreaterThan(now.getTime());
+      // <= 25h dans le futur (24h max + marge DST/timezone)
+      expect(parsed.getTime() - now.getTime()).toBeLessThanOrEqual(25 * 60 * 60 * 1000);
     });
   });
 });
