@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Building2, ChevronDown, Loader2, ArrowLeftCircle } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { firebaseAuthGateway } from "@/services/auth";
@@ -22,6 +22,7 @@ type Dossier = {
 
 export function CompanySelector() {
   const router = useRouter();
+  const pathname = usePathname();
   const { activeCompanyId, setActiveCompanyId } = useActiveCompany();
   const [dossiers, setDossiers] = useState<Dossier[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -118,6 +119,11 @@ export function CompanySelector() {
 
   // Rétrocompat : non-firm_member → composant invisible.
   if (accountType !== "firm_member") return null;
+
+  // Sur le portefeuille, le selector n'a pas de sens (on est déjà en vue
+  // d'ensemble) → on le masque. Les pages /cabinet/dossier/[id] et les
+  // routes cockpit (/synthese, /analysis…) le conservent pour switcher.
+  if (pathname?.startsWith("/cabinet/portefeuille")) return null;
 
   if (dossiers === null) {
     return (

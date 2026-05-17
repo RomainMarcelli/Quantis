@@ -57,12 +57,12 @@ type NavItem = {
 };
 
 const PRIMARY_NAV: NavItem[] = [
-  { id: "cabinet-portefeuille", label: "Portefeuille", icon: Briefcase, href: "/cabinet/portefeuille", onlyFor: "firm_member" },
   { id: "synthese", label: "Synthèse", icon: Sparkles, href: "/synthese" },
   { id: "analysis", label: "Tableau de bord", icon: LayoutDashboard, href: "/analysis" },
   { id: "assistant-ia", label: "Assistant IA", icon: Bot, href: "/assistant-ia" },
   { id: "etats-financiers", label: "États financiers", icon: Receipt, href: "/etats-financiers" },
   { id: "documents", label: "Documents", icon: FileText, href: "/documents" },
+  { id: "cabinet-portefeuille", label: "Portefeuille", icon: Briefcase, href: "/cabinet/portefeuille", onlyFor: "firm_member" },
 ];
 
 // Sous-item rendu sous "Tableau de bord" quand le sous-menu est expandable.
